@@ -16,6 +16,8 @@
  * **والسادسةُ تقع في الفشل أيضًا** (D-164) حين وصل جوابٌ ثمّ رُدّ: مبتورًا
  * أو مرفوضًا أو بلا نصٍّ أو بـJSON فاسد. وما لم يصل لا يُكتب له صفّ.
  */
+import { candidates, nextFrom, runChain } from '../ai/chain'
+import { modelFor } from '../ai/textCall'
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey, type Provider } from '../providers'
@@ -213,29 +215,18 @@ export async function analyzeSource(
     return { kind: 'blocked', sourceId: source.id, reason: blockerReason(allowance.blocker) }
   }
   /*
-   * ‏ثمّ المزوّد **من «توجيه المهامّ»** لا من ثابت: كان التحليلُ ينادي Anthropic
-   * ‏حرفًا، واللوحةُ تقول غيرَه وتعرض «جاهز» — يُقرأ ولا يُطاع (علّة D-079/D-091).
+   * ‏ثمّ المزوّدون **من «توجيه المهامّ»** لا من ثابت (علّة D-079/D-091) — **بسلسلة مفاتيح «الفهم»** (D-349): الأرخصُ أوّلًا افتراضًا،
+   * ‏والمتعذّرُ يُتخطّى. ولا مرشّحَ مفعَّلًا: يُقال قبل أن يُلمس Drive.
    */
-  const route = await routeFor(deps.db, 'analyze')
-  const provider = await getProvider(deps.db, route.provider)
-  if (provider === null || !provider.enabled) {
+  const list = await candidates(deps.db, 'analyze', now)
+  if (list.length === 0) {
     await releaseAnalysis(deps.db, source.id)
-    return { kind: 'failed', sourceId: source.id, reason: `مزوّد «الفهم» غير متاح: ${route.provider}`, retryable: false }
-  }
-  if (provider.kind !== 'anthropic' && provider.baseUrl === null) {
-    await releaseAnalysis(deps.db, source.id)
-    return { kind: 'failed', sourceId: source.id, reason: `لا عنوان لمزوّد «الفهم»: ${provider.label}`, retryable: false }
-  }
-  // ثمّ حارس المزوّد: تفصيلٌ تحت الجملة لا فوقها
-  const providerBlocker = await checkProvider(deps.db, provider.name)
-  if (providerBlocker !== null) {
-    await releaseAnalysis(deps.db, source.id)
-    return { kind: 'blocked', sourceId: source.id, reason: blockerReason(providerBlocker) }
+    return { kind: 'failed', sourceId: source.id, reason: 'لا مزوّدَ مفعَّلًا لـ«الفهم»', retryable: false }
   }
 
   // خطوةُ الكلفة (٦) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
   // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
-  const charge = async (spent: Spent): Promise<number> => {
+  const chargeWith = (provider: Provider) => async (spent: Spent): Promise<number> => {
     const priced = provider.kind === 'anthropic' ? { total: analysisCost(spent), priced: true } : costOf(provider, spent)
     const cost = priced.total
     const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
@@ -316,34 +307,48 @@ export async function analyzeSource(
       return { kind: 'skipped', sourceId: source.id, reason: 'المستند فارغ' }
     }
 
-    // ٥ · النداء — بالمزوّد والنموذج المختارَين، والمفتاحُ من مصدره (سرّ Worker للمدمَج ثمّ الخزانة)
-    const workerSecret = provider.builtin
-      ? provider.name === 'anthropic' ? deps.anthropicKey : provider.name === 'gemini' ? deps.geminiKey : undefined
-      : undefined
-    const resolved =
-      deps.encKey === undefined || deps.encKey.length === 0
-        ? { key: workerSecret ?? null }
-        : await resolveKey(deps.db, deps.encKey, provider.name, workerSecret)
-    if (resolved.key === null || resolved.key.length === 0) {
+    // ٥ · النداء — بسلسلة المفاتيح (D-349): لكلّ مفتاحٍ سقفُه ومفتاحُه (سرُّ Worker للمدمَج ثمّ الخزانة) ونداؤه بلهجته،
+    // ‏و**الكلفةُ قبل الكتابة** (D-008) باسم مفتاحها — وفي الفشل حين وصل جوابٌ ثمّ رُدّ (D-164)
+    const done = await runChain<{ analysis: Analysis; cost: number }>(deps.db, list, now, async (c) => {
+      const provider = c.provider
+      const blocked = await checkProvider(deps.db, provider.name)
+      if (blocked !== null) return { kind: 'next', why: 'cap', reason: blockerReason(blocked) }
+      if (provider.kind !== 'anthropic' && provider.baseUrl === null) return { kind: 'next', why: 'nokey', reason: `لا عنوان لـ ${provider.label}` }
+      const workerSecret = provider.builtin
+        ? provider.name === 'anthropic' ? deps.anthropicKey : provider.name === 'gemini' ? deps.geminiKey : undefined
+        : undefined
+      const resolved =
+        deps.encKey === undefined || deps.encKey.length === 0
+          ? { key: workerSecret ?? null }
+          : await resolveKey(deps.db, deps.encKey, provider.name, workerSecret)
+      if (resolved.key === null || resolved.key.length === 0) return { kind: 'next', why: 'nokey', reason: `لا مفتاح لـ ${provider.label}` }
+      const model = c.model !== '' ? c.model : provider.model ?? (await modelFor(deps.db, provider.name, list[0]!.model))
+      const charge = chargeWith(provider)
+      try {
+        const result = provider.kind === 'anthropic'
+          ? await analyzeText(
+            { apiKey: resolved.key, model, ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }) } satisfies AnalyzeDeps,
+            { name: source.name, text, now },
+          )
+          : await analyzeCompat(provider, resolved.key, model, { name: source.name, text, now }, deps.fetchImpl)
+        // ٦ · الكلفة **قبل** الكتابة (D-008)
+        return { kind: 'ok', value: { analysis: result.analysis, cost: await charge({ ...result.usage, model: result.model }) } }
+      } catch (error) {
+        const late = spentOf(error)
+        const paid = late === null ? 0 : await charge(late)
+        const why = late === null ? nextFrom(error) : null
+        if (why !== null) return { kind: 'next', why, reason: error instanceof Error ? error.message : 'نداء فشل' }
+        if (error instanceof AnalyzeError || error instanceof CompatError) return { kind: 'stop', reason: error.message, retryable: error.retryable, cost: paid }
+        throw error
+      }
+    })
+    if (done.kind === 'failed') {
       await releaseAnalysis(deps.db, source.id)
-      return { kind: 'failed', sourceId: source.id, reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
+      return { kind: 'failed', sourceId: source.id, reason: done.reason, retryable: done.retryable }
     }
-    const result = provider.kind === 'anthropic'
-      ? await analyzeText(
-        {
-          apiKey: resolved.key,
-          model: route.model,
-          ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-        } satisfies AnalyzeDeps,
-        { name: source.name, text, now },
-      )
-      : await analyzeCompat(provider, resolved.key, route.model, { name: source.name, text, now }, deps.fetchImpl)
-
-    // ٦ · الكلفة **قبل** الكتابة (D-008)
-    const cost = await charge({ ...result.usage, model: result.model })
+    const { analysis, cost } = done.value
 
     // ٧ · الكتابة — والبصمة معها، فيُعرف ما حُلِّل ولأيّ نسخة
-    const { analysis } = result
     const themes = JSON.stringify({
       hash: source.content_hash,
       themes: analysis.themes,
@@ -363,8 +368,7 @@ export async function analyzeSource(
   } catch (error) {
     // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164).
     // ومستهلكُ الطابور يعيد المبتور، فكلُّ إعادةٍ صفٌّ — ويراه السقفُ في التالية
-    const late = spentOf(error)
-    if (late !== null) await charge(late)
+    // ‏(وكلفةُ النداء سُجّلت داخل محاولته — هنا أعطالُ ما قبله: Drive والقاعدة)
     if (error instanceof AnalyzeError || error instanceof CompatError) {
       await releaseAnalysis(deps.db, source.id)
       return { kind: 'failed', sourceId: source.id, reason: error.message, retryable: error.retryable }

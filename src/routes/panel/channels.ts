@@ -3,6 +3,7 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { clearHealth } from '../../lib/ai/chain'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
@@ -543,6 +544,8 @@ channels.post('/panel/providers/key', async (c) => {
 
   try {
     const result = await saveKey(c.env.DB, c.env.TOKEN_ENC_KEY, guard.provider.name, raw, 'panel')
+    // ‏مفتاحٌ جديد: يُرفع علمُ تعذّر القديم فيُجرَّب في السلسلة من جديد (D-349)
+    await clearHealth(c.env.DB, guard.provider.name)
     // **ولا في السجلّ**: التلميحُ وحده — وهو أوّلُ المفتاح وآخرُه لا نصُّه
     await record(
       c.env.DB,
@@ -759,18 +762,23 @@ channels.post('/panel/routes', async (c) => {
     return back('providers')
   }
 
-  // ‏الاحتياطُ (D-348): مزوّدٌ قائمٌ غيرُ الأوّل، أو فراغٌ يمحوه. وحقلُه في صفّ الكتابة وحدَه — وغيابُه في غيره يبقي ما كان
-  const rawFallback = form.get('fallback')
-  let fallback: string | null | undefined
-  if (typeof rawFallback === 'string') {
-    if (rawFallback === '') fallback = null
-    else if (rawFallback !== provider && (await getProvider(c.env.DB, rawFallback)) !== null) fallback = rawFallback
-    else {
-      await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'المزوّد الاحتياطيّ يجب أن يكون مزوّدًا آخرَ قائمًا.' })
-      return back('providers')
+  // ‏سلسلةُ المفاتيح وترتيبُها (D-349): حقولُها في صفوف المهامّ النصّيّة وحدَها — وغيابُها يبقي ما كان. والحلقةُ مزوّدٌ قائمٌ غيرُ الأوّل
+  // ‏ولا يتكرّر، والفارغُ يُسقَط
+  let extra: { chain?: string[]; order?: 'mine' | 'cheap' } | undefined
+  if (form.has('order')) {
+    const chain: string[] = []
+    for (const k of ['chain_1', 'chain_2', 'chain_3']) {
+      const name = String(form.get(k) ?? '')
+      if (name === '' || name === provider || chain.includes(name)) continue
+      if ((await getProvider(c.env.DB, name)) === null) {
+        await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'حلقةٌ في السلسلة ليست مزوّدًا قائمًا: ' + name })
+        return back('providers')
+      }
+      chain.push(name)
     }
+    extra = { chain, order: form.get('order') === 'cheap' ? 'cheap' : 'mine' }
   }
-  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel', fallback)
+  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel', extra)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'route.write', target: task, detail: `${provider} / ${model}` },

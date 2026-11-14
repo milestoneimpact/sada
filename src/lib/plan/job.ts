@@ -19,15 +19,8 @@
  * نموذجٌ قراءةً واحدة. فيُنادى للشهر الأوّل ثمّ للثاني من بدايته، وكلٌّ بصفّه في الدفتر، وتُدمج
  * البنودُ خطّةً واحدة. وفشلُ الثاني بعد نجاح الأوّل يُعاد كما هو: ما دُفع دُفع، وما يُكتب يُكتب كاملًا.
  */
+import { callText } from '../ai/textCall'
 import { readBrief, voiceSection } from '../brief'
-import { recordCost } from '../cost'
-import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { costOf, getProvider, resolveKey } from '../providers'
-import { routeFor } from '../ai/routes'
-import { anthropicChat } from '../ai/anthropic'
-import { chatCompletion } from '../ai/openaiCompat'
-import { portableSchema } from '../ai/portableSchema'
-import { spentOf, type Spent } from '../ai/spent'
 import { localToUtc } from '../time/local'
 import {
   applyTimes, asSpan, CALL_CAP, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
@@ -182,98 +175,29 @@ async function planOnce(ctx: Caller, start: string, span: PlanSpan): Promise<Cal
   const { deps, sources, channels, cadence } = ctx
   const fail = (outcome: PlanOutcome): Called => ({ ok: false, outcome })
 
-  // ٣ · الحارس قبل النداء
-  const allowance = await checkAllowance(deps.db, 'plan', deps.org)
-  if (allowance.blocker !== null) return fail({ kind: 'blocked', reason: blockerReason(allowance.blocker) })
-
-  const route = await routeFor(deps.db, 'plan')
-  const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) return fail({ kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false })
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return fail({ kind: 'blocked', reason: blockerReason(perProvider) })
-
-  const secretName = provider.builtin
-    ? provider.name === 'anthropic'
-      ? 'ANTHROPIC_API_KEY'
-      : provider.name === 'gemini'
-        ? 'GEMINI_API_KEY'
-        : undefined
-    : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) return fail({ kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false })
-
-  // خطوةُ الكلفة (٥) تُعرَّف قبل النداء لأنّ مسارين يحتاجانها: الجوابُ
-  // الناجح، والجوابُ الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
-  const charge = async (spent: Spent): Promise<{ total: number; units: number }> => {
-    const priced = costOf(provider, spent)
-    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
-    await recordCost(deps.db, {
-      provider: provider.name,
-      operation: `plan:${spent.model}`,
-      units,
-      unitCost: units === 0 ? 0 : priced.total / units,
-      refId: start,
-      ...(deps.org === undefined ? {} : { org: deps.org }),
-    })
-    return { total: priced.total, units }
-  }
-
-  // ٤ · النداء
+  // ٣–٥ · الحارسُ ثمّ سلسلةُ مفاتيح «الخطّة» (D-349): لكلّ مفتاحٍ سقفُه ومفتاحُه ونداؤه، **والكلفةُ في الدفتر قبل القراءة** (D-008)
   const options = { channels, cadence }
   const system = systemPrompt(options)
   // ‏وموجزُ العميل (D-257): هدفُه وجمهورُه ونبرتُه وما لا يُقال — وفارغٌ إن لم يُكتب
   const body = userPrompt(sources, start, span, options)
   const user = ctx.voice === '' ? body : `${ctx.voice}\n\n${body}`
-  let text: string
-  let spent: Spent
-  try {
-    if (provider.kind === 'anthropic') {
-      const result = await anthropicChat({
-        apiKey: resolved.key,
-        model: route.model,
-        system,
-        user,
-        // المحمولُ لا الخامّ (D-164): `minLength` و`maxItems` يُطويان وصفًا،
-        // وحدودُهما في `parsePlan`
-        schema: portableSchema(planSchema(channels, maxItems(span, cadence))),
-        // حكمٌ يقرّر إنفاقَ مدًى كامل — يُعطى جهدَه
-        effort: 'high',
-        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-      })
-      text = result.text
-      spent = result
-    } else {
-      if (provider.baseUrl === null) return fail({ kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false })
-      const result = await chatCompletion(
-        {
-          baseUrl: provider.baseUrl, apiKey: resolved.key, model: route.model, system, user, json: true,
-          // ‏خطّةُ ستّين بندًا أطولُ من ‏4096 رمزًا ومن ‏30 ثانية (D-332): كان الجوابُ يُقطع أو النداءُ يُلغى بعد أن انتظر المالك
-          maxTokens: Math.min(16_000, Math.max(4096, maxItems(span, cadence) * 160 + 600)),
-          timeoutMs: 240_000,
-        },
-        deps.fetchImpl,
-      )
-      text = result.text
-      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
-    }
-  } catch (error) {
-    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
-    const late = spentOf(error)
-    if (late !== null) await charge(late)
-    const retryable =
-      typeof error === 'object' && error !== null && 'retryable' in error
-        ? Boolean((error as { retryable: unknown }).retryable)
-        : true
-    return fail({ kind: 'failed', reason: error instanceof Error ? error.message : 'نداء فشل', retryable })
-  }
-
-  // ٥ · الكلفة قبل القراءة
-  const priced = await charge(spent)
+  const out = await callText(deps, {
+    task: 'plan', system, user,
+    // ‏المحمولُ لا الخامّ (D-164): `minLength` و`maxItems` يُطويان وصفًا، وحدودُهما في `parsePlan`
+    schema: planSchema(channels, maxItems(span, cadence)),
+    // ‏حكمٌ يقرّر إنفاقَ مدًى كامل — يُعطى جهدَه
+    effort: 'high',
+    // ‏خطّةُ ستّين بندًا أطولُ من ‏4096 رمزًا ومن ‏30 ثانية (D-332)
+    maxTokens: Math.min(16_000, Math.max(4096, maxItems(span, cadence) * 160 + 600)),
+    timeoutMs: 240_000,
+    operation: 'plan', refId: start,
+    ...(deps.org === undefined ? {} : { org: deps.org, ledgerOrg: true }),
+  })
+  if (out.kind === 'blocked') return fail({ kind: 'blocked', reason: out.reason })
+  if (out.kind === 'failed') return fail({ kind: 'failed', reason: out.reason, retryable: out.retryable })
+  const text = out.text
+  const spent = out.spent
+  const priced = { total: out.cost, units: spent.inputTokens + spent.cachedInputTokens + spent.outputTokens }
 
   // ٦ · القراءة — وما لا يصحّ يُسقَط
   let parsedJson: unknown

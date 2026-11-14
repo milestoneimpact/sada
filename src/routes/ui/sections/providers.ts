@@ -442,13 +442,28 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
     </div>
   </details>`
 
-  // ‏الاحتياطُ (D-348): الكتابةُ وحدَها اليوم — يُجرَّب مرّةً حين يردّ الأوّلُ بخطأ مفتاحٍ أو حدٍّ أو انشغال، أو يبلغ سقفَه
-  const fallbackPick = (task: string, primary: string, current: string | null): string =>
-    '<label class="vh" for="rf-' + escapeHtml(task) + '">المزوّد الاحتياطيّ</label>'
-    + '<select id="rf-' + escapeHtml(task) + '" name="fallback" class="w-s"><option value="">بلا احتياط</option>'
-    + d.knownProviders.filter((p) => p.name !== primary)
-      .map((p) => '<option value="' + escapeHtml(p.name) + '"' + (p.name === current ? ' selected' : '') + '>احتياط: ' + escapeHtml(p.label) + '</option>').join('')
-    + '</select>'
+  // ‏سلسلةُ المفاتيح (D-349): للمهامّ النصّيّة — الترتيبُ، وثلاثُ حلقاتٍ بعد الأوّل، وشارةُ ما يُتخطّى الآن بسببه
+  const CHAIN_TASKS = new Set(['draft', 'plan', 'analyze'])
+  const DOWN_LABEL: Readonly<Record<string, string>> = { key: 'مفتاحُه مرفوض', nokey: 'بلا مفتاح', limit: 'عند الحدّ', busy: 'متعطّلٌ مؤقّتًا', cap: 'بلغ سقفَه' }
+  const labelOf = (name: string): string => d.knownProviders.find((p) => p.name === name)?.label ?? name
+  const chainEditor = (r: (typeof d.routing)[number]): string => {
+    const t = escapeHtml(r.task)
+    const order = r.order ?? 'mine'
+    const slot = (n: number): string => {
+      const current = r.chain?.[n - 1] ?? ''
+      return '<label class="vh" for="rc' + String(n) + '-' + t + '">الحلقة ' + String(n + 1) + '</label>'
+        + '<select id="rc' + String(n) + '-' + t + '" name="chain_' + String(n) + '" class="w-s"><option value="">' + (n === 1 ? 'بلا تالٍ' : '—') + '</option>'
+        + d.knownProviders.filter((p) => p.name !== r.provider)
+          .map((p) => '<option value="' + escapeHtml(p.name) + '"' + (p.name === current ? ' selected' : '') + '>ثمّ ' + escapeHtml(p.label) + '</option>').join('')
+        + '</select>'
+    }
+    const downs = Object.entries(r.down ?? {}).map(([name, x]) =>
+      statusBadge(x.why === 'key' || x.why === 'nokey' ? 'bad' : 'warn', '▲', escapeHtml(labelOf(name)) + ': ' + (DOWN_LABEL[x.why] ?? x.why) + ' حتّى ' + escapeHtml(x.until.slice(11, 16)) + ' UTC')).join('')
+    return '<span class="chain-row"><label class="vh" for="ro-' + t + '">ترتيب التجربة</label>'
+      + '<select id="ro-' + t + '" name="order" class="w-s"><option value="mine"' + (order === 'mine' ? ' selected' : '') + '>بترتيبي</option>'
+      + '<option value="cheap"' + (order === 'cheap' ? ' selected' : '') + '>الأرخص أوّلًا</option></select>'
+      + slot(1) + slot(2) + slot(3) + '</span>' + (downs === '' ? '' : '<span class="chain-down">' + downs + '</span>')
+  }
 
   const providerOptions = (selected: string): string =>
     d.knownProviders
@@ -462,7 +477,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         <form class="row gap-2" method="POST" action="/panel/routes">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
           <select name="provider" class="mp-provider w-s">${providerOptions(r.provider)}</select>
-          ${r.task === 'draft' ? fallbackPick(r.task, r.provider, r.fallback ?? null) : ''}
+          ${CHAIN_TASKS.has(r.task) ? chainEditor(r) : ''}
           ${modelPicker({
             id: `rm-${r.task}`,
             provider: r.provider,

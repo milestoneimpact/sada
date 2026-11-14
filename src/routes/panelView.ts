@@ -372,8 +372,10 @@ export interface PanelData {
   readonly routing: {
     task: string; provider: string; model: string
     why: string; ready: boolean; implemented: boolean
-    /** المزوّدُ الاحتياطيّ (D-348). */
-    fallback?: string | null
+    /** سلسلةُ المفاتيح وترتيبُها وحالُ المتعذّر منها (D-349). */
+    chain?: string[]
+    order?: 'mine' | 'cheap'
+    down?: Record<string, { why: string; until: string }>
     /**
      * ما ينتظرك قبل أن يُضمَن النداء — **ملاحظةُ النقطة التي تحت الزرّ بعينها**
      * حين تنتظرك ولا تسقط (رابطُ Worker وحده). فلا يقول الجدولُ «جاهز» ولا

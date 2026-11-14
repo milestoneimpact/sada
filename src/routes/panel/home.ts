@@ -4,6 +4,7 @@
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك. **وكلُّ لوحٍ يُحمَّل له ما يقرأ وحدَه** (D-280):
  * الهيكلُ لكلّ لوح، ثمّ محمِّلٌ للوح المطلوب — انظر `panelRoute`.
  */
+import { readHealth, type Down } from '../../lib/ai/chain'
 import { waitingImages } from '../../lib/image/job'
 import { NEURON_USD } from '../../lib/ai/imagePricing'
 import { Hono, type Context } from 'hono'
@@ -496,14 +497,17 @@ function readiness(load: Load, p: ProviderLoad): { readonly slide: SlideGate; re
  * فينتظرك في الجدول ولا يُعدّ في المهامّ الجاهزة — والرابطُ معرَّفٌ
  * في البيئتين، فكان كلُّ لوحٍ بلا `CF_AI_ACCOUNT_ID` يقول «جاهز».
  */
-function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'] {
+/** و`health` حالُ المفاتيح (D-349) — يقرؤها «الإعدادات» وحدَها حيث تُرسم السلسلة، فلا تحمّلها الرئيسيّة. */
+function routingOf(p: ProviderLoad, mediaReady: MediaReady, health: ReadonlyMap<string, Down> = new Map()): PanelData['routing'] {
   return p.routes.map((r) => {
     const dot = routeDot(mediaReady, r.task)
     return {
       task: r.task,
       provider: r.provider,
       model: r.model,
-      fallback: r.fallback,
+      chain: [...r.chain],
+      order: r.order,
+      down: Object.fromEntries([r.provider, ...r.chain].flatMap((n) => { const d = health.get(n); return d === undefined ? [] : [[n, { why: d.why, until: d.until }]] })),
       why: r.why,
       implemented: r.implemented,
       ready: r.implemented && (dot === undefined
@@ -813,7 +817,7 @@ async function settingsData(load: Load): Promise<SettingsData> {
     factors,
     audit,
     providers: p.cards,
-    routing: routingOf(p, mediaReady),
+    routing: routingOf(p, mediaReady, await readHealth(c.env.DB, new Date())),
     knownProviders: p.cards.map((x) => ({ name: x.name, label: x.label })),
     cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     baseUrl: c.env.PUBLIC_BASE_URL,
