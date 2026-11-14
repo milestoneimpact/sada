@@ -84,7 +84,7 @@ fieldset.field > legend{padding:0; margin-bottom:var(--s-2); font-weight:600}
 /* اللصيقةُ نمطُ «ui» بحبر المتن (D-185 · خطّة التصميم 7.6): كانت ‏١٢٫٥ خافتةً فوق
    حقل ‏١٥٫٥ — تُقرأ هامشًا، وهي سؤال الحقل */
 label{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
-input[type=number],input[type=password],input[type=text],input[type=email],input[type=url],input[type=datetime-local],input[type=date],input[type=time],
+input[type=number],input[type=password],input[type=text],input[type=email],input[type=url],input[type=search],input[type=datetime-local],input[type=date],input[type=time],
 input:not([type]),select,textarea{
   background:var(--surface); border:var(--bd-field); border-radius:var(--r-control);
   color:var(--ink); padding:var(--s-2) var(--s-3); font:inherit; font-size:var(--t-input);

@@ -396,6 +396,23 @@ describe('«من المكتبة» على بطاقة المنشور (D-334)', () 
     expect(ready(A)).toEqual(['lib/one'])
   })
 
+  it('المكتبةُ ببحثها وعلاماتها (D-347): «فضّلها» و«احفظ الوسوم» يعودان إلى العرض نفسِه، والبحثُ يحصر، وبلا CSRF لا يُكتب', async () => {
+    const { cookie, csrf } = await session()
+    const page = await (await app.request('/panel/assets?kind=image', { headers: { Cookie: cookie } }, env)).text()
+    expect(page).toContain('<form method="GET" action="/panel/assets" class="lib-find" role="search">')
+    expect(page).toContain('action="/panel/assets/mark"')
+    const fav = await app.request('/panel/assets/mark', { method: 'POST', body: form({ _csrf: csrf, ref: 'f:f1', fav: '1', back: 'kind=image' }), headers: { Cookie: cookie } }, env)
+    expect(fav.status).toBe(303)
+    expect(fav.headers.get('Location')).toBe('/panel/assets?kind=image')
+    await app.request('/panel/assets/mark', { method: 'POST', body: form({ _csrf: csrf, ref: 'f:f1', tags: 'هويّة، شعار', back: '"><script>' }), headers: { Cookie: cookie } }, env)
+    const found = await (await app.request('/panel/assets?q=' + encodeURIComponent('هويّة') + '&fav=1', { headers: { Cookie: cookie } }, env)).text()
+    expect(found).toContain('<span class="chip">هويّة</span>')
+    expect(found).toContain('aria-pressed="true"')
+    expect((found.match(/<article class="card card-inset tile">/g) ?? []).length).toBe(1)
+    await app.request('/panel/assets/mark', { method: 'POST', body: form({ ref: 'f:f1', fav: '0' }), headers: { Cookie: cookie } }, env)
+    expect((db.raw.prepare('SELECT favourite FROM asset_marks').get() as { favourite: number }).favourite).toBe(1)
+  })
+
   it('المجدولُ يُردّ بسببه، وما ليس في المكتبة، ومنشورٌ لا وجودَ له — ولا صفَّ يُكتب', async () => {
     const { cookie, csrf } = await session()
     const send = (fields: Record<string, string>): Promise<Response> =>

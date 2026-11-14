@@ -24,7 +24,7 @@ import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
 import { editPlanItem } from '../../lib/plan/edit'
 import { thumbFor, thumbWidth } from '../../lib/media/thumb'
-import { addLibraryFile, attachToPost, libraryProblem, listLibrary, rawObject } from '../../lib/library'
+import { addLibraryFile, attachToPost, markAsset, libraryProblem, listLibrary, rawObject } from '../../lib/library'
 import { libraryScreen } from '../ui/libraryView'
 import { captionIssues, captionsFor, readCaptions, saveCaptions } from '../../lib/media/captions'
 import { momentLabel, presetAt } from '../../lib/time/local'
@@ -57,6 +57,8 @@ media.get('/panel/assets', async (c) => {
       ? { post: c.req.query('post')!, index, w: /^(?:\d{1,2}|all)$/.test(c.req.query('w') ?? '') ? c.req.query('w')! : '' }
       : null,
     flash: await takeFlash(c.env, c.req.raw),
+    q: (c.req.query('q') ?? '').slice(0, 80),
+    fav: c.req.query('fav') === '1',
   })
   return page((nonce) =>
     soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' }, injectCsrf(body, session.record.csrf), nonce, '',
@@ -136,6 +138,27 @@ media.post('/panel/plan/review/image', async (c) => {
     ? { kind: 'ok', text: 'رُبطت «' + done.name + '» بالمنشور من مكتبتك — بلا كلفة.' }
     : { kind: 'bad', text: done.reason })
   return toPlanCard(withBack(gate.form)) ?? c.redirect('/panel/plan/review', 303)
+})
+
+/**
+ * **«فضّلها» و«احفظ الوسوم»** (D-347): علامةُ المالك على أصلٍ في مكتبته — والحكمُ في `markAsset` (المنظّمة، وأنّ له كائنًا). وتعود إلى
+ * العرض نفسِه: `back` نصُّ استعلامٍ يُفحص حرفًا حرفًا قبل أن يُكتب في العنوان.
+ */
+media.post('/panel/assets/mark', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const ref = String(f.get('ref') ?? '')
+  const fav = f.get('fav')
+  const tags = f.get('tags')
+  const done = await markAsset(c.env.DB, activeOrg(gate.session.record), ref, {
+    ...(fav === '1' || fav === '0' ? { favourite: fav === '1' } : {}),
+    ...(typeof tags === 'string' ? { tags } : {}),
+  })
+  await record(c.env.DB, { actor: 'panel', action: 'library.mark', target: ref.slice(0, 120), detail: done.ok ? (typeof tags === 'string' ? 'tags' : 'favourite') : ('refused:' + done.reason).slice(0, 200) }, c.req.raw)
+  if (!done.ok) await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.reason })
+  const back = String(f.get('back') ?? '')
+  return c.redirect('/panel/assets' + (/^[A-Za-z0-9=&%_.~+-]{1,300}$/.test(back) ? '?' + back : ''), 303)
 })
 
 const KEEP = 'private, max-age=31536000, immutable'

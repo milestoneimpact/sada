@@ -50,9 +50,9 @@
     "inputs": 0
   },
   "routes/ui/libraryView.ts": {
-    "buttons": 5,
+    "buttons": 4,
     "cards": 2,
-    "inputs": 1
+    "inputs": 0
   },
   "routes/ui/monthlyView.ts": {
     "buttons": 4,
