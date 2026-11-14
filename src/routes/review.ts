@@ -32,18 +32,22 @@ review.get('/r/:token', async (c) => {
   if (link === null) return gone()
   const plan = await latestPlan(c.env.DB, link.org)
   if (plan === null || plan.id !== link.planId) return gone()
-  const [model, verdicts, zone, orgRow] = await Promise.all([
+  const [model, verdicts, zone, orgRow, accounts] = await Promise.all([
     reviewModel(c.env.DB, link.org, plan),
     verdictsFor(c.env.DB, link.org, plan.id),
     ownerZone(c.env.DB, null),
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(link.org).first<{ name: string }>().catch(() => null),
+    c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
+      .bind(link.org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
   ])
+  const authors: Record<string, string> = {}
+  for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
   const cards: ClientCard[] = await Promise.all(model.cards.map(async (card) => ({
     card,
     mediaSrc: card.mediaId === null ? null : '/m/' + await signMediaToken(c.env.TOKEN_ENC_KEY, card.mediaId, now).catch(() => ''),
   })))
   const body = clientReviewScreen({
-    token: c.req.param('token'), orgName: orgRow?.name ?? 'صدى', cards, verdicts, zone: zone ?? null,
+    token: c.req.param('token'), orgName: orgRow?.name ?? 'صدى', authors, cards, verdicts, zone: zone ?? null,
     expiresAt: link.expiresAt, saved: c.req.query('saved') === '1',
   })
   const res = page((nonce) => shell(TITLE, body, nonce))

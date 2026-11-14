@@ -23,6 +23,8 @@ export interface ClientCard {
 export interface ClientReviewData {
   readonly token: string
   readonly orgName: string
+  /** اسمُ الحساب لكلّ منصّة — رأسُ المنشور كما في المراجعة. */
+  readonly authors: Readonly<Record<string, string>>
   readonly cards: readonly ClientCard[]
   readonly verdicts: ReadonlyMap<string, VerdictRow>
   readonly zone: string | null
@@ -44,7 +46,7 @@ function item(c: ClientCard, d: ClientReviewData, n: number): Html {
   return html`<li class="${cardClass()} cr-item" id="i${String(n)}"${v === undefined ? '' : raw(' data-verdict="' + v.verdict + '"')}>
     <div class="cr-head"><b>${platformLabel(it.platform as never)}</b><span class="ago">${dayLabel(it.day)} · ${local}</span>
       ${v === undefined ? html`` : html`<span class="cr-said">${SAID[v.verdict]}</span>`}</div>
-    ${raw(nativePost({ platform: it.platform as never, id: post.id, author: { name: d.orgName, kind: null }, text: post.text, when: local, media, poster: null, metrics: null, variant: 'feed' }))}
+    ${raw(nativePost({ platform: it.platform as never, id: post.id, author: { name: d.authors[it.platform] ?? d.orgName, kind: null }, text: post.text, when: local, media, poster: null, metrics: null, variant: 'feed' }))}
     <form method="POST" action="${action}" class="cr-form">
       <input type="hidden" name="key" value="${c.card.key}"><input type="hidden" name="at" value="i${String(n)}">
       <label class="cr-note"><span>ملحوظةٌ للفريق (اختياريّة)</span>
@@ -68,13 +70,14 @@ export function clientReviewScreen(d: ClientReviewData): string {
       <p class="ph-lede m-0">كلُّ منشورٍ كما سيظهر في منصّته. قل «موافق» أو «أطلب تعديلًا» واكتب ما تريد تغييره — يصل إلى الفريق فورًا.</p>
       <div class="ph-kpis">
         <div class="ph-kpi"><b>${String(done)}<em> / ${String(shown.length)}</em></b><span>قلتَ فيها رأيك</span></div>
-        <div class="ph-kpi"><b>${dayLabel(d.expiresAt.slice(0, 10), 'short')}</b><span>يبقى الرابطُ نافذًا حتّى</span></div>
+        <div class="ph-kpi"><b>${dayLabel(d.expiresAt.slice(0, 10))}</b><span>آخرُ يومٍ يعمل فيه الرابط</span></div>
       </div>
     </header>
     ${d.saved ? html`<p class="cr-saved" role="status">حُفظ رأيك. شكرًا لك.</p>` : html``}
     ${shown.length === 0
       ? html`<div class="${cardClass()}"><h2 class="m-0">لا منشوراتَ مكتوبةً بعد</h2><p class="hint m-0">افتح الرابطَ نفسَه لاحقًا: تظهر هنا حين تُكتب.</p></div>`
       : html`<ol class="cr-list">${shown.map((c, n) => item(c, d, n))}</ol>`}
+    <p class="cr-foot">صفحةُ مراجعةٍ خاصّةٌ بك من صدى — لا تشاركها.</p>
   </main>`.value
 }
 

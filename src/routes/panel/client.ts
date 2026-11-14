@@ -14,7 +14,8 @@ import { OWNER_EMAIL } from '../../lib/ownerEmail'
 import { inviteMember, listMembers, revokeMember, ROLE_LABEL, type MemberRole } from '../../lib/team'
 import { teamScreen } from '../ui/teamView'
 import { PERIODS, portfolio, previousWindow, type Period } from '../../lib/portfolio'
-import { portfolioScreen } from '../ui/portfolioView'
+import { clientsCalendar, portfolioScreen } from '../ui/portfolioView'
+import { portfolioCalendar } from '../../lib/portfolioCalendar'
 import { sendText } from '../../lib/mail/send'
 import { clearSetting, isOrgKey, ORG_KEYS, readSettings, readSettingsBoth, writeSetting } from '../../lib/settings'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../../lib/pivot'
@@ -226,8 +227,12 @@ client.get('/panel/portfolio', async (c) => {
     org: orgs.some((o) => o.id === wanted) ? wanted : null,
   }
   const now = new Date()
-  const [rows, before] = await Promise.all([portfolio(c.env.DB, filter, now), portfolio(c.env.DB, filter, previousWindow(now, filter.period))])
-  const body = portfolioScreen(rows, orgs, filter, activeOrg(session.record), before)
+  const [rows, before, cal, zone] = await Promise.all([
+    portfolio(c.env.DB, filter, now), portfolio(c.env.DB, filter, previousWindow(now, filter.period)),
+    portfolioCalendar(c.env.DB, filter.org === null ? orgs.map((o) => o.id) : [filter.org], now),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+  ])
+  const body = portfolioScreen(rows, orgs, filter, activeOrg(session.record), before, clientsCalendar(cal, orgs, now, zone ?? null))
   return page((nonce) =>
     soloPage('صدى — المحفظة', { href: '/panel', label: 'اللوحة' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('overview')),
