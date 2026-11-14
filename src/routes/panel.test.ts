@@ -1201,6 +1201,23 @@ describe('توجيه المهامّ يصير للمالك', () => {
     expect(row.model).toBe('deepseek-chat')
   })
 
+  it('مفتاحٌ ثانٍ لـ Anthropic بلا عنوان، واحتياطٌ للكتابة يُحفظ ويُمحى — والاحتياطُ نفسُه أو غائبٌ يُردّ (D-348)', async () => {
+    const cookie = await login()
+    expect((await post(cookie, '/panel/providers/add', { name: 'anthropic-2', label: 'Anthropic 2', kind: 'anthropic', model: 'claude-opus-5' })).status).toBe(303)
+    expect(db.raw.prepare("SELECT kind, base_url FROM providers WHERE name='anthropic-2'").get()).toEqual({ kind: 'anthropic', base_url: null })
+    const fb = (): unknown => (db.raw.prepare("SELECT fallback FROM task_routes WHERE task='draft'").get() as { fallback: string | null } | undefined)?.fallback
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', fallback: 'anthropic-2' })
+    expect(fb()).toBe('anthropic-2')
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', fallback: 'anthropic' })
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', fallback: 'ghost' })
+    expect(fb()).toBe('anthropic-2')
+    // ‏صفٌّ بلا حقل الاحتياط (مهمّةٌ أخرى، أو نموذجٌ قديم) لا يمحوه، والفراغُ يمحوه
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5' })
+    expect(fb()).toBe('anthropic-2')
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', fallback: '' })
+    expect(fb()).toBeNull()
+  })
+
   it('مهمّة غير معروفة أو مزوّد غير موجود يُرفضان', async () => {
     const cookie = await login()
     expect((await post(cookie, '/panel/routes', { task: 'hack', provider: 'anthropic', model: 'x' })).status).toBe(400)

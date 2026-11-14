@@ -20,7 +20,7 @@
 import { recordCost } from '../cost'
 import { blockerReason, checkAllowance, checkProvider } from '../limits'
 import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes, routeFor } from '../ai/routes'
+import { readRoutes, routeFor, wantsFallback } from '../ai/routes'
 import { chatCompletion } from '../ai/openaiCompat'
 import { anthropicChat } from '../ai/anthropic'
 import { portableSchema } from '../ai/portableSchema'
@@ -90,6 +90,17 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
     ? routed
     : { provider: call.provider, model: '' }
 
+  /*
+   * ‏**الاحتياط** (D-348): يُجرَّب مرّةً واحدة حين تتبع الكتابةُ التوجيهَ (لا مقارنةً طُلب فيها مزوّدٌ بعينه) والاحتياطُ غيرُ الأوّل.
+   * ‏ونداؤه هو هذه الدالّةُ نفسُها بمزوّده — فحارسُه وسقفُه ومفتاحُه ودفترُه كلُّها تمرّ كما تمرّ للأوّل، ولا احتياطَ للاحتياط.
+   */
+  const following = call.provider === undefined || call.provider === '' || call.provider === routed.provider
+  const fallback = following && routed.fallback !== null && routed.fallback !== route.provider ? routed.fallback : null
+  const viaFallback = async (why: string): Promise<Written> => {
+    const second = await writeOnce(deps, { ...call, provider: fallback! })
+    return second.kind === 'failed' ? { ...second, reason: why + ' — والاحتياطُ: ' + second.reason } : second
+  }
+
   const provider = await getProvider(deps.db, route.provider)
   if (provider === null) {
     return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
@@ -99,7 +110,8 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
   // ٣ · وسقفُ المزوّد بعد الحارس العامّ لا قبله: مَن قدّم التفصيل على الجملة
   // قال «المزوّد متاح» ونظامُه موقوف
   const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
+  // ‏وسقفُ المزوّد اليوميّ سقفُ مفتاحه: بلغه الأوّلُ فيكتب الاحتياط (D-348)
+  if (perProvider !== null) return fallback !== null ? viaFallback(blockerReason(perProvider)) : { kind: 'blocked', reason: blockerReason(perProvider) }
 
   // ٤ · المفتاح
   const secretName = provider.builtin
@@ -116,6 +128,7 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
     secretName === undefined ? undefined : deps.workerSecrets[secretName],
   )
   if (resolved.key === null) {
+    if (fallback !== null) return viaFallback(`لا مفتاح لـ ${provider.label}`)
     return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
   }
 
@@ -173,6 +186,10 @@ export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Writ
     // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
     const late = spentOf(error)
     const paid = late === null ? null : await charge(late)
+    // ‏مفتاحٌ مرفوضٌ أو حدٌّ أو انشغال: الاحتياطُ مرّة (D-348). وما حوسب عليه لا يُعاد (`wantsFallback` يردّه)
+    if (fallback !== null && paid === null && wantsFallback(error)) {
+      return viaFallback(error instanceof Error ? error.message : 'نداء فشل')
+    }
     const retryable =
       typeof error === 'object' && error !== null && 'retryable' in error
         ? Boolean((error as { retryable: unknown }).retryable)

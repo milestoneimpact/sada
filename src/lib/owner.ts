@@ -568,6 +568,13 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     unblocks: 'guard',
     done: () => null,
   },
+  {
+    code: 'M-50',
+    title: 'مفاتيح Anthropic الإضافيّة',
+    ifLeft: 'مفتاحٌ واحدٌ كما كان — تأجيل.',
+    unblocks: 'guard',
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

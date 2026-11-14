@@ -401,9 +401,11 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
               <input class="w-s" id="np" name="name" dir="ltr" required placeholder="deepseek"></span>
             <span class="field"><label for="nl">الاسم المعروض</label>
               <input class="w-s" id="nl" name="label" placeholder="DeepSeek"></span>
+            <span class="field"><label for="nk">النوع</label>
+              <select class="w-s" id="nk" name="kind"><option value="openai_compat">OpenAI-compatible</option><option value="anthropic">Anthropic (مفتاحٌ آخر)</option></select></span>
             <span class="field grow-field"><label for="nu">العنوان (https)</label>
-              <input class="w-full" id="nu" name="base_url" dir="ltr" required placeholder="https://api.deepseek.com/v1"
-                    ></span>
+              <input class="w-full" id="nu" name="base_url" dir="ltr" placeholder="https://api.deepseek.com/v1" aria-describedby="nu-h">
+              <span class="field-hint" id="nu-h">لـ OpenAI-compatible وحدَه. ونوعُ Anthropic بلا عنوان: يُنادى Anthropic نفسُه بمفتاح هذا الصفّ.</span></span>
           </span>
           <span class="row mt-2">
             <span class="field"><label for="nm">النموذج (مبدئيّ)</label>
@@ -440,6 +442,14 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
     </div>
   </details>`
 
+  // ‏الاحتياطُ (D-348): الكتابةُ وحدَها اليوم — يُجرَّب مرّةً حين يردّ الأوّلُ بخطأ مفتاحٍ أو حدٍّ أو انشغال، أو يبلغ سقفَه
+  const fallbackPick = (task: string, primary: string, current: string | null): string =>
+    '<label class="vh" for="rf-' + escapeHtml(task) + '">المزوّد الاحتياطيّ</label>'
+    + '<select id="rf-' + escapeHtml(task) + '" name="fallback" class="w-s"><option value="">بلا احتياط</option>'
+    + d.knownProviders.filter((p) => p.name !== primary)
+      .map((p) => '<option value="' + escapeHtml(p.name) + '"' + (p.name === current ? ' selected' : '') + '>احتياط: ' + escapeHtml(p.label) + '</option>').join('')
+    + '</select>'
+
   const providerOptions = (selected: string): string =>
     d.knownProviders
       .map((p) => `<option value="${escapeHtml(p.name)}"${p.name === selected ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
@@ -452,6 +462,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         <form class="row gap-2" method="POST" action="/panel/routes">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
           <select name="provider" class="mp-provider w-s">${providerOptions(r.provider)}</select>
+          ${r.task === 'draft' ? fallbackPick(r.task, r.provider, r.fallback ?? null) : ''}
           ${modelPicker({
             id: `rm-${r.task}`,
             provider: r.provider,

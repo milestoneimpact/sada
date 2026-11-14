@@ -19,17 +19,19 @@ export interface TaskRoute {
   readonly implemented: boolean
   /** أمن اللوحة هو أم من الافتراض في الشيفرة؟ */
   readonly custom: boolean
+  /** المزوّدُ الاحتياطيّ (D-348) — يُجرَّب مرّةً حين يردّ الأوّلُ بخطأ مفتاحٍ أو حدٍّ أو انشغال. و`null`: بلا احتياط. */
+  readonly fallback: string | null
 }
 
 export async function readRoutes(db: Db): Promise<TaskRoute[]> {
-  let saved = new Map<string, { provider: string; model: string }>()
+  let saved = new Map<string, { provider: string; model: string; fallback: string | null }>()
+  // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277). والاحتياطُ (D-348) عمودٌ قد لا يكون رُحّل بعد: قراءتُه تسقط وحدَها
+  // ثمّ تُقرأ الجملةُ بلا عموده — فقاعدةٌ قبل 0050 تعمل بتوجيهها كما كانت لا بالافتراض
+  const read = (sql: string) => db.prepare(sql).bind(OWNER_ORG).all<{ task: string; provider: string; model: string; fallback?: string | null }>()
   try {
-    const { results } = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
-      .prepare('SELECT task, provider, model FROM task_routes WHERE org_id = ?')
-      .bind(OWNER_ORG)
-      .all<{ task: string; provider: string; model: string }>()
-    saved = new Map(results.map((r) => [r.task, { provider: r.provider, model: r.model }]))
+    const { results } = await read('SELECT task, provider, model, fallback FROM task_routes WHERE org_id = ?')
+      .catch(() => read('SELECT task, provider, model FROM task_routes WHERE org_id = ?'))
+    saved = new Map(results.map((r) => [r.task, { provider: r.provider, model: r.model, fallback: r.fallback ?? null }]))
   } catch {
     saved = new Map()
   }
@@ -44,6 +46,7 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
       why: fallback.why,
       implemented: IMPLEMENTED.has(task),
       custom: chosen !== undefined,
+      fallback: chosen?.fallback ?? null,
     }
   })
 }
@@ -59,10 +62,24 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
  * فالنوعُ هنا يقول الحقيقة: توجيهٌ دائما، من اللوحة إن كُتب ومن الشيفرة
  * إن لم يُكتَب.
  */
-export async function routeFor(db: Db, task: TaskName): Promise<{ provider: string; model: string }> {
+export async function routeFor(db: Db, task: TaskName): Promise<{ provider: string; model: string; fallback: string | null }> {
   const routes = await readRoutes(db)
   const found = routes.find((r) => r.task === task)
-  return found ?? { provider: ROUTES[task].provider, model: ROUTES[task].model }
+  return found ?? { provider: ROUTES[task].provider, model: ROUTES[task].model, fallback: null }
+}
+
+/**
+ * **أيُستحقّ الاحتياط؟** (D-348) — خطأٌ يعني «هذا المفتاحُ أو هذا المزوّدُ لا يخدم الآن» فيخدم غيرُه:
+ * مفتاحٌ مرفوض (401 · 403)، أو حدٌّ بلغ (429)، أو انشغالٌ أو تعطّل (500 · 502 · 503 · 529).
+ * **وما سواها لا**: طلبٌ مرفوضٌ لمحتواه أو نموذجٌ غيرُ موجود (400 · 404 · 422) يُرفض عند الثاني كذلك، وجوابٌ بُتر وقد حوسب عليه لا يُعاد.
+ */
+export const FALLBACK_STATUSES: ReadonlySet<number> = new Set([401, 403, 429, 500, 502, 503, 529])
+export function wantsFallback(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null || !('status' in error)) return false
+  const status = Number((error as { status: unknown }).status)
+  // ‏‎502 «بُتر الجواب» يحمل ما أُنفق: لا يُعاد عند غيره
+  if ('spent' in error && (error as { spent: unknown }).spent !== undefined && (error as { spent: unknown }).spent !== null) return false
+  return FALLBACK_STATUSES.has(status)
 }
 
 export async function writeRoute(
@@ -71,6 +88,8 @@ export async function writeRoute(
   provider: string,
   model: string,
   by: string,
+  /** المزوّدُ الاحتياطيّ (D-348): `undefined` يبقيه كما هو، و`null` يمحوه. */
+  fallback?: string | null,
 ): Promise<void> {
   await db
     .prepare(
@@ -83,6 +102,9 @@ export async function writeRoute(
     )
     .bind(task, provider, model, by, OWNER_ORG)
     .run()
+  if (fallback !== undefined) {
+    await db.prepare('UPDATE task_routes SET fallback = ? WHERE task = ? AND org_id = ?').bind(fallback, task, OWNER_ORG).run()
+  }
 }
 
 /**

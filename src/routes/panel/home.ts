@@ -503,6 +503,7 @@ function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'
       task: r.task,
       provider: r.provider,
       model: r.model,
+      fallback: r.fallback,
       why: r.why,
       implemented: r.implemented,
       ready: r.implemented && (dot === undefined

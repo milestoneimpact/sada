@@ -475,9 +475,12 @@ channels.post('/panel/providers/add', async (c) => {
   const model = String(form.get('model') ?? '').trim()
   const rawUrl = String(form.get('base_url') ?? '')
 
+  // ‏النوعُ للجديد وحدَه (D-348): «Anthropic» مفتاحٌ آخرُ لـ Anthropic بلا عنوان، والقائمُ يبقى بنوعه
+  const kind = existing?.kind ?? (form.get('kind') === 'anthropic' ? 'anthropic' : 'openai_compat')
   // المدمَج لا يُبدَّل عنوانه: عنوانه في الشيفرة
   let baseUrl: string | null = existing?.baseUrl ?? null
-  if (existing === null || !existing.builtin) {
+  if (kind === 'anthropic') baseUrl = null
+  else if (existing === null || !existing.builtin) {
     const verdict = checkProviderUrl(rawUrl)
     if (!verdict.ok) {
       await setFlash(c.env, c.req.raw, { kind: 'bad', text: `العنوان مرفوض: ${verdict.reason}` })
@@ -491,7 +494,7 @@ channels.post('/panel/providers/add', async (c) => {
     {
       name,
       label,
-      kind: existing?.kind ?? 'openai_compat',
+      kind,
       baseUrl,
       model: model === '' ? (existing?.model ?? null) : model,
       priceIn: num(form, 'price_in'),
@@ -756,7 +759,18 @@ channels.post('/panel/routes', async (c) => {
     return back('providers')
   }
 
-  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel')
+  // ‏الاحتياطُ (D-348): مزوّدٌ قائمٌ غيرُ الأوّل، أو فراغٌ يمحوه. وحقلُه في صفّ الكتابة وحدَه — وغيابُه في غيره يبقي ما كان
+  const rawFallback = form.get('fallback')
+  let fallback: string | null | undefined
+  if (typeof rawFallback === 'string') {
+    if (rawFallback === '') fallback = null
+    else if (rawFallback !== provider && (await getProvider(c.env.DB, rawFallback)) !== null) fallback = rawFallback
+    else {
+      await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'المزوّد الاحتياطيّ يجب أن يكون مزوّدًا آخرَ قائمًا.' })
+      return back('providers')
+    }
+  }
+  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel', fallback)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'route.write', target: task, detail: `${provider} / ${model}` },
