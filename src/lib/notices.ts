@@ -22,7 +22,7 @@ import type { Allowance } from './limits'
 import { isOwnerEmail } from './ownerEmail'
 import { panelHref } from './nav/panes'
 
-export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security' | 'provider'
+export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security' | 'provider' | 'review'
 
 /**
  * **من يقرأ الإشعارات** (D-317): بريدُه لإشعارات أمان حسابه، وبصمةُ جلسته كي لا يُرى إشعارُ الدخول في الجلسة التي فُتحت
@@ -148,6 +148,8 @@ export async function unreadNotices(db: Db, org: string, extraRefs: readonly str
            UNION ALL
            SELECT 'provider:' || provider || ':' || since FROM (${PROVIDER_FAILS}) WHERE ?1 = 'org_owner'
            UNION ALL
+           SELECT 'review:' || link_id || ':' || at FROM review_verdicts WHERE org_id = ?1 AND at >= datetime('now', '-14 days')
+           UNION ALL
            SELECT value FROM json_each(?2)
            UNION ALL
            ${SECURITY_REFS}
@@ -170,7 +172,7 @@ export async function collectNotices(
   memory: { readonly pulses: readonly Pulse[]; readonly allowance: Pick<Allowance, 'settings' | 'usage'> | null },
   viewer?: NoticeViewer,
 ): Promise<Notice[]> {
-  const [failed, reauth, quota, tokens, security, keys] = await Promise.all([
+  const [failed, reauth, quota, tokens, security, keys, verdicts] = await Promise.all([
     db.prepare(
       `SELECT p.id, p.platform, p.text,
               (SELECT pa.response_json FROM publish_attempts pa WHERE pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'failed' ORDER BY pa.at DESC LIMIT 1) AS why,
@@ -202,6 +204,11 @@ export async function collectNotices(
     org !== 'org_owner' ? Promise.resolve([]) : db.prepare(PROVIDER_FAILS)
       .all<{ provider: string; label: string; since: string; last: string; detail: string }>()
       .then((r) => r.results).catch(() => []),
+    // ‏رأيُ العميل (D-353): كلُّ قرارٍ إشعار، وتغييرُه قرارٌ جديد
+    db.prepare(`SELECT link_id, item_key, verdict, note, at FROM review_verdicts
+                 WHERE org_id = ? AND at >= datetime('now', '-14 days') ORDER BY at DESC LIMIT 50`)
+      .bind(org).all<{ link_id: string; item_key: string; verdict: 'approve' | 'changes'; note: string; at: string }>()
+      .then((r) => r.results).catch(() => []),
   ])
   const out: Notice[] = []
   for (const k of keys) {
@@ -209,6 +216,17 @@ export async function collectNotices(
       ref: `provider:${k.provider}:${k.since}`, kind: 'provider', tone: 'bad',
       text: `مفتاح ${k.label} لا يعمل: ${k.detail} — والمهامّ الموجَّهة إليه تقف حتّى يُستبدل`,
       href: panelHref('providers'), action: 'النماذج والمفاتيح', at: k.last.replace(' ', 'T') + 'Z',
+    })
+  }
+  for (const v of verdicts) {
+    const platform = v.item_key.split('|')[1] ?? ''
+    const label = platformLabel(platform as Platform)
+    out.push({
+      ref: `review:${v.link_id}:${v.at}`, kind: 'review', tone: 'warn',
+      text: v.verdict === 'approve'
+        ? `وافق العميل على منشور ${label} (${v.item_key.split('|')[2] ?? ''})`
+        : `يطلب العميل تعديل منشور ${label} (${v.item_key.split('|')[2] ?? ''})${v.note === '' ? '' : ': «' + v.note + '»'}`,
+      href: '/panel/plan/review', action: 'افتح الخطّة', at: v.at,
     })
   }
   for (const f of failed) {

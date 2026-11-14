@@ -48,6 +48,7 @@ import { CHANNELS, listAccounts } from '../../lib/channels'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
 import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
+import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/clientReview'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
@@ -251,6 +252,41 @@ plan.get('/panel/plan/new', async (c) => {
       PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
+
+/**
+ * **رابطُ العميل** (D-353): يُنشأ لأحدث خطّة، ويُعرض في الرسالة مرّةً واحدة — القاعدةُ تحفظ بصمتَه لا رمزَه، فلا يُستعاد.
+ * ومن لا يعتمد (المحرّر والقارئ) لا يفتح للعميل باب رأيٍ في خطّة: الحارسُ في `lib/access.ts` (الناشرُ فما فوق).
+ */
+plan.post('/panel/plan/share', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== String(gate.form.get('id') ?? '')) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'صارت للخطّة نسخةٌ أحدث — افتح المراجعة من جديد.' })
+    return reviewBack()
+  }
+  const link = await createLink(c.env.DB, org, current.id, gate.session.record.email ?? 'owner')
+  await record(c.env.DB, { actor: 'panel', action: 'review.share', target: current.id, detail: link.expiresAt.slice(0, 10) }, c.req.raw)
+  const url = (c.env.PUBLIC_BASE_URL ?? new URL(c.req.url).origin) + '/r/' + link.token
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رابطُ العميل — انسخه الآن، فلا يُعرض مرّةً أخرى: ' + url })
+  return reviewBack()
+})
+
+plan.post('/panel/plan/share/revoke', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('id') ?? '')
+  const n = await revokeLinks(c.env.DB, org, id)
+  await record(c.env.DB, { actor: 'panel', action: 'review.revoke', target: id, detail: String(n) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: n === 0 ? 'لا رابطَ نافذ.' : 'أُلغيت روابطُ العميل، ولم يعد أيٌّ منها يفتح.' })
+  return reviewBack()
+})
+
+function reviewBack(): Response {
+  return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' } })
+}
 
 /** اعتمادُ منطق الخطّة — علامةٌ لا تنفيذ. */
 plan.post('/panel/plan/approve', async (c) => {
@@ -604,17 +640,19 @@ plan.get('/panel/plan/review', async (c) => {
   const org = activeOrg(session.record)
   const current = await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
-  const [model, zone, flash, orgRow, accounts] = await Promise.all([
+  const [model, zone, flash, orgRow, accounts, share, verdicts] = await Promise.all([
     reviewModel(c.env.DB, org, current),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     takeFlash(c.env, c.req.raw),
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
     c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
       .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
+    activeLinks(c.env.DB, org, current.id),
+    verdictsFor(c.env.DB, org, current.id),
   ])
   const authors: Record<string, string> = {}
   for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
-  const body = planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors }) +
+  const body = planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,

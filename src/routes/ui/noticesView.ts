@@ -30,6 +30,7 @@ const KIND: Readonly<Record<NoticeKind, { readonly label: string; readonly icon:
   pulse: { label: 'نبض', icon: ICON.overview },
   security: { label: 'أمان', icon: ICON.account },
   provider: { label: 'مفتاح نموذج', icon: ICON.providers },
+  review: { label: 'رأي العميل', icon: ICON.plan },
 }
 
 function row(n: Notice, read: NoticeRead | undefined, now: Date): Html {

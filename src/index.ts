@@ -35,6 +35,7 @@ import { readApp, SECRET_NAMES } from './lib/oauth/apps'
 import { ICON_BYTES } from './routes/ui/shell'
 import { assets } from './routes/assets'
 import { pwa } from './routes/pwa'
+import { review } from './routes/review'
 import { fonts } from './routes/fonts'
 import { legal } from './routes/legal'
 import { landing } from './routes/landing'
@@ -425,6 +426,7 @@ app.route('/', media)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)
+app.route('/', review)
 app.route('/', panel)
 
 /**
