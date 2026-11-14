@@ -259,11 +259,18 @@ function tally(rows: readonly OwnerRow[]): { readonly todo: readonly OwnerRow[];
   }
 }
 
-/** ‏الرأسُ حين لا شيء عليك ممّا يُعرَف — ويقول المجهولَ إن كان، فلا يُقرأ الفراغُ «تمّ كلُّ شيء». */
-function idleLede(unknown: number): Html {
+/**
+ * ‏**ما يعدّه رأسُ كلّ صفحةٍ باسمه** (مراجعة متابعة D-324): كلٌّ يعدّ نوعَه وحدَه، فرأسٌ يقول «N عليك» أو «لا شيء عليك» بلا اسمِ
+ * ‏ما يعدّه يُقرأ عن الكلّ — وقد قال «لا شيء عليك» وسطرُ «تفتح قدرة» تحته «7 عليك».
+ */
+const HERE_SCOPE = 'ممّا يوقف أو يحرس'
+const LATER_SCOPE = 'ممّا يفتح قدرة'
+
+/** ‏الرأسُ حين لا شيء عليك ممّا يُعرَف — **باسم ما تعدّه الصفحة**، ويقول المجهولَ إن كان، فلا يُقرأ الفراغُ «تمّ كلُّ شيء». */
+function idleLede(scope: string, unknown: number): Html {
   return unknown === 0
-    ? html`<b>لا شيء عليك ممّا يُعرَف من هنا.</b>`
-    : html`<b>لا شيء عليك ممّا يُعرَف من هنا</b> — و${unknown} لا تُقرأ
+    ? html`<b>لا شيء عليك ${scope}</b>، فيما يُعرَف من هنا.`
+    : html`<b>لا شيء عليك ${scope}</b>، فيما يُعرَف من هنا — و${unknown} لا تُقرأ
            من اللوحة، تُراجَع في بوّابة المنصّة.`
 }
 
@@ -308,8 +315,8 @@ export function laterTitle(): string {
 }
 
 /**
- * ‏سطرُ «تفتح قدرة» في رأس «ما عليك» (متابعة D-324) — **في الشاشة الأولى**: الرأسُ يعدّ ما يوقف أو يحرس وحدَه، فبلا هذا السطر
- * ‏يقرأ المالكُ «3 عليك» وقد كانت «10» ولا يعرف أين ذهب الباقي. ويعدّ ما عليك منها كما تعدّه صفحتُها.
+ * ‏سطرُ «تفتح قدرة» في رأس «ما عليك» (متابعة D-324) — **في الشاشة الأولى**: الرأسُ يعدّ ما يوقف أو يحرس وحدَه ويقولها، فبلا هذا
+ * ‏السطر يقرأ المالكُ «3 عليك ممّا يوقف أو يحرس» وقد كانت «10 عليك» ولا يعرف أين ذهب الباقي. ويعدّ ما عليك منها كما تعدّه صفحتُها.
  */
 function laterLine(rows: readonly OwnerRow[]): Html {
   const n = rows.filter((r) => r.state === false).length
@@ -324,8 +331,8 @@ export function tasksScreen(d: TasksScreenData): string {
 
   const lede =
     todo.length === 0
-      ? idleLede(unknown.length)
-      : html`<b>${todo.length}</b> عليك، منها
+      ? idleLede(HERE_SCOPE, unknown.length)
+      : html`<b>${todo.length}</b> عليك ${HERE_SCOPE}، منها
          <b>${todo.filter((r) => r.unblocks === 'gate').length}</b> توقف بوّابة مرحلة.`
 
   // ‏و`vitalsCard` يعيد نصًّا (`.value` من قالب `html` نفسِه)، فيمرّ بـ`raw` عند الحدّ
@@ -364,7 +371,7 @@ export function laterScreen(d: LaterScreenData): string {
   const rows = d.rows.filter((r) => r.unblocks === 'capability')
   const { todo, unknown } = tally(rows)
   const lede = todo.length === 0
-    ? idleLede(unknown.length)
+    ? idleLede(LATER_SCOPE, unknown.length)
     : html`<b>${todo.length}</b> عليك، وكلٌّ منها يفتح لصدى ما لا يقدر عليه اليوم.`
 
   return html`<div class="page-head">

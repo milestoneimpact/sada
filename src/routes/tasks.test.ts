@@ -9,7 +9,9 @@ import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
-import { OWNER_TASKS } from '../lib/owner'
+import { OWNER_TASKS, ownerRows } from '../lib/owner'
+import { OWNER_ORG } from '../lib/tenancy'
+import { ownerFacts } from './panel/shared'
 
 const TOKEN = 'Yk3pQ9vX2mLsA7nR4tWfZ8cB6dH1jG0e'
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -43,6 +45,11 @@ const ledeCount = (h: string): number => Number(/(\d+)<\/b> عليك/.exec(h)?.[
 const laterCount = (h: string): number => Number(/href="\/panel\/tasks\/later">تفتح قدرة<\/a> · (\d+) عليك/.exec(h)?.[1] ?? '0')
 /** ‏والعددُ في رقاقة القائمة («N تمّت · N عليك · N لا تُعرَف») — لا أوّلُ «· N عليك» في الصفحة، فسطرُ «تفتح قدرة» قبلها. */
 const chipCount = (h: string): number => Number(/<span class="chip">\d+ تمّت · (\d+) عليك/.exec(h)?.[1] ?? '-1')
+/** ‏والرقاقةُ كلُّها: تمّت · عليك · لا تُعرَف — و`null` حين لا رقاقة. */
+const chip = (h: string): { done: number; todo: number; unknown: number } | null => {
+  const m = /<span class="chip">(\d+) تمّت · (\d+) عليك · (\d+) لا تُعرَف<\/span>/.exec(h)
+  return m === null ? null : { done: Number(m[1]), todo: Number(m[2]), unknown: Number(m[3]) }
+}
 /** ‏رموزُ المهامّ المرسومة في الصفحة، معلّقةً أو مطويّةً فيما تمّ. */
 const codesIn = (h: string): string[] => [...h.matchAll(/<bdi dir="ltr">(M-\d+)<\/bdi><\/small>/g)].map((m) => m[1]!)
 
@@ -132,15 +139,28 @@ describe('ولا علامة صحّ على ما لم يُتحقَّق منه', ()
     expect(html).toContain('M-03')
   })
 
-  it('والعدّ لا يشمل ما لا يُعرَف — في الصفحتين', async () => {
-    for (const html of [await open(), await later()]) {
-      const unknown = Number(/(\d+) لا تُعرَف/.exec(html)?.[1] ?? '0')
-      const todo = chipCount(html)
+  /**
+   * ‏**والمتوقَّعُ من الحقائق لا من العدّاد نفسِه** (مراجعة متابعة D-324): كان الاختبارُ يقارن رقمين من `tally()` نفسِها
+   * ‏(«عليك» أقلُّ من «عليك» زائدًا المجهول، والرأسُ يساوي الرقاقة)، فعدُّ المجهول «عليك» يحرّكهما معًا ولا يسقط شيء. فالمتوقَّعُ
+   * ‏صفوفُ الحقائق نفسِها التي يقرؤها المسار (`ownerFacts` ثمّ `ownerRows`)، مقسومةً بنوع الصفحة، و«عليك» ما `state === false` وحده.
+   */
+  it('والعدّ لا يشمل ما لا يُعرَف — في الصفحتين، والمتوقَّعُ من الحقائق', async () => {
+    const rows = ownerRows(await ownerFacts({ env: env as never }, OWNER_ORG))
+    const pages: ReadonlyArray<readonly [string, typeof rows]> = [
+      [await open(), rows.filter((r) => r.unblocks !== 'capability')],
+      [await later(), rows.filter((r) => r.unblocks === 'capability')],
+    ]
+    for (const [html, mine] of pages) {
+      const todo = mine.filter((r) => r.state === false).length
+      const unknown = mine.filter((r) => r.state === null).length
+      const done = mine.filter((r) => r.state === true).length
+      // ‏وبلا مجهولٍ في الصفحة لا يمتحن الاختبارُ شيئًا
       expect(unknown).toBeGreaterThan(0)
-      // ولو عُدّ المجهولُ لصار المجموعُ أكبر — والرقمُ لا ينزل أبدا فيُهمَل
-      expect(todo).toBeLessThan(todo + unknown)
-      // ‏والرأسُ يعدّ ما في الرقاقة نفسَه: ما عليك في هذه الصفحة
+      expect(chip(html)).toEqual({ done, todo, unknown })
+      // ‏والرأسُ يعدّ ما عليك في هذه الصفحة وحدها، لا المجهول
       expect(ledeCount(html)).toBe(todo)
+      // ‏والرقاقةُ تجمع صفوفَ الصفحة كلَّها مرّةً: لا يُعدّ مجهولٌ «عليك» و«لا تُعرَف» معًا
+      expect(done + todo + unknown).toBe(codesIn(html).length)
     }
   })
 })

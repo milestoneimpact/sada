@@ -243,7 +243,8 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     const html = tasksScreen({ phase: '0', env: 'staging', rows })
     for (const code of ['M-01', 'M-02']) expect(html, code).toContain(`>${code}</bdi>`)
     for (const code of ['M-03', 'M-04', 'M-05']) expect(html, code).not.toContain(`>${code}</bdi>`)
-    expect(html).toMatch(/<b>1<\/b> عليك، منها\s+<b>1<\/b> توقف بوّابة مرحلة\./)
+    // ‏والرأسُ يسمّي ما يعدّه (مراجعة متابعة D-324): كان «<b>1</b> عليك، منها» فيُقرأ عن القائمة كلّها
+    expect(html).toMatch(/<b>1<\/b> عليك ممّا يوقف أو يحرس، منها\s+<b>1<\/b> توقف بوّابة مرحلة\./)
     expect(html).toContain('<a class="tap" href="/panel/tasks/later">تفتح قدرة</a> · 2 عليك، ولا ينكسر شيء بتركها.')
     // ‏وشرحُ «قدرة» في صفحتها لا هنا، و«بوّابة» و«حارس» هنا مرّةً
     expect(html).not.toContain('تُفتَح قدرة جديدة')
@@ -264,6 +265,42 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
     // ‏والبوّاباتُ وسرعةُ اللوحة في «ما عليك» وحدَها
     expect(page).not.toContain('href="/panel/gates"')
     expect(page).not.toContain('سرعةُ اللوحة عندك')
+  })
+
+  /**
+   * ‏**ورأسُ كلّ صفحةٍ يسمّي ما يعدّه** (مراجعة متابعة D-324): كان رأسُ «ما عليك» يعدّ البوّابةَ والحارسَ وحدهما ويقول «N عليك» كما
+   * ‏كان يعدّ الكلّ، وحين لا شيء منهما يقول «لا شيء عليك ممّا يُعرَف من هنا» وسطرُ «تفتح قدرة» تحته «2 عليك» — في الشاشة الأولى
+   * ‏نفسِها. وهذا حالُ المالك العاديّ بعد أن يُغلق البوّابات والحرّاس والقدرةُ مفتوحة.
+   */
+  it('ورأسُ كلّ صفحةٍ يسمّي ما يعدّه، فلا يقول «لا شيء عليك» وسطرُ «تفتح قدرة» تحته يعدّ (مراجعة متابعة D-324)', () => {
+    const r = (code: string, unblocks: string, state: boolean | null) =>
+      ({ code, title: `عنوان ${code}`, ifLeft: 'يقف', unblocks, state, measured: '', done: () => state }) as never
+    const lede = (h: string): string =>
+      (/<p class="lede">([\s\S]*?)<\/p>/.exec(h)?.[1] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    const laterLine = (h: string): string => /href="\/panel\/tasks\/later">تفتح قدرة<\/a> · ([^،]+)،/.exec(h)?.[1] ?? ''
+
+    // ‏البوّابةُ والحارسُ تمّا والقدرةُ عليك: الرأسُ يسمّي ما يعدّه، والسطرُ تحته يعدّ القدرة
+    const closed = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-01', 'gate', true), r('M-02', 'guard', true), r('M-03', 'capability', false), r('M-04', 'capability', false)] })
+    expect(lede(closed)).toBe('لا شيء عليك ممّا يوقف أو يحرس، فيما يُعرَف من هنا.')
+    expect(laterLine(closed)).toBe('2 عليك')
+
+    // ‏وما بقي منهما لا يُعرَف من هنا (حالُ العيّنة بعد M-04 وM-16 وM-18): يُقال المجهول، ولا يُقرأ الفراغُ «تمّ كلُّ شيء»
+    const unread = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-31', 'gate', null), r('M-16', 'guard', true), r('M-19', 'capability', false), r('M-17', 'capability', false)] })
+    expect(lede(unread)).toBe('لا شيء عليك ممّا يوقف أو يحرس، فيما يُعرَف من هنا — و1 لا تُقرأ من اللوحة، تُراجَع في بوّابة المنصّة.')
+    expect(laterLine(unread)).toBe('2 عليك')
+
+    // ‏والعددُ يسمّي ما يعدّه: البوّابةَ والحارسَ، لا القدرةَ التي سطرُها تحته
+    const pending = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-01', 'gate', false), r('M-02', 'guard', false), r('M-03', 'capability', false)] })
+    expect(lede(pending)).toBe('2 عليك ممّا يوقف أو يحرس، منها 1 توقف بوّابة مرحلة.')
+    expect(laterLine(pending)).toBe('1 عليك')
+
+    // ‏و«تفتح قدرة» حين لا شيء منها عليك لا تقول «لا شيء عليك» والبوّابةُ معلّقةٌ في «ما عليك»
+    const page = laterScreen({ env: 'staging', rows: [r('M-01', 'gate', false), r('M-03', 'capability', true), r('M-05', 'capability', null)] })
+    expect(lede(page)).toBe('لا شيء عليك ممّا يفتح قدرة، فيما يُعرَف من هنا — و1 لا تُقرأ من اللوحة، تُراجَع في بوّابة المنصّة.')
+    expect(lede(laterScreen({ env: 'staging', rows: [r('M-03', 'capability', true)] }))).toBe('لا شيء عليك ممّا يفتح قدرة، فيما يُعرَف من هنا.')
+
+    // ‏ولا رأسَ يقول «لا شيء عليك» بلا اسمِ ما يعدّه
+    for (const h of [closed, unread, pending, page]) expect(lede(h)).not.toMatch(/^لا شيء عليك ممّا يُعرَف/)
   })
 
   /** ‏**والرابطُ إلى مهمّةٍ يتبع نوعَها** (متابعة D-324): صفحتُها ومرساةُ عنوانها فيها، فمهمّةٌ يتبدّل نوعُها يتبعها كلُّ رابط. */
