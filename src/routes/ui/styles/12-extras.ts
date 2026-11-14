@@ -615,7 +615,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}
-.rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400}
+.rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400; color:var(--ink-2)}
+/* ‏واليومُ الفارغُ أهدأ (D-351): بلا إطار، ورقمُه خافت — فالأيّامُ ذاتُ المنشورات هي ما تقرؤه العين */
+.rv-cal.is-board .rv-cd:not(.is-on){border-color:transparent; background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
 /* ‏رأسُ اليوم والمصغَّرةُ يُلمسان: هدفُ كلٍّ ‏44px (قيس ‏24 و‏32 عند ‏768) */
 .rv-cd-h{display:flex; align-items:center; justify-content:space-between; gap:var(--s-1); padding:0 var(--s-1); min-height:var(--tap); min-width:var(--tap); color:inherit; text-decoration:none; border-radius:var(--r-inline)}
 .rv-cd-h span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--accent); font-weight:600}
@@ -626,7 +628,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-mini[draggable=true]{cursor:grab}
 .rv-mini.is-drag{opacity:.35}
 .rv-mini-img{flex:none; width:var(--s-6); height:var(--s-6); object-fit:cover; border-radius:var(--r-inline)}
-.rv-mini bdi{min-width:0; overflow:hidden; text-overflow:ellipsis}
+.rv-mini bdi{flex:none}
+/* ‏سطرٌ من الزاوية تحت المصغَّرة (D-351): الساعةُ والشعارُ وحدهما لا يقولان أيُّ منشور. في سطرٍ ثانٍ — في سطرها كان يبقى منه حرفان — يُقصّ بنقاط */
+.rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1)}
 /* ‏حالُ المصغَّرة نقطةٌ بلونها، واسمُها نصٌّ لقارئ الشاشة بجانبها — اللونُ لا يقول وحدَه */
 .rv-st{flex:none; margin-inline-start:auto; width:var(--s-2); height:var(--s-2); border-radius:var(--r-pill); background:var(--ink-3)}
 .rv-mini[data-st=wait] .rv-st{background:var(--warn)}

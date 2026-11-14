@@ -21,6 +21,7 @@ import { LOGOS } from './logos'
 import { nativePost } from './nativePost'
 import { maySpend } from '../../lib/access'
 import { button } from './components/button'
+import { menu, menuAction } from './components/menu'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
@@ -144,9 +145,17 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
     <div class="row gap-2 rv-acts">
       ${approve}${undo}
       ${c.post === null || status === 'published' ? html`` : html`<a class="btn btn-secondary btn-sm" href="/panel?open=${encodeURIComponent(c.post.id)}#ed" data-sheet="${String(c.index)}">عدّل</a>`}
-      ${status === 'published' ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/delay">${hidden}<button class="btn btn-secondary btn-sm" type="submit" name="days" value="1">أخّر يومًا</button><button class="btn btn-secondary btn-sm" type="submit" name="days" value="7">أسبوعًا</button></form>`}
-      ${/* ‏والإزالةُ حمراء (مراجعة D-323): حوارُ التأكيد يقرأ الهدمَ من لون الزرّ، فيقف التركيزُ على «إلغاء» */''}
-      ${status === 'published' ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/drop" data-confirm="${'أزِل ' + label + ' من هذا اليوم؟' + (c.post === null ? '' : status === 'queued' ? ' يُسحب موعدُ منشوره ويُرفض، ويبقى بكلفته.' : ' ومسوّدتُه تُرفض وتبقى بكلفتها.')}">${hidden}${raw(button({ label: 'أزِل', variant: 'danger', size: 'sm', type: 'submit', icon: ICON.close }))}</form>`}
+      ${/*
+        ‏**فعلٌ أوّلٌ ظاهر، والباقي في «أفعال أخرى»** (D-351 · رونق): كانت البطاقةُ ستّةَ أزرارٍ متساوية — اعتمد، وعدّل، وأخّر يومًا، وأسبوعًا،
+        ‏وأزِل — فلا تقول العينُ أيّها الأهمّ. والتأخيرُ يقع بالسحب في التقويم أيضًا (D-330)، والإزالةُ حمراءُ في القائمة كما كانت في الصفّ
+        ‏(مراجعة D-323: حوارُ التأكيد يقرأ الهدمَ من لونها).
+      */''}
+      ${status === 'published' ? html`` : raw(menu({ label: 'أفعال أخرى', variant: 'icon', size: 'sm', icon: ICON.more, items: [
+        menuAction({ label: 'أخّر يومًا', action: '/panel/plan/review/delay', fields: { id: planId, index: String(c.index), key: c.key, w, days: '1' } }),
+        menuAction({ label: 'أخّر أسبوعًا', action: '/panel/plan/review/delay', fields: { id: planId, index: String(c.index), key: c.key, w, days: '7' } }),
+        menuAction({ label: 'أزِل', action: '/panel/plan/review/drop', danger: true, fields: { id: planId, index: String(c.index), key: c.key, w },
+          confirm: 'أزِل ' + label + ' من هذا اليوم؟' + (c.post === null ? '' : status === 'queued' ? ' يُسحب موعدُ منشوره ويُرفض، ويبقى بكلفته.' : ' ومسوّدتُه تُرفض وتبقى بكلفتها.') }),
+      ] }))}
     </div>
   </article>`
 }
@@ -197,7 +206,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
           ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}?w=160" alt="" loading="lazy" decoding="async" width="28" height="28">`}
           <span class="pf-logo rv-pf rv-dot" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
-          <bdi class="mono">${stamp(c.item.day + ' ' + c.item.time, board.zone).slice(11, 16)}</bdi><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
+          <bdi class="mono">${stamp(c.item.day + ' ' + c.item.time, board.zone).slice(11, 16)}</bdi><span class="rv-mini-t" aria-hidden="true">${c.item.angle}</span><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
       })}
     </div>`)
   }
