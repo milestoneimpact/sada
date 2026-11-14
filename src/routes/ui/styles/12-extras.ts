@@ -761,4 +761,25 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   .hp-next li{flex-wrap:wrap; row-gap:var(--s-0)}
   .hp-a{flex-basis:100%; white-space:normal; padding-inline-start:calc(var(--s-6) + var(--s-2))}
 }
+/* ── الإشعارات (D-352 · رونق) ─────────────
+   كلُّ إشعارٍ بطاقة: أيقونةُ نوعه في مربّعٍ بلون نبرته، واسمُ النوع، والنصّ، وفعلٌ واحد. والمقروءُ أهدأ. */
+.nt-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-3)}
+.nt-row{display:flex; align-items:center; gap:var(--s-4); border-inline-start:var(--s-1) solid var(--warn)}
+.nt-row[data-tone="bad"]{border-inline-start-color:var(--bad)}
+.nt-row[data-read]{border-inline-start-color:var(--surface-3)}
+.nt-ico{flex:none; display:grid; place-items:center; width:var(--tap); height:var(--tap); border-radius:var(--r-control); background:var(--warn-wash); color:var(--warn)}
+.nt-row[data-tone="bad"] .nt-ico{background:var(--bad-wash); color:var(--bad)}
+.nt-row[data-read] .nt-ico, .nt-calm .nt-ico{background:var(--surface-2); color:var(--ink-2)}
+.nt-ico svg{width:var(--icon-md); height:var(--icon-md); display:block}
+.nt-body{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--s-1)}
+.nt-meta{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
+.nt-kind{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
+.nt-text{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.nt-act{flex:none}
+.nt-calm{display:flex; align-items:center; gap:var(--s-4)}
+details.card .nt-list{margin-top:var(--s-4)}
+@media${below('sm')}{
+  .nt-row{flex-wrap:wrap}
+  .nt-act{flex-basis:100%; padding-inline-start:calc(var(--tap) + var(--s-4))}
+}
 `
