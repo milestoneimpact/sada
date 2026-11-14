@@ -89,7 +89,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ‏وتحت العريض عمودٌ واحد — وبعد قاعدتها في الورقة، فلا يغلبها الترتيب */
 /* ‏**عمودان** (D-355): الرئيسيُّ للقرار والجانبيُّ للسياق، والجانبيُّ ثابتُ العرض كي لا يتمدّد في الشاشات العريضة */
 .home-head{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin-bottom:var(--s-5)}
-.home-grid{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,1fr) 22rem; margin-top:var(--gap-card)}
+.home-grid{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,1fr) 24rem; margin-top:var(--gap-card)}
 .home-main, .home-aside{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card); min-width:0}
 .home-main > .card, .home-aside > .card{margin-bottom:0}
 @media${below('lg')}{.home-grid{grid-template-columns:minmax(0,1fr)}}
