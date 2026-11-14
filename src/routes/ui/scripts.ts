@@ -172,7 +172,7 @@ export const THEME_SCRIPT = `
   var apply=function(v){
     bar(v);
     try{
-      if(v==='system'){localStorage.removeItem('sada-theme');
+      if(v==='system'){localStorage.setItem('sada-theme','system');
         delete document.documentElement.dataset.theme;}
       else{localStorage.setItem('sada-theme',v); document.documentElement.dataset.theme=v;}
     }catch(e){
@@ -182,8 +182,8 @@ export const THEME_SCRIPT = `
     all().forEach(function(b){
       b.setAttribute('aria-pressed',String(b.dataset.theme===v));});
   };
-  var saved='system';
-  try{saved=localStorage.getItem('sada-theme')||'system';}catch(e){}
+  var saved='light';
+  try{saved=localStorage.getItem('sada-theme')||'light';}catch(e){}
   apply(saved);
   all().forEach(function(b){
     b.addEventListener('click',function(){apply(b.dataset.theme);});});

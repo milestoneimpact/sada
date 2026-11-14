@@ -31,7 +31,8 @@ describe('لكلّ لونٍ دورٌ واحد (D-325)', () => {
 
   it('وما يُبرز ولا يُضغط «--accent»: المقياسُ وحافّةُ «مجدولة» وحلقةُ اليوم وحدُّ المختار', () => {
     expect(css.rule('.bar i').background).toBe('var(--accent)')
-    expect(css.rule('.hstats [data-tone=sched] a')['border-inline-start-color']).toBe('var(--accent)')
+    // ‏‏D-355: الحافّةُ صارت نقطةً قبل اسم الرقم، والدورُ نفسُه
+    expect(css.rule('.hstats [data-tone=sched] .hs-k::before')['background']).toBe('var(--accent)')
     expect(css.rule('.wk li[data-today]')['box-shadow']).toContain('var(--accent)')
     expect(css.rule('.wz-opt:has(input:checked)')['border-color']).toBe('var(--accent)')
   })

@@ -86,13 +86,18 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ── القمعُ وشريطُ الأسبوع (D-194) ─────────────────────────────────────────────────
    القمع صفوف: اسم المحطّة وحالُها، ثمّ شريط بطول ما مرّ بها (حبر واحد: قياس لا هويّة)،
    ثمّ العدد. **والمميَّزة وحدَها بلون حالها** فلا تُقرأ سبع محطّات برتقاليّة ضجيجًا. */
-.home-pair{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,3fr) minmax(0,2fr); margin-bottom:var(--gap-card)}
-.home-pair > .home-card{margin-bottom:0}
 /* ‏وتحت العريض عمودٌ واحد — وبعد قاعدتها في الورقة، فلا يغلبها الترتيب */
-@media${below('lg')}{.home-pair{grid-template-columns:minmax(0,1fr)}}
-.home-side{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card)}
-.grid.tiles + .home-pair{margin-top:var(--gap-card)}
-.home-side > .home-card{margin-bottom:0}
+/* ‏**عمودان** (D-355): الرئيسيُّ للقرار والجانبيُّ للسياق، والجانبيُّ ثابتُ العرض كي لا يتمدّد في الشاشات العريضة */
+.home-head{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin-bottom:var(--s-5)}
+.home-grid{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,1fr) 22rem; margin-top:var(--gap-card)}
+.home-main, .home-aside{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card); min-width:0}
+.home-main > .card, .home-aside > .card{margin-bottom:0}
+@media${below('lg')}{.home-grid{grid-template-columns:minmax(0,1fr)}}
+/* ‏«خطوتك التالية» سطرٌ مضغوط (D-355): كان كتلةً بعنوانٍ كبير تملأ أوّلَ الشاشة */
+.card-alert.next.is-slim{padding:var(--s-3) var(--s-5); border-radius:var(--r-card)}
+.next.is-slim .next-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.next.is-slim .next-k{display:inline; margin-inline-end:var(--s-2)}
+.next.is-slim .next-body{display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--s-1)}
 .funnel{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-1)}
 .funnel a{display:grid; grid-template-columns:9rem minmax(0,1fr) 2.5rem; grid-template-areas:"t bar n" "t note note";
   column-gap:var(--s-3); row-gap:var(--s-0); align-items:center; padding:var(--s-1) var(--s-2); border-radius:var(--r-control);
@@ -264,18 +269,20 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .td-pf svg{width:var(--icon-sm); height:var(--icon-sm)}
 /* ── الرئيسيّة (D-265): التحيّة، والأرقام الأربعة، وأعمدة الأيّام ── */
 .hello{margin:0 0 var(--s-2); font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
-.hstats{list-style:none; margin:0 0 var(--gap-card); padding:0; display:grid; gap:var(--s-3);
-  grid-template-columns:repeat(4,minmax(0,1fr))}
-@media${below('md')}{.hstats{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.hstats a{display:flex; flex-direction:column; gap:var(--s-1); min-height:var(--tap); padding:var(--s-4);
-  background:var(--surface); border:1px solid var(--bd-soft); border-radius:var(--r-card); color:var(--ink);
-  text-decoration:none; border-inline-start:var(--ring-w) solid var(--line); animation:rise var(--dur-3) var(--ease-rise) both}
-.hstats li:nth-child(2) a{animation-delay:40ms}.hstats li:nth-child(3) a{animation-delay:80ms}.hstats li:nth-child(4) a{animation-delay:120ms}
-@media(hover:hover){.hstats a:hover{box-shadow:var(--sh-2)} .db-bar:hover rect{opacity:.8}}
-.hstats [data-tone=wait] a{border-inline-start-color:var(--ink-3)}
-.hstats [data-tone=sched] a{border-inline-start-color:var(--accent)}
-.hstats [data-tone=ok] a{border-inline-start-color:var(--ok)}
-.hstats [data-tone=bad] a{border-inline-start-color:var(--bad)}
+.hstats{list-style:none; margin:0 0 var(--gap-card); padding:0; display:grid; gap:0; overflow:hidden;
+  grid-template-columns:repeat(4,minmax(0,1fr)); background:var(--surface); border:var(--bd); border-radius:var(--r-card);
+  box-shadow:var(--sh-1); animation:rise var(--dur-3) var(--ease-rise) both}
+/* ‏**شريطٌ واحد لا أربعُ بطاقات** (D-355): الأرقامُ مقياسٌ واحد يُقرأ معًا، فتفصلها خيوطٌ لا حوافٌّ ملوّنة. والحالُ نقطةٌ قبل اسم الرقم */
+@media${below('md')}{.hstats{grid-template-columns:repeat(2,minmax(0,1fr))} .hstats li:nth-child(n+3){border-top:var(--bd)} .hstats li:nth-child(3){border-inline-start:0}}
+.hstats li + li{border-inline-start:var(--bd)}
+.hstats a{display:flex; flex-direction:column; gap:var(--s-1); min-height:var(--tap); padding:var(--s-4) var(--s-5); color:var(--ink); text-decoration:none;
+  transition:background-color var(--dur-2) var(--ease)}
+@media(hover:hover){.hstats a:hover{background:var(--hover)} .db-bar:hover rect{opacity:.8}}
+.hs-k::before{content:''; display:inline-block; width:var(--s-2); height:var(--s-2); margin-inline-end:var(--s-2); border-radius:var(--r-pill); background:var(--line); vertical-align:middle}
+.hstats [data-tone=wait] .hs-k::before{background:var(--ink-3)}
+.hstats [data-tone=sched] .hs-k::before{background:var(--accent)}
+.hstats [data-tone=ok] .hs-k::before{background:var(--ok)}
+.hstats [data-tone=bad] .hs-k::before{background:var(--bad)}
 .hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .hs-n{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .daybars{margin:0}

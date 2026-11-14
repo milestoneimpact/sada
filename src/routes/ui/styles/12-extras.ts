@@ -696,25 +696,26 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .pd-state{margin-top:var(--s-1); padding:var(--s-1) var(--s-3); border-radius:var(--r-control); border:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 35%,transparent);
   font-size:var(--t-ui); line-height:var(--lh-ui)}
 .pd-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,8rem),1fr)); gap:var(--s-4); width:100%; margin-top:var(--s-6)}
-.pd-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 30%,transparent)}
+.pd-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid var(--line)}
 .pd-kpi b{font-size:var(--t-h1); line-height:var(--lh-h1); font-variant-numeric:tabular-nums}
 .pd-kpi span{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
 /* ── اللوحةُ العليا لـ«النماذج والمفاتيح» (D-350 · رونق) ─────────────
    أرضُ اللحظة ونقشُ الصدى كرأس «وثيقة الخطّة»، والنقشُ في الزاوية المقابلة للعنوان مقنَّعٌ نحو الأرقام فلا يمرّ تحت نصّ. */
 .ph-hero{position:relative; overflow:hidden; isolation:isolate; display:flex; flex-direction:column; align-items:flex-start;
-  gap:var(--s-2); padding:var(--s-8) var(--s-6); margin-bottom:var(--s-4); border-radius:var(--r-hero);
-  background:var(--moment-ground); color:var(--moment-ink)}
-.ph-echo{position:absolute; top:0; inset-inline-end:0; width:55%; height:100%; z-index:-1; pointer-events:none; opacity:.85;
+  gap:var(--s-2); padding:var(--s-8) var(--s-6); margin-bottom:var(--s-6); border-radius:var(--r-hero);
+  border:var(--bd); box-shadow:var(--sh-1); color:var(--ink);
+  background:linear-gradient(135deg, var(--selected), var(--surface) 62%)}
+.ph-echo{position:absolute; top:0; inset-inline-end:0; width:55%; height:100%; z-index:-1; pointer-events:none; opacity:.16; color:var(--accent);
   -webkit-mask-image:linear-gradient(to right, currentColor 35%, transparent); mask-image:linear-gradient(to right, currentColor 35%, transparent)}
 .ph-echo svg{display:block; width:100%; height:100%}
-.ph-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
+.ph-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--link)}
 .ph-title{margin:0; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
-.ph-lede{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui); opacity:.9}
+.ph-lede{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
 .ph-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,6rem),1fr)); gap:var(--s-4); width:min(100%,36rem); margin-top:var(--s-4)}
-.ph-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 30%,transparent)}
+.ph-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid var(--line)}
 .ph-kpi b{font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600; font-variant-numeric:tabular-nums}
-.ph-kpi b em{font-style:normal; font-weight:400; font-size:var(--t-small); opacity:.75}
-.ph-kpi span{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
+.ph-kpi b em{font-style:normal; font-weight:400; font-size:var(--t-small); color:var(--ink-2)}
+.ph-kpi span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .ph-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); margin-top:var(--s-4)}
 .pd-sec h2{margin:0 0 var(--s-4); font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
 .pd-mix{display:grid; gap:var(--s-3); max-width:calc(var(--measure) * 1.4)}
