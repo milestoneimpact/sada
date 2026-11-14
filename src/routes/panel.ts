@@ -23,6 +23,7 @@ import { drafts } from './panel/drafts'
 import { notices } from './panel/notices'
 import { vitals } from './panel/vitals'
 import { help } from './panel/help'
+import { privacy } from './panel/privacy'
 
 import { dispatchSoon, SCHEDULING_PATHS } from './panel/shared'
 
@@ -50,3 +51,4 @@ panel.route('/', drafts)
 panel.route('/', notices)
 panel.route('/', vitals)
 panel.route('/', help)
+panel.route('/', privacy)

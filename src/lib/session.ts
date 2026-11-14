@@ -485,6 +485,29 @@ export async function setActiveOrg(store: SessionStore, session: Session, org: s
   return { id: session.id, record }
 }
 
+/**
+ * **كلُّ جلسةٍ كانت في منظّمةٍ حُذفت تنتقل إلى غيرها** (D-322) — وإلّا بقي جهازٌ آخر للمالك يكتب صفوفًا لمنظّمةٍ لا وجودَ لها
+ * (`org_id` نصٌّ لا مفتاحٌ أجنبيّ). والكتابةُ بما بقي من عمر الجلسة كـ`setActiveOrg`. ويعيد كم جلسةً نُقلت.
+ */
+export async function moveSessionsFrom(store: SessionStore, from: string, to: string, now: Date = new Date()): Promise<number> {
+  if (store.list === undefined) return 0
+  let moved = 0
+  let cursor: string | undefined
+  do {
+    const page = await store.list({ prefix: PREFIX, cursor: cursor ?? null })
+    for (const key of page.keys) {
+      const raw = await store.get(key.name)
+      const record = raw === null ? null : parse(raw)
+      if (record === null || record.org !== from) continue
+      const next: SessionRecord = { ...record, org: to }
+      await store.put(key.name, JSON.stringify(next), { expirationTtl: remainingSeconds(next, now) })
+      moved += 1
+    }
+    cursor = page.list_complete === false ? page.cursor : undefined
+  } while (cursor !== undefined)
+  return moved
+}
+
 export async function destroySession(store: SessionStore, request: Request): Promise<void> {
   const id = readCookie(request.headers.get('Cookie'), COOKIE)
   if (id !== null) await store.delete(sessionKey(id))

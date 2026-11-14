@@ -16,6 +16,15 @@ import { failingProviders, failingSince } from '../ai/health'
 import type { Db } from '../tokens'
 import { alertable, pulseReport } from '../ops/pulse'
 
+/**
+ * **نافذةُ «نشرٌ فشل»** (D-322) — منشورٌ فشل في آخر ثلاثين يومًا وحدَه.
+ *
+ * كان يُقرأ كلُّ منشورٍ فاشلٍ منذ أوّل يوم، كلَّ ساعة، **و«لا يُرسَل مرّتين» قائمٌ على صفّه في `alert_outbox`** (`publish:<معرّف>`).
+ * فلمّا صار الصندوقُ يُكنَس بعد تسعين يومًا (`privacy/retention.ts`) كان تنبيهُ منشورٍ فشل قبل مئة يومٍ يعود إلى القناة في الساعة
+ * التالية لكنسه. فالجمعُ أقصرُ من الكنس، **والاختبارُ يحرس أنّه يبقى أقصر**. ووقتُ الفشل آخرُ محاولةٍ له، وإلّا آخرُ ما يُعرف من وقته.
+ */
+export const PUBLISH_ALERT_DAYS = 30
+
 /** اليومُ بصيغة القاعدة — والسقفُ يوميٌّ فمفتاحُه يومٌ لا لحظة. */
 function dayOf(now: Date): string {
   return now.toISOString().slice(0, 10)
@@ -47,8 +56,10 @@ export async function collectAlerts(
       `SELECT p.id, p.platform, p.org_id, COUNT(pa.id) AS tries
          FROM posts p LEFT JOIN publish_attempts pa ON pa.post_id = p.id AND pa.org_id = p.org_id
         WHERE p.status = 'failed'
-        GROUP BY p.id`,
+        GROUP BY p.id
+       HAVING COALESCE(MAX(pa.at), p.dispatched_at, p.scheduled_at, p.created_at) >= datetime('now', ?)`,
     )
+    .bind(`-${PUBLISH_ALERT_DAYS} days`)
     .all<{ id: string; platform: string; org_id: string; tries: number }>()
     .catch(() => ({ results: [] as { id: string; platform: string; org_id: string; tries: number }[] }))
   for (const f of failed) out.push(publishAlert(f.id, f.platform, f.tries, f.org_id))

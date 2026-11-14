@@ -141,3 +141,23 @@ describe('«بنفسي» و«تراجَع» بعد الجدولة (D-324)', () =
     expect(needsStepUp('POST', '/panel/drafts/undo-schedule')).toBe(false)
   })
 })
+
+/** الحذفُ والتصدير (D-322): لمن يعتمد، والمصدرُ للمدير كإضافته، والعميلُ كلُّه للمالك وبتحقّقٍ للتوّ. */
+describe('أبوابُ الحذف والتصدير (D-322)', () => {
+  it('الحذفُ والتراجعُ للناشر — والمقطعُ لا يتبع سطرَ المحرّر في «uploads»', () => {
+    for (const path of ['/panel/drafts/delete', '/panel/uploads/u1/delete', '/panel/assets/delete', '/panel/trash/restore']) {
+      expect(requiredRole('POST', path), path).toBe('publisher')
+    }
+    expect(requiredRole('POST', '/panel/sources/delete')).toBe('admin')
+  })
+
+  it('وتصديرُ العميل وحذفُه للمالك، ولا يجريان بلا تحقّقٍ حديث', () => {
+    expect(requiredRole('POST', '/panel/orgs/delete')).toBe('owner')
+    expect(requiredRole('GET', '/panel/orgs/export')).toBe('owner')
+    expect(needsStepUp('POST', '/panel/orgs/delete')).toBe(true)
+    expect(needsStepUp('GET', '/panel/orgs/export')).toBe(true)
+    expect(needsStepUp('HEAD', '/panel/orgs/export')).toBe(true)
+    // ‏وحذفُ مسوّدةٍ يُتراجَع عنه: لا يُسأل عن العامل
+    expect(needsStepUp('POST', '/panel/drafts/delete')).toBe(false)
+  })
+})

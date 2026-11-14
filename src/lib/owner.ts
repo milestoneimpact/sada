@@ -590,6 +590,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏يقع على جهاز المالك ولا أثرَ له على الخادم (D-061)
     done: () => null,
   },
+  {
+    code: 'M-53',
+    title: 'سياسة الخصوصيّة وأساس نقل بيانات العملاء خارج المملكة (بعد D-322)',
+    ifLeft: 'السياسةُ صادقة، وأساسُ نقل نصوص العملاء إلى خدمات الذكاء خارج المملكة لم يُقرَّر — خطرٌ قانونيّ لا عطل.',
+    unblocks: 'guard',
+    // ‏حكمٌ قانونيٌّ وعقدٌ مع العميل — لا أثرَ له يُقرأ من هنا (D-061)
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

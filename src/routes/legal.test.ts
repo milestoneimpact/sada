@@ -9,6 +9,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { scopeSet } from '../lib/oauth/scopes'
+import { RETENTION } from '../lib/privacy/retention'
+import { counted, NOUNS } from '../lib/format'
 
 let db: FakeDb
 
@@ -179,5 +181,35 @@ describe('كلّ تصل إلى الأخرى', () => {
   it('السياسة تشير إلى الشروط والعكس', async () => {
     expect(await (await app.request('/privacy', {}, env())).text()).toContain('href="/terms"')
     expect(await (await app.request('/terms', {}, env())).text()).toContain('href="/privacy"')
+  })
+})
+
+/**
+ * ‏**السياسةُ تقول ما يقع** (D-322). كانت تقول «ليس لصدى مستخدمون» وله فريقٌ وعملاء، و«خلف عاملين» والعاملُ اختياريٌّ لبعض
+ * ‏الأدوار، و«حتّى يحذفها المشغّل» أربعَ مرّاتٍ ولا بابَ يحذف، ولا تسمّي خدمةَ كتابةٍ واحدةً ولا مدّة.
+ */
+describe('سياسةٌ صادقة (D-322)', () => {
+  it('لا تقول ما لم يعد صحيحًا', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const stale of ['وليس لصدى مستخدمون', 'خلف عاملين', 'حتّى يحذفها المشغّل', 'يشغّلها شخص واحد']) expect(html).not.toContain(stale)
+  })
+
+  it('تسمّي من يدخل ومن يعالج: الفريقَ والعملاء، وكلَّ خدمة كتابةٍ وصور، وCloudflare وDrive والبريد', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const name of ['أعضاءُ فريقٍ', 'عملائه', 'Anthropic', 'Gemini', 'OpenAI', 'Workers AI', 'Drive API', 'Email Routing', 'قناة التنبيهات', 'خارج المملكة']) {
+      expect(html, name).toContain(name)
+    }
+  })
+
+  it('**وكلُّ مدّةٍ في الكنّاس مكتوبةٌ فيها بأرقامه** — بالعربيّة والإنجليزيّة', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const n of Object.values(RETENTION)) expect(html, String(n)).toContain(counted(n, NOUNS.day, 'gen'))
+    expect(html).toContain(`after ${RETENTION.auditDays} days`)
+    expect(html).toContain('Time Travel')
+  })
+
+  it('وتقول كيف يُحذف كلُّ شيءٍ ويُصدَّر، وما لا يُحذف وحدَه ولماذا', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const how of ['احذفها', 'احذف المقطع', '«صدّر»', 'احذف عميلًا وبياناته', 'تراجَع', 'يمنع نشره', 'دفترُ الكلفة']) expect(html, how).toContain(how)
   })
 })

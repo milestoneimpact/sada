@@ -6,6 +6,7 @@
  */
 import { ICON as SVG } from './icons'
 import { escapeHtml } from './escape'
+import { html, raw } from './html'
 import { button } from './components/button'
 import { field } from './components/field'
 import { pageHead } from './parts'
@@ -22,7 +23,12 @@ export interface LibraryData {
   readonly pick: { readonly plan: string; readonly index: number } | null
   /** وجهُ الاختيار لمنشورٍ مكتوب (D-334): «اختر من المكتبة» على بطاقة الخطّة — المنشورُ وبطاقتُه وأسبوعُها للعودة. */
   readonly pickPost?: { readonly post: string; readonly index: number; readonly w: string } | null
-  readonly flash?: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+  readonly flash?: {
+    readonly kind: 'ok' | 'warn' | 'bad'
+    readonly text: string
+    /** «تراجَع» بعد حذف صورة (D-322) — رمزُه وحدَه، والصفُّ في KV لا في النموذج. */
+    readonly undo?: { readonly action: string; readonly id: string; readonly label: string }
+  } | null
   /** البحثُ والمفضّلة (D-347). */
   readonly q?: string
   readonly fav?: boolean
@@ -69,6 +75,10 @@ function tile(a: Asset, d: LibraryData): string {
   const forPost = d.pickPost !== undefined && d.pickPost !== null
   // ‏عدّادُ الاستعمال (D-334): يُرى قبل الاختيار، فلا تتكرّر الصورةُ بلا قصد
   const used = a.uses === undefined || a.uses === 0 ? '' : ' · ' + (a.uses === 1 ? 'في منشورٍ واحد' : 'في ' + String(a.uses) + ' منشورات')
+  // ‏وصورةُ الأصول المرفوعةُ تُحذف من هنا (D-322) بلا «أتمضي؟» — «تراجَع» في إشعارها. والمقاطعُ من «فيديوهاتك»، والمولَّدةُ مع منشورها
+  const remove = d.pick !== null || forPost || !a.ref.startsWith('f:') ? ''
+    : html`<form class="inline" method="POST" action="/panel/assets/delete" data-busy="جار…"><input type="hidden" name="ref" value="${a.ref}">
+        ${raw(button({ label: 'احذف', variant: 'danger', size: 'sm', type: 'submit', attrs: html`aria-label="${'احذف ' + a.name}"`.value }))}</form>`.value
   const pick = forPost
     ? a.kind !== 'image' || a.origin === 'drive' ? ''
       : '<form class="inline" method="POST" action="/panel/plan/review/image">' + hidden(d) + '<input type="hidden" name="ref" value="' + escapeHtml(a.ref) + '">'
@@ -80,7 +90,7 @@ function tile(a: Asset, d: LibraryData): string {
     ${media}
     <div class="kv-k"><bdi>${escapeHtml(a.name)}</bdi></div>
     <div class="note">${escapeHtml(folderOf(a))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}${escapeHtml(used)}</div>
-    <div class="row gap-2 mt-3">${pick}${open}</div>
+    <div class="row gap-2 mt-3">${pick}${open}${remove}</div>
     ${assetMarks(a, query(d, {}).split('?')[1] ?? '')}
   </article>`
 }
@@ -115,7 +125,13 @@ export function libraryScreen(d: LibraryData): string {
     + '</div></form>'
 
   return `${pageHead('الأصول', 'أصولُ العميل', lead)}
-  ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
+  ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({
+    tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad',
+    ...(d.flash.undo === undefined ? {} : {
+      action: html`<form class="inline" method="POST" action="${d.flash.undo.action}"><input type="hidden" name="id" value="${d.flash.undo.id}">
+        ${raw(button({ label: d.flash.undo.label, size: 'sm', type: 'submit' }))}</form>`.value,
+    }),
+  }))}
   <div class="row gap-2 mb-3 lib-chips" role="group" aria-label="النوع">${chips(d, KIND_LABEL, d.kind, 'kind', (v) => d.assets.filter((a) => v === null || a.kind === v).length)}</div>
   <div class="row gap-2 mb-4 lib-chips" role="group" aria-label="المنشأ">${chips(d, ORIGIN_LABEL, d.origin, 'origin', (v) => d.assets.filter((a) => v === null || a.origin === v).length)}</div>
   ${assetSearch(d.q ?? '', d.fav === true, keep)}

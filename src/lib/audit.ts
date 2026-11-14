@@ -204,6 +204,15 @@ export const ACTION_LABEL: Readonly<Record<string, string>> = {
   'oauth_app.verify': 'اختبار تطبيق منصّة',
   'oauth_app.delete': 'حذف تطبيق منصّة',
   'promotion.decide': 'قرار ترويج',
+  // ‏الحذفُ والتصديرُ والكنس (D-322)
+  'post.delete': 'حذف مسوّدة',
+  'source.delete': 'حذف مصدر',
+  'upload.delete': 'حذف مقطع',
+  'library.delete': 'حذف صورة من الأصول',
+  'trash.restore': 'تراجع عن حذف',
+  'org.export': 'تصدير بيانات عميل',
+  'org.delete': 'حذف عميل وبياناته',
+  'retention.sweep': 'كنس ما فات مدّته',
 }
 
 export function actionLabel(action: string): string {

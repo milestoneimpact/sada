@@ -345,3 +345,32 @@ describe('النسخة الاحتياطيّة (D-321)', () => {
     expect((db.raw.prepare("SELECT count(*) AS n FROM backups WHERE status = 'ok'").get() as { n: number }).n).toBe(1)
   })
 })
+
+/**
+ * ‏**الكنسُ اليوميّ على جدول المسح وحدَه** (D-322) — لا جدولٌ خامس في `wrangler.toml`، ولا كنسٌ كلَّ ربع ساعة.
+ */
+describe('الكنسُ اليوميّ (D-322)', () => {
+  function seedOld(): void {
+    db.raw.exec(`INSERT INTO audit_log (org_id, actor, action, at, ip) VALUES
+      ('org_owner', 'panel', 'settings.write', datetime('now', '-400 days'), '203.0.113.9'),
+      ('org_owner', 'panel', 'session.open', datetime('now', '-40 days'), '203.0.113.9')`)
+  }
+
+  it('يدور مع المسح: ما فات سنةً يُمحى، وعنوانُ IP بعد شهرٍ يُقصَّر، وسطرُه في سجلّ النشاط', async () => {
+    seedOld()
+    await runCron(0, '3 3 * * *')
+    expect(db.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'settings.write'").get()).toEqual({ n: 0 })
+    expect(db.raw.prepare("SELECT ip FROM audit_log WHERE action = 'session.open'").get()).toEqual({ ip: '203.0.113.0' })
+    const line = db.raw.prepare("SELECT actor, detail FROM audit_log WHERE action = 'retention.sweep'").get() as { actor: string; detail: string }
+    expect(line.actor).toBe('cron')
+    expect(line.detail).toContain('نشاط 1')
+    expect(line.detail).toContain('IP 1')
+  })
+
+  it('ولا يدور على دورة الربع', async () => {
+    seedOld()
+    await runCron(0, '*/15 * * * *')
+    expect(db.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'settings.write'").get()).toEqual({ n: 1 })
+    expect(db.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'retention.sweep'").get()).toEqual({ n: 0 })
+  })
+})

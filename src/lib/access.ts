@@ -60,10 +60,13 @@ const STEP_UP_POST: readonly RegExp[] = [
   /^\/panel\/team\/(invite|revoke)$/,
   /^\/panel\/providers\/(add|key|delete)$/,
   /^\/panel\/channels\/disconnect$/,
+  // ‏وحذفُ عميلٍ كلِّه (D-322): لا يُردّ، فلا تبدؤه جلسةٌ مسروقة
+  /^\/panel\/orgs\/delete$/,
 ]
 
 export function needsStepUp(method: string, path: string, settingKey?: string | null): boolean {
-  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path)
+  // ‏وتصديرُ عميلٍ كلِّه (D-322) صفحةٌ تُفتح — وملفُّه ما تريده جلسةٌ مسروقةٌ تحديدًا
+  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path) || path === '/panel/orgs/export'
   // ‏وفتحُ أبواب الطرفيّة (D-318): بابٌ يُنادى برمزٍ ثابتٍ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
   if (path === '/panel/settings') return settingKey === 'alert_webhook' || settingKey === 'admin_api'
   return STEP_UP_POST.some((re) => re.test(path))
@@ -112,7 +115,7 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/(security|stepup)(\/|$)/, 'viewer'],
   // ‏المالكُ وحدَه: الفريق، والجلسات، ومفاتيحُ المزوّدين، والإعدادات العامّة، وإنشاءُ الشركات، وتطبيقاتُ المنصّات
   [/^\/panel\/(team|sessions|providers|routes|channels\/app)(\/|$)/, 'owner'],
-  [/^\/panel\/(settings|orgs)$/, 'owner'],
+  [/^\/panel\/(settings|orgs|orgs\/delete)$/, 'owner'],
   // ‏المدير: ربطُ القنوات وفصلُها، والمسحُ والتحليل، والترويج، واستيرادُ الخطط
   [/^\/panel\/(channels\/disconnect|scan|analyze|sources|images\/quota|report\/promote|plan-import|plan\/import|client\/limits)(\/|$)/, 'admin'],
   // ‏الناشر: كلُّ ما يعتمد أو يجدول أو يُنشر
@@ -122,6 +125,8 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   // ‏و«تراجَع» في إشعار الجدولة (D-324) لمن يجدول: يعيد ما فعله قبل ثوانٍ
   [/^\/panel\/drafts\/undo-schedule$/, 'publisher'],
   [/^\/panel\/client\/report\/send$/, 'publisher'],
+  // ‏والحذفُ (D-322) لمن يعتمد: المسوّدةُ والمقطعُ وصورةُ الأصول، و«تراجَع» عنها — والمصدرُ للمدير كإضافته (سطرُ «sources» أعلاه)
+  [/^\/panel\/(drafts\/delete|uploads\/[^/]+\/delete|assets\/delete|trash\/restore)$/, 'publisher'],
   // ‏**وما يُنفق مالًا لمن يعتمد** (D-318): توليدُ الخطّة، والكتابةُ بالذكاء (من مصدرٍ أو فكرةٍ أو نصوصِ مقطع)، والصورُ،
   // ‏وتحريكُها فيديو. كان المحرّرُ يبدأها كلَّها والسقوفُ وحدَها تحدّه؛ وصار الإنفاقُ مربوطًا بالدور الذي يعتمد
   [SPEND_PATHS, 'publisher'],
@@ -142,7 +147,7 @@ export function requiredRole(method: string, path: string, action?: string | nul
   if (OPEN.test(path)) return null
   if (path.startsWith('/oauth/')) return 'admin'
   if (method === 'GET' || method === 'HEAD') {
-    if (/^\/panel\/team(\/|$)/.test(path)) return 'owner'
+    if (/^\/panel\/team(\/|$)/.test(path) || path === '/panel/orgs/export') return 'owner'
     // ‏و«بوّابات المراحل» بدور «ما عليك» نفسِه: كانت طيّةً فيها، وخرجت إلى صفحتها لوزنها (دمجُ D-318 مع D-324)
     if (/^\/panel\/(settings|tasks|gates)(\/|$)/.test(path)) return 'admin'
     return 'viewer'

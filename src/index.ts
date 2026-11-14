@@ -44,6 +44,9 @@ import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
+import { sweepRetention } from './lib/privacy/retention'
+import { purgeDeleted } from './lib/privacy/trash'
+import { record } from './lib/audit'
 import { pulseReport } from './lib/ops/pulse'
 import { snapshotDue, takeSnapshot } from './lib/ops/backup'
 import { snapshotKid } from './lib/ops/snapshot'
@@ -1142,6 +1145,28 @@ async function rotateTick(env: Env): Promise<void> {
   }
 }
 
+/**
+ * **الكنسُ اليوميّ** (D-322) — مع المسح في جدوله (`3 3 * * *`) لا في جدولٍ خامس: ما فات مدّتَه من سجلّ النشاط والصندوق وتنبيهات
+ * الأذونات وعدّادات الدخول يُمحى، وعنوانُ IP يُقصَّر، وبايتاتُ ما حُذف من اللوحة تُمحى من R2 بعد مهلة «تراجَع».
+ *
+ * **وعطلُه لا يُوقف ما بعده**: يُقال في السجلّ ويُعاد غدًا. وأثرُه سطرٌ في سجلّ نشاط المالك بأعداده — بلا نصٍّ ولا عنوان.
+ */
+async function retentionTick(env: Env): Promise<void> {
+  // ‏الكنسُ والمحوُ مستقلّان: R2 أو KV لا يردّ لا يُبقي سجلَّ النشاط بلا كنس، ولا العكس
+  const swept = await sweepRetention(env.DB)
+    .catch((error: unknown) => { console.error({ job: 'retention', failed: String(error) }); return null })
+  const purged = await purgeDeleted({ db: env.DB, kv: env.KV, bucket: env.MEDIA })
+    .catch((error: unknown) => { console.error({ job: 'retention-purge', failed: String(error) }); return null })
+  console.info({ job: 'retention', ...(swept ?? {}), ...(purged ?? {}) })
+  const detail = [
+    swept === null ? 'الكنس تعذّر' : [
+      `نشاط ${swept.audit + swept.formRejects}`, `IP ${swept.ips}`, `صندوق ${swept.outbox}`, `أذونات ${swept.tokenAlerts}`, `دخول ${swept.authAttempts}`,
+    ].join(' · '),
+    purged === null ? 'المحو تعذّر' : `ملفّات ${purged.objects}`,
+  ].join(' · ')
+  await record(env.DB, { actor: 'cron', action: 'retention.sweep', detail, org: OWNER_ORG })
+}
+
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
   // ‏حلقةُ المفاتيح قبل أيّ فكّ (D-318)
   registerKeyring(env)
@@ -1157,6 +1182,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
     await providersTick(env)
     await alertTick(env)
     await quotaTick(env)
+    await retentionTick(env)
     // ‏آخرًا (D-321): النسخةُ تقرأ ما كتبه المسحُ، ولا تؤخّر ما يُنتظر
     await backupTick(env)
     await prunePulseSlots(env.DB, new Date()).catch((error: unknown) => {
