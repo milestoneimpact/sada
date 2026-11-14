@@ -58,7 +58,7 @@ export function noticesScreen(d: NoticesScreenData): string {
     : 'ما يحتاج يدَك، بالأحدث أوّلًا. والإشعارُ يختفي وحدَه حين يزول سببُه.'
   const refs = unread.map((n) => html`<input type="hidden" name="ref" value="${n.ref}">`)
   return html`<header class="ph-hero">
-    <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'deep', crest: 0.2, level: 0.5, scale: 1.1, density: 4, hairline: false, align: 'xMinYMid' }))}</span>
+    <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'light', crest: 0.2, level: 0.5, scale: 1.1, density: 3, hairline: false, align: 'xMinYMid' }))}</span>
     <span class="ph-eyebrow">ما يحتاج يدَك</span>
     <h1 class="ph-title">الإشعارات</h1>
     <p class="ph-lede m-0">${lede}</p>

@@ -548,9 +548,10 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     db.raw.exec("UPDATE accounts SET status = 'needs_reauth'")
     const { cookie } = await session()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(html).toContain('class="row gap-2 home-hello"')
+    // ‏‏D-355: سطرُ التحيّة صار رأسَ الرئيسيّة (`home-head`)، والقاعدةُ نفسُها: زرٌّ صغيرٌ فيه
+    expect(html).toContain('class="home-head home-hello"')
     expect(html).toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
-    expect(html).not.toContain('class="card card-alert next" data-tone="bad"')
+    expect(html).not.toContain('card-alert next is-slim" data-tone="bad"')
   })
 })
 

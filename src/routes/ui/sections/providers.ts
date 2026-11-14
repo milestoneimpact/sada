@@ -144,7 +144,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
   const healthy = ready.filter((p) => p.checks.at(-1)?.ok !== false)
   const failing = ready.length - healthy.length
   const strip = html`<header class="ph-hero">
-    <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'deep', crest: 0.2, level: 0.5, scale: 1.1, density: 4, hairline: false, align: 'xMinYMid' }))}</span>
+    <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'light', crest: 0.2, level: 0.5, scale: 1.1, density: 3, hairline: false, align: 'xMinYMid' }))}</span>
     <span class="ph-eyebrow">الإعدادات · المحرّك</span>
     <h2 class="ph-title">النماذج والمفاتيح</h2>
     <p class="ph-lede m-0">مفتاحٌ لكلّ مزوّد يُحفظ هنا ويُختبر كلَّ فجر، ثمّ يُختار لكلّ مهمّةٍ نموذجُها.</p>

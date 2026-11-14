@@ -41,7 +41,8 @@ describe('لوحة القيادة (D-194)', () => {
   it('التحيّة بساعة المالك، والأرقام الأربعة من العدّ المجمَّع (D-265)', () => {
     const html = homeTop(facts({ zone: 'Asia/Riyadh', counts: { perPlatform: {
       x: { draft: 3, approved: 0, queued: 2, published: 5, failed: 1, recentFailed: 1, nextAt: null } }, publishedWeek: 4 } }), NOW)
-    expect(html).toContain('<p class="hello">نهارك سعيد</p>')
+    // ‏‏D-355: التحيّةُ في رأس الرئيسيّة
+    expect(html).toContain('<p class="hello m-0">نهارك سعيد</p>')
     expect(html.match(/class="hs-n num">(\d+)</g)!.map((m) => m.replace(/\D/g, ''))).toEqual(['3', '2', '4', '1'])
   })
   it('أعمدة الأيّام من تواريخ الكتابة الحقيقيّة، وبلا شيء رسمٌ فارغ لا أعمدة مسطّحة', () => {

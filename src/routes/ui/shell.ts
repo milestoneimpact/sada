@@ -184,7 +184,7 @@ ${THEME_COLOR}`
  * «console.debug» بعلامة «sada:vt-muted» (مخفيٌّ في أدوات المتصفّح ما لم يُطلب «Verbose»)، والرحلاتُ تعدّه بجوار أخطاء الصفحة.
  */
 const THEME_BOOT = `
-try{var t=localStorage.getItem('sada-theme');
+try{var t=localStorage.getItem('sada-theme')||'light';
 if(t==='dark'||t==='light'){document.documentElement.dataset.theme=t;
 document.querySelectorAll('meta[name="theme-color"][data-c]').forEach(function(m){
 m.content=t==='dark'?${JSON.stringify(THEME.dark['--bg'])}:${JSON.stringify(THEME.light['--bg'])};});}
@@ -345,9 +345,9 @@ export function backNav(href: string, label: string): string {
  */
 export function themeSwitch(withId = true): string {
   return segmented('سمة العرض', 'theme', [
-    { value: 'light', label: 'نهاريّ' },
+    { value: 'light', label: 'نهاريّ', pressed: true },
     { value: 'dark', label: 'ليليّ' },
-    { value: 'system', label: 'النظام', pressed: true },
+    { value: 'system', label: 'النظام' },
   ], withId ? 'theme' : undefined)
 }
 

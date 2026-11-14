@@ -62,7 +62,7 @@ media.get('/panel/assets', async (c) => {
   })
   return page((nonce) =>
     soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('accounts')),
+      buildCommands({ onPanel: false }), soloNav('library')),
   )
 })
 

@@ -4243,7 +4243,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     // ‏والبطاقةُ في «النظام» بالإعدادات (D-221)، والمرساةُ تُتبَع إليها
     expect(html).not.toContain('id="machine"')
     expect(await (await app.request('/panel/settings', withSession(await login()), env)).text()).toContain('id="machine"')
-    const next = html.slice(html.indexOf('<div class="card card-alert next"'), html.indexOf('<div class="card home-card">'))
+    const next = html.slice(html.indexOf('<div class="card card-alert next is-slim"'), html.indexOf('<div class="home-grid">'))
     expect(next).toContain('href="#machine"')
     expect(next).toContain('قبل 3 أيّام')
   })
@@ -4256,7 +4256,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
       .run()
     await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 6.06 })
     const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
-    const next = html.slice(html.indexOf('<div class="card card-alert next"'), html.indexOf('<div class="card home-card">'))
+    const next = html.slice(html.indexOf('<div class="card card-alert next is-slim"'), html.indexOf('<div class="home-grid">'))
     expect(next).toContain('href="#c2"')
     expect(next).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
     expect(html).toContain('id="c2"')

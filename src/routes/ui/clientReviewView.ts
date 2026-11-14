@@ -64,7 +64,7 @@ export function clientReviewScreen(d: ClientReviewData): string {
   const done = shown.filter((c) => d.verdicts.has(c.card.key)).length
   return html`<main class="cr-page">
     <header class="ph-hero">
-      <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'deep', crest: 0.2, level: 0.5, scale: 1.1, density: 4, hairline: false, align: 'xMinYMid' }))}</span>
+      <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'light', crest: 0.2, level: 0.5, scale: 1.1, density: 3, hairline: false, align: 'xMinYMid' }))}</span>
       <span class="ph-eyebrow">${d.orgName}</span>
       <h1 class="ph-title">راجع منشوراتك</h1>
       <p class="ph-lede m-0">كلُّ منشورٍ كما سيظهر في منصّته. قل «موافق» أو «أطلب تعديلًا» واكتب ما تريد تغييره — يصل إلى الفريق فورًا.</p>

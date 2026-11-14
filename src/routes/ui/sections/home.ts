@@ -269,35 +269,37 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '
    */
   // ‏والزرُّ يبقى بضغطةٍ واحدة صغيرًا بجانب التحيّة: الشريطُ يقول الحالَ، وهذا يصلحها
   const repeated = next.tone === 'bad' && next.href.startsWith('/oauth/')
-  const hello = entry === ''
-    ? html`<p class="hello">${greeting(now, f.zone)}</p>`
-    : html`<div class="row gap-2"><p class="hello">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}</div>`
-  return `${repeated
-    ? html`<div class="row gap-2 home-hello"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}
-        <a class="btn btn-secondary btn-sm" href="${next.href}">${next.label}</a></div>`.value
-    : html`<div class="card card-alert next" data-tone="${next.tone}">
-    <div class="next-body">${hello}<span class="next-k">خطوتُك التالية</span>
-      <p class="next-t">${next.text}</p></div>
-    <a class="btn btn-primary" href="${next.href}">${next.label}</a>
-  </div>`.value}
+  /*
+   * ‏**التخطيطُ المعتمد** (D-355): رأسٌ بالتحيّة وزرِّ الدخول، ثمّ سطرُ «خطوتك التالية» مضغوطًا لا كتلةً تملأ أوّلَ الشاشة، ثمّ شريطُ
+   * ‏الأرقام، ثمّ عمودان: الرئيسيُّ للقرار (ينتظر قرارك ورحلةُ المنشور)، والجانبيُّ للسياق (الخطّةُ واليومُ والأسبوع). كان كلُّه عمودًا
+   * ‏واحدًا تتزاحم فيه البطاقاتُ وثلثا الشاشة فارغان.
+   */
+  // ‏منصّةٌ انقطعت يقولها الشريطُ (D-289): زرُّها صغيرٌ في سطر التحيّة، ولا سطرَ «خطوتك التالية» أحمر
+  const head = html`<div class="home-head${repeated ? ' home-hello' : ''}"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}${repeated
+    ? html`<a class="btn btn-secondary btn-sm" href="${next.href}">${next.label}</a>` : html``}</div>`
+  const nextRow = repeated ? html`` : html`<div class="card card-alert next is-slim" data-tone="${next.tone}">
+    <div class="next-body"><span class="next-k">خطوتُك التالية</span><p class="next-t m-0">${next.text}</p></div>
+    <a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a>
+  </div>`
+  return `${head.value}
+  ${nextRow.value}
   ${run === null ? '' : firstRunCard(run, f, now)}
-  ${lead}
   ${bare ? '' : stats(f)}
-  ${kpis}
-
-  ${bare ? '' : html`<div class="home-pair">
-    <div class="card home-card">
-      <div class="card-head"><h2>رحلة المنشور</h2><div class="grow"></div>
-        <span class="ago">كم مرّ بكلّ محطّة</span></div>
-      <ol class="funnel">${raw(trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join(''))}</ol>
+  <div class="home-grid">
+    <div class="home-main">
+      ${kpis}
+      ${bare ? '' : html`<div class="card home-card">
+        <div class="card-head"><h2>رحلة المنشور</h2><div class="grow"></div>
+          <span class="ago">كم مرّ بكلّ محطّة</span></div>
+        <ol class="funnel">${raw(trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join(''))}</ol>
+      </div>`.value}
     </div>
-    <div class="home-side">
-    ${/* ‏ولا بطاقةَ منصّاتٍ هنا (D-309 · خطّة التصميم 5.5): صفحتُها «الحسابات»، والمنقطعةُ يقولها الشريطُ و«خطوتك التالية»؛
-       ‏و«ما كُتب في أسبوعين» سجلٌّ لا قرار، فنزل إلى «الكلفة وما وقع» (قاعدةُ الحذف D-232) */''}
-    ${raw(today(f.scheduled ?? [], now, f.zone))}
-    ${raw(week(f.scheduled ?? [], now, f.zone))}
-    </div>
-  </div>`.value}`
+    <aside class="home-aside" aria-label="سياقُ الأسبوع">
+      ${lead}
+      ${bare ? '' : today(f.scheduled ?? [], now, f.zone)}
+      ${bare ? '' : week(f.scheduled ?? [], now, f.zone)}
+    </aside>
+  </div>`
 }
 
 /**
