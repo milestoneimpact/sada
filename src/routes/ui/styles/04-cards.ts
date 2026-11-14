@@ -120,6 +120,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ‏والاسمُ بقدر عموده (D-325): الكاملُ فوق «sm»، وبلا «ال» تحتها بحجم الشارة، وحرفُه الأوّلُ تحت «xs» («ح ن ث ر خ ج س» كما في
    تقويم الهاتف) — «الخميس» ‏42px و«خميس» ‏36px في عمودٍ ‏33px عند ‏320. والاسمُ الكاملُ لقارئ الشاشة دائمًا («.vh») */
 .wk-short,.wk-min{display:none}
+/* ‏في العمود الجانبيّ (D-355) الخانةُ أضيقُ من اسم اليوم كاملًا، فالمختصرُ على كلّ عرض */
+@media${atLeast('lg')}{.home-aside .wk-long{display:none} .home-aside .wk-short{display:inline}}
 .wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
 /* ‏ومربّعُ شعارٍ لا نقطةُ لون (D-325): الرمزُ الأبيضُ يحمل المنصّة، واللونُ يُعين؛ وحلقةُ الليل تحدّ مربّعَ X على الأرض الداكنة */
