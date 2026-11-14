@@ -35,6 +35,8 @@ export interface NpMedia {
   readonly height?: number | null
   /** الصورةُ بمقاس البطاقة (`?w=800`، D-335) حيث تكثر البطاقات — والأبعادُ المحجوزةُ نسبتُها نفسُها. */
   readonly small?: boolean
+  /** عنوانٌ موقَّع يحلّ محلّ عنوان اللوحة — لصفحة العميل بلا جلسة (D-353). */
+  readonly src?: string
 }
 
 export interface NpMetrics {
@@ -96,7 +98,7 @@ function avatar(input: NativePostInput): string {
 function mediaFigure(input: NativePostInput, stage: boolean): string {
   const m = input.media
   if (m === null) return ''
-  const src = `/panel/media/${encodeURIComponent(m.id)}` + (m.small === true && !m.mime.startsWith('video/') ? '?w=800' : '')
+  const src = m.src ?? `/panel/media/${encodeURIComponent(m.id)}` + (m.small === true && !m.mime.startsWith('video/') ? '?w=800' : '')
   if (m.mime.startsWith('video/')) {
     const poster = input.poster === null ? '' : ` poster="/panel/media/${escapeHtml(encodeURIComponent(input.poster))}"`
     return `<video src="${escapeHtml(src)}"${poster} preload="metadata" muted playsinline

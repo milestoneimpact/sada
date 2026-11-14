@@ -56,6 +56,10 @@ export interface ReviewView {
   readonly orgName?: string
   /** اسمُ الحساب لكلّ منصّة — رأسُ المنشور في معاينته. */
   readonly authors?: Readonly<Record<string, string>>
+  /** رابطُ العميل النافذ لهذه الخطّة (D-353): عددُه وأبعدُ انتهاء — والرمزُ لا يُعاد عرضُه. */
+  readonly share?: { readonly count: number; readonly until: string | null }
+  /** رأيُ العميل في كلّ بندٍ ببصمته (D-353). */
+  readonly verdicts?: ReadonlyMap<string, { readonly verdict: 'approve' | 'changes'; readonly note: string }>
 }
 
 /** أيُّ أسبوعٍ من الخطّة يقع فيه اليوم — من 1. */
@@ -141,6 +145,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
     ${c.post === null || c.item.why === 'من خطّتك المرفوعة' ? html`` : html`<p class="hint m-0">${c.item.angle}</p>`}
     ${c.item.note === undefined ? html`` : html`<p class="hint m-0">ملاحظة: ${c.item.note}</p>`}
     ${c.gaps.includes('clash') ? html`<div class="row gap-2"><span class="chip">${GAP_LABEL.clash}</span></div>` : html``}
+    ${clientSaid(view.verdicts?.get(c.key))}
     ${imageActs(c, m, w)}
     <div class="row gap-2 rv-acts">
       ${approve}${undo}
@@ -158,6 +163,28 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
       ] }))}
     </div>
   </article>`
+}
+
+/** رأيُ العميل على البطاقة (D-353): وسمٌ بحاله، وملحوظتُه إن كتب. */
+function clientSaid(v: { readonly verdict: 'approve' | 'changes'; readonly note: string } | undefined): Html {
+  if (v === undefined) return html``
+  return html`<div class="rv-client" data-verdict="${v.verdict}"><span class="st ${v.verdict === 'approve' ? 'ok' : 'warn'}">${v.verdict === 'approve' ? 'العميل: موافق' : 'العميل: يطلب تعديلًا'}</span>${v.note === '' ? html`` : html`<q>${v.note}</q>`}</div>`
+}
+
+/** «شارك مع العميل» (D-353): رابطٌ يُنشأ ويُعرض مرّةً، أو حالُ الرابط النافذ وإلغاؤه. */
+function shareBox(m: ReviewModel, view: ReviewView): Html {
+  const s = view.share ?? { count: 0, until: null }
+  const said = view.verdicts === undefined ? 0 : [...view.verdicts.values()].length
+  const changes = view.verdicts === undefined ? 0 : [...view.verdicts.values()].filter((v) => v.verdict === 'changes').length
+  return html`<details class="fold rv-share"><summary><span>شارك مع العميل${s.count > 0 ? ' · رابطٌ نافذ' : ''}${said > 0 ? ' · قال رأيه في ' + AR(said) + (changes > 0 ? '، ويطلب تعديلَ ' + AR(changes) : '') : ''}</span></summary>
+    <p class="hint">رابطٌ يرى به العميلُ منشورات هذه الخطّة بشكل كلّ منصّة، ويقول في كلٍّ منها «موافق» أو «أطلب تعديلًا» بملحوظة. لا ينشر ولا يعتمد، ولا يرى شيئًا سواها. وينتهي بعد أربعة عشر يومًا، أو حين تُبنى خطّةٌ أحدث.</p>
+    <div class="row gap-2">
+      <form class="inline" method="POST" action="/panel/plan/share" data-busy="جار…"><input type="hidden" name="id" value="${m.plan.id}">
+        ${raw(button({ label: s.count > 0 ? 'أنشئ رابطًا آخر' : 'أنشئ رابطَ العميل', variant: s.count > 0 ? 'secondary' : 'primary', type: 'submit', size: 'sm' }))}</form>
+      ${s.count === 0 ? html`` : html`<span class="hint">نافذٌ حتّى ${dayLabel((s.until ?? '').slice(0, 10))}</span>
+      <form class="inline" method="POST" action="/panel/plan/share/revoke" data-busy="جار…" data-confirm="يتوقّف كلُّ رابطٍ أُرسل للعميل عن العمل. أتابع؟"><input type="hidden" name="id" value="${m.plan.id}">
+        ${raw(button({ label: 'ألغِ الروابط', variant: 'danger', type: 'submit', size: 'sm' }))}</form>`}
+    </div></details>`
 }
 
 /**
@@ -322,6 +349,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
     <div class="row gap-2 mb-3">${state}<span class="grow"></span>${toggle}<a class="btn btn-secondary btn-sm" href="/panel/plan/view">اعرض واطبع</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
     ${progress}
+    ${shareBox(m, view)}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) })}
     ${weekTabs(m, shown)}
     ${gapsBar(m)}

@@ -60,8 +60,8 @@
     "inputs": 0
   },
   "routes/ui/noticesView.ts": {
-    "buttons": 2,
-    "cards": 2,
+    "buttons": 0,
+    "cards": 1,
     "inputs": 0
   },
   "routes/ui/oauthResult.ts": {
