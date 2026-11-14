@@ -579,6 +579,33 @@ export const ERRSUM_SCRIPT = `
 })();
 `
 
+/** الحركةُ بدرجتين (D-349): «مخفّفة» تضع «data-motion="reduced"» على <html> وتُحفظ كالكثافة. */
+export const MOTION_SCRIPT = `
+(function(){
+  var box=document.getElementById('motion');
+  if(!box)return;
+  var all=function(){return document.querySelectorAll('.seg button[data-motion]');};
+  var apply=function(v){
+    try{
+      if(v==='reduced'){localStorage.setItem('sada-motion',v);
+        document.documentElement.dataset.motion=v;}
+      else{localStorage.removeItem('sada-motion');
+        delete document.documentElement.dataset.motion;}
+    }catch(e){
+      if(v==='reduced')document.documentElement.dataset.motion=v;
+      else delete document.documentElement.dataset.motion;
+    }
+    all().forEach(function(b){
+      b.setAttribute('aria-pressed',String(b.dataset.motion===v));});
+  };
+  var saved='full';
+  try{saved=localStorage.getItem('sada-motion')||'full';}catch(e){}
+  apply(saved);
+  all().forEach(function(b){
+    b.addEventListener('click',function(){apply(b.dataset.motion);});});
+})();
+`
+
 /**
  * حجمُ الخطّ بدرجتين (D-306): «أكبر» يضع «data-size="large"» على <html> ويُحفَظ في المتصفّح كالكثافة، والأزرارُ كلُّها
  * (في القائمة وفي الإعدادات) تُربط معًا. والقراءةُ قبل الرسم في سكربت الرأس كالثيم، فلا وميضَ صغير ثمّ كبير.
@@ -662,7 +689,8 @@ export const TIP_SCRIPT = `
   var tip=document.createElement('div'); tip.className='tip'; tip.id='sada-tip'; tip.setAttribute('role','tooltip'); tip.hidden=true;
   body.appendChild(tip); root.setAttribute('data-tipjs','');
   var SEL='[data-tip],.btn-icon[aria-label]', ACT='a[href],button,input,select,textarea,summary,label';
-  var on=null, how='', wait=0, gone=0, kbd=false, down=null, muted=null;
+  // ‏و«warm» آخرُ ما خفي تلميحُ تمرير (D-349 · رونق): الانتقالُ إلى هدفٍ آخر خلال ‏300ms يُظهره فورًا — الخبيرُ لا ينتظر ‏400 لكلّ أيقونة
+  var on=null, how='', wait=0, gone=0, kbd=false, down=null, muted=null, warm=0;
   var delay=parseFloat(getComputedStyle(root).getPropertyValue('--delay-tip'))||400;
   function own(t){return t&&t.closest?t.closest(SEL):null;}
   function text(el){return el.getAttribute('data-tip')||el.getAttribute('aria-label')||'';}
@@ -692,7 +720,7 @@ export const TIP_SCRIPT = `
       el.setAttribute('aria-describedby',(d?d+' ':'')+'sada-tip');
     }
   }
-  function drop(){clearTimeout(wait); clearTimeout(gone); unlink(); on=null; how=''; tip.hidden=true;}
+  function drop(){clearTimeout(wait); clearTimeout(gone); if(how==='hover'&&!tip.hidden)warm=Date.now(); unlink(); on=null; how=''; tip.hidden=true;}
   // ‏والهدفُ المركَّزُ يبقى موصوفًا وإن غاب التلميحُ عن العين: يُقرأ ما بقي التركيزُ عليه
   function hide(){if(on&&on===document.activeElement){clearTimeout(wait); clearTimeout(gone); how='focus'; tip.hidden=true; return;} drop();}
   function later(){clearTimeout(gone); gone=setTimeout(hide,300);}
@@ -720,6 +748,7 @@ export const TIP_SCRIPT = `
     var el=own(e.target); if(!el||el===muted)return;
     clearTimeout(wait);
     if(!tip.hidden&&how==='hover'){show(el,'hover'); return;}
+    if(Date.now()-warm<300){show(el,'hover'); return;}
     wait=setTimeout(function(){show(el,'hover');},delay);
   });
   document.addEventListener('pointerout',function(e){

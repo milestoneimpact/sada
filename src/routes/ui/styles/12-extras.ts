@@ -162,6 +162,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   ::view-transition-group(*),::view-transition-old(*),::view-transition-new(*){animation:none!important}
   .card{animation-delay:0s}
 }
+/* ‏**والاختيارُ من الواجهة كإعداد الجهاز** (D-349 · رونق): «الحركة: مخفّفة» في القائمة تضع «data-motion» فيُطفأ ما يُطفئه الإعداد */
+:root[data-motion="reduced"] *,:root[data-motion="reduced"] *::before,:root[data-motion="reduced"] *::after{transition:none!important; animation:none!important; scroll-behavior:auto!important}
+:root[data-motion="reduced"]::view-transition-group(*),:root[data-motion="reduced"]::view-transition-old(*),:root[data-motion="reduced"]::view-transition-new(*){animation:none!important}
 
 /* ── لوحةُ الأوامر (D-105) ────────────────────────────────────────────
    طبقة تعلو كلّ شيء وتحجب ما تحتها بلا أن تمحوه: الحجاب يقول «أنت
