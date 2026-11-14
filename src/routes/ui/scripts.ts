@@ -105,7 +105,8 @@ export const CONFIRM_SCRIPT = `
     (danger?no:ok).focus();
   }
   function label(b){return b?((b.getAttribute('data-confirm-ok')||b.textContent||'').trim()):'';}
-  function danger(b){return !!b&&!!b.classList&&b.classList.contains('btn-danger');}
+  // ‏والبندُ الأحمرُ في قائمة «أفعال أخرى» هادمٌ كالزرّ الأحمر (D-351): حوارُه بفعلٍ أحمر والتركيزُ على «إلغاء»
+  function danger(b){return !!b&&!!b.classList&&(b.classList.contains('btn-danger')||b.classList.contains('menu-danger'));}
   function dead(b){return !!b&&!!b.closest&&!!b.closest('[aria-disabled="true"]');}
   window.sadaAsk=ask;
   document.addEventListener('click',function(e){

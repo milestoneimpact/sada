@@ -114,9 +114,11 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
 .pic img,.pic video{display:block; width:100%; height:auto; max-height:76vh; object-fit:contain;
   border-radius:var(--r-control); border:var(--bd); background:var(--surface-2)}
 /* صورةٌ لم تُحمَّل تُقال بلفظها: مربّعٌ رماديٌّ فارغٌ كان يُقرأ «لا صورة» */
+/* ‏**بهدوء** (D-351 · رونق): كان إطارًا أحمرَ متقطّعًا يصرخ في كلّ بطاقة. الصورةُ التي لم تصل حالٌ يُقال، لا إنذار: أرضٌ هادئة وخطٌّ ناعم */
 .pic-err{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   padding:var(--s-3); border-radius:var(--r-control); background:var(--surface-2);
-  border:1px dashed var(--bad)}
+  border:var(--bd-soft); color:var(--ink-2)}
+.pic-err b{color:var(--ink); font-weight:600}
 .pic-foot{display:flex; align-items:center; gap:var(--s-1); flex-wrap:wrap; margin-top:var(--s-2)}
 .pic.none{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap;
   padding:var(--s-3) var(--s-3); border-radius:var(--r-control); background:var(--surface-2);

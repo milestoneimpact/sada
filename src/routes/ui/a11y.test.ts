@@ -461,8 +461,8 @@ describe('مراجعةُ D-323', () => {
       cards: [{ index: 0, key: 'k0', item: items[0], post: { id: 'p0', status: 'draft', text: 'نصّ', scheduledAt: null }, mediaId: null, gaps: ['pending'] }],
     } as never
     const html = planReviewScreen(m, null)
-    // ‏«أزِل» على البطاقة بزرّ العُدّة وأيقونته (D-327)، و«أزِلها» في شريط المحدَّد
-    expect(html).toMatch(/<button class="btn btn-danger btn-sm" type="submit"><svg[^>]*>.*?<\/svg><span>أزِل<\/span><\/button>/)
+    // ‏«أزِل» في «أفعال أخرى» على البطاقة (D-351 · كان زرًّا في صفّها، D-327) بندًا أحمر، و«أزِلها» في شريط المحدَّد
+    expect(html).toMatch(/<form class="menu-form" method="POST" action="\/panel\/plan\/review\/drop"[^>]*>.*?<button class="menu-item menu-danger" type="submit"><span class="menu-t"><b>أزِل<\/b>/s)
     expect(html).toMatch(/<button class="btn btn-danger btn-sm"[^>]*>أزِلها<\/button>/)
     const w = boot(html)
     const d = w.document
