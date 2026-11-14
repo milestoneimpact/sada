@@ -339,6 +339,31 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
           p.textContent=stages[0]; setTimeout(tick,4000);}}
     });
   }
+  /*
+   * ‏**«اختبر المفتاح» داخل البطاقة** (D-348): يُرسَل النموذجُ نفسُه بطلب JSON، وتُبدَّل الشارةُ بنسخةٍ من قالبها (لا وسمٌ يُبنى
+   * ‏هنا)، وتُعلَن النتيجة. ويُسجَّل قبل «data-busy» فيمنع إرساله الكامل؛ وإن فشل الطلبُ نفسُه أُرسل النموذجُ كما كان.
+   */
+  var inlineTest=function(e){
+    var f=e.target; if(!f||!f.matches||!f.matches('form[data-inline-test]')||!window.fetch)return;
+    e.preventDefault(); if(f.getAttribute('aria-busy')==='true')return;
+    var b=f.querySelector('button'), slot=document.getElementById(f.getAttribute('data-inline-test'));
+    f.setAttribute('aria-busy','true'); if(b){b.setAttribute('data-busy-on','1'); b.setAttribute('aria-busy','true');}
+    var done=function(){f.removeAttribute('aria-busy'); if(b){b.removeAttribute('data-busy-on'); b.removeAttribute('aria-busy');}};
+    fetch(f.action,{method:'POST',body:new FormData(f),headers:{'Accept':'application/json'},credentials:'same-origin'})
+      .then(function(r){if(!r.ok)throw new Error(String(r.status)); return r.json();})
+      .then(function(j){
+        var t=document.getElementById(j.ok?'st-tpl-ok':'st-tpl-bad');
+        if(slot&&t&&t.content){var n=t.content.firstElementChild.cloneNode(true);
+          n.appendChild(document.createTextNode(j.ok?('يعمل · '+j.ms+' ملّي ث'):(j.status===429?'بلغ الحدّ':j.status===null?'تعذّر الوصول':'مرفوض ('+j.status+')')));
+          slot.replaceChildren(n);}
+        var st=document.getElementById('flash');
+        if(st){var p=document.createElement('p'); p.className='busy-note'; p.setAttribute('role','status');
+          p.textContent=j.label+': '+j.detail+(j.ok?' · '+j.ms+' ملّي ث':''); st.replaceChildren(p);}
+        done();
+      })
+      .catch(function(){done(); f.removeAttribute('data-inline-test'); f.submit();});
+  };
+  document.addEventListener('submit',inlineTest,true);
   document.querySelectorAll('form[data-busy]').forEach(bindBusy);
 
   /*

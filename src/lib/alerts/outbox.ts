@@ -46,7 +46,7 @@ import { OWNER_ORG } from '../tenancy'
  * ورمزُ استرداد استُعمل، وإخراجُ الأجهزة. يُكتب صفُّه عند الحدث (`security/events.ts`) وتُرسله الدورةُ كالثلاثة.
  */
 export interface Alert {
-  readonly kind: 'token' | 'publish' | 'budget' | 'security' | 'heartbeat'
+  readonly kind: 'token' | 'publish' | 'budget' | 'security' | 'heartbeat' | 'provider'
   /**
    * مفتاحٌ يُبنى من الحدث نفسِه لا من وقت الإرسال (D-004).
    *
@@ -105,6 +105,20 @@ export function budgetAlert(day: string, spent: number, cap: number): Alert {
     ref: `budget:${day}`,
     body: `صدى — بلغ إنفاق اليوم ${spent.toFixed(2)}$ من سقف ${cap.toFixed(2)}$.` +
       ' وما بعده يُردّ حتّى الثالثة فجرًا بتوقيت الرياض أو حتّى تَرفع السقف.',
+  }
+}
+
+/**
+ * ‏**مفتاحُ مزوّدٍ سقط** (D-348) — السادس: اختبارُ الفجر أو اختبارٌ يدويّ فشل لمزوّدٍ مفعَّل. **ومفتاحُه من أوّل الفشل**
+ * ‏(`since`)، فالعطلُ نفسُه يُقال مرّةً ولو دام أسبوعًا، وفشلٌ جديدٌ بعد نجاحٍ مفتاحُه جديد. ونصُّه من شرحنا (`explain`)، لا من
+ * ‏جواب المزوّد، **ولا يحمل المفتاحَ ولا أوّلَه ولا آخرَه**.
+ */
+export function providerAlert(label: string, provider: string, since: string, detail: string): Alert {
+  return {
+    kind: 'provider',
+    org: OWNER_ORG,
+    ref: `provider:${provider}:${since}`,
+    body: `صدى — مفتاح ${label} لا يعمل: ${detail}. والمهامّ الموجَّهة إليه تقف حتّى يُستبدل. افتح «النماذج والمفاتيح» في لوحة صدى.`,
   }
 }
 

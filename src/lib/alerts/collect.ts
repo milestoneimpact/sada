@@ -11,7 +11,8 @@
  *
  * **ولا يُخترَع حدثٌ لتكتمل القائمة** — قاعدةُ D-104 نفسُها في موضعٍ آخر.
  */
-import { budgetAlert, heartbeatAlert, MAX_TRIES, publishAlert, tokenAlert, type Alert } from './outbox'
+import { budgetAlert, heartbeatAlert, MAX_TRIES, providerAlert, publishAlert, tokenAlert, type Alert } from './outbox'
+import { failingProviders, failingSince } from '../ai/health'
 import type { Db } from '../tokens'
 import { alertable, pulseReport } from '../ops/pulse'
 
@@ -92,6 +93,13 @@ export async function collectAlerts(
   // ‏يُحسَب في `scheduled()` بعد دورتي التجديد والإرسال، فعمرُ نبضيهما ثوانٍ ولا يتأخّران — والإرسالُ يسقط كلَّ ربع ساعةٍ بلا كلمة
   const pulse = await pulseReport(db, now).catch(() => null)
   for (const late of pulse?.late ?? []) if (alertable(late)) out.push(heartbeatAlert(late))
+
+  // ── ٦ · مفتاحُ مزوّدٍ سقط (D-348) ──────────────────────────────────
+  // ‏من آخر اختبارٍ لمزوّدٍ مفعَّل، والمرجعُ من أوّل الفشل بعد آخر نجاح: فلا يتكرّر كلَّ ساعةٍ ولا كلَّ فجر
+  for (const f of await failingProviders(db)) {
+    const since = await failingSince(db, f.provider)
+    if (since !== null) out.push(providerAlert(f.label, f.provider, since, f.detail))
+  }
 
   return out
 }

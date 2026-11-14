@@ -20,8 +20,9 @@ import { briefError } from './platform/screen'
 import type { Pulse } from './ops/heartbeat'
 import type { Allowance } from './limits'
 import { isOwnerEmail } from './ownerEmail'
+import { panelHref } from './nav/panes'
 
-export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security'
+export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security' | 'provider'
 
 /**
  * **من يقرأ الإشعارات** (D-317): بريدُه لإشعارات أمان حسابه، وبصمةُ جلسته كي لا يُرى إشعارُ الدخول في الجلسة التي فُتحت
@@ -70,6 +71,17 @@ export interface NoticeRead {
   readonly readAt: string
   readonly byEmail: string | null
 }
+
+/**
+ * ‏**مفتاحُ مزوّدٍ سقط** (D-348): مزوّدٌ مفعَّلٌ فشلت اختباراتُه بعد آخر نجاح — مرجعُه أوّلُ فشلٍ بعده، فالعطلُ نفسُه إشعارٌ
+ * واحد ولو تكرّر كلَّ فجر، ويزول بأوّل نجاح. والمزوّدون إعدادُ منظّمة المالك (D-277)، فلا يُرى في منظّمةِ عميل.
+ */
+const PROVIDER_FAILS = `SELECT c.provider, p.label, MIN(c.at) AS since, MAX(c.at) AS last,
+         (SELECT detail FROM provider_checks d WHERE d.org_id = c.org_id AND d.provider = c.provider ORDER BY d.id DESC LIMIT 1) AS detail
+    FROM provider_checks c JOIN providers p ON p.name = c.provider AND p.org_id = c.org_id
+   WHERE c.org_id = 'org_owner' AND p.enabled = 1 AND c.ok = 0
+     AND c.id > COALESCE((SELECT MAX(s.id) FROM provider_checks s WHERE s.org_id = c.org_id AND s.provider = c.provider AND s.ok = 1), 0)
+   GROUP BY c.provider`
 
 /** الدوراتُ التي يعني تأخّرُها أنّ شيئًا لا يُنشر ولا يُجدَّد — لا كلُّ دورة. */
 const WATCHED_JOBS = new Set(['publish', 'renew', 'metrics', 'scan'])
@@ -134,6 +146,8 @@ export async function unreadNotices(db: Db, org: string, extraRefs: readonly str
              JOIN accounts a ON a.id = al.account_id AND a.org_id = al.org_id
             WHERE al.org_id = ?1 AND al.at >= datetime('now', '-2 days')
            UNION ALL
+           SELECT 'provider:' || provider || ':' || since FROM (${PROVIDER_FAILS}) WHERE ?1 = 'org_owner'
+           UNION ALL
            SELECT value FROM json_each(?2)
            UNION ALL
            ${SECURITY_REFS}
@@ -156,7 +170,7 @@ export async function collectNotices(
   memory: { readonly pulses: readonly Pulse[]; readonly allowance: Pick<Allowance, 'settings' | 'usage'> | null },
   viewer?: NoticeViewer,
 ): Promise<Notice[]> {
-  const [failed, reauth, quota, tokens, security] = await Promise.all([
+  const [failed, reauth, quota, tokens, security, keys] = await Promise.all([
     db.prepare(
       `SELECT p.id, p.platform, p.text,
               (SELECT pa.response_json FROM publish_attempts pa WHERE pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'failed' ORDER BY pa.at DESC LIMIT 1) AS why,
@@ -185,8 +199,18 @@ export async function collectNotices(
         ORDER BY id DESC LIMIT 20`,
     ).bind('org_owner', viewer.email, viewer.handle).all<{ id: number; detail: string | null; ip: string | null; at: string }>()
       .then((r) => r.results).catch(() => []),
+    org !== 'org_owner' ? Promise.resolve([]) : db.prepare(PROVIDER_FAILS)
+      .all<{ provider: string; label: string; since: string; last: string; detail: string }>()
+      .then((r) => r.results).catch(() => []),
   ])
   const out: Notice[] = []
+  for (const k of keys) {
+    out.push({
+      ref: `provider:${k.provider}:${k.since}`, kind: 'provider', tone: 'bad',
+      text: `مفتاح ${k.label} لا يعمل: ${k.detail} — والمهامّ الموجَّهة إليه تقف حتّى يُستبدل`,
+      href: panelHref('providers'), action: 'النماذج والمفاتيح', at: k.last.replace(' ', 'T') + 'Z',
+    })
+  }
   for (const f of failed) {
     const label = platformLabel(f.platform as Platform)
     const snippet = f.text.replace(/\s+/g, ' ').trim().slice(0, 48)

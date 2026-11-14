@@ -988,6 +988,35 @@ describe('خزانة المفاتيح في اللوحة', () => {
    * حقيقيّة. والفهرسُ يُجلَب من عند المزوّد لحظةَ الطلب — **ولا يُخزَّن**:
    * قائمةٌ محفوظةٌ تتقادم بصمت.
    */
+  /** حراسةُ المفاتيح (D-348): الاختبارُ يُحفظ بزمنه، وزرُّ البطاقة يأخذ JSON بلا إعادة تحميل. */
+  describe('اختبار المفتاح — يُحفظ ويُردّ', () => {
+    const real = globalThis.fetch
+    afterEach(() => { globalThis.fetch = real })
+
+    it('بـJSON: النتيجةُ والزمنُ، وصفٌّ في provider_checks', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      globalThis.fetch = (async () => new Response('{"data":[]}', { status: 401 })) as unknown as typeof fetch
+      const body = new FormData()
+      body.set('provider', 'gemini')
+      const res = await app.request('/panel/providers/verify', withSession(cookie, { method: 'POST', body, headers: { Accept: 'application/json' } }), env)
+      const json = await res.json() as { ok: boolean; status: number; ms: number; detail: string }
+      expect(json.ok).toBe(false)
+      expect(json.status).toBe(401)
+      expect(typeof json.ms).toBe('number')
+      const row = await db.prepare("SELECT ok, source FROM provider_checks WHERE provider = 'gemini'").first<{ ok: number; source: string }>()
+      expect(row).toEqual({ ok: 0, source: 'panel' })
+    })
+
+    it('بلا JSON: يعود إلى الصفحة برسالة كما كان', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      globalThis.fetch = (async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch
+      const res = await post(cookie, '/panel/providers/verify', { provider: 'gemini' })
+      expect(res.status).toBe(303)
+    })
+  })
+
   describe('فهرس النماذج — يُجلَب ولا يُكتب', () => {
     const real = globalThis.fetch
 

@@ -52,6 +52,8 @@ import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
 import { runPlanBuild, type PlanBuildMessage } from './routes/panel/plan'
+import { providerKey } from './routes/panel/channels'
+import { dailyChecks } from './lib/ai/health'
 
 /** يُصدَّر للاختبار: `app.request` يشغّل المسارات بلا شبكة ولا Worker. */
 export const app = new Hono<{ Bindings: Env }>()
@@ -1074,6 +1076,19 @@ async function quotaTick(env: Env): Promise<void> {
 }
 
 /**
+ * **حراسةُ المفاتيح** (D-348) — مع مسح الفجر: كلُّ مزوّدٍ مفعَّلٍ له مفتاح يُختبر بنداءٍ لا يكلّف رموزًا، ويُكتب صفُّه.
+ * ومن آخر صفٍّ فاشلٍ يُشتقّ الإشعار والتنبيه، فيعرف المالكُ قبل أن تفشل به مهمّة.
+ */
+async function providersTick(env: Env): Promise<void> {
+  try {
+    const checks = await dailyChecks(env.DB, (p) => providerKey(env, p))
+    console.info({ job: 'provider-checks', tested: checks.length, failed: checks.filter((c) => !c.ok).map((c) => c.provider) })
+  } catch (error) {
+    console.warn({ job: 'provider-checks', failed: String(error) })
+  }
+}
+
+/**
  * **دورةُ التدوير** (D-318) — في كلّ دورةٍ ما دام `TOKEN_ENC_KEY_PREV` مضبوطًا، وإلّا لا تعمل أصلًا. دفعةٌ في كلّ جدول،
  * والتالية تُكمل؛ وما بقي يُقرأ في `/admin/ready` (`keys.pending`).
  */
@@ -1101,6 +1116,8 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   await uploadsTick(env)
   if (controller.cron === SCAN_CRON) {
     await scanTick(env)
+    // ‏قبل التنبيهات: فمفتاحٌ سقط الليلةَ يصل تنبيهُه في الدورة نفسِها
+    await providersTick(env)
     await alertTick(env)
     await quotaTick(env)
   }

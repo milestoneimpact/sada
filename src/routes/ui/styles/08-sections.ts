@@ -102,6 +102,16 @@ ol.steps .why{display:block; color:var(--ink-2)}
 .prow .pv i{display:block; font-style:normal; font-size:var(--t-small); line-height:var(--lh-small); font-weight:400; color:var(--ink-2)}
 .prow .pst{flex:none; width:9.5rem}
 .pbody{padding:var(--s-4); background:var(--surface-2)}
+/* ‏أعمدةُ آخر سبعة اختبارات (D-348): الطولُ من زمن الردّ بخمس درجات، والفاشلُ قصيرٌ بلون العطل. لا تُقرأ وحدها: الوسمُ بجانبها */
+.prow .pspark{flex:none; display:inline-flex; align-items:flex-end; gap:calc(var(--s-1) / 2); height:var(--s-5)}
+.prow .pspark i{display:block; width:var(--s-1); border-radius:var(--r-inline); background:color-mix(in srgb,var(--ok) 55%,transparent)}
+.prow .pspark i:last-child{background:var(--ok)}
+.prow .pspark i[data-fail]{background:var(--bad)}
+.prow .pspark i[data-h="1"]{height:20%} .prow .pspark i[data-h="2"]{height:40%} .prow .pspark i[data-h="3"]{height:60%}
+.prow .pspark i[data-h="4"]{height:80%} .prow .pspark i[data-h="5"]{height:100%}
+/* ‏سطرُ العاقبة: ما يتوقّف إن بقي العطل — لا «معطّل» وحدها */
+.pconseq{margin:0 0 var(--s-3); padding:var(--s-2) var(--s-3); border:var(--bd-dash); border-color:color-mix(in srgb,var(--bad) 45%,transparent);
+  border-radius:var(--r-control); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink)}
 /* أربعةُ حقولٍ في سطرٍ على الشاشة، واثنان في الجوّال — ولا يُقصّ شيء */
 .pgrid{display:grid; grid-template-columns:repeat(auto-fit,minmax(11.25rem,1fr)); gap:var(--s-3)}
 .pgrid .kv-k{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); margin-bottom:var(--s-1)}
