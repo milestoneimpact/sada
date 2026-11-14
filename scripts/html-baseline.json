@@ -61,7 +61,7 @@
   "routes/ui/sections/library.ts": 4,
   "routes/ui/sections/pivot.ts": 18,
   "routes/ui/sections/plan.ts": 13,
-  "routes/ui/sections/providers.ts": 28,
+  "routes/ui/sections/providers.ts": 26,
   "routes/ui/sections/videos.ts": 57,
   "routes/ui/shell.ts": 1,
   "routes/ui/spreadView.ts": 8,

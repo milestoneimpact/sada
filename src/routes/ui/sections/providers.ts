@@ -11,9 +11,11 @@ import { modelName } from '../../../lib/ai/modelName'
 import type { PanelData, PanelProvider } from '../../panelView'
 import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
-import { RUNG_MARK, bar, pathArrows } from '../parts'
+import { RUNG_MARK, pathArrows } from '../parts'
 import { statusBadge } from '../components/badge'
+import { button } from '../components/button'
 import { html, raw } from '../html'
+import { echo } from '../echo'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -132,27 +134,33 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
   const tasksReady = d.routing.filter((r) => r.ready).length
 
   /**
-   * الشريطُ — **ثلاثةُ أرقامٍ تجيب «هل أنا بخير؟» قبل النزول**.
+   * ‏**اللوحةُ العليا** (D-350 · رونق): ثلاثةُ أرقامٍ تجيب «هل أنا بخير؟»، وفعلان يصلحان أكثرَ ما يقع — «اختبر الكلّ» و«طبّق
+   * ‏التوصيات». على أرض اللحظة العميقة ونقشِ الصدى في الزاوية المقابلة للعنوان، **ولا يمرّ النقشُ تحت نصّ** (حارسُ النقش كما في
+   * ‏«وثيقة الخطّة» D-286): مقنَّعٌ نحو الأرقام، وبلا خيطٍ ذهبيّ (ميزانيّةُ الذهب). وهو استثناءٌ اعتمده المالك من «لا نقشَ في سطح
+   * ‏عمل»: رأسُ صفحةٍ لا خلفُ بيانات.
    *
-   * وكان الجوابُ يحتاج مسحَ ستّ بطاقاتٍ وجدولا في آخر اللوح. **ورقمٌ
-   * أعلى الصفحة ليس زينة**: من لا يرى أنّ مفتاحا لم يُختبر لا يختبره.
+   * ‏و«يعمل» من آخر اختبار لا من «له مفتاح» (D-348): مفتاحٌ مرفوضٌ ليس جاهزًا.
    */
-  const strip = `<div class="card grid tiles c3 mb-3">
-    <div class="card tile"><div class="kv-k">مزوّدون جاهزون</div>
-      <div class="kv-v">${ready.length}<em> / ${d.providers.length}</em></div>
-      ${bar(ready.length, Math.max(1, d.providers.length))}
-      <div class="note">${untested === 0
-        ? 'وكلّ مفاتيحهم اختُبرت'
-        : `<b>${untested}</b> منها لم يُختبر مفتاحُه بعد — افتح صفَّه واضغط «اختبر»`}</div></div>
-    <div class="card tile"><div class="kv-k">إنفاق اليوم على الذكاء</div>
-      <div class="kv-v">${money(spentToday)}<em> / ${money(d.spendCap)}</em></div>
-      ${bar(spentToday, d.spendCap)}
-      <div class="note">مجموع ما أنفقته خدمات الكتابة والصور اليوم · يُصفَّر الثالثة فجرًا بتوقيت الرياض</div></div>
-    <div class="card tile"><div class="kv-k">مهامّ جاهزة</div>
-      <div class="kv-v">${tasksReady}<em> / ${d.routing.length}</em></div>
-      ${bar(tasksReady, Math.max(1, d.routing.length))}
-      <div class="note">مهمّة بلا مزوّد جاهز تقف عند أوّل نداء</div></div>
-  </div>`
+  const healthy = ready.filter((p) => p.checks.at(-1)?.ok !== false)
+  const failing = ready.length - healthy.length
+  const strip = html`<header class="ph-hero">
+    <span class="ph-echo" aria-hidden="true">${raw(echo({ width: 1200, height: 360, tone: 'deep', crest: 0.2, level: 0.5, scale: 1.1, density: 4, hairline: false, align: 'xMinYMid' }))}</span>
+    <span class="ph-eyebrow">الإعدادات · المحرّك</span>
+    <h2 class="ph-title">النماذج والمفاتيح</h2>
+    <p class="ph-lede m-0">مفتاحٌ لكلّ مزوّد يُحفظ هنا ويُختبر كلَّ فجر، ثمّ يُختار لكلّ مهمّةٍ نموذجُها.</p>
+    <div class="ph-kpis">
+      <div class="ph-kpi"><b>${healthy.length}<em> / ${d.providers.length}</em></b><span>${failing > 0 ? (failing === 1 ? 'مفتاحٌ واحدٌ لا يعمل' : String(failing) + ' مفاتيح لا تعمل') : untested > 0 ? String(untested) + ' لم يُختبر بعد' : 'مفاتيح تعمل'}</span></div>
+      <div class="ph-kpi"><b>${tasksReady}<em> / ${d.routing.length}</em></b><span>مهامّ جاهزة</span></div>
+      <div class="ph-kpi"><b>${money(spentToday)}<em> / ${money(d.spendCap)}</em></b><span>إنفاقُ اليوم</span></div>
+    </div>
+    <div class="ph-acts">
+      <form class="inline" method="POST" action="/panel/providers/verify-all" data-busy="جار اختبار المفاتيح…">
+        ${raw(button({ label: 'اختبر الكلّ', variant: 'primary', type: 'submit' }))}</form>
+      <form class="inline" method="POST" action="/panel/providers/recommend" data-busy="جار ضبط المهامّ…"
+            data-confirm="تُضبط الفهمُ والكتابةُ والخطّةُ على أنسب نموذجٍ مفتاحُه يعمل، وتقول الرسالةُ ما كان لكلٍّ منها. أتابع؟">
+        ${raw(button({ label: 'طبّق التوصيات', type: 'submit' }))}</form>
+    </div>
+  </header>`.value
 
   /**
    * صفٌّ واحدٌ لكلّ مزوّد.

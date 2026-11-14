@@ -794,7 +794,8 @@ describe('شريط المؤشّرات واحد (D-146)', () => {
     // ‏والهامشُ صنفٌ من السلّم لا سِمةُ «style» (D-189)
     // ‏و«الحسابات» ثلاثُ بلاطات (D-205): متّصلة · تحتاج إعادةَ ربط · تحتاج إعدادًا
     expect(html).toContain('<div class="card grid tiles c3 mb-4">')
-    expect(html).toContain('<div class="card grid tiles c3 mb-3">')
+    // ‏و«النماذج والمفاتيح» صار لها لوحةٌ عليا بأرقامها الثلاثة لا شريطَ بلاطات (D-350)
+    expect(html).toContain('<header class="ph-hero">')
     // ‏وشاشةُ المنصّة صارت صفحةَ حساب (D-172): أعدادُها في رأسها بصيغة المنصّة، لا شريطَ مؤشّرات
     const screen = await (await app.request('/panel/channels/linkedin', withSession(cookie), env)).text()
     expect(screen).toContain('<header class="card acct acct-linkedin">')
@@ -1014,6 +1015,31 @@ describe('خزانة المفاتيح في اللوحة', () => {
       globalThis.fetch = (async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch
       const res = await post(cookie, '/panel/providers/verify', { provider: 'gemini' })
       expect(res.status).toBe(303)
+    })
+  })
+
+  /** «اختبر الكلّ» و«طبّق التوصيات» (D-350). */
+  describe('أفعال اللوحة العليا', () => {
+    const real = globalThis.fetch
+    afterEach(() => { globalThis.fetch = real })
+
+    it('اختبر الكلّ: كلُّ مفعَّلٍ له مفتاح يُختبر ويُكتب صفُّه', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      globalThis.fetch = (async () => new Response('{"data":[]}', { status: 200 })) as unknown as typeof fetch
+      const res = await post(cookie, '/panel/providers/verify-all', {})
+      expect(res.status).toBe(303)
+      const n = await db.prepare("SELECT COUNT(*) AS n FROM provider_checks WHERE source = 'daily'").first<{ n: number }>()
+      expect(n?.n).toBeGreaterThanOrEqual(1)
+    })
+
+    it('طبّق التوصيات: الخطّةُ تنتقل عن نموذجٍ يفكّر إلى الأنسب الصالح', async () => {
+      const cookie = await login()
+      await post(cookie, '/panel/providers/key', { provider: 'gemini', key: GEMINI })
+      await post(cookie, '/panel/routes', { task: 'plan', provider: 'gemini', model: 'gemini-2.5-pro' })
+      await post(cookie, '/panel/providers/recommend', {})
+      const row = await db.prepare("SELECT provider, model FROM task_routes WHERE task = 'plan'").first<{ provider: string; model: string }>()
+      expect(row).toEqual({ provider: 'gemini', model: 'gemini-2.5-flash' })
     })
   })
 
@@ -3771,7 +3797,8 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
   }
   /** رقمُ «مهامٌّ جاهزة» في شريط المزوّدين. */
   const tasksReady = (html: string): number =>
-    Number(/مهامّ جاهزة<\/div>\s*<div class="kv-v">(\d+)<em>/.exec(html)?.[1] ?? NaN)
+    // ‏من اللوحة العليا لـ«النماذج والمفاتيح» (D-350): الرقمُ قبل «مهامّ جاهزة»
+    Number(/<div class="ph-kpi"><b>(\d+)<em> \/ \d+<\/em><\/b><span>مهامّ جاهزة<\/span>/.exec(html)?.[1] ?? NaN)
   // ‏والمعطَّلُ يصف نفسَه بسطر جاهزيّته في بطاقته (D-325): كان «disabled» وحدَه
   const IMAGE_BUTTON_OFF = /<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-image-[^"]+">ولّد صورةً فنّيّة<\/button>/
   const IMAGE_BUTTON_ON = '<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>'
