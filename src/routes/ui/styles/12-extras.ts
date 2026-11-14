@@ -615,7 +615,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}
-.rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400; color:var(--ink-3)}
+.rv-cal.is-board .rv-cd:not(.is-on) b{align-self:flex-start; padding:0 var(--s-1); font-weight:400; color:var(--ink-2)}
 /* ‏واليومُ الفارغُ أهدأ (D-351): بلا إطار، ورقمُه خافت — فالأيّامُ ذاتُ المنشورات هي ما تقرؤه العين */
 .rv-cal.is-board .rv-cd:not(.is-on){border-color:transparent; background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
 /* ‏رأسُ اليوم والمصغَّرةُ يُلمسان: هدفُ كلٍّ ‏44px (قيس ‏24 و‏32 عند ‏768) */
