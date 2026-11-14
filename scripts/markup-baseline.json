@@ -151,7 +151,7 @@
   },
   "routes/ui/sections/providers.ts": {
     "buttons": 9,
-    "cards": 6,
+    "cards": 2,
     "inputs": 11
   },
   "routes/ui/sections/security.ts": {

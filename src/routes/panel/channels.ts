@@ -22,10 +22,11 @@ import {
 import { verifyAppCredentials } from '../../lib/oauth/verify'
 import { disconnectAccount, findLinked, REVOKE_PAGE } from '../../lib/oauth/disconnect'
 import {
-  deleteProvider, getProvider, normalizeName, resolveKey, saveKey, setEnabled, upsertProvider, type Provider,
+  deleteProvider, getProvider, listProviders, normalizeName, resolveKey, saveKey, setEnabled, upsertProvider, type Provider,
 } from '../../lib/providers'
 import { checkProviderUrl } from '../../lib/ai/urlGuard'
-import { testProviderKey } from '../../lib/ai/health'
+import { dailyChecks, recentChecks, testProviderKey } from '../../lib/ai/health'
+import { recommend } from '../../lib/ai/recommend'
 import { readRoutes, routeMismatch, writeRoute } from '../../lib/ai/routes'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession, type Session } from '../../lib/session'
@@ -660,6 +661,50 @@ channels.post('/panel/providers/verify', async (c) => {
     kind: result.ok ? 'ok' : 'bad',
     text: result.ok ? `${provider.label}: ${result.detail} · ${result.ms} ملّي ث.` : `${provider.label}: ${result.detail}.`,
   })
+  return back('providers')
+})
+
+/**
+ * **«اختبر الكلّ»** (D-350): كلُّ مزوّدٍ مفعَّلٍ له مفتاح يُختبر الآن كاختبار الفجر، بنداءٍ لا يكلّف. والرسالةُ تعدّ ما يعمل
+ * وتسمّي ما سقط.
+ */
+/** أسماءُ المهامّ النصّيّة في رسالة التوصيات — من شاشة التوجيه نفسها. */
+const TASK_NAME: Readonly<Record<string, string>> = { analyze: 'الفهم', draft: 'الكتابة', plan: 'الخطّة' }
+
+channels.post('/panel/providers/verify-all', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const done = await dailyChecks(c.env.DB, (p) => providerKey(c.env, p))
+  const failed = done.filter((x) => !x.ok)
+  await record(c.env.DB, { actor: 'panel', action: 'provider.verify_all', target: String(done.length), detail: failed.map((x) => x.provider).join(' ') || 'كلّها تعمل' }, c.req.raw)
+  await setFlash(c.env, c.req.raw, done.length === 0
+    ? { kind: 'warn', text: 'لا مزوّدَ مفعَّلًا له مفتاحٌ لاختباره.' }
+    : failed.length === 0
+      ? { kind: 'ok', text: 'اختُبرت ' + String(done.length) + ' مفاتيح، وكلّها تعمل.' }
+      : { kind: 'bad', text: 'اختُبرت ' + String(done.length) + ' مفاتيح: ' + String(failed.length) + (failed.length === 1 ? ' لا يعمل — ' : ' لا تعمل — ') + failed.map((x) => x.provider).join('، ') + '.' })
+  return back('providers')
+})
+
+/**
+ * **«طبّق التوصيات»** (D-350): كلُّ مهمّةٍ نصّيّة إلى أنسب نموذجٍ مزوّدُه صالح (`recommend`). والرسالةُ تسمّي القديمَ لكلّ مهمّة،
+ * فيُعاد من صفّها إن شاء المالك. ولا تُلمس الصورةُ والفيديو وقراءةُ الصور: لها نماذجُها.
+ */
+channels.post('/panel/providers/recommend', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const [providers, routes, checks] = await Promise.all([listProviders(c.env.DB), readRoutes(c.env.DB), recentChecks(c.env.DB, 1)])
+  const state = await Promise.all(providers.map(async (p) => ({
+    name: p.name, enabled: p.enabled, configured: (await providerKey(c.env, p)) !== null,
+    lastOk: checks[p.name]?.at(-1)?.ok ?? null,
+  })))
+  const changes = recommend(state, routes)
+  for (const ch of changes) {
+    await writeRoute(c.env.DB, ch.task, ch.to.provider, ch.to.model, 'panel')
+    await record(c.env.DB, { actor: 'panel', action: 'route.write', target: ch.task, detail: ch.to.provider + ' / ' + ch.to.model + ' (توصية · كان ' + ch.from.provider + ' / ' + ch.from.model + ')' }, c.req.raw)
+  }
+  await setFlash(c.env, c.req.raw, changes.length === 0
+    ? { kind: 'ok', text: 'كلُّ مهمّةٍ نصّيّة على أنسب نموذجٍ متاح — لا تغيير.' }
+    : { kind: 'ok', text: 'ضُبطت ' + String(changes.length) + (changes.length === 1 ? ' مهمّة: ' : ' مهامّ: ') + changes.map((x) => (TASK_NAME[x.task] ?? x.task) + ' إلى ' + x.to.model + ' بدل ' + x.from.model).join('؛ ') + '.' })
   return back('providers')
 })
 

@@ -7,6 +7,7 @@
  *
  * **والمرجعُ حرفٌ ومعرّف** (`m:` · `u:` · `f:` · `s:`) يُحفظ في البند، ويُتحقّق منه بمنظّمة الجلسة قبل أن يُحفظ وقبل أن يُربط.
  */
+import { foldArabic } from './format'
 import type { Db, DbStatement } from './tokens'
 import { driveFileUrl } from './drive/sync'
 
@@ -115,9 +116,10 @@ export function cleanTags(raw: string): string[] {
 
 /** البحثُ في المكتبة (D-347): الاسمُ أو وسمٌ يحوي النصّ، والمفضّلةُ وحدَها إن طُلبت — في الذاكرة على ما قُرئ. */
 export function searchAssets(assets: readonly Asset[], q: string, favOnly: boolean): Asset[] {
-  const needle = q.trim().toLowerCase()
+  // ‏مطويّةً عربيًّا (D-349): «اسامه» تجد «أسامة»
+  const needle = foldArabic(q)
   return assets.filter((a) => (!favOnly || a.favourite === true)
-    && (needle === '' || a.name.toLowerCase().includes(needle) || (a.tags ?? []).some((t) => t.toLowerCase().includes(needle))))
+    && (needle === '' || foldArabic(a.name).includes(needle) || (a.tags ?? []).some((t) => foldArabic(t).includes(needle))))
 }
 
 /**

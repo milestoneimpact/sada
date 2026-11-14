@@ -161,6 +161,16 @@ export type Case = 'nom' | 'acc' | 'gen'
  * تترجم. والقاعدةُ أربع: واحدٌ بوصفه، واثنان بالمثنّى، ومن ثلاثةٍ إلى عشرة
  * بالجمع، وما فوقها بالتمييز المفرد. والصفرُ يقوله المنادي بجملته.
  */
+/**
+ * ‏**طيُّ العربيّة للبحث** (D-349 · رونق): بلا تشكيلٍ ولا تطويل، والهمزاتُ على الألف ألفٌ، والألفُ المقصورة ياء، والتاءُ المربوطة هاء،
+ * ‏وحالةُ اللاتينيّ صغيرة. فـ«اسامه» تجد «أسامة»، و«الاولى» تجد «الأُولى». للمقارنة وحدها — لا يُعرض ولا يُحفظ.
+ */
+export function foldArabic(s: string): string {
+  return s.normalize('NFKC').replace(/[\u064B-\u065F\u0670\u0640]/g, '')
+    .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/ؤ/g, 'و').replace(/ئ/g, 'ي')
+    .toLowerCase().trim()
+}
+
 export function counted(n: number, noun: Noun, kase: Case = 'nom'): string {
   // ‏«اعتمد منشورًا واحدًا» لا «اعتمد منشورٌ واحد» (D-182): الإعرابُ في الواحد والاثنين وحدهما
   if (n === 1) return kase === 'acc' ? noun.oneAcc ?? noun.one : kase === 'gen' ? noun.oneGen ?? noun.one : noun.one

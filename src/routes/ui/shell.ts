@@ -191,7 +191,9 @@ m.content=t==='dark'?${JSON.stringify(THEME.dark['--bg'])}:${JSON.stringify(THEM
 var d=localStorage.getItem('sada-density');
 if(d==='compact')document.documentElement.dataset.density=d;
 var z=localStorage.getItem('sada-size');
-if(z==='large')document.documentElement.dataset.size=z;}catch(e){}
+if(z==='large')document.documentElement.dataset.size=z;
+var mo=localStorage.getItem('sada-motion');
+if(mo==='reduced')document.documentElement.dataset.motion=mo;}catch(e){}
 if(typeof window!=='undefined'&&window.addEventListener){['pagereveal','pageswap'].forEach(function(n){window.addEventListener(n,function(e){var t=e.viewTransition;if(!t)return;
 var no=function(){};[t.ready,t.finished,t.updateCallbackDone].forEach(function(p){if(p&&p.catch)p.catch(no);});});});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;
@@ -229,6 +231,19 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
       ...(options.logout === true ? [menuAction({ label: 'خروج', action: '/panel/logout', fields: {}, busy: 'جار الخروج…' })] : []),
     ],
   })
+}
+
+/**
+ * ‏**مبدّلُ الحركة** (D-349 · رونق): «مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في الجهاز — لمن تُتعبه الحركة ولا يعرف
+ * ‏إعدادَ جهازه أو لا يملكه. ويُحفظ في المتصفّح كالكثافة، ويُقرأ قبل الرسم فلا تبدأ حركةٌ ثمّ تقف.
+ */
+export function motionSwitch(withId = true): string {
+  // ‏في «السمة والكثافة» بالإعدادات وحدَها لا في قائمة كلّ صفحة: الثلاثةُ في القائمة يُختار منها كلَّ يوم، والحركةُ مرّةً في العمر —
+  // ‏ومبدّلٌ رابعٌ في كلّ صفحةٍ وزنٌ على كلّ صفحة (أمسكه audit_size في «خطّة جديدة»)
+  return segmented('الحركة', 'motion', [
+    { value: 'full', label: 'كاملة', pressed: true },
+    { value: 'reduced', label: 'مخفّفة' },
+  ], withId ? 'motion' : undefined)
 }
 
 /** مبدّلُ حجم الخطّ بدرجتين (D-306) — سلّمٌ ثالثٌ معلَن لا تكبيرٌ بنسبة، وسكربتُه يقرأ «data-size». */

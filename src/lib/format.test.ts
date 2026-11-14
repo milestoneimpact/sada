@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { kb, money, moneyDigits, parseSqliteUtc, relativeTime, attemptsLeft, shortAgo, untilTime } from './format'
+import { foldArabic, kb, money, moneyDigits, parseSqliteUtc, relativeTime, attemptsLeft, shortAgo, untilTime } from './format'
+import { searchAssets } from './library'
 
 const NOW = new Date('2026-09-05T12:00:00Z')
 
@@ -118,5 +119,20 @@ describe('المدّة بأكبر وحدة تصدق (D-194)', () => {
     expect(duration(120 * 60)).toBe('ساعتَين')
     expect(duration(5 * 60)).toBe('5 دقائق')
     expect(duration(30)).toBe('دقيقةً واحدة')
+  })
+})
+
+/** ‏طيُّ العربيّة للبحث (D-349): الكتابةُ الشائعة تجد الصحيحة، ولا يُطوى ما يغيّر المعنى. */
+describe('foldArabic', () => {
+  it.each([
+    ['أسامة', 'اسامه'], ['إطلاق', 'اطلاق'], ['آمنة', 'امنه'], ['الأُولى', 'الاولي'],
+    ['مسؤولية', 'مسووليه'], ['مسئولية', 'مسيوليه'], ['كتـــاب', 'كتاب'], ['LinkedIn', 'linkedin'],
+  ])('%s ← %s', (raw, folded) => expect(foldArabic(raw)).toBe(folded))
+
+  it('البحثُ في المكتبة يتسامح', () => {
+    const assets = [{ name: 'صورة أسامة', tags: ['الأولى'] }, { name: 'شعار', tags: [] }] as unknown as Parameters<typeof searchAssets>[0]
+    expect(searchAssets(assets, 'اسامه', false)).toHaveLength(1)
+    expect(searchAssets(assets, 'الاولى', false)).toHaveLength(1)
+    expect(searchAssets(assets, 'غائب', false)).toHaveLength(0)
   })
 })

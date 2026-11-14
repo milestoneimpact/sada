@@ -36,7 +36,7 @@ import type { DraftRow } from '../lib/draft/store'
 import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { shortcutsSwitch } from './ui/components/tabs'
-import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, shell, themeSwitch, bell } from './ui/shell'
+import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, motionSwitch, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
@@ -1313,6 +1313,8 @@ function settingsPane(d: ShellData & SettingsData): string {
     <div class="split"><p><b>السمة</b>: «النظام» يتبع جهازَك نهارًا وليلًا.</p>${themeSwitch(false)}</div>
     <hr>
     <div class="split"><p><b>الكثافة</b>: «مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p>${densitySwitch(false)}</div>
+    <hr>
+    <div class="split"><p><b>الحركة</b>: «مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في جهازك.</p>${motionSwitch(false)}</div>
     <hr>
     <div class="split"><p><b>اختصارات الحرف الواحد</b>: J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p>${shortcutsSwitch()}</div>
   </div>
