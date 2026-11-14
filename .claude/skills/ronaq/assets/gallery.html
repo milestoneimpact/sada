@@ -1,0 +1,252 @@
+<title>معرض رونق</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="ronaq.css">
+<style>
+/* المعرض: كلُّ مكوّنٍ بحالاته، والهويّةُ والثيمُ يتبدّلان من الشريط — المكوّنات لا تُلمس */
+.g-bar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:color-mix(in srgb,var(--card) 90%,transparent);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+.g-bar .in{display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-height:60px;padding-block:8px}
+.g-bar h1{font-size:18px;margin:0;font-weight:600;display:flex;gap:8px;align-items:center;color:var(--ink)}
+.g-bar h1 svg{color:var(--gold)}
+.g-bar .sp{flex:1}
+.g-main{display:grid;gap:48px;padding-block:32px 120px}
+.g-sec{display:grid;gap:16px}
+.g-sec>header h2{font-size:22px;margin:0}
+.g-sec>header p{margin:4px 0 0;color:var(--ink-3);font-size:14px}
+.g-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px}
+.g-cell{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;display:grid;gap:10px;align-content:start}
+.g-cell small{font-size:12px;color:var(--mute)}
+.g-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.g-item{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:8px;cursor:pointer;text-align:start;transition:transform var(--m-base) var(--ease),box-shadow var(--m-base) var(--ease)}
+.g-item:hover{transform:translateY(-2px);box-shadow:var(--shadow-lift)}
+.g-item b{font-size:16px} .g-item span{font-size:13px;color:var(--ink-3)}
+.g-write{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.g-write .g-cell p{margin:0;font-size:14px}
+.g-no{color:var(--bad)} .g-yes{color:var(--ok)}
+.r-menu,.r-submenu{display:grid;gap:2px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-md);padding:6px;box-shadow:var(--shadow-lift)}
+.r-submenu{position:absolute;top:56px;right:calc(100% - 24px);width:200px;z-index:6}
+.r-menu .opt{grid-template-columns:4px minmax(0,1fr) auto}
+.tag-pill{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--inset);color:var(--ink-3);width:max-content}
+</style>
+
+<div id="app">
+<div class="g-bar"><div class="in">
+  <h1><i data-lucide="gem"></i>معرض رونق <span class="tag-pill">1.3</span></h1>
+  <span class="sp"></span>
+  <button class="btn ghost sm" type="button" id="g-pal" data-keys="⌘K" data-tip="كلّ أوامر الصفحة بالاسم"><i data-lucide="search"></i>الأوامر <span class="kbd">⌘K</span></button>
+  <button class="btn ghost sm" type="button" id="g-keys" data-keys="?" data-tip="نافذة الاختصارات">الاختصارات <span class="kbd">?</span></button>
+  <div class="dens" role="group" aria-label="الهويّة"><button type="button" data-id="sada" aria-pressed="true">هويّة صدى</button><button type="button" data-id="nakhla" aria-pressed="false">هويّة «نخلة» (اختبار)</button></div>
+  <div class="dens" role="group" aria-label="طابع الزوايا"><button type="button" data-rad="sharp" aria-pressed="false" data-tip="زوايا حادّة">حادّ</button><button type="button" data-rad="soft" aria-pressed="true" data-tip="الافتراضيّ">لطيف</button><button type="button" data-rad="round" aria-pressed="false" data-tip="زوايا مستديرة وأزرار حبّيّة">مستدير</button></div>
+  <button class="btn ghost sm" type="button" id="g-motion" aria-pressed="false" data-tip="يوقف الحركة كلّها ويحفظ اختيارك">إيقاف الحركة</button>
+  <div class="dens" role="group" aria-label="الثيم"><button type="button" data-th="light" aria-pressed="false">فاتح</button><button type="button" data-th="dark" aria-pressed="false">داكن</button><button type="button" data-th="auto" aria-pressed="true">النظام</button></div>
+</div></div>
+
+<main class="in g-main">
+
+<section class="g-sec" aria-labelledby="s1">
+  <header><h2 id="s1">الوسوم والحالات</h2><p>رمزٌ وكلمةٌ ولون — لا لونٌ وحده.</p></header>
+  <div class="g-grid">
+    <div class="g-cell s-ok"><small>يعمل</small><span class="state"><span class="sym">✓</span><span>يعمل · 410 ملّي ث</span></span></div>
+    <div class="g-cell s-bad"><small>مرفوض</small><span class="state"><span class="sym">✕</span><span>مرفوض</span></span></div>
+    <div class="g-cell s-warn"><small>تحذير</small><span class="state"><span class="sym">▲</span><span>بلغ الحدّ</span></span></div>
+    <div class="g-cell s-idle"><small>لم يُختبر</small><span class="state"><span class="sym">○</span><span>لم يُختبر</span></span></div>
+  </div>
+</section>
+
+<section class="g-sec" aria-labelledby="s2">
+  <header><h2 id="s2">الأزرار والحقول والمفاتيح</h2><p>الزرّ يقول ما يفعل. الحقل المرفوض يهتزّ ويقول السبب.</p></header>
+  <div class="g-grid">
+    <div class="g-cell"><small>أوّليّ · عاديّ · هادئ</small><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" type="button"><i data-lucide="check"></i>اختبر واحفظ</button><button class="btn" type="button">إلغاء</button><button class="btn ghost" type="button">تخطَّ</button></div></div>
+    <div class="g-cell"><small>حقلٌ يُرفض</small><input class="kin" id="g-in" placeholder="الصق المفتاح" aria-describedby="g-h"><small id="g-h">يُختبر قبل الحفظ.</small><button class="btn sm" type="button" id="g-rej">جرّب الرفض</button></div>
+    <div class="g-cell"><small>مفتاح تشغيل</small><div class="row"><span>الاختبار اليوميّ</span><button class="switch" type="button" role="switch" aria-checked="true" aria-label="الاختبار اليوميّ" onclick="this.setAttribute('aria-checked',this.getAttribute('aria-checked')!=='true')"></button></div></div>
+    <div class="g-cell"><small>رسالة مع تراجع</small><button class="btn" type="button" id="g-toast"><i data-lucide="send"></i>احفظ تغييرًا</button></div>
+  </div>
+</section>
+
+<section class="g-sec" aria-labelledby="s3">
+  <header><h2 id="s3">الحالات الأربع</h2><p>كلُّ قسمٍ يُصمَّم في التحميل والفراغ والخطأ والجزئيّ.</p></header>
+  <div class="g-grid">
+    <div class="sk-card"><div class="sk-row"><div class="skel sk-a"></div><div style="flex:1;display:grid;gap:8px"><div class="skel sk-l" style="width:60%"></div><div class="skel sk-l" style="width:35%"></div></div></div><div class="skel sk-b"></div></div>
+    <div class="g-cell"><small>فراغ</small><b>لا مصدر بعد</b><span style="font-size:13px;color:var(--ink-3)">ارفع أوّل ملفّ، ويُفهم في دقيقة.</span><button class="btn primary sm" type="button"><i data-lucide="file-text"></i>ارفع ملفًّا</button></div>
+    <div class="statebox err"><span class="ico"><i data-lucide="cloud-off"></i></span><div><b>تعذّرت القراءة</b><span>بياناتك سليمة.</span></div></div>
+    <div class="statebox part"><span class="ico"><i data-lucide="hourglass"></i></span><div><b>وصل 4 من 5</b><span>الباقي يكتمل وحده.</span></div></div>
+  </div>
+</section>
+
+<section class="g-sec" aria-labelledby="s4">
+  <header><h2 id="s4">البيانات الكثيفة</h2><p>بحث، ورقائق تصفية بالعدد، وفرزٌ بالعمود، وتحديدٌ متعدّد يُظهر شريط الأفعال.</p></header>
+  <div id="g-table" style="display:grid;gap:12px"></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s5">
+  <header><h2 id="s5">من القائمة إلى التفاصيل</h2><p>اضغط بطاقة: تتحوّل إلى صفحتها بانتقالٍ مشترك، و«رجوع» يعيدها إلى مكانها.</p></header>
+  <div id="g-morph"></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s6">
+  <header><h2 id="s6">الكتابة في الواجهة</h2><p>من «دليل الكتابة» — ما يُقال وما لا يُقال.</p></header>
+  <div class="g-write">
+    <div class="g-cell"><small>زرّ</small><p class="g-no">✕ موافق</p><p class="g-yes">✓ اختبر واحفظ</p></div>
+    <div class="g-cell"><small>نجاح</small><p class="g-no">✕ تمّت العمليّة بنجاح!</p><p class="g-yes">✓ حُفظ مفتاح Gemini</p></div>
+    <div class="g-cell"><small>خطأ</small><p class="g-no">✕ نعتذر، حدث خطأ ما.</p><p class="g-yes">✓ رفض Anthropic المفتاح (401). أنشئ مفتاحًا جديدًا ثمّ استبدله.</p></div>
+    <div class="g-cell"><small>عاقبة</small><p class="g-no">✕ المزوّد معطّل.</p><p class="g-yes">✓ إن بقي: تقف الكتابة، و3 منشورات مجدولة غدًا لن تُكتب.</p></div>
+  </div>
+</section>
+
+
+<section class="g-sec" aria-labelledby="s7">
+  <header><h2 id="s7">مسار الإعداد</h2><p>يبقى حتّى يكتمل، ولكلّ خطوةٍ فعلٌ مباشر. أكمل الخطوات لترى الختام.</p></header>
+  <div id="g-cl" style="max-width:620px"></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s8">
+  <header><h2 id="s8">نموذجٌ يحفظ نفسه</h2><p>التحقّق بعد مغادرة الحقل، والحفظ تلقائيّ بعد سكون، والمغادرة بتعديلٍ لم يُحفظ تُنبَّه.</p></header>
+  <form id="g-form" class="g-cell" style="max-width:620px;gap:14px" novalidate>
+    <div class="row"><b>ملفّ العميل</b><span data-status class="r-fstatus ok">حُفظ</span></div>
+    <div class="r-field"><label for="f-name">اسم العميل</label><input id="f-name" name="name" value="جمعيّة الوقف" aria-describedby="f-name-h"><small id="f-name-h" data-hint="كما يظهر في المنشورات.">كما يظهر في المنشورات.</small></div>
+    <div class="r-field"><label for="f-mail">بريد التنبيهات</label><input id="f-mail" name="mail" type="email" value="team@example.org" aria-describedby="f-mail-h" dir="ltr"><small id="f-mail-h" data-hint="تصله تنبيهات الأعطال.">تصله تنبيهات الأعطال.</small></div>
+    <div class="r-field"><label for="f-voice">نبرة الكتابة</label><textarea id="f-voice" name="voice" aria-describedby="f-voice-h">رصينة، قريبة، بلا مبالغة.</textarea><small id="f-voice-h" data-hint="جملة أو جملتان.">جملة أو جملتان.</small></div>
+  </form>
+</section>
+
+<section class="g-sec" aria-labelledby="s9">
+  <header><h2 id="s9">رسالةٌ تتبع العمليّة</h2><p>رسالةٌ واحدة تتحوّل من «يختبر…» إلى النتيجة، وفي الفشل «أعد المحاولة» داخلها.</p></header>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="g-ok"><i data-lucide="activity"></i>اختبار ينجح</button><button class="btn" type="button" id="g-fail"><i data-lucide="activity"></i>اختبار يفشل</button></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s10">
+  <header><h2 id="s10">العربيّة الصحيحة</h2><p>الجمع يتغيّر مع العدد، والوقت النسبيّ والهجريّ من محرّك المتصفّح لا مكتوبًا باليد.</p></header>
+  <div class="g-grid" id="g-ar"></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s11">
+  <header><h2 id="s11">قائمةٌ بالأسهم داخل لوحٍ محبوس</h2><p>افتح اللوح: Tab لا يخرج منه، والصفحة خلفه خاملة، والأسهم وHome وEnd تتنقّل، وEsc يعيدك إلى الزرّ.</p></header>
+  <button class="btn" type="button" id="g-open-sheet" style="width:max-content"><i data-lucide="layers"></i>افتح اللوح</button>
+</section>
+
+<section class="g-sec" aria-labelledby="s12">
+  <header><h2 id="s12">الرسائل في طابور</h2><p>حتّى ثلاث معًا، والمؤقّت يتوقّف حين تمرّ عليها أو تُخفى الصفحة. اضغط F8 للوصول إليها بلوحة المفاتيح، وEsc للعودة.</p></header>
+  <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" type="button" id="g-burst" data-tip="ثلاث رسائل متتالية"><i data-lucide="bell"></i>ثلاث رسائل</button></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s13">
+  <header><h2 id="s13">بحثٌ عربيّ يتسامح</h2><p>«اسامه» تجد «أسامة»، و«الاولى» تجد «الأُولى». جرّب في الحقل أو في بحث الجدول أعلاه.</p></header>
+  <div class="g-cell" style="max-width:620px"><label class="r-search"><i data-lucide="search"></i><input id="g-ar-q" type="search" placeholder="اكتب: اسامه، الاولى، مؤسسه…" aria-label="بحث عربيّ"></label><div id="g-ar-res" style="display:flex;gap:6px;flex-wrap:wrap"></div></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s14">
+  <header><h2 id="s14">الأزرار: سلّمٌ وطبقات</h2><p>ثلاثة أحجام، وثانويٌّ بخلفيّةٍ ملوّنة باهتة، وعمقٌ مادّيّ في الداكن. جرّب «طابع الزوايا» في الشريط.</p></header>
+  <div class="g-cell"><div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+    <button class="btn primary sm" type="button">صغير</button><button class="btn primary" type="button">متوسّط</button><button class="btn primary lg" type="button">كبير</button>
+    <button class="btn tint" type="button" data-tip="ثانويّ ملوّن: أوضح من المحدَّد بخطّ">ثانويّ ملوّن</button><button class="btn" type="button">محدَّد</button><button class="btn ghost" type="button">هادئ</button></div></div>
+</section>
+
+<section class="g-sec" aria-labelledby="s15">
+  <header><h2 id="s15">قائمةٌ فرعيّة تتسامح مع الحركة</h2><p>مرّر على «انقل إلى» ثمّ اتّجه قُطريًّا إلى القائمة: لا تنغلق في الطريق. وبلوحة المفاتيح: ← تفتحها و→ تغلقها.</p></header>
+  <div class="g-cell" style="max-width:320px;position:relative">
+    <div class="r-menu" role="menu" aria-label="أفعال المنشور">
+      <button class="opt" role="menuitem" type="button"><span></span><span class="om"><b>عدّل</b></span><span></span></button>
+      <button class="opt" role="menuitem" type="button" id="g-sub-t" aria-haspopup="menu" aria-expanded="false"><span></span><span class="om"><b>انقل إلى</b></span><i data-lucide="chevron-left"></i></button>
+      <button class="opt" role="menuitem" type="button"><span></span><span class="om"><b>أرشف</b></span><span></span></button>
+    </div>
+    <div class="r-submenu" id="g-sub" role="menu" aria-label="انقل إلى" hidden>
+      <button class="opt" role="menuitem" type="button"><span></span><span class="om"><b>المسوّدات</b></span><span></span></button>
+      <button class="opt" role="menuitem" type="button"><span></span><span class="om"><b>المجدولة</b></span><span></span></button>
+      <button class="opt" role="menuitem" type="button"><span></span><span class="om"><b>الأرشيف</b></span><span></span></button>
+    </div>
+  </div>
+</section>
+
+</main>
+<div class="scrim" id="g-scrim" hidden></div>
+<aside class="sheet" id="g-sheet" role="dialog" aria-modal="true" aria-labelledby="g-sh-t" hidden><div class="shh"><div><h3 id="g-sh-t">اختر المنصّة</h3><p>جرّب الأسهم وTab وEsc.</p></div><button class="btn ghost" type="button" id="g-sh-x" aria-label="إغلاق"><i data-lucide="x"></i></button></div><div class="olist" role="listbox" aria-label="المنصّات" id="g-lb"><button type="button" class="opt" role="option" aria-selected="false" data-v="LinkedIn"><span class="radio"></span><span class="om"><b>LinkedIn</b><span>منصّة</span></span><span></span></button><button type="button" class="opt" role="option" aria-selected="false" data-v="X"><span class="radio"></span><span class="om"><b>X</b><span>منصّة</span></span><span></span></button><button type="button" class="opt" role="option" aria-selected="false" data-v="Instagram"><span class="radio"></span><span class="om"><b>Instagram</b><span>منصّة</span></span><span></span></button><button type="button" class="opt" role="option" aria-selected="false" data-v="TikTok"><span class="radio"></span><span class="om"><b>TikTok</b><span>منصّة</span></span><span></span></button><button type="button" class="opt" role="option" aria-selected="false" data-v="YouTube"><span class="radio"></span><span class="om"><b>YouTube</b><span>منصّة</span></span><span></span></button></div></aside>
+</div>
+
+<script src="ronaq.js"></script>
+<script>
+const R = window.Ronaq;
+document.addEventListener('click', e => {
+  const idb = e.target.closest('.g-bar [data-id]');
+  if(idb){ const v = idb.dataset.id; document.querySelectorAll('.g-bar [data-id]').forEach(x=>x.setAttribute('aria-pressed',x===idb));
+    R.vt(()=>{ v==='nakhla' ? document.documentElement.setAttribute('data-identity','nakhla') : document.documentElement.removeAttribute('data-identity') }) }
+  const thb = e.target.closest('[data-th]');
+  if(thb){ const v = thb.dataset.th; document.querySelectorAll('[data-th]').forEach(x=>x.setAttribute('aria-pressed',x===thb));
+    R.vt(()=>{ v==='auto' ? document.documentElement.removeAttribute('data-theme') : document.documentElement.setAttribute('data-theme', v) }) }
+});
+document.getElementById('g-rej').addEventListener('click', () => R.reject(document.getElementById('g-in'), 'هذا لا يبدو مفتاحًا: قصيرٌ جدًّا.'));
+document.getElementById('g-toast').addEventListener('click', () => R.toast('حُفظ: الخطّة ← DeepSeek Chat', {undo: () => R.toast('أُعيد إلى DeepSeek V4 Pro')}));
+
+const ST = ['منشور','مجدول','مسوّدة'];
+const rows = Array.from({length:14}, (_,i) => ({ id:'p'+i, title:['خطّة الربع الأوّل','دليل الوقف','تقرير الأثر','قصّة متطوّع','إطلاق البرنامج','أرقام الشهر','لقاء الشركاء'][i%7]+(i>6?' · 2':''),
+  platform:['LinkedIn','X','Instagram'][i%3], status:ST[i%3], reach:Math.round(400+Math.sin(i)*300+i*120), date:`2026-11-${String(1+i).padStart(2,'0')}` }));
+R.table(document.getElementById('g-table'), {
+  columns:[{key:'title',label:'المنشور'},{key:'platform',label:'المنصّة'},{key:'status',label:'الحال',render:r=>`<span class="tag ${r.status==='منشور'?'t-free':r.status==='مجدول'?'t-cheap':'t-paid'}">${r.status}</span>`},{key:'reach',label:'الوصول',num:true},{key:'date',label:'التاريخ',num:true}],
+  rows, filters:{key:'status', values:ST}, empty:'لا منشور يطابق البحث.',
+  actions:[{icon:'calendar',label:'جدول',run:(r,done)=>{R.toast(`جُدول ${r.length} منشورات`,{undo:()=>R.toast('أُلغيت الجدولة')});done()}},
+           {icon:'archive',label:'أرشف',run:(r,done)=>{R.toast(`أُرشف ${r.length}`,{undo:()=>R.toast('أُعيدت')});done()}}]
+});
+
+const items = [{id:'a',t:'خطّة الربع الأوّل',d:'12 منشورًا على 3 منصّات'},{id:'b',t:'دليل الوقف',d:'مصدرٌ محلَّل · استحقاق 0.8'},{id:'c',t:'تقرير الأثر',d:'مسوّدتان بانتظار مراجعتك'}];
+const host = document.getElementById('g-morph');
+function list(){ host.innerHTML = `<div class="g-cards">${items.map(x=>`<button class="g-item" type="button" data-open="${x.id}" style="view-transition-name:card-${x.id}"><b>${x.t}</b><span>${x.d}</span></button>`).join('')}</div>`; R.icons(host) }
+function detail(x){ host.innerHTML = `<article class="r-detail" style="view-transition-name:card-${x.id}"><button class="btn ghost sm back" type="button" data-back><i data-lucide="arrow-right"></i>رجوع</button><h3 style="margin:0;font-size:22px">${x.t}</h3><p style="margin:0;color:var(--ink-3)">${x.d}</p><div class="skel" style="height:120px"></div></article>`; R.icons(host); host.querySelector('[data-back]').focus() }
+host.addEventListener('click', e => { let b;
+  if(b = e.target.closest('[data-open]')){ const x = items.find(i=>i.id===b.dataset.open); R.vt(()=>detail(x)) }
+  if(e.target.closest('[data-back]')){ const id = host.querySelector('.r-detail').style.viewTransitionName.slice(5); R.vt(list); setTimeout(()=>{ const t=host.querySelector(`[data-open="${id}"]`); t&&t.focus() }, 50) }
+});
+list(); R.icons();
+
+// ── 1.2 ──
+const cl = [{id:'k',title:'أضف مفتاح Gemini',desc:'مجّانيّ، ويكفي للفهم.',action:'أضفه',done:true},{id:'t',title:'اختبره',desc:'نداءٌ صغير يتأكّد أنّه يعمل.',action:'اختبر',done:true},{id:'s',title:'ارفع أوّل مصدر',desc:'ملفٌّ أو رابط.',action:'ارفع',done:false},{id:'r',title:'طبّق التوصيات',desc:'تُضبط المهامّ الستّ.',action:'طبّق',done:false},{id:'p',title:'ابنِ أوّل خطّة',desc:'أسبوعٌ على منصّةٍ واحدة.',action:'ابنِ',done:false}];
+R.checklist(document.getElementById('g-cl'), cl);
+R.form(document.getElementById('g-form'), { rules:{ name:v=>v.length<2?'اكتب اسم العميل.':'', mail:v=>/^\S+@\S+\.\S+$/.test(v)?'':'هذا لا يبدو بريدًا: ينقصه @ أو النطاق.', voice:v=>v.length>200?'أطول من جملتين — اختصرها.':'' }, save:()=>new Promise(r=>setTimeout(r,600)) });
+const wait = (ok) => () => new Promise((res,rej)=>setTimeout(()=>ok?res(412):rej(new Error('401')),1400));
+document.getElementById('g-ok').addEventListener('click', ()=>R.track(wait(true), {loading:'يختبر Gemini…', success:v=>`Gemini يعمل · ${v} ملّي ث`, error:e=>`Gemini رفض المفتاح (${e.message})`}).catch(()=>{}));
+document.getElementById('g-fail').addEventListener('click', ()=>R.track(wait(false), {loading:'يختبر Anthropic…', success:v=>`يعمل`, error:e=>`Anthropic رفض المفتاح (${e.message})`}).catch(()=>{}));
+const f = {zero:'لا منشور', one:'منشور', two:'منشوران', few:'منشورات', many:'منشورًا', other:'منشور'};
+const now = Date.now();
+document.getElementById('g-ar').innerHTML = [0,1,2,3,11,100].map(n=>`<div class="g-cell"><small>${n}</small><b>${R.plural(n,f)}</b></div>`).join('') +
+  [[-180e3,'قبل 3 دقائق؟'],[-864e5,'أمس؟'],[72e5,'بعد ساعتين؟']].map(([d])=>`<div class="g-cell"><small>وقت نسبيّ</small><b>${R.ago(now+d, now)}</b></div>`).join('') +
+  `<div class="g-cell"><small>ميلاديّ</small><b>${R.date(now)}</b></div><div class="g-cell"><small>هجريّ</small><b>${R.date(now,{hijri:true})}</b></div>`;
+const sheet = document.getElementById('g-sheet'), scrim = document.getElementById('g-scrim'); let rel = null;
+R.listbox(document.getElementById('g-lb'));
+function openSheet(){ sheet.hidden = false; scrim.hidden = false; requestAnimationFrame(()=>document.getElementById('app').classList.add('sheet-open')); rel = R.trap(sheet) }
+function closeSheet(){ document.getElementById('app').classList.remove('sheet-open'); setTimeout(()=>{ sheet.hidden = true; scrim.hidden = true }, 300); rel && rel() }
+document.getElementById('g-open-sheet').addEventListener('click', openSheet);
+document.getElementById('g-sh-x').addEventListener('click', closeSheet); scrim.addEventListener('click', closeSheet);
+sheet.addEventListener('keydown', e => { if(e.key==='Escape') closeSheet() });
+document.getElementById('g-lb').addEventListener('click', e => { const o = e.target.closest('.opt'); if(!o) return; document.querySelectorAll('#g-lb .opt').forEach(x=>x.setAttribute('aria-selected', x===o)); R.toast(`اختيرت ${o.dataset.v}`); closeSheet() });
+const pal = R.palette([
+  {id:'theme-dark',title:'الوضع الداكن',icon:'layers',run:()=>document.querySelector('[data-th="dark"]').click()},
+  {id:'theme-light',title:'الوضع الفاتح',icon:'layers',run:()=>document.querySelector('[data-th="light"]').click()},
+  {id:'nakhla',title:'جرّب هويّة «نخلة»',icon:'gem',run:()=>document.querySelector('[data-id="nakhla"]').click()},
+  {id:'sada',title:'عُد إلى هويّة صدى',icon:'gem',run:()=>document.querySelector('[data-id="sada"]').click()},
+  {id:'sheet',title:'افتح اللوح',icon:'layers',run:openSheet},
+  {id:'table',title:'اذهب إلى البيانات الكثيفة',icon:'list-filter',run:()=>document.getElementById('s4').scrollIntoView({behavior:'smooth'})},
+  {id:'form',title:'اذهب إلى النموذج',icon:'file-text',run:()=>document.getElementById('s8').scrollIntoView({behavior:'smooth'})},
+  {id:'keys',title:'اختصارات لوحة المفاتيح',icon:'settings',keys:'?',run:()=>keys.open()},
+]);
+const keys = R.shortcuts([{keys:'⌘K',label:'لوحة الأوامر'},{keys:'?',label:'هذه النافذة'},{keys:'Esc',label:'إغلاق أيّ لوح'},{keys:'↑ ↓',label:'التنقّل في القوائم'},{keys:'Home / End',label:'أوّل القائمة وآخرها'},{keys:'Tab',label:'العنصر التالي'}]);
+document.getElementById('g-pal').addEventListener('click', ()=>pal.open());
+document.getElementById('g-keys').addEventListener('click', ()=>keys.open());
+R.icons();
+
+// ── 1.3 ──
+document.getElementById('g-burst').addEventListener('click', () => {
+  R.toast('حُفظ: الخطّة ← DeepSeek Chat', {undo:()=>R.toast('أُعيد')});
+  setTimeout(()=>R.toast('Gemini يعمل · 412 ملّي ث'), 350);
+  setTimeout(()=>R.toast('Anthropic رفض المفتاح (401)', {bad:true, action:{label:'استبدل', run:()=>R.toast('افتح بطاقة Anthropic')}}), 700);
+});
+const names = ['أسامة الشهري','الأُولى في الوقف','مؤسّسة الأثر','إطلاق البرنامج','آمنة العتيبي','تقرير الأولى','مسئولية مجتمعية'];
+const arq = document.getElementById('g-ar-q'), arres = document.getElementById('g-ar-res');
+const showAr = () => { const q = arq.value; arres.innerHTML = names.filter(n=>R.match(n,q)).map(n=>`<span class="tag t-cheap">${R.esc(n)}</span>`).join('') || '<small>لا نتيجة</small>' };
+arq.addEventListener('input', showAr); showAr();
+document.addEventListener('click', e => {
+  const rb = e.target.closest('[data-rad]'); if(rb){ document.querySelectorAll('[data-rad]').forEach(x=>x.setAttribute('aria-pressed',x===rb)); R.vt(()=>R.radius(rb.dataset.rad)) }
+});
+const mb = document.getElementById('g-motion');
+mb.addEventListener('click', () => { const off = mb.getAttribute('aria-pressed') !== 'true'; mb.setAttribute('aria-pressed', off); mb.textContent = off ? 'شغّل الحركة' : 'إيقاف الحركة'; R.motion(!off); R.toast(off ? 'أُوقفت الحركة' : 'عادت الحركة') });
+R.submenu(document.getElementById('g-sub-t'), document.getElementById('g-sub'));
+R.stickyNav(document.querySelector('.g-bar'));
+R.icons();
+</script>
