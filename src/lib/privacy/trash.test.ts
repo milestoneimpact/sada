@@ -51,8 +51,10 @@ describe('المسوّدة', () => {
     seedPost('p1')
     seedMedia('m1', 'p1', 'img/p1/m1.png')
     db.raw.exec(`INSERT INTO metrics (post_id, window, impressions) VALUES ('p1', '24h', 5)`)
-    db.raw.exec(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status)
-      VALUES ('a1', 'p1', 'k-p1', 1, '{}', 'failed'), ('a2', 'p1', 'k-p1', 2, '{}', 'failed')`)
+    // ‏محاولتان ثبت أنّهما لم تُرسَلا (مراجعة D-322: كانتا بلا سبب، و«فشلٌ بلا سبب» لم يعد يُحذف — لا يُعرف أأُرسل أم لا)
+    db.raw.exec(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+      VALUES ('a1', 'p1', 'k-p1', 1, '{"preflight":true}', '{"error":"no_tokens","preflight":true}', 'failed'),
+             ('a2', 'p1', 'k-p1', 2, '{}', '{"error":"linkedin: رفض النشر (duplicate)","status":422}', 'failed')`)
     const before = JSON.stringify([
       db.raw.prepare('SELECT * FROM posts').all(), db.raw.prepare('SELECT * FROM media').all(),
       db.raw.prepare('SELECT * FROM metrics').all(), db.raw.prepare('SELECT * FROM publish_attempts ORDER BY rowid').all(),
@@ -98,6 +100,61 @@ describe('المسوّدة', () => {
     const open = await trashPost(deps(), 'org_owner', 'p1')
     expect(open.ok ? '' : open.reason).toContain('يُنشر الآن')
     expect(count('SELECT COUNT(*) AS n FROM publish_attempts')).toBe(1)
+  })
+
+  /*
+   * ‏**مراجعة D-322**: الحارسُ كان يسأل عن `sent` و`succeeded` وحدهما. وسلسلةُ X نُشر بعضُها محاولتُها `failed` وعلاماتُ ما نُشر في
+   * ‏`request_json.tweets`، وطلبٌ لم يُعرف جوابُه يُكتب `failed` بـ`unconfirmed_send` — فكان يُحذف ما بلغ المنصّة، ومعه ذاكرةُ D-004
+   * ‏الوحيدة له: مسوّدةٌ تُكتب ثانيةً بالمفتاح نفسِه فتُرسَل التغريدتان مرّتين وتُدفعان مرّتين.
+   */
+  function seedAttempt(post: string, no: number, request: unknown, response: unknown, status = 'failed'): void {
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`).run(`a-${post}-${no}`, post, 'k-' + post, no, JSON.stringify(request), JSON.stringify(response), status)
+  }
+
+  it('**وسلسلةٌ نُشر بعضُها لا تُحذف** — علاماتُ تغريداتها الناجحة في محاولةٍ فاشلة هي D-004', async () => {
+    seedPost('p2', 'org_owner', 'failed')
+    db.raw.exec("UPDATE posts SET platform = 'x', type = 'thread' WHERE id = 'p2'")
+    seedAttempt('p2', 1, { platform: 'x', thread: 3, tweets: [
+      { no: 1, key: 'k-p2#1', digest: 'a', status: 'succeeded', id: '111' },
+      { no: 2, key: 'k-p2#2', digest: 'b', status: 'succeeded', id: '222' },
+      { no: 3, key: 'k-p2#3', digest: 'c', status: 'failed', error: 'رفض النشر' },
+    ] }, { error: 'x: التغريدة 3 من 3 لم تُنشَر (رفض النشر) — نُشرت قبلها 2 ولا تُعاد، والإعادةُ تُكمل منها', status: 403 })
+    const out = await trashPost(deps(), 'org_owner', 'p2')
+    expect(out.ok).toBe(false)
+    expect(out.ok ? '' : out.reason).toContain('نُشر')
+    expect(count('SELECT COUNT(*) AS n FROM publish_attempts')).toBe(1)
+    expect(count('SELECT COUNT(*) AS n FROM posts')).toBe(1)
+  })
+
+  it.each([
+    ['تغريدةٌ أُرسلت ولم يُعرف جوابُها', { platform: 'x', thread: 2, tweets: [{ no: 1, key: 'k#1', digest: 'a', status: 'sent', error: 'unconfirmed_send: timeout' }] },
+      { error: 'thread_unconfirmed: التغريدة 1 من 2 أُرسلت ولم يُؤكَّد نشرُها (انقضت المهلة قبل جوابها) — تحقّق على X ثمّ قل ما وجدت', status: 0 }],
+    ['مهلةٌ قبل جواب المنصّة', { platform: 'linkedin' }, { error: 'unconfirmed_send: timeout', status: 0 }],
+    ['5xx من المنصّة', { platform: 'linkedin' }, { error: 'linkedin: unconfirmed_send (Internal Server Error)', status: 500 }],
+    ['قُبل بلا معرّف', { platform: 'linkedin' }, { error: 'linkedin: نجح الطلب بلا معرف منشور', status: 502 }],
+  ])('**وما لم يُعرف أبلغ المنصّةَ لا يُحذف وحدَه**: %s', async (_name, request, response) => {
+    seedPost('p3', 'org_owner', 'failed')
+    seedAttempt('p3', 1, request, response)
+    const out = await trashPost(deps(), 'org_owner', 'p3')
+    expect(out.ok).toBe(false)
+    expect(out.ok ? '' : out.reason).toContain('لم يُعرف')
+    expect(count('SELECT COUNT(*) AS n FROM publish_attempts')).toBe(1)
+  })
+
+  it.each([
+    ['ردٌّ قبل الإرسال (preflight)', { platform: 'linkedin', preflight: true }, { error: 'no_tokens', preflight: true }],
+    ['دفترٌ سقط قبل الإرسال (pre_send)', { platform: 'linkedin' }, { error: 'pre_send: لم يُكتب الدفتر', pre_send: true }],
+    ['رفضٌ قاطع (4xx)', { platform: 'linkedin' }, { error: 'linkedin: رفض النشر (duplicate)', status: 422 }],
+    ['طابورٌ استنفد محاولاته', { dead_letter: true }, { error: 'dead_letter: استنفد الطابورُ محاولاتَه ولم يُنشَر', dead_letter: true }],
+    ['تغريدةٌ معلّقة قال المالكُ إنّه لم يجدها',
+      { platform: 'x', thread: 2, tweets: [{ no: 1, key: 'k#1', digest: 'a', status: 'failed', settled: 'missing' }] },
+      { error: 'thread_unconfirmed: التغريدة 1 من 2 أُرسلت ولم يُؤكَّد نشرُها', status: 0 }],
+  ])('وما ثبت أنّه لم يُرسَل يُحذف بمحاولاته: %s', async (_name, request, response) => {
+    seedPost('p4', 'org_owner', 'failed')
+    seedAttempt('p4', 1, request, response)
+    expect((await trashPost(deps(), 'org_owner', 'p4')).ok).toBe(true)
+    expect(count('SELECT COUNT(*) AS n FROM publish_attempts')).toBe(0)
   })
 
   it('ولا تُحذف وصورتُها تُولَّد الآن (حجزٌ حيّ بلا صفّ)', async () => {
@@ -165,7 +222,7 @@ describe('محوُ البايتات في الكنس', () => {
     expect(r2.objects.has('img/p1/own.png')).toBe(true)
   })
 
-  it('**ومفتاحُ عميلٍ لا يُسأل عنه في غيره**: صفٌّ في عميلٍ آخر بالمفتاح نفسِه لا يُبقيه ولا يُمحى', async () => {
+  it('حذفُ عميلٍ يمحو مفاتيحَه ولا يمسّ مفاتيحَ عميلٍ آخر', async () => {
     seedPost('pb', 'org_b')
     seedMedia('mb', 'pb', 'org/org_b/img/pb/x.png', 'org_b')
     seedPost('po')
@@ -175,6 +232,27 @@ describe('محوُ البايتات في الكنس', () => {
     await purgeDeleted({ ...deps(), bucket: r2 }, new Date(clock + 3 * UNDO_SECONDS * 1000))
     expect([...r2.objects]).toEqual(['img/po/y.png'])
     expect(count("SELECT COUNT(*) AS n FROM media WHERE org_id = 'org_owner'")).toBe(1)
+  })
+
+  /*
+   * ‏**مراجعة D-322**: الاختبارُ أعلاه كان يُعَنوَن «صفٌّ في عميلٍ آخر بالمفتاح نفسِه» ومفتاحاه مختلفان. والسؤالُ «أيشير إليه أحد؟»
+   * ‏في منظّمة القيد وحدها (حارسُ المستأجرين D-224 لا يقبل جملةً بلا `org_id`)، فالحارسُ هنا **مساحةُ المفتاح** (`objectKey` ·
+   * ‏`library/<org>/` · `sources/<org>/`): مفتاحٌ خارج مساحة العميل الذي حُذف منه شيء لا يُمحى بحذفه، أيًّا كان من يشير إليه.
+   */
+  it('**ومفتاحٌ بالمفتاح نفسِه في عميلين لا يُمحى بحذفٍ في غير صاحب مساحته**', async () => {
+    // ‏صورةُ أصول المالك وُصلت (خطأً أو بمخطّطٍ آتٍ) بمنشورٍ في العميل ب، والمالكُ يستعملها
+    seedPost('pb', 'org_b')
+    seedMedia('mb', 'pb', 'library/org_owner/logo.png', 'org_b')
+    seedPost('po')
+    seedMedia('mo', 'po', 'library/org_owner/logo.png')
+    // ‏ومقطعُ المالك بمفتاحٍ بلا سابقة، في صفّ العميل ب كذلك
+    seedMedia('mb2', 'pb', 'img/po/y.png', 'org_b')
+    seedMedia('mo2', 'po', 'img/po/y.png')
+    const r2 = bucket(['library/org_owner/logo.png', 'img/po/y.png'])
+    await trashPost(deps(), 'org_b', 'pb')
+    const report = await purgeDeleted({ ...deps(), bucket: r2 }, new Date(clock + 3 * UNDO_SECONDS * 1000))
+    expect([...r2.objects].sort()).toEqual(['img/po/y.png', 'library/org_owner/logo.png'])
+    expect(report).toMatchObject({ objects: 0, kept: 2 })
   })
 })
 

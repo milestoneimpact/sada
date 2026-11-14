@@ -65,11 +65,24 @@ const STEP_UP_POST: readonly RegExp[] = [
 ]
 
 export function needsStepUp(method: string, path: string, settingKey?: string | null): boolean {
-  // ‏وتصديرُ عميلٍ كلِّه (D-322) صفحةٌ تُفتح — وملفُّه ما تريده جلسةٌ مسروقةٌ تحديدًا
-  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path) || path === '/panel/orgs/export'
+  // ‏وتصديرُ عميلٍ كلِّه (D-322) صفحتُه وملفُّه — والملفُّ ما تريده جلسةٌ مسروقةٌ تحديدًا
+  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path) || /^\/panel\/orgs\/export(ed)?$/.test(path)
   // ‏وفتحُ أبواب الطرفيّة (D-318): بابٌ يُنادى برمزٍ ثابتٍ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
   if (path === '/panel/settings') return settingKey === 'alert_webhook' || settingKey === 'admin_api'
   return STEP_UP_POST.some((re) => re.test(path))
+}
+
+/**
+ * ‏**إلى أين يعود «تحقّق للتوّ» بعد صفحةٍ تُفتح** (مراجعة D-322) — إلى المسار نفسِه، **إلّا ملفًّا يُنزَّل**: ترويسةُ `attachment` لا
+ * ‏تنقل المتصفّحَ، فكان التصديرُ يُنزَّل في الخلفية وتبقى الشاشةُ على نموذج التحقّق ورمزُه مستهلَك، بلا تأكيدٍ ولا خطوةٍ تالية.
+ * ‏فيعود إلى صفحته التي تحمل رابطَه («نزّل الملفّ»)، والجلسةُ عندئذٍ «للتوّ».
+ */
+const STEP_UP_LANDING: Readonly<Record<string, string>> = {
+  '/panel/orgs/export': '/panel/orgs/exported',
+}
+
+export function stepUpReturn(path: string): string {
+  return STEP_UP_LANDING[path] ?? path
 }
 
 /**
@@ -147,7 +160,7 @@ export function requiredRole(method: string, path: string, action?: string | nul
   if (OPEN.test(path)) return null
   if (path.startsWith('/oauth/')) return 'admin'
   if (method === 'GET' || method === 'HEAD') {
-    if (/^\/panel\/team(\/|$)/.test(path) || path === '/panel/orgs/export') return 'owner'
+    if (/^\/panel\/team(\/|$)/.test(path) || /^\/panel\/orgs\/export(ed)?$/.test(path)) return 'owner'
     // ‏و«بوّابات المراحل» بدور «ما عليك» نفسِه: كانت طيّةً فيها، وخرجت إلى صفحتها لوزنها (دمجُ D-318 مع D-324)
     if (/^\/panel\/(settings|tasks|gates)(\/|$)/.test(path)) return 'admin'
     return 'viewer'

@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { RETENTION, sweepRetention, truncateIp } from './retention'
 import { collectAlerts, PUBLISH_ALERT_DAYS } from '../alerts/collect'
-import { anyWeekAlert } from '../token/expiry'
+import { anyWeekAlert, expiringTokens, recordAlerts } from '../token/expiry'
 
 let db: FakeDb
 
@@ -198,6 +198,30 @@ describe('ما لا يمسّه الكنسُ أبدًا (D-004 · D-008)', () => 
     expect((db.raw.prepare('SELECT threshold, expires_at FROM token_alerts').all() as { threshold: number; expires_at: string }[]))
       .toEqual([{ threshold: 7, expires_at: '2026-02-01' }])
     expect(report.tokenAlerts).toBe(2)
+  })
+
+  /*
+   * ‏**مراجعة D-322**: إذنٌ انتهى وحسابُه غيرُ مفصول يعود إلى `expiringTokens` كلَّ يوم بعتبة الصفر، و«لا يُكتب مرّتين» قائمٌ على صفّه
+   * ‏في `token_alerts`. فكنسُ الصفّ بعد 180 يومًا (وصفِّ الصندوق قبله بعد 90) كان يكتبه ثانيةً بتاريخ اليوم فيعود «انتهى» إلى القناة
+   * ‏كلَّ نصف سنة — وكان قبل D-322 يُرسَل مرّةً واحدة.
+   */
+  it('**وإذنٌ انتهى ولم يُفصَل لا يعود تنبيهُه بعد الكنس** — صفُّه يبقى ما بقي الإذنُ نفسُه', async () => {
+    db.raw.exec("INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a1', 'linkedin', 'member', 'x', 'حساب', 'needs_reauth')")
+    const expired = new Date(Date.now() - 200 * 86_400_000).toISOString()
+    db.raw.prepare(`INSERT INTO tokens (account_id, access_enc, access_iv, refresh_enc, refresh_iv, expires_at, refresh_expires_at, scopes)
+      VALUES ('a1', 'x', 'x', 'x', 'x', ?, ?, 'w_member_social')`).run(expired, expired)
+    for (const kind of ['access', 'refresh']) {
+      db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, at) VALUES ('a1', ?, 0, ?, datetime('now', '-199 days'))`).run(kind, expired)
+      db.raw.prepare(`INSERT INTO alert_outbox (ref, kind, body, status, at) VALUES (?, 'token', 'نصّ', 200, datetime('now', '-199 days'))`).run(`token:حساب:${kind}:0`)
+    }
+    expect((await collectAlerts(db, new Date(), 0)).filter((a) => a.ref.startsWith('token:'))).toEqual([])
+    await sweepRetention(db)
+    expect(count("SELECT COUNT(*) AS n FROM alert_outbox WHERE ref LIKE 'token:%'")).toBe(0)
+    expect((await recordAlerts(db, await expiringTokens(db, new Date()))).written).toBe(0)
+    expect((await collectAlerts(db, new Date(), 0)).filter((a) => a.ref.startsWith('token:'))).toEqual([])
+    // ‏وصفُّ إذنٍ تجدّد بعده (تاريخٌ آخر) يُكنَس كعادته
+    db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, at) VALUES ('a1', 'access', 1, '2025-01-01T00:00:00.000Z', datetime('now', '-300 days'))`).run()
+    expect((await sweepRetention(db)).tokenAlerts).toBe(1)
   })
 
   it('ونافذةُ جمع تنبيه النشر أقصرُ من مدّة الصندوق — وإلّا عاد ما كُنس', () => {

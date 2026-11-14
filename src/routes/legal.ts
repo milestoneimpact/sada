@@ -111,7 +111,7 @@ const DATA: readonly Row[] = [
   {
     what: 'إذن الوصول وإذن التجديد',
     from: 'المنصّة، عبر OAuth 2.0 بـ PKCE',
-    why: 'النشر نيابةً عنك بعد موافقتك على كلّ منشور',
+    why: 'النشر نيابةً عنك بعد الموافقة على كلّ منشور',
     where: 'D1 — <b>مشفَّرةً بـ <span class="nb">AES-GCM</span></b>، ومفتاحُها في أسرار Worker وحدها',
     howLong: 'حتّى يُفصَل الحساب أو ينتهي الإذن',
   },
@@ -133,10 +133,11 @@ const DATA: readonly Row[] = [
   },
   {
     what: 'نصّ المنشورات وحالاتُها ومحاولات النشر',
-    from: 'ما يولّده النظام أو يكتبه المشغّل، ويعتمده بيده',
+    // ‏ويعتمد الناشرُ المدعوُّ كالمشغّل (D-272 · `access.ts`) — مراجعة D-322
+    from: 'ما يولّده النظام أو يكتبه المشغّل وفريقُه، ويعتمده بيده المشغّل أو ناشرٌ من فريقه',
     why: 'سجلّ لما نُشر ولما رُفض، ومنع النشر مرّتين',
     where: 'Cloudflare D1',
-    howLong: 'حتّى تُحذف — وما نُشر يبقى ما بقي عميلُه: محاولتُه الناجحة هي ما يمنع نشره مرّتين',
+    howLong: 'حتّى تُحذف — وما نُشر كلُّه أو بعضُه، أو لم يُعرف أنُشر، يبقى ما بقي عميلُه: محاولاتُه هي ما يمنع نشره مرّتين',
   },
   {
     what: 'سجلّ النشاط: من فعل ماذا ومتى، ومن أيّ عنوان IP ومتصفّح',
@@ -159,7 +160,7 @@ const DATA: readonly Row[] = [
     why: 'أن يعرف المشغّل ما يحتاجه خارج اللوحة، ولا يُرسَل الحدثُ مرّتين',
     where: 'Cloudflare D1',
     howLong: 'ما وصل ' + days(RETENTION.outboxDeliveredDays, 'nom') + '، وما لم يصل ' + days(RETENTION.outboxUndeliveredDays, 'nom') +
-      '، وتنبيهات الأذونات ' + days(RETENTION.tokenAlertDays, 'nom') + ' (ويبقى أحدثُ تنبيهٍ قبل أسبوعٍ من الانتهاء شاهدًا، بلا نصٍّ ولا بريد)',
+      '، وتنبيهات الأذونات ' + days(RETENTION.tokenAlertDays, 'nom') + ' (ويبقى تنبيهُ إذنٍ ما زال قائمًا بتاريخه فلا يُرسَل مرّتين، وأحدثُ تنبيهٍ قبل أسبوعٍ من الانتهاء شاهدًا، بلا نصٍّ ولا بريد)',
   },
   {
     what: 'كعكة جلسة واحدة للوحة، ومعها عنوان IP والمتصفّح الذي فُتحت منه',
@@ -202,7 +203,7 @@ const NEVER: readonly string[] = [
   'لا نبيع بياناتك ولا نؤجّرها ولا نشاركها مع معلن.',
   'لا إعلانات ولا تتبّع ولا تحليلات طرف ثالث في أيّ صفحة.',
   'لا نُرسل بيانات حسابك على أيّ منصّة إلى مزوّد ذكاء اصطناعيّ — النصّ يُكتب من مستنداتك وكلماتك <b>قبل</b> أن يمسّ حسابك، ولا تعود بيانات المنصّة إليه.',
-  'لا نشر آليّ: لا يخرج منشور إلّا بعد أن يعتمده المشغّل بيده، والقاعدة نفسها ترفض غير ذلك.',
+  'لا نشر آليّ: لا يخرج منشور إلّا بعد أن يعتمده بيده المشغّل أو ناشرٌ من فريقه، والقاعدة نفسها ترفض غير ذلك.',
 ]
 
 function section(title: string, body: string): string {
@@ -283,8 +284,10 @@ function policyBody(env: Env, base: string): string {
       <li>سجلّ النشاط بعد ${days(RETENTION.auditDays)}، وعنوانُ IP فيه يُقصَّر إلى شبكته بعد ${days(RETENTION.ipDays)}
         (IPv4 إلى أوّل ثلاثة أرقام، و IPv6 إلى أوّل ثلاث مجموعات)، و«إرسالٌ رُدّ» بعد ${days(RETENTION.formRejectDays)}.</li>
       <li>التنبيهات: ما وصل بعد ${days(RETENTION.outboxDeliveredDays)}، وما لم يصل بعد ${days(RETENTION.outboxUndeliveredDays)}،
-        وتنبيهات الأذونات بعد ${days(RETENTION.tokenAlertDays)}، وعدّادات الدخول بعد ${days(RETENTION.authAttemptDays)}.</li>
+        وتنبيهات الأذونات بعد ${days(RETENTION.tokenAlertDays)} (وتنبيهُ إذنٍ ما زال قائمًا بتاريخه يبقى ما بقي، فلا يُرسَل مرّتين)،
+        وعدّادات الدخول بعد ${days(RETENTION.authAttemptDays)}.</li>
       <li>ملفّات ما حُذف من اللوحة تُمحى من R2 في أوّل كنسٍ بعد انقضاء مهلة التراجع.</li>
+      <li>وعيّنات سرعة الصفحات تُمحى بعد ${days(VITALS_DAYS)}، عند كتابة كلّ عيّنةٍ جديدة لا في الكنس.</li>
     </ul>
     <p><b>ونُسخ الاسترجاع</b>: يحفظ Cloudflare D1 حالَ القاعدة ثلاثين يومًا لاسترجاعها (Time Travel)، فما يُحذف قد يبقى فيها
       حتّى تنقضي مدّتُها، ولا يُقرأ منها إلّا عند استرجاعٍ بعد عطل.</p>`.value)}
@@ -292,16 +295,16 @@ function policyBody(env: Env, base: string): string {
   ${section('٨ · الحذف والتصدير', pathArrows(`<p><b>ما يضيفه المشغّل يُحذف من اللوحة</b>، ويعود بزرّ «تراجَع» في إشعار الحذف
     خلال ${counted(Math.round(UNDO_SECONDS / 60), NOUNS.minute, 'gen')}، ثمّ لا:</p>
     <ul>
-      <li>المسوّدة: «أفعال أخرى» على بطاقتها ← «احذفها». والمنشورُ الذي نُشر لا يُحذف وحده: محاولتُه الناجحة هي ما يمنع نشره
-        مرّتين، فيُحذف مع عميله.</li>
+      <li>المسوّدة: «أفعال أخرى» على بطاقتها ← «احذفها». والمنشورُ الذي نُشر — كلُّه أو بعضُه، أو لم يُعرف أبلغ منصّتَه — لا يُحذف
+        وحده: محاولاتُه هي ما يمنع نشره مرّتين، فيُحذف مع عميله.</li>
       <li>المصدر: «المكتبة» ← «احذف». وملفّ Drive يُحذف من مجلّده أوّلًا، وإلّا عاد في المسح التالي.</li>
       <li>المقطع: «فيديوهاتك» ← «احذف المقطع»؛ وصورة الأصول: «الأصول» ← «احذف».</li>
     </ul>
-    <p><b>والعميل كلّه</b>: من «الإعدادات» ← «متقدّم» ← «منظّماتك»، «صدّر» ملفّ JSON بكلّ بياناته — بلا أذونات المنصّات ولا
+    <p><b>والعميل كلّه</b>: من «الإعدادات» ← «متقدّم» ← «منظّماتك»، «صدّر» ثمّ «نزّل الملفّ»: ملفّ JSON بكلّ بياناته — بلا أذونات المنصّات ولا
       أسرارٍ ولا عوامل دخول ولا عناوين IP — ثمّ «احذف عميلًا وبياناته» بعد فصل حساباته وكتابة اسمه. ولا يُردّ، ولا يُحذف بلا
       تصديرٍ في آخر يوم، ولا تُحذف منظّمةُ المشغّل نفسِه. ويبقى بعده دفترُ الكلفة وحده، وسطرُ الحذف في سجلّ المشغّل.</p>
     <p><b>والحساب على المنصّة</b>: في صفحة كلّ منصّة من لوحة صدى، تحت «الإعداد»، زرّ <b>«افصل الحساب»</b>. وحين يؤكّده
-      المشغّل يقع هذا كلُّه:</p>
+      المشغّل أو مديرٌ من فريقه يقع هذا كلُّه:</p>
     <ul>
       <li>يُحذف صفّ إذن الوصول وإذن التجديد المشفَّر لذلك الحساب من القاعدة.</li>
       <li>يُوقَف كلّ منشور مجدول عليه ويُوسَم «فشل» بسبب الفصل، ولا يُنشَر منه شيء.</li>
@@ -345,7 +348,7 @@ function termsBody(env: Env, base: string): string {
     حساب أحدٍ آخر، ولا تجمع بيانات غير صاحبها.</p>`)}
 
   ${section('٢ · المحتوى ومسؤوليّتُه', `<p>تصوغ نماذج لغويّة مسوّدات المنشورات، <b>ولا
-    يُنشر منها شيء قبل أن يقرأه المشغّل ويعتمده بيده.</b> والمشغّل هو المسؤول وحده عن كلّ ما
+    يُنشر منها شيء قبل أن يقرأه المشغّل أو ناشرٌ من فريقه ويعتمده بيده.</b> والمشغّل هو المسؤول وحده عن كلّ ما
     يُنشر باسمه، وعن موافقته لشروط المنصّة التي يُنشر عليها.</p>`)}
 
   ${section('٣ · احترام شروط المنصّات', `<p>يلتزم استعمال صدى بشروط LinkedIn و X و YouTube و TikTok
@@ -409,20 +412,25 @@ function policyEnglish(contact: string | null): string {
     <span class="mono">video.publish</span> (Content Posting API) to post the videos you approve. SADA does not read
     your feed, followers, messages or other users' content.</p>
   <h3>Retention</h3>
-  <p>A nightly job deletes the activity log after ${String(r.auditDays)} days and shortens its IP addresses to their network after
-    ${String(r.ipDays)} days; delivered alerts after ${String(r.outboxDeliveredDays)} days and undelivered ones after
-    ${String(r.outboxUndeliveredDays)}; token-expiry alerts after ${String(r.tokenAlertDays)}; and login-attempt counters after
-    ${String(r.authAttemptDays)}. Database point-in-time recovery (Cloudflare D1 Time Travel) keeps 30 days.</p>
+  <p>A nightly job deletes the activity log after ${String(r.auditDays)} days, shortens its IP addresses to their network after
+    ${String(r.ipDays)} days, and deletes its rejected form submissions after ${String(r.formRejectDays)} days; it deletes
+    delivered alerts after ${String(r.outboxDeliveredDays)} days and undelivered ones after ${String(r.outboxUndeliveredDays)} days;
+    token-expiry alerts after ${String(r.tokenAlertDays)} days (an alert for a token that is still current is kept while it lasts, so
+    it is never sent twice, and the latest seven-day warning is kept as a record); and login-attempt counters after
+    ${String(r.authAttemptDays)} days. Files of deleted items are erased from storage in the first nightly run after the undo window.
+    Page-speed samples (no identity) are kept ${String(VITALS_DAYS)} days: older ones are deleted each time a new one is written.
+    Database point-in-time recovery (Cloudflare D1 Time Travel) keeps 30 days.</p>
   <h3>What we never do</h3>
   <ul>
     <li>No selling, renting or sharing of your data with advertisers.</li>
     <li>No ads, tracking or third-party analytics on any page.</li>
-    <li>No automatic posting: nothing is published until a person approves it.</li>
+    <li>No automatic posting: nothing is published until the operator, or a publisher on their team, approves it.</li>
   </ul>
   <h3>Deletion and export</h3>
   <p>Drafts, sources, videos and uploaded images can be deleted from the panel and restored with "Undo" for
-    ${String(Math.round(UNDO_SECONDS / 60))} minutes; their files are then erased from storage. A published post stays as the record
-    that prevents publishing it twice, and is deleted with its client. A whole client can be exported as one JSON file (without
+    ${String(Math.round(UNDO_SECONDS / 60))} minutes; their files are then erased from storage. A post that was published, in whole
+    or in part, or whose outcome on the platform is unknown, stays as the record that prevents publishing it twice, and is deleted
+    with its client. A whole client can be exported as one JSON file (without
     tokens, secrets or login factors) and then deleted. Disconnecting an account deletes its encrypted tokens, cancels its
     scheduled posts and asks the platform to revoke access (TikTok included). You can also revoke SADA at any time from the
     security settings of each platform.</p>
@@ -439,7 +447,7 @@ function termsEnglish(contact: string | null): string {
     with SADA, and publishes what they approve <b>to their own accounts only</b>. SADA never posts to anyone else's account
     and does not collect data about other people.</p>
   <h3>2. Content and responsibility</h3>
-  <p>Language models draft posts, but <b>nothing is published until the owner reads and approves it</b>. The owner is solely
+  <p>Language models draft posts, but <b>nothing is published until the owner, or a publisher on their team, reads and approves it</b>. The owner is solely
     responsible for what is published under their name and for complying with each platform's terms.</p>
   <h3>3. Platform terms</h3>
   <p>Use of SADA follows the terms and rate limits of LinkedIn, X, YouTube, TikTok and Instagram. SADA is not used for

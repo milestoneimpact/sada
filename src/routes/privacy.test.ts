@@ -114,7 +114,11 @@ describe('تصديرُ عميلٍ وحذفُه: المالكُ وحدَه وبت
     await age(owner, 6)
     const exp = await app.request('/panel/orgs/export?org=org_a', { headers: { Cookie: owner } }, env)
     expect(exp.status).toBe(303)
-    expect(exp.headers.get('Location')).toBe(`/panel/stepup?next=${encodeURIComponent('/panel/orgs/export?org=org_a')}`)
+    // ‏**ويعود بعد التحقّق إلى صفحة التصدير لا إلى الملفّ** (مراجعة D-322): الملفُّ يُنزَّل بترويسة `attachment`، فالعودةُ إليه تُبقي
+    // ‏المتصفّحَ على صفحة «تحقّق للتوّ» ورمزُها قد استُهلك
+    expect(exp.headers.get('Location')).toBe(`/panel/stepup?next=${encodeURIComponent('/panel/orgs/exported?org=org_a')}`)
+    const landing = await app.request('/panel/orgs/exported?org=org_a', { headers: { Cookie: owner } }, env)
+    expect(landing.headers.get('Location')).toBe(`/panel/stepup?next=${encodeURIComponent('/panel/orgs/exported?org=org_a')}`)
     const del = await post('/panel/orgs/delete', owner, { _csrf: csrf, org: 'org_a', confirm: 'شركة أ' })
     expect(del.headers.get('Location') ?? '').toContain('/panel/stepup')
     expect(count("SELECT COUNT(*) AS n FROM orgs WHERE id = 'org_a'")).toBe(1)
@@ -157,11 +161,37 @@ describe('تصديرُ عميلٍ وحذفُه: المالكُ وحدَه وبت
   it('والإعداداتُ تعرض «صدّر» لكلّ عميل، ونموذجَ الحذف بلا منظّمة المالك', async () => {
     const owner = cookieOf(await emailLogin(app, env))
     const html = await (await app.request('/panel/settings', { headers: { Cookie: owner } }, env)).text()
-    expect(html).toContain('href="/panel/orgs/export?org=org_a"')
-    expect(html).toContain('href="/panel/orgs/export?org=org_owner"')
+    expect(html).toContain('href="/panel/orgs/exported?org=org_a"')
+    expect(html).toContain('href="/panel/orgs/exported?org=org_owner"')
     const form = /<form method="POST" action="\/panel\/orgs\/delete"[\s\S]*?<\/form>/.exec(html)?.[0] ?? ''
     expect(form).toContain('value="org_a"')
     expect(form).not.toContain('value="org_owner"')
+    // ‏والزرُّ باسمه في المعجم والسياسة والدليل (مراجعة D-322): «احذف عميلًا وبياناته» لا «احذف العميل وبياناته»
+    expect(form).toContain('<span>احذف عميلًا وبياناته</span>')
+  })
+
+  /*
+   * ‏**مراجعة D-322**: «صدّر» كان رابطًا إلى الملفّ نفسِه، فجلسةٌ تحتاج «تحقّق للتوّ» تعود بعده إلى ملفٍّ يُنزَّل في الخلفية وتبقى
+   * ‏الشاشةُ على نموذج التحقّق ورمزُه مستهلَك — لا تأكيدَ ولا خطوةَ تالية. فصار «صدّر» صفحةً تقول ما في الملفّ، وفيها «نزّل الملفّ»،
+   * ‏ثمّ الخطوةُ التالية.
+   */
+  it('**وصفحةُ التصدير تقول ما في الملفّ وتحمل رابطَه والخطوةَ التالية** — ولا تكتب سطرَ تصديرٍ قبل أن يُنزَّل', async () => {
+    const owner = cookieOf(await emailLogin(app, env))
+    const res = await app.request('/panel/orgs/exported?org=org_a', { headers: { Cookie: owner } }, env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Type')).toContain('text/html')
+    const html = await res.text()
+    expect(html).toContain('شركة أ')
+    expect(html).toMatch(/<a class="btn btn-primary" href="\/panel\/orgs\/export\?org=org_a"[^>]*><span>نزّل الملفّ<\/span><\/a>/)
+    expect(html).toContain('احذف عميلًا وبياناته')
+    expect(html).toContain('href="/panel/settings#orgs"')
+    expect(count("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'org.export'")).toBe(0)
+    // ‏ولا عميلَ بهذا المعرّف: يُقال ولا يُرسم رابط
+    const none = await app.request('/panel/orgs/exported?org=org_nope', { headers: { Cookie: owner } }, env)
+    expect(none.status).toBe(404)
+    // ‏وللمالك وحدَه
+    const admin = await invite(owner, 'admin2@example.com', 'admin')
+    expect((await app.request('/panel/orgs/exported?org=org_a', { headers: { Cookie: admin } }, env)).headers.get('Location')).toBe('/panel')
   })
 })
 
@@ -178,11 +208,50 @@ describe('الأبوابُ في اللوحة', () => {
     expect(del).not.toContain('data-confirm')
     const library = await (await app.request('/panel/library', { headers: { Cookie: owner } }, env)).text()
     const forms = library.match(/<form[^>]*action="\/panel\/sources\/delete"[\s\S]*?<\/form>/g) ?? []
-    // ‏وملفُّ Drive الذي رآه المسحُ للتوّ لا زرَّ له: يُحذف من المجلّد أوّلًا
+    // ‏وملفُّ Drive الذي رآه المسحُ للتوّ لا نموذجَ حذفٍ له: يُحذف من المجلّد أوّلًا
     expect(forms.map((f) => /name="id" value="([^"]+)"/.exec(f)?.[1])).toEqual(['src:upload:h'])
+    // ‏**وزرُّه ظاهرٌ معطَّلٌ بسببه** (مراجعة D-322 · D-163): كان لا يُرسَم ولا يُقال لماذا
+    expect(library).toMatch(/<button class="btn btn-danger btn-sm" type="button" aria-disabled="true" aria-describedby="[^"]+" aria-label="احذف في المجلّد.txt"><span>احذف<\/span><\/button><small class="btn-why" id="[^"]+">ما زال في مجلّد Drive/)
     expect(library).toContain('action="/panel/uploads/u1/delete"')
     const assets = await (await app.request('/panel/assets', { headers: { Cookie: owner } }, env)).text()
     expect(assets).toContain('action="/panel/assets/delete"')
     expect(assets).toContain('value="f:f1"')
+  })
+})
+
+describe('مراجعة D-322: ما يُرسم يوافق ما يقبله الخادم', () => {
+  /*
+   * ‏كان زرُّ «احذف» لملفّ Drive لا يُرسَم قبل ستٍّ وعشرين ساعةً من آخر مسحٍ رآه، والخادمُ يقبل حذفَه حين يمسح مسحٌ بعده (`trashSource`).
+   * ‏فالمالكُ يحذف الملفَّ من المجلّد ثمّ «مسح Drive الآن» كما يقول السببُ، فلا يجد زرًّا يومًا كاملًا. فصار الحكمُ واحدًا للاثنين.
+   */
+  it('**ملفُّ Drive غاب عن المسح الأخير له «احذف»** ولو رُئي قبل ساعات — بالحكم الذي يحذف به الخادم', async () => {
+    db.raw.exec(`INSERT INTO sources (id, drive_file_id, name, mime, content_hash, kind, last_seen_at)
+      VALUES ('src:gone', 'drive-2', 'غاب.txt', 'text/plain', 'h', 'drive', datetime('now', '-3 hours'))`)
+    db.raw.exec(`INSERT INTO audit_log (actor, action, org_id, at) VALUES ('panel', 'drive.scan', 'org_owner', datetime('now', '-10 minutes'))`)
+    const owner = cookieOf(await emailLogin(app, env))
+    const library = await (await app.request('/panel/library', { headers: { Cookie: owner } }, env)).text()
+    const forms = library.match(/<form[^>]*action="\/panel\/sources\/delete"[\s\S]*?<\/form>/g) ?? []
+    expect(forms.map((f) => /name="id" value="([^"]+)"/.exec(f)?.[1])).toEqual(['src:gone'])
+    const res = await post('/panel/sources/delete', owner, { _csrf: await csrfOf(owner), id: 'src:gone' })
+    expect(res.status).toBe(303)
+    expect(count("SELECT COUNT(*) AS n FROM sources WHERE id = 'src:gone'")).toBe(0)
+  })
+
+  /*
+   * ‏و«احذفها» كان مفعَّلًا لكلّ ما ليس مجدولًا ولا منشورًا، والمنشورُ الفاشلُ قد يكون بلغ منصّتَه (سلسلةٌ نُشر بعضُها، أو جوابٌ لم يُعرف).
+   */
+  it('**و«احذفها» معطَّلٌ بسببه لمنشورٍ فاشلٍ لم يُعرف أبلغ منصّتَه**', async () => {
+    db.raw.exec(`UPDATE posts SET status = 'failed' WHERE id = '${POST}'`)
+    db.raw.prepare(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, response_json, status)
+      VALUES ('a1', ?, 'k1', 1, '{}', ?, 'failed')`).run(POST, JSON.stringify({ error: 'unconfirmed_send: timeout', status: 0 }))
+    const owner = cookieOf(await emailLogin(app, env))
+    const posts = await (await app.request('/panel', { headers: { Cookie: owner } }, env)).text()
+    const del = /<form class="menu-form" method="POST" action="\/panel\/drafts\/delete"[\s\S]*?<\/form>/.exec(posts)?.[0] ?? ''
+    expect(del).toContain(`value="${POST}"`)
+    expect(del).toContain(' disabled aria-describedby=')
+    expect(del).toContain('لم يُعرف')
+    const res = await post('/panel/drafts/delete', owner, { _csrf: await csrfOf(owner), id: POST })
+    expect(res.status).toBe(303)
+    expect(count(`SELECT COUNT(*) AS n FROM posts WHERE id = '${POST}'`)).toBe(1)
   })
 })

@@ -21,7 +21,8 @@ import {
 } from '../../lib/privacy/trash'
 import { deleteOrg, exportOrg } from '../../lib/privacy/orgData'
 import type { Role } from '../../lib/ownerEmail'
-import { back, guardPost, loginResponse, setFlash, toCard } from './shared'
+import { back, guardPost, loginResponse, page, setFlash, toCard } from './shared'
+import { exportPage } from '../authView'
 import { loadSession } from '../../lib/session'
 import { counted, NOUNS } from '../../lib/format'
 
@@ -108,7 +109,21 @@ function isOwner(record: { readonly role?: Role; readonly email?: string }): boo
 }
 
 /**
- * **تصديرُ عميل** (D-322) — ملفٌّ يُنزَّل، للمالك وحدَه وبتحقّقٍ للتوّ (الحارسُ يحوّل إليه ثمّ يعيد إلى هنا). ويُكتب سطرُه في سجلّ
+ * ‏**صفحةُ «صدّر»** (مراجعة D-322) — ما في الملفّ، و«نزّل الملفّ»، ثمّ الخطوةُ التالية. للمالك وحدَه وبتحقّقٍ للتوّ (الحارس)، وإليها
+ * ‏يعود «تحقّق للتوّ» بعد الملفّ (`stepUpReturn`). **ولا تكتب سطرَ تصدير**: السطرُ شرطُ الحذف، ويُكتب حين يُنزَّل الملفُّ لا حين يُرى.
+ */
+privacy.get('/panel/orgs/exported', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (!isOwner(session.record)) return c.text('للمالك وحده.', 403)
+  const org = c.req.query('org') ?? activeOrg(session.record)
+  const row = await c.env.DB.prepare('SELECT id, name FROM orgs WHERE id = ?').bind(org).first<{ id: string; name: string }>()
+  if (row === null) return c.text('لا عميل بهذا المعرّف.', 404)
+  return page((nonce) => exportPage({ org: row.id, name: row.name, deletable: row.id !== OWNER_ORG }, nonce))
+})
+
+/**
+ * **تصديرُ عميل** (D-322) — ملفٌّ يُنزَّل، للمالك وحدَه وبتحقّقٍ للتوّ (الحارسُ يحوّل إليه ثمّ يعيد إلى صفحته). ويُكتب سطرُه في سجلّ
  * نشاط المالك (لا العميل): هو شرطُ حذفه بعد ذلك، ويبقى بعد أن يُحذف العميل.
  */
 privacy.get('/panel/orgs/export', async (c) => {

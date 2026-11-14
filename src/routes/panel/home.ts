@@ -66,6 +66,7 @@ import {
   BUILTIN_SECRET, readSpan, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, POST_ID, BOARD, envFacts,
   type EnvFacts,
 } from './shared'
+import { SCAN_BEAT_SQL, SCAN_MANUAL_SQL, scanTime, stillInFolder } from '../../lib/privacy/trash'
 
 export const home = new Hono<{ Bindings: Env }>()
 
@@ -88,9 +89,12 @@ interface SourceRow {
   file_key?: string | null
   /** كم منشورًا كُتب منه (D-343) — غيرُ المرفوض. */
   uses?: number
+  /** آخرُ مسحٍ بوقتيه — عمودان في الجملة نفسِها (مراجعة D-322). */
+  scan_beat?: string | null
+  scan_manual?: string | null
 }
 
-function toPanelSource(row: SourceRow): PanelSource {
+function toPanelSource(row: SourceRow, scanned: number | null): PanelSource {
   let hash: string | null = null
   let themes: string[] = []
   let reason: string | null = null
@@ -121,6 +125,8 @@ function toPanelSource(row: SourceRow): PanelSource {
     kind: row.kind ?? 'drive',
     originUrl: row.origin_url ?? null,
     hasFile: (row.file_key ?? null) !== null,
+    // ‏وأما زال في مجلّد Drive؟ بحكم الحذف نفسِه (`trashSource`) — فزرُّ «احذف» يُرسم بما يقبله الخادم (مراجعة D-322)
+    inFolder: (row.kind ?? 'drive') === 'drive' && stillInFolder(row.last_seen_at, scanned),
   }
 }
 
@@ -305,17 +311,18 @@ async function shellData(
 
 async function loadSources(c: PanelContext, org: string): Promise<PanelSource[]> {
   try {
+    // ‏وآخرُ مسحٍ عمودان في الجملة نفسِها لا جملتان فوقها (D-280): بهما يُحكم أما زال ملفُّ Drive في مجلّده (مراجعة D-322)
     const { results } = await c.env.DB.prepare(
       `SELECT s.id, s.drive_file_id, s.name, s.content_hash, s.last_seen_at, s.kind, s.origin_url, s.file_key,
               i.worth_score, i.summary, i.themes_json,
-              (SELECT COUNT(*) FROM posts p WHERE p.source_id = s.id AND p.org_id = s.org_id AND p.status <> 'rejected') AS uses
+              (SELECT COUNT(*) FROM posts p WHERE p.source_id = s.id AND p.org_id = s.org_id AND p.status <> 'rejected') AS uses, (` + SCAN_BEAT_SQL + ') AS scan_beat, (' + SCAN_MANUAL_SQL + `) AS scan_manual
          FROM sources s
          LEFT JOIN content_items i ON i.source_id = s.id AND i.org_id = s.org_id
-        WHERE s.org_id = ?
+        WHERE s.org_id = ?1
         ORDER BY s.last_seen_at DESC
         LIMIT 200`,
     ).bind(org).all<SourceRow>()
-    return results.map(toPanelSource)
+    return results.map((row) => toPanelSource(row, scanTime(row.scan_beat, row.scan_manual)))
   } catch {
     return []
   }

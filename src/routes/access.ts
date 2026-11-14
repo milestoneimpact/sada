@@ -26,7 +26,7 @@ import {
 } from '../lib/session'
 import { activeOrg, OWNER_ORG } from '../lib/tenancy'
 import {
-  allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, stepUpSecretFields,
+  allows, enrolMayOpen, factorRequired, needsStepUp, orgAllowed, pendingMayOpen, requiredRole, runAs, stepUpReturn, stepUpSecretFields,
 } from '../lib/access'
 import { activeMember, OWNER_WHO, ROLE_LABEL, touchMember, type Who } from '../lib/team'
 import { OWNER_EMAIL } from '../lib/ownerEmail'
@@ -92,7 +92,8 @@ export interface SavedForm {
 async function toStepUp(c: Context<{ Bindings: Env }>, session: Session, who: Who, path: string, form: FormData | null): Promise<Response> {
   const url = new URL(c.req.url)
   if (c.req.method === 'GET' || c.req.method === 'HEAD') {
-    return c.redirect(stepUpUrl(path + url.search), 303)
+    // ‏وملفٌّ يُنزَّل يعود بعده إلى صفحته لا إليه (`stepUpReturn`، مراجعة D-322)
+    return c.redirect(stepUpUrl(stepUpReturn(path) + url.search), 303)
   }
   const json = path.startsWith('/panel/security/') || form?.get('auto') === '1'
     || (c.req.header('Accept') ?? '').includes('application/json')

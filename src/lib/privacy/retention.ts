@@ -113,10 +113,19 @@ export async function sweepRetention(db: Db): Promise<SweepReport> {
       .prepare(`DELETE FROM alert_outbox WHERE org_id = ?
                   AND ((status BETWEEN 200 AND 299 AND at < datetime('now', ?)) OR at < datetime('now', ?))`)
       .bind(org, ago(RETENTION.outboxDeliveredDays), ago(RETENTION.outboxUndeliveredDays)).run())
-    // ‏ويبقى أحدثُ صفّ عتبة السبعة شاهدًا لبند البوّابة (`anyWeekAlert`): «وقع تنبيهٌ قبل أسبوعٍ يومًا ما» لا يعود «لم يقع»
+    /*
+     * ‏ويبقى أحدثُ صفّ عتبة السبعة شاهدًا لبند البوّابة (`anyWeekAlert`): «وقع تنبيهٌ قبل أسبوعٍ يومًا ما» لا يعود «لم يقع».
+     * ‏**ويبقى صفُّ إذنٍ ما زال قائمًا بتاريخه** (مراجعة D-322): إذنٌ انتهى وحسابُه غيرُ مفصول يعود إلى `expiringTokens` كلَّ يوم بعتبة
+     * ‏الصفر، و«لا يُكتب مرّتين» قائمٌ على هذا الصفّ (`recordAlerts`)؛ فكنسُه يكتبه ثانيةً بتاريخ اليوم فيعود «انتهى» إلى القناة كلَّ نصف
+     * ‏سنة. وإذنٌ تجدّد (تاريخٌ آخر) أو حسابٌ فُصل يُكنَس صفُّه القديم كعادته.
+     */
     tokenAlerts += await safe(db
       .prepare(`DELETE FROM token_alerts WHERE org_id = ?1 AND at < datetime('now', ?2)
-                  AND id IS NOT (SELECT MAX(id) FROM token_alerts WHERE threshold >= 7 AND org_id IN (SELECT id FROM orgs))`)
+                  AND id IS NOT (SELECT MAX(id) FROM token_alerts WHERE threshold >= 7 AND org_id IN (SELECT id FROM orgs))
+                  AND NOT EXISTS (SELECT 1 FROM tokens t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
+                                   WHERE t.account_id = token_alerts.account_id AND t.org_id = ?1 AND a.status != 'revoked'
+                                     AND ((token_alerts.kind = 'access' AND t.expires_at = token_alerts.expires_at)
+                                       OR (token_alerts.kind = 'refresh' AND t.refresh_expires_at = token_alerts.expires_at)))`)
       .bind(org, ago(RETENTION.tokenAlertDays)).run())
   }
   // ‏عدّاداتُ الدخول بلا منظّمة (D-317): نافذتُها يومٌ على الأكثر، فما بدأ قبل يومين ميّتٌ لا يحدّ أحدًا

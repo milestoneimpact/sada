@@ -253,10 +253,13 @@ export async function publishPost(
        *
        * **ومقطعُ المالك يغلب ما وُلّد بعده** (D-182): منشورُ Instagram من «فيديوهاتك»
        * وُلّد له إنفوجرافيك بالخطأ فصار أحدثَ وسيطه، فكان يُنشر صورةً مكانَ الـ Reel.
+       *
+       * ‏**ويُعرف صفُّ المقطع بنموذجه لا بإشارته وحدها** (مراجعة D-322): حذفُ المقطع من «فيديوهاتك» يقطع `upload_id`
+       * ‏(`SET NULL`) ويُبقي صفَّ المنشور بمفتاحه، فكان يعود الإنفوجرافيكُ الأحدث. و`model = 'upload'` يكتبه `uploadMediaRow` وحدَه.
        */
       `SELECT id, r2_key, mime, platform_media_id FROM media
         WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE ?
-        ORDER BY (upload_id IS NOT NULL) DESC, created_at DESC LIMIT 1`,
+        ORDER BY (upload_id IS NOT NULL OR model = 'upload') DESC, created_at DESC LIMIT 1`,
     )
     .bind(
       post.id,

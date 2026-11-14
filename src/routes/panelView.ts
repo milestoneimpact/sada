@@ -274,6 +274,11 @@ export interface PanelSource {
   readonly uses?: number
   /** أللمرفوع أصلٌ في R2 يُنزَّل؟ */
   readonly hasFile?: boolean
+  /**
+   * ‏أما زال ملفُّ Drive في مجلّده؟ — بحكم الخادم نفسِه (`stillInFolder` وآخرُ مسح، مراجعة D-322). **وغيابُه «نعم»** لملفّ Drive:
+   * ‏ما لا يُعرف أغاب لا يُرسم زرُّه مفعَّلًا.
+   */
+  readonly inFolder?: boolean
 }
 
 export interface PanelProvider {
@@ -653,13 +658,19 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
   /*
    * ‏**«احذف»** (D-322) بلا «أتمضي؟»: الإشعارُ يحمل «تراجَع». وملفُّ Drive يُحذف من مجلّده أوّلًا — وإلّا عاد في المسح التالي
-   * ‏وحُلّل بكلفة — فلا يُرسَم زرُّه إلّا لما لم يره مسحُ الفجر منذ يوم؛ والخادمُ يسأل آخرَ مسحٍ قبل أن يحذف (`trashSource`).
+   * ‏وحُلّل بكلفة. **وحكمُ الزرّ حكمُ الخادم** (`inFolder` من `stillInFolder` وآخرِ مسح): كان لا يُرسَم قبل ستٍّ وعشرين ساعةً من آخر
+   * ‏مسحٍ رآه، والخادمُ يقبل الحذفَ بعد أوّل مسحٍ لا يراه — فالمالكُ يتبع السببَ ثمّ لا يجد زرًّا يومًا كاملًا ولا يُقال لماذا. فما زال
+   * ‏في المجلّد زرُّه **ظاهرٌ معطَّلٌ بسببه** (D-163 · D-325) بلا نموذج، وما غاب نموذجُه يُرسَل (مراجعة D-322).
    */
-  const gone = (s.kind ?? 'drive') !== 'drive' || now.getTime() - seen > 26 * 60 * 60 * 1000
-  const remove = gone
-    ? html`<form class="inline" method="POST" action="/panel/sources/delete" data-busy="جار…"><input type="hidden" name="id" value="${s.id}">${
-        raw(button({ label: 'احذف', variant: 'danger', size: 'sm', type: 'submit', attrs: html`aria-label="احذف ${s.name}"`.value }))}</form>`.value
-    : ''
+  const inFolder = (s.kind ?? 'drive') === 'drive' && s.inFolder !== false
+  const label = html`aria-label="احذف ${s.name}"`.value
+  const remove = inFolder
+    ? button({
+        label: 'احذف', variant: 'danger', size: 'sm', attrs: label,
+        disabled: { id: 'sdel-' + s.id.replace(/[^A-Za-z0-9_-]/g, '_'), reason: 'ما زال في مجلّد Drive — احذفه منه، ثمّ «مسح Drive الآن»' },
+      })
+    : html`<form class="inline" method="POST" action="/panel/sources/delete" data-busy="جار…"><input type="hidden" name="id" value="${s.id}">${
+        raw(button({ label: 'احذف', variant: 'danger', size: 'sm', type: 'submit', attrs: label }))}</form>`.value
   const acts = `${action}${open}${origin}${file}${remove}`
 
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
@@ -845,10 +856,11 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
       : `<form class="inline" method="POST" action="/panel/orgs/switch">
           <input type="hidden" name="org" value="${escapeHtml(o.id)}">
           ${button({ label: 'انتقل إليها', size: 'sm', type: 'submit' })}</form>`
-    // ‏«صدّر» (D-322): ملفُّ بياناته كلِّها بلا رمزٍ ولا سرّ — للمالك وحدَه وبتحقّقٍ للتوّ. **ورابطٌ بلا `download`**: الملفُّ يُنزَّل
-    // ‏بترويسة `attachment`، وجلسةٌ تحتاج «تحقّق للتوّ» تُحوَّل إلى صفحته — و`download` كان يحفظ تلك الصفحةَ ملفًّا بدل أن يفتحها
+    // ‏«صدّر» (D-322): ملفُّ بياناته كلِّها بلا رمزٍ ولا سرّ — للمالك وحدَه وبتحقّقٍ للتوّ. **وصفحةٌ لا الملفُّ نفسُه** (مراجعة D-322):
+    // ‏الملفُّ يُنزَّل بترويسة `attachment`، فجلسةٌ تعود إليه بعد «تحقّق للتوّ» تبقى على نموذج التحقّق ورمزُه مستهلَك. فالصفحةُ تقول ما
+    // ‏في الملفّ، وفيها «نزّل الملفّ» ثمّ الخطوةُ التالية
     const exported = button({
-      label: 'صدّر', size: 'sm', href: '/panel/orgs/export?org=' + encodeURIComponent(o.id),
+      label: 'صدّر', size: 'sm', href: '/panel/orgs/exported?org=' + encodeURIComponent(o.id),
       attrs: html`aria-label="صدّر بيانات ${o.name}"`.value,
     })
     return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td><div class="row acts">${action}${exported}</div></td></tr>`
@@ -867,7 +879,7 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
         control: html`<select name="org">${raw(others.map((o) => html`<option value="${o.id}">${o.name}</option>`.value).join(''))}</select>`.value }))}
       ${raw(field({ id: 'del-confirm', label: 'اكتب اسمه للتأكيد',
         control: html`<input name="confirm" required autocomplete="off" maxlength="${String(ORG_NAME_MAX)}">`.value }))}
-      ${raw(button({ label: 'احذف العميل وبياناته', variant: 'danger', type: 'submit' }))}
+      ${raw(button({ label: 'احذف عميلًا وبياناته', variant: 'danger', type: 'submit' }))}
     </form>`.value,
   }))}</div>`.value
   return `<div class="card"><h2>منظّماتك</h2>

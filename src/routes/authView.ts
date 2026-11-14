@@ -11,6 +11,8 @@ import { brandMoment } from './ui/moment'
 import { notice, noticeText } from './ui/components/toast'
 import { B64URL_SCRIPT, FACTORS_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { html, raw } from './ui/html'
+import { button } from './ui/components/button'
+import { card } from './ui/components/card'
 
 export interface SecondFactorData {
   readonly csrf: string
@@ -251,6 +253,35 @@ export function resumePage(d: ResumeData, nonce: string): string {
       <div class="cancel"><a class="btn btn-secondary btn-sm" href="${d.back}">ألغِ</a></div>
     </main></div></div>`
   return shell('صدى — أكمل ما بدأته', body.value, nonce, '', { moment: true })
+}
+
+// ── صفحةُ التصدير (مراجعة D-322) ──────────────────────────────────────
+
+export interface ExportData {
+  readonly org: string
+  readonly name: string
+  /** منظّمةُ المالك لا تُحذف: لا خطوةَ تاليةَ تُقترح لها. */
+  readonly deletable: boolean
+}
+
+/**
+ * ‏**«صدّر»** — صفحةٌ تقول ما في الملفّ وتحمل رابطَه، ثمّ الخطوةَ التالية. كان «صدّر» رابطًا إلى الملفّ نفسِه، فجلسةٌ تعود إليه بعد
+ * ‏«تحقّق للتوّ» يُنزَّل لها الملفُّ في الخلفية وتبقى على نموذج التحقّق ورمزُه مستهلَك. **ورابطٌ بلا `download`**: جلسةٌ انقضت دقائقُها
+ * ‏تُحوَّل إلى «تحقّق للتوّ» ثمّ تعود إلى هنا (`stepUpReturn`)، و`download` كان يحفظ صفحةَ التحقّق ملفًّا.
+ */
+export function exportPage(d: ExportData, nonce: string): string {
+  const next = d.deletable
+    ? html`<p class="hint">ثمّ إن أردت حذفه: «احذف عميلًا وبياناته» في منظّماتك، بعد فصل حساباته وفي يومك هذا. ولا يُردّ.</p>`
+    : raw('<p class="hint">وهذه منظّمتُك أنت، فلا تُحذف.</p>')
+  const inner = html`<p>ملفّ JSON واحد بكلّ صفوفه جدولًا جدولًا، وقائمةُ ملفّاته بمفاتيحها — بلا أذونات المنصّات ولا أسرارٍ ولا عوامل دخول ولا عناوين IP.</p>
+        ${raw(button({ label: 'نزّل الملفّ', variant: 'primary', href: '/panel/orgs/export?org=' + encodeURIComponent(d.org) }))}
+        ${next}`
+  const body = html`<div class="auth-split">${raw(brandMoment())}<div class="wrap"><main class="auth">
+      <h1>صدّر بيانات «${d.name}»</h1>
+      ${raw(card({ body: inner.value }))}
+      <div class="cancel">${raw(button({ label: 'ارجع إلى منظّماتك', size: 'sm', href: '/panel/settings#orgs' }))}</div>
+    </main></div></div>`
+  return shell('صدى — صدّر بيانات عميل', body.value, nonce, '', { moment: true })
 }
 
 // ── صفحةُ التسجيل و«أمان حسابك» (D-317) ───────────────────────────────

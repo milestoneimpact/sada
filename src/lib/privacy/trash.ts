@@ -16,16 +16,19 @@
  * ## وما لا يُحذف هنا
  *
  * - **منشورٌ مجدول** (`queued`): يُسحب موعدُه أوّلًا — حذفُه قد يسبق دورةَ الإرسال أو يلحقها.
- * - **منشورٌ بلغ منصّتَه** (`published`، أو له محاولةٌ `succeeded` — تغريدةٌ من سلسلةٍ خرجت): **محاولتُه الناجحة هي D-004**،
- *   ومفتاحُ المسوّدة يُشتقّ من بندها، فلو حُذف وكُتب البندُ ثانيةً لخرج مرّتين. يُحذف مع العميل كلِّه (`orgData.ts`) لا وحدَه.
+ * - **منشورٌ بلغ منصّتَه أو لم يُعرف أبلغها** (`publish/reached.ts`): `published`، أو محاولةٌ `succeeded`، أو تغريدةٌ من سلسلةٍ
+ *   علامتُها `succeeded` أو `sent` في محاولةٍ فاشلة، أو عطلٌ لم يثبت أنّه قبل الإرسال (مهلةٌ، 5xx، قبولٌ بلا معرّف). **محاولاتُه هي
+ *   D-004**، ومفتاحُ المسوّدة يُشتقّ من بندها، فلو حُذف وكُتب البندُ ثانيةً لخرج مرّتين. يُحذف مع العميل كلِّه (`orgData.ts`) لا وحدَه.
  * - **منشورٌ يُنشر الآن** (محاولةٌ `sent` مفتوحة) أو **صورتُه تُولَّد الآن** (حجزٌ حيّ بلا صفّ): البايتاتُ تُكتب بعد الحذف فتيتم.
  * - **ملفُّ Drive ما زال في المجلّد**: يعود في المسح التالي ويُحلَّل ثانيةً بكلفة. يُحذف من المجلّد أوّلًا.
  * - **مقطعٌ لم يكتمل رفعُه**: له «ألغ» (D-182).
  *
- * فما يُحذف من `publish_attempts` مع منشوره محاولاتٌ فشلت وحدَها، وتعود معه بـ«تراجَع» بترتيب كتابتها (`rowid`).
+ * فما يُحذف من `publish_attempts` مع منشوره محاولاتٌ **ثبت أنّها لم تُرسَل**، وتعود معه بـ«تراجَع» بترتيب كتابتها (`rowid`).
  */
 import { atomically, type Db, type DbStatement } from '../tokens'
 import type { SessionStore } from '../session'
+import { OWNER_ORG } from '../tenancy'
+import { attemptReachSql, reachOf } from '../publish/reached'
 
 export type TrashKind = 'post' | 'source' | 'upload' | 'file'
 
@@ -134,13 +137,20 @@ export async function trashPost(deps: TrashDeps, org: string, id: string, now = 
   const post = await db.prepare('SELECT * FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<Row>()
   if (post === null) return { ok: false, reason: 'لم أجد هذا المنشور في هذا العميل.' }
   if (post['status'] === 'queued') return { ok: false, reason: 'مجدول — اسحب موعده أوّلًا، ثمّ احذفه.' }
-  // ‏**وما خرج إلى منصّةٍ لا يُحذف وحدَه** (D-004): محاولتُه الناجحة هي ما يمنع نشرَه مرّتين، وتذهب معه لو حُذف
-  const reached = await db
-    .prepare("SELECT status FROM publish_attempts WHERE post_id = ? AND org_id = ? AND status IN ('sent', 'succeeded') ORDER BY status = 'sent' DESC LIMIT 1")
-    .bind(id, org).first<{ status: string }>()
-  if (reached?.status === 'sent') return { ok: false, reason: 'يُنشر الآن أو لم يُعرف جوابُ المنصّة — انتظر نتيجته أو سوِّه من بطاقته.' }
-  if (post['status'] === 'published' || reached !== null) {
-    return { ok: false, reason: 'نُشر، فيبقى سجلًّا لما خرج باسمك ولا يُنشر مرّتين — ويُحذف مع العميل كلِّه.' }
+  /*
+   * ‏**وما خرج إلى منصّةٍ أو لم يُعرف أخرج لا يُحذف وحدَه** (D-004 · مراجعة D-322): محاولاتُه هي ما يمنع نشرَه مرّتين، وتذهب معه لو
+   * ‏حُذف. كان يُسأل عن `sent` و`succeeded` وحدهما، فسلسلةٌ نُشر بعضُها (علاماتُها في محاولةٍ `failed`) وطلبٌ لم يُعرف جوابُه يُحذفان.
+   */
+  const rank = await db
+    .prepare(`SELECT MAX(${attemptReachSql('pa')}) AS r FROM publish_attempts pa WHERE pa.post_id = ? AND pa.org_id = ?`)
+    .bind(id, org).first<{ r: number | null }>()
+  const reach = reachOf(rank?.r)
+  if (reach === 'open') return { ok: false, reason: 'يُنشر الآن أو لم يُعرف جوابُ المنصّة — انتظر نتيجته أو سوِّه من بطاقته.' }
+  if (post['status'] === 'published' || reach === 'out') {
+    return { ok: false, reason: 'نُشر كلُّه أو بعضُه، فيبقى سجلًّا لما خرج باسمك ولا يُنشر مرّتين — ويُحذف مع العميل كلِّه.' }
+  }
+  if (reach === 'maybe') {
+    return { ok: false, reason: 'لم يُعرف أبلغ المنصّةَ أم لا (انقطع جوابُها أو جاء بلا معرّف)، فيبقى سجلًّا يمنع نشرَه مرّتين — ويُحذف مع العميل كلِّه.' }
   }
   const busy = await db
     .prepare(`SELECT 1 AS hit FROM media_claims c WHERE c.post_id = ? AND c.org_id = ? AND c.claimed_at >= datetime('now', '-30 minutes')
@@ -169,17 +179,37 @@ const SCAN_MARGIN_MS = 15 * 60 * 1000
 const utc = (s: unknown): number => (typeof s === 'string' ? Date.parse(s.replace(' ', 'T') + (s.endsWith('Z') ? '' : 'Z')) : NaN)
 
 /**
- * متى رأى صدى مجلّدَ Drive آخرَ مرّة — دورةُ الفجر (نبضُها) أو «مسح Drive الآن» (سطرُه في السجلّ)، أيُّهما أحدث.
- * و`null` إن لم يُمسح بعد.
+ * ‏**أما زال ملفُّ Drive في مجلّده؟** — ما لم يُمسح المجلّدُ بعد، أو رآه آخرُ مسحٍ (في هامش دقائقه)، أو لا يُقرأ تاريخُه: نعم. وحكمٌ
+ * ‏واحدٌ للخادم (`trashSource`) ولزرّ «المكتبة» — كان الزرُّ لا يُرسم قبل ستٍّ وعشرين ساعةً والخادمُ يقبل الحذفَ بعد أوّل مسح.
  */
-async function lastScan(db: Db, org: string): Promise<number | null> {
-  const [beat, manual] = await Promise.all([
-    db.prepare("SELECT at FROM heartbeats WHERE job = 'scan' AND outcome = 'ok'").first<{ at: string }>().catch(() => null),
-    db.prepare("SELECT MAX(at) AS at FROM audit_log WHERE org_id = ? AND action = 'drive.scan'").bind(org).first<{ at: string | null }>()
-      .catch(() => null),
-  ])
-  const times = [utc(beat?.at), utc(manual?.at)].filter((t) => Number.isFinite(t))
+export function stillInFolder(lastSeenAt: unknown, scanned: number | null): boolean {
+  const seen = utc(lastSeenAt)
+  return scanned === null || !Number.isFinite(seen) || seen >= scanned - SCAN_MARGIN_MS
+}
+
+/**
+ * ‏جملتا آخر مسح: نبضُ دورة الفجر، وأحدثُ «مسح Drive الآن» في سجلّ المنظّمة (`?1`). **وتقرؤهما «المكتبة» عمودين في جملة مصادرها**
+ * ‏(`loadSources`) لا جملتين فوقها — فلا رحلةَ إلى D1 فوق حِمل اللوح (D-280) — ويقرؤهما الحذفُ جملتين.
+ */
+export const SCAN_BEAT_SQL = "SELECT at FROM heartbeats WHERE job = 'scan' AND outcome = 'ok' LIMIT 1"
+export const SCAN_MANUAL_SQL = "SELECT MAX(at) FROM audit_log WHERE org_id = ?1 AND action = 'drive.scan'"
+
+/** أحدثُ الوقتين بالملّي ثانية، و`null` إن لم يُمسح بعد. */
+export function scanTime(beat: unknown, manual: unknown): number | null {
+  const times = [utc(beat), utc(manual)].filter((t) => Number.isFinite(t))
   return times.length === 0 ? null : Math.max(...times)
+}
+
+/**
+ * متى رأى صدى مجلّدَ Drive آخرَ مرّة — دورةُ الفجر (نبضُها) أو «مسح Drive الآن» (سطرُه في السجلّ)، أيُّهما أحدث.
+ * و`null` إن لم يُمسح بعد. **و«المكتبة» تسأل السؤالَ نفسَه** فيُرسم زرُّ الحذف بالحكم الذي يحذف به الخادم (مراجعة D-322).
+ */
+async function lastDriveScan(db: Db, org: string): Promise<number | null> {
+  const [beat, manual] = await Promise.all([
+    db.prepare(`SELECT (${SCAN_BEAT_SQL}) AS at`).first<{ at: string | null }>().catch(() => null),
+    db.prepare(`SELECT (${SCAN_MANUAL_SQL}) AS at`).bind(org).first<{ at: string | null }>().catch(() => null),
+  ])
+  return scanTime(beat?.at, manual?.at)
 }
 
 /** مصدرٌ ومعه خلاصتُه وحجزُ تحليله؛ والمنشوراتُ التي كُتبت منه تبقى بنصّها وتُقطع إشارتُها إليه. */
@@ -188,9 +218,7 @@ export async function trashSource(deps: TrashDeps, org: string, id: string, now 
   const source = await db.prepare('SELECT * FROM sources WHERE id = ? AND org_id = ?').bind(id, org).first<Row>()
   if (source === null) return { ok: false, reason: 'لم أجد هذا المصدر في هذا العميل.' }
   if ((source['kind'] ?? 'drive') === 'drive') {
-    const scanned = await lastScan(db, org)
-    const seen = utc(source['last_seen_at'])
-    if (scanned === null || !Number.isFinite(seen) || seen >= scanned - SCAN_MARGIN_MS) {
+    if (stillInFolder(source['last_seen_at'], await lastDriveScan(db, org))) {
       return { ok: false, reason: 'ما زال في مجلّد Drive: احذفه من المجلّد، ثمّ «مسح Drive الآن»، ثمّ احذفه هنا — وإلّا عاد في المسح التالي وحُلّل بكلفة.' }
     }
   }
@@ -303,6 +331,18 @@ export async function queuePrefixes(kv: SessionStore, org: string, prefixes: rea
   await kv.put(`purge:${crypto.randomUUID()}`, JSON.stringify(entry), { expirationTtl: PURGE_TTL_SECONDS })
 }
 
+/**
+ * ‏**أفي مساحة المنظّمة هذا المفتاح؟** (مراجعة D-322) — مخطّطُ المفاتيح نفسُه: `objectKey` (‏`org/<المنظّمة>/…`، وللمالك بلا سابقة)،
+ * ‏وصورُ الأصول `library/<المنظّمة>/`، والمصادرُ `sources/<المنظّمة>/`. **ومفتاحٌ خارج مساحة من حُذف منه شيءٌ لا يُمحى بحذفه**:
+ * ‏السؤالُ «أيشير إليه أحد؟» في منظّمة القيد وحدها (حارسُ المستأجرين D-224)، فصورةٌ وُصلت بين عميلين، أو مخطّطُ مفاتيح بلا سابقة،
+ * ‏لا تُمحى بايتاتُها من تحت من يستعملها. والخطأُ هنا بايتاتٌ تبقى، لا بايتاتٌ تُمحى.
+ */
+function inNamespace(org: string, key: string): boolean {
+  for (const shared of ['library/', 'sources/']) if (key.startsWith(shared)) return key.startsWith(`${shared}${org}/`)
+  if (key.startsWith('org/')) return org !== OWNER_ORG && key.startsWith(`org/${org}/`)
+  return org === OWNER_ORG
+}
+
 /** أيشير صفٌّ في المنظّمة إلى هذا الكائن؟ — صورةُ منشور، أو مقطع، أو صورةُ أصول، أو أصلُ مصدرٍ ونصُّه. */
 async function referenced(db: Db, org: string, key: string): Promise<boolean> {
   const hit = await db
@@ -326,8 +366,9 @@ export interface PurgeReport {
 }
 
 /**
- * **محوُ البايتات في الكنس الليليّ** — ما حلّ موعدُه من قيود `purge:`. وكلُّ مفتاحٍ يُسأل عنه قبل محوه؛ وما زال مشارًا إليه
- * يُترك (يُمحى يومَ يُحذف من يشير إليه، فيُقيَّد ثانيةً). والسوابقُ (منظّمةٌ حُذفت) تُمحى صفحاتٍ بحدٍّ، والباقي غدًا.
+ * **محوُ البايتات في الكنس الليليّ** — ما حلّ موعدُه من قيود `purge:`. وكلُّ مفتاحٍ يُسأل عنه قبل محوه: أفي مساحة منظّمته
+ * (`inNamespace`)، وأيشير إليه صفٌّ فيها؛ وما خرج عن مساحتها أو ما زال مشارًا إليه يُترك (يُمحى يومَ يُحذف من يشير إليه، فيُقيَّد
+ * ثانيةً). والسوابقُ (منظّمةٌ حُذفت) تُمحى صفحاتٍ بحدٍّ، والباقي غدًا.
  */
 export async function purgeDeleted(deps: TrashDeps & { readonly bucket: PurgeBucket }, now = new Date()): Promise<PurgeReport> {
   const { db, kv, bucket } = deps
@@ -350,7 +391,11 @@ export async function purgeDeleted(deps: TrashDeps & { readonly bucket: PurgeBuc
       if (Date.parse(entry.due) > now.getTime()) continue
       const gone: string[] = []
       for (const key of entry.keys) {
-        if (await referenced(db, entry.org, key)) kept += 1
+        if (!inNamespace(entry.org, key)) {
+          // ‏يُقال ولا يُمحى: صفٌّ في منظّمةٍ يحمل مفتاحَ غيرها خطأٌ يُرى في السجلّ
+          console.warn({ job: 'trash', foreign_key_kept: true, org: entry.org })
+          kept += 1
+        } else if (await referenced(db, entry.org, key)) kept += 1
         else gone.push(key)
       }
       for (let i = 0; i < gone.length; i += 1000) await bucket.delete(gone.slice(i, i + 1000))
