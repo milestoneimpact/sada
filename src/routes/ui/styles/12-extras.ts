@@ -763,8 +763,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 }
 /* ── الإشعارات (D-352 · رونق) ─────────────
    كلُّ إشعارٍ بطاقة: أيقونةُ نوعه في مربّعٍ بلون نبرته، واسمُ النوع، والنصّ، وفعلٌ واحد. والمقروءُ أهدأ. */
-.nt-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-3)}
-.nt-row{display:flex; align-items:center; gap:var(--s-4); max-width:none; border-inline-start:var(--s-1) solid var(--warn)}
+.nt-list{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,30rem),1fr)); gap:var(--s-3); align-items:start}
+.nt-row{display:flex; align-items:center; gap:var(--s-4); border-inline-start:var(--s-1) solid var(--warn)}
 .nt-row[data-tone="bad"]{border-inline-start-color:var(--bad)}
 .nt-row[data-read]{border-inline-start-color:var(--surface-3)}
 .nt-ico{flex:none; display:grid; place-items:center; width:var(--tap); height:var(--tap); border-radius:var(--r-control); background:var(--warn-wash); color:var(--warn)}
@@ -774,7 +774,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .nt-body{flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--s-1)}
 .nt-meta{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .nt-kind{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
-.nt-text{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.nt-text{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui)}
 .nt-act{flex:none}
 .nt-calm{display:flex; align-items:center; gap:var(--s-4)}
 details.card .nt-list{margin-top:var(--s-4)}
@@ -782,12 +782,13 @@ details.card .nt-list{margin-top:var(--s-4)}
   .nt-row{flex-wrap:wrap; align-items:flex-start}
   .nt-act{flex-basis:100%; padding-inline-start:calc(var(--tap) + var(--s-4))}
   .ph-hero{padding:var(--s-6) var(--s-5)}
+  .ph-echo{display:none}
 }
 /* ── رابطُ موافقة العميل (D-353 · رونق) ─────────────
    صفحةُ العميل عمودٌ واحد بقياس القراءة: رأسُ اللحظة، ثمّ منشورٌ منشورٌ بشكل منصّته وقرارُه تحته. والرأيُ على بطاقة المراجعة وسمٌ وملحوظة. */
-.cr-page{max-width:calc(var(--measure) * 1.2); margin:0 auto; padding:var(--s-6) var(--s-4) var(--s-16)}
+.cr-page{max-width:var(--measure); margin:0 auto; padding:var(--s-6) var(--s-4) var(--s-16)}
 .cr-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-6)}
-.cr-item{display:grid; gap:var(--s-4); max-width:none; scroll-margin-block-start:var(--s-6)}
+.cr-item{display:grid; gap:var(--s-4); scroll-margin-block-start:var(--s-6)}
 .cr-foot{margin-top:var(--s-8); text-align:center; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .cr-item[data-verdict="approve"]{border-inline-start:var(--s-1) solid var(--ok)}
 .cr-item[data-verdict="changes"]{border-inline-start:var(--s-1) solid var(--warn)}
