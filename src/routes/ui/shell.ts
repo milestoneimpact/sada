@@ -221,7 +221,6 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
       html`<div class="menu-seg"><span>السمة</span>${raw(themeSwitch())}</div>`.value,
       html`<div class="menu-seg"><span>الكثافة</span>${raw(densitySwitch())}</div>`.value,
       html`<div class="menu-seg"><span>حجم الخطّ</span>${raw(sizeSwitch())}</div>`.value,
-      html`<div class="menu-seg"><span>الحركة</span>${raw(motionSwitch())}</div>`.value,
       // ‏المساعدةُ في الموضع نفسِه على كلّ صفحة (D-305 · WCAG 2.2 · 3.2.6)
       menuItem({ label: 'المساعدة', href: '/panel/help' }),
       // ‏وأمانُ الحساب لصاحبه (مراجعة D-317): المالكُ إلى الجلسات والأمان في الإعدادات، والعضوُ إلى «أمان حسابك» —
@@ -239,6 +238,8 @@ export function accountMenu(options: { readonly logout?: boolean; readonly scope
  * ‏إعدادَ جهازه أو لا يملكه. ويُحفظ في المتصفّح كالكثافة، ويُقرأ قبل الرسم فلا تبدأ حركةٌ ثمّ تقف.
  */
 export function motionSwitch(withId = true): string {
+  // ‏في «السمة والكثافة» بالإعدادات وحدَها لا في قائمة كلّ صفحة: الثلاثةُ في القائمة يُختار منها كلَّ يوم، والحركةُ مرّةً في العمر —
+  // ‏ومبدّلٌ رابعٌ في كلّ صفحةٍ وزنٌ على كلّ صفحة (أمسكه audit_size في «خطّة جديدة»)
   return segmented('الحركة', 'motion', [
     { value: 'full', label: 'كاملة', pressed: true },
     { value: 'reduced', label: 'مخفّفة' },

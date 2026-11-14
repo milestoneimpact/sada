@@ -579,12 +579,11 @@ export const ERRSUM_SCRIPT = `
 })();
 `
 
-/** الحركةُ بدرجتين (D-349): «مخفّفة» تضع «data-motion="reduced"» على <html> وتُحفظ كالكثافة. */
+/** الحركةُ بدرجتين (D-349): «مخفّفة» تضع «data-motion="reduced"» على <html> وتُحفظ كالكثافة. والمبدّلُ في الإعدادات وحدَها، فلا «#motion» في غيرها. */
 export const MOTION_SCRIPT = `
 (function(){
-  var box=document.getElementById('motion');
-  if(!box)return;
   var all=function(){return document.querySelectorAll('.seg button[data-motion]');};
+  if(!all().length)return;
   var apply=function(v){
     try{
       if(v==='reduced'){localStorage.setItem('sada-motion',v);
