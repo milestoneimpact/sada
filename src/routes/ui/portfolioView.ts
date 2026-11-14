@@ -10,6 +10,45 @@ import { money } from '../../lib/format'
 import { platformLabel, PLATFORM_IDS } from '../../lib/oauth/providers'
 import { PERIODS, totals, type PortfolioFilter, type PortfolioRow } from '../../lib/portfolio'
 import type { OrgRow } from '../../lib/tenancy'
+import { html, raw } from './html'
+import { stamp } from '../../lib/time/zone'
+import { postStatus } from '../../lib/status'
+import { CAL_DAYS, type CalPost } from '../../lib/portfolioCalendar'
+import { dayLabel, shift } from './planReviewView'
+
+
+const WEEKDAY = new Intl.DateTimeFormat('ar', { weekday: 'long', timeZone: 'UTC' })
+
+/**
+ * **تقويمُ العملاء** (D-354): أسبوعان من اليوم، يومٌ في خانة، وفي كلّ خانةٍ منشوراتُ كلّ الشركات بساعتها وشعار منصّتها واسم
+ * شركتها. اليومُ المزدحم يُرى مزدحمًا، والفارغُ فارغًا — وهذا ما لا يُرى من شاشة شركةٍ واحدة.
+ */
+export function clientsCalendar(posts: readonly CalPost[], orgs: readonly OrgRow[], now: Date, zone: string | null): string {
+  const names = new Map(orgs.map((o) => [o.id, o.name]))
+  const today = now.toISOString().slice(0, 10)
+  const days = Array.from({ length: CAL_DAYS }, (_, i) => shift(today, i))
+  const byDay = new Map<string, CalPost[]>()
+  for (const p of posts) {
+    const local = stamp(p.at.replace('T', ' ').slice(0, 16), zone)
+    const day = local.slice(0, 10)
+    byDay.set(day, [...(byDay.get(day) ?? []), { ...p, at: local }])
+  }
+  const busiest = Math.max(0, ...days.map((d) => byDay.get(d)?.length ?? 0))
+  return html`<section class="pc-cal" aria-labelledby="pc-cal-t">
+    <div class="pc-head"><h2 id="pc-cal-t">تقويمُ العملاء</h2><span class="hint">أسبوعان من اليوم · ${String(posts.length)} منشورًا${busiest > 0 ? ' · أزحمُ يومٍ ' + String(busiest) : ''}</span></div>
+    ${posts.length === 0 ? html`<p class="hint">لا منشورَ مجدولًا في الأسبوعين القادمين لأيّ شركة.</p>` : html`<ol class="pc-grid">${days.map((d) => {
+      const list = byDay.get(d) ?? []
+      return html`<li class="pc-day"${list.length === 0 ? raw(' data-empty') : ''}${d === today ? raw(' aria-current="date"') : ''}>
+        <span class="pc-dh">${WEEKDAY.format(new Date(d + 'T12:00:00Z'))} ${dayLabel(d, 'short')}</span>
+        ${list.map((p) => html`<span class="pc-post" data-st="${p.status}" title="${p.text}">
+          <span class="pc-logo" data-pf="${p.platform}" aria-hidden="true">${raw(LOGOS[p.platform] ?? '')}</span>
+          <bdi class="mono" dir="ltr">${p.at.slice(11, 16)}</bdi>
+          <span class="pc-org">${names.get(p.org) ?? p.org}</span>
+          <span class="vh">${platformLabel(p.platform as never)} · ${postStatus(p.status).label}</span></span>`)}
+      </li>`
+    })}</ol>`}
+  </section>`.value
+}
 
 function href(f: PortfolioFilter, change: Partial<PortfolioFilter>): string {
   const n = { ...f, ...change }
@@ -21,7 +60,7 @@ function href(f: PortfolioFilter, change: Partial<PortfolioFilter>): string {
   return `/panel/portfolio${s === '' ? '' : `?${s}`}`
 }
 
-export function portfolioScreen(rows: readonly PortfolioRow[], orgs: readonly OrgRow[], f: PortfolioFilter, active: string, before: readonly PortfolioRow[] = []): string {
+export function portfolioScreen(rows: readonly PortfolioRow[], orgs: readonly OrgRow[], f: PortfolioFilter, active: string, before: readonly PortfolioRow[] = [], calendar = ''): string {
   const t = totals(rows)
   const p = totals(before)
   const bar = filterBar([
@@ -70,5 +109,6 @@ export function portfolioScreen(rows: readonly PortfolioRow[], orgs: readonly Or
     ${statTile({ label: 'التفاعل', value: String(t.engagement), delta: pctChange(t.engagement, p.engagement), note: 'في اليوم الأوّل' })}
     ${statTile({ label: 'أُنفق', value: escapeHtml(money(t.spend)), delta: pctChange(Math.round(t.spend * 100), Math.round(p.spend * 100)), good: 'down', note: f.platform === null ? 'كلُّ المنصّات' : 'لكلّ المنصّات — لا يُقسَم' })}
   </div>
-  ${rows.length === 0 ? '<p class="hint">لا شركةَ في محفظتك بعد.</p>' : `<div class="oc-grid">${cards}</div>`}`
+  ${rows.length === 0 ? '<p class="hint">لا شركةَ في محفظتك بعد.</p>' : `<div class="oc-grid">${cards}</div>`}
+  ${calendar}`
 }

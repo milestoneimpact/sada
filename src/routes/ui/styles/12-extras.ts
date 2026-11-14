@@ -710,7 +710,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .ph-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); opacity:.85}
 .ph-title{margin:0; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .ph-lede{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui); opacity:.9}
-.ph-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,9rem),1fr)); gap:var(--s-4); width:min(100%,36rem); margin-top:var(--s-4)}
+.ph-kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,6rem),1fr)); gap:var(--s-4); width:min(100%,36rem); margin-top:var(--s-4)}
 .ph-kpi{display:flex; flex-direction:column; gap:var(--s-0); padding-inline-start:var(--s-3); border-inline-start:var(--stroke) solid color-mix(in srgb,var(--moment-ink) 30%,transparent)}
 .ph-kpi b{font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600; font-variant-numeric:tabular-nums}
 .ph-kpi b em{font-style:normal; font-weight:400; font-size:var(--t-small); opacity:.75}
@@ -763,7 +763,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 }
 /* ── الإشعارات (D-352 · رونق) ─────────────
    كلُّ إشعارٍ بطاقة: أيقونةُ نوعه في مربّعٍ بلون نبرته، واسمُ النوع، والنصّ، وفعلٌ واحد. والمقروءُ أهدأ. */
-.nt-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-3)}
+.nt-list{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,30rem),1fr)); gap:var(--s-3); align-items:start}
 .nt-row{display:flex; align-items:center; gap:var(--s-4); border-inline-start:var(--s-1) solid var(--warn)}
 .nt-row[data-tone="bad"]{border-inline-start-color:var(--bad)}
 .nt-row[data-read]{border-inline-start-color:var(--surface-3)}
@@ -771,22 +771,25 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .nt-row[data-tone="bad"] .nt-ico{background:var(--bad-wash); color:var(--bad)}
 .nt-row[data-read] .nt-ico, .nt-calm .nt-ico{background:var(--surface-2); color:var(--ink-2)}
 .nt-ico svg{width:var(--icon-md); height:var(--icon-md); display:block}
-.nt-body{flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:var(--s-1)}
+.nt-body{flex:1 1 0; min-width:0; display:flex; flex-direction:column; gap:var(--s-1)}
 .nt-meta{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .nt-kind{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
-.nt-text{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.nt-text{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui)}
 .nt-act{flex:none}
 .nt-calm{display:flex; align-items:center; gap:var(--s-4)}
 details.card .nt-list{margin-top:var(--s-4)}
 @media${below('sm')}{
-  .nt-row{flex-wrap:wrap}
+  .nt-row{flex-wrap:wrap; align-items:flex-start}
   .nt-act{flex-basis:100%; padding-inline-start:calc(var(--tap) + var(--s-4))}
+  .ph-hero{padding:var(--s-6) var(--s-5)}
+  .ph-echo{display:none}
 }
 /* ── رابطُ موافقة العميل (D-353 · رونق) ─────────────
    صفحةُ العميل عمودٌ واحد بقياس القراءة: رأسُ اللحظة، ثمّ منشورٌ منشورٌ بشكل منصّته وقرارُه تحته. والرأيُ على بطاقة المراجعة وسمٌ وملحوظة. */
-.cr-page{max-width:calc(var(--measure) * 1.2); margin:0 auto; padding:var(--s-6) var(--s-4) var(--s-16)}
+.cr-page{max-width:var(--measure); margin:0 auto; padding:var(--s-6) var(--s-4) var(--s-16)}
 .cr-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-6)}
 .cr-item{display:grid; gap:var(--s-4); scroll-margin-block-start:var(--s-6)}
+.cr-foot{margin-top:var(--s-8); text-align:center; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .cr-item[data-verdict="approve"]{border-inline-start:var(--s-1) solid var(--ok)}
 .cr-item[data-verdict="changes"]{border-inline-start:var(--s-1) solid var(--warn)}
 .cr-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--s-2)}
@@ -799,4 +802,24 @@ details.card .nt-list{margin-top:var(--s-4)}
 .rv-client{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-client q{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .rv-share{margin-bottom:var(--s-4)}
+/* ── تقويمُ العملاء في المحفظة (D-354 · رونق) ─────────────
+   سبعةُ أيّامٍ في الصفّ، وفي كلّ يومٍ رقائقُ بشعار المنصّة والساعة واسم الشركة. الحالُ شريطٌ على حافّة الرقاقة، واليومُ الفارغ أهدأ. */
+.pc-cal{margin-top:var(--s-8)}
+.pc-head{display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--s-3); margin-bottom:var(--s-4)}
+.pc-head h2{margin:0; font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
+.pc-grid{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-2)}
+.pc-day{max-width:none; min-height:7rem; display:flex; flex-direction:column; gap:var(--s-1); padding:var(--s-2); border:var(--bd); border-radius:var(--r-control); background:var(--surface)}
+.pc-day[data-empty]{background:transparent}
+.pc-day[aria-current="date"]{border-color:var(--accent)}
+.pc-dh{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
+.pc-post{display:flex; align-items:center; gap:var(--s-1); min-width:0; padding:var(--s-0) var(--s-1); border-inline-start:var(--stroke) solid var(--accent);
+  border-radius:var(--r-inline); background:var(--surface-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.pc-post[data-st="published"]{border-inline-start-color:var(--ok)}
+.pc-post[data-st="failed"]{border-inline-start-color:var(--bad)}
+.pc-post bdi{flex:none; white-space:nowrap}
+.pc-org{min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+@media${below('md')}{
+  .pc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .pc-day[data-empty]{display:none}
+}
 `
