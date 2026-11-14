@@ -1201,6 +1201,26 @@ describe('توجيه المهامّ يصير للمالك', () => {
     expect(row.model).toBe('deepseek-chat')
   })
 
+  it('مفتاحٌ ثانٍ لـ Anthropic بلا عنوان، وسلسلةٌ وترتيبٌ يُحفظان ويُمحيان — والحلقةُ الغائبةُ تُردّ، ومفتاحٌ جديدٌ يرفع علمَ التعذّر (D-349)', async () => {
+    const cookie = await login()
+    expect((await post(cookie, '/panel/providers/add', { name: 'anthropic-2', label: 'Anthropic 2', kind: 'anthropic', model: 'claude-opus-5' })).status).toBe(303)
+    expect(db.raw.prepare("SELECT kind, base_url FROM providers WHERE name='anthropic-2'").get()).toEqual({ kind: 'anthropic', base_url: null })
+    const row = (): { chain: string | null; order_mode: string | null } =>
+      db.raw.prepare("SELECT chain, order_mode FROM task_routes WHERE task='draft'").get() as { chain: string | null; order_mode: string | null }
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', order: 'cheap', chain_1: 'anthropic-2', chain_2: 'anthropic', chain_3: 'anthropic-2' })
+    expect(row()).toEqual({ chain: '["anthropic-2"]', order_mode: 'cheap' })
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', order: 'mine', chain_1: 'ghost' })
+    expect(row()).toEqual({ chain: '["anthropic-2"]', order_mode: 'cheap' })
+    // ‏نموذجٌ بلا حقول السلسلة (مهمّةٌ أخرى، أو نموذجٌ قديم) لا يمسّها، والحلقاتُ الفارغةُ تمحوها
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5' })
+    expect(row().chain).toBe('["anthropic-2"]')
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'anthropic', model: 'claude-opus-5', order: 'mine', chain_1: '' })
+    expect(row()).toEqual({ chain: null, order_mode: 'mine' })
+    db.raw.exec("INSERT INTO provider_health (provider, why, down_until) VALUES ('anthropic-2', 'key', '2999-01-01T00:00:00Z')")
+    await post(cookie, '/panel/providers/key', { provider: 'anthropic-2', key: 'sk-ant-new-key-0123456789' })
+    expect((db.raw.prepare("SELECT COUNT(*) AS n FROM provider_health WHERE provider='anthropic-2'").get() as { n: number }).n).toBe(0)
+  })
+
   it('مهمّة غير معروفة أو مزوّد غير موجود يُرفضان', async () => {
     const cookie = await login()
     expect((await post(cookie, '/panel/routes', { task: 'hack', provider: 'anthropic', model: 'x' })).status).toBe(400)

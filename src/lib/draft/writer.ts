@@ -17,15 +17,8 @@
  * **ولا يُقرأ الجوابُ هنا**: ما يُقبَل منه يحكم فيه من طلبه — منشورٌ بحدّ منصّته، أو
  * نصوصُ مقطعٍ بحدود منصّاتها. والكلفةُ وقعت قبل ذلك الحكم في كلّ حال.
  */
-import { recordCost } from '../cost'
-import { blockerReason, checkAllowance, checkProvider } from '../limits'
-import { costOf, getProvider, resolveKey } from '../providers'
-import { readRoutes, routeFor } from '../ai/routes'
-import { chatCompletion } from '../ai/openaiCompat'
-import { anthropicChat } from '../ai/anthropic'
-import { portableSchema } from '../ai/portableSchema'
-import { spentOf, type Spent } from '../ai/spent'
 import type { Db } from '../tokens'
+import { callText } from '../ai/textCall'
 
 export interface WriterDeps {
   readonly db: Db
@@ -68,124 +61,16 @@ export type Written =
   | { readonly kind: 'failed'; readonly reason: string; readonly retryable: boolean; readonly cost?: number }
 
 /**
- * نموذج المزوّد المختار للمقارنة حين لا نموذج في صفّه: ما وُجّهت إليه مهمّة
- * أخرى عنده، وإلّا نموذج التوجيه نفسه. فنموذج Anthropic لا يُرسَل إلى مزوّد غيره فيُردّ.
+ * نداءٌ واحدٌ بحرّاسه كلِّها — **بسلسلة مفاتيح «الكتابة»** (D-349): الحارسُ العامّ، ثمّ لكلّ مفتاحٍ سقفُه ومفتاحُه ونداؤه ودفترُه،
+ * والمتعذّرُ يُتخطّى إلى التالي. والمقارنةُ (`call.provider`) مزوّدُها وحدَه.
  */
-async function modelFor(db: Db, provider: string, fallback: string): Promise<string> {
-  const other = (await readRoutes(db)).find((r) => r.provider === provider)
-  return other?.model ?? fallback
-}
-
-/** نداءٌ واحدٌ بحرّاسه كلِّها — والكلفةُ مكتوبةٌ قبل أن يعود. */
 export async function writeOnce(deps: WriterDeps, call: WriteCall): Promise<Written> {
-  // ١ · الحارس العامّ قبل أيّ نداء
-  const allowance = await checkAllowance(deps.db, 'draft', call.org)
-  if (allowance.blocker !== null) {
-    return { kind: 'blocked', reason: blockerReason(allowance.blocker) }
-  }
-
-  // ٢ · المزوّد من توجيه المالك لا من ثابتٍ في الشيفرة
-  const routed = await routeFor(deps.db, 'draft')
-  const route = call.provider === undefined || call.provider === '' || call.provider === routed.provider
-    ? routed
-    : { provider: call.provider, model: '' }
-
-  const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { kind: 'failed', reason: `مزوّد غير موجود: ${route.provider}`, retryable: false }
-  }
-  if (route.model === '') route.model = provider.model ?? (await modelFor(deps.db, provider.name, routed.model))
-
-  // ٣ · وسقفُ المزوّد بعد الحارس العامّ لا قبله: مَن قدّم التفصيل على الجملة
-  // قال «المزوّد متاح» ونظامُه موقوف
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) return { kind: 'blocked', reason: blockerReason(perProvider) }
-
-  // ٤ · المفتاح
-  const secretName = provider.builtin
-    ? provider.name === 'anthropic'
-      ? 'ANTHROPIC_API_KEY'
-      : provider.name === 'gemini'
-        ? 'GEMINI_API_KEY'
-        : undefined
-    : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) {
-    return { kind: 'failed', reason: `لا مفتاح لـ ${provider.label}`, retryable: false }
-  }
-
-  // خطوةُ الكلفة (٦) تُعرَّف قبل النداء: يحتاجها الجوابُ الناجح، والجوابُ
-  // الذي وصل ثمّ رُدّ (D-164). صفٌّ واحدٌ بشكلٍ واحد
-  const charge = async (spent: Spent): Promise<number> => {
-    const priced = costOf(provider, spent)
-    const units = spent.inputTokens + spent.cachedInputTokens + spent.outputTokens
-    await recordCost(deps.db, {
-      provider: provider.name,
-      operation: `${call.operation}:${spent.model}`,
-      units,
-      // سعرُ الوحدة مشتقٌّ لا مفترَض: مزوّدٌ بلا سعرٍ مضبوط يعطي صفرا
-      unitCost: units === 0 ? 0 : priced.total / units,
-      refId: call.refId,
-    })
-    return priced.total
-  }
-
-  // ٥ · النداء — بلهجة المزوّد
-  let text: string
-  let spent: Spent
-  try {
-    if (provider.kind === 'anthropic') {
-      const result = await anthropicChat({
-        apiKey: resolved.key,
-        model: route.model,
-        system: call.system,
-        user: call.user,
-        // المحمولُ لا الخامّ (D-164): `minLength` يُطوى وصفًا، وحدُّه عند القارئ
-        schema: portableSchema(call.schema),
-        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-      })
-      text = result.text
-      spent = result
-    } else {
-      if (provider.baseUrl === null) {
-        return { kind: 'failed', reason: 'لا عنوان لهذا المزوّد', retryable: false }
-      }
-      const result = await chatCompletion(
-        {
-          baseUrl: provider.baseUrl,
-          apiKey: resolved.key,
-          model: route.model,
-          system: call.system,
-          user: call.user,
-          json: true,
-        },
-        deps.fetchImpl,
-      )
-      text = result.text
-      spent = { ...result.usage, cachedInputTokens: 0, model: result.model }
-    }
-  } catch (error) {
-    // جوابٌ وصل ثمّ رُدّ حوسِب عليه: يُكتب قبل أن يُعاد الفشل (D-164)
-    const late = spentOf(error)
-    const paid = late === null ? null : await charge(late)
-    const retryable =
-      typeof error === 'object' && error !== null && 'retryable' in error
-        ? Boolean((error as { retryable: unknown }).retryable)
-        : true
-    return {
-      kind: 'failed',
-      reason: error instanceof Error ? error.message : 'نداء فشل',
-      retryable,
-      ...(paid === null ? {} : { cost: paid }),
-    }
-  }
-
-  // ٦ · **الكلفة قبل القراءة** — النداءُ وقع وحوسِب عليه
-  const cost = await charge(spent)
-  return { kind: 'written', text, cost, model: spent.model }
+  const out = await callText(deps, {
+    task: 'draft', system: call.system, user: call.user, schema: call.schema, operation: call.operation, refId: call.refId,
+    ...(call.org === undefined ? {} : { org: call.org }),
+    ...(call.provider === undefined ? {} : { provider: call.provider }),
+  })
+  if (out.kind === 'ok') return { kind: 'written', text: out.text, cost: out.cost, model: out.model }
+  if (out.kind === 'blocked') return out
+  return { kind: 'failed', reason: out.reason, retryable: out.retryable, ...(out.cost > 0 ? { cost: out.cost } : {}) }
 }

@@ -19,17 +19,42 @@ export interface TaskRoute {
   readonly implemented: boolean
   /** أمن اللوحة هو أم من الافتراض في الشيفرة؟ */
   readonly custom: boolean
+  /** سلسلةُ المفاتيح بعد الأوّل (D-349) — تُجرَّب بالترتيب حين يتعذّر ما قبلها. وفارغةً: الأوّلُ وحدَه. */
+  readonly chain: readonly string[]
+  /** ترتيبُ التجربة (D-349): `mine` كما كُتبت، و`cheap` الأرخصُ أوّلًا. */
+  readonly order: ChainOrder
+}
+
+export type ChainOrder = 'mine' | 'cheap'
+
+/**
+ * **افتراضُ الترتيب لكلّ مهمّة** (D-349، بقرار المالك): الفهمُ قراءةٌ واستخلاصٌ يكفيه الأرخص، والخطّةُ والكتابةُ ينشر خطؤهما باسمه
+ * فتبدأان بالأقوى (الأوّل كما كتبه). وما يكتبه المالكُ في اللوحة يغلب الافتراض.
+ */
+export const DEFAULT_ORDER: Readonly<Partial<Record<TaskName, ChainOrder>>> = { analyze: 'cheap' }
+
+const asChain = (raw: string | null | undefined): string[] => {
+  if (raw === null || raw === undefined || raw === '') return []
+  try {
+    const v = JSON.parse(raw) as unknown
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x !== '').slice(0, 4) : []
+  } catch {
+    return []
+  }
 }
 
 export async function readRoutes(db: Db): Promise<TaskRoute[]> {
-  let saved = new Map<string, { provider: string; model: string }>()
+  let saved = new Map<string, { provider: string; model: string; chain: string[]; order: ChainOrder | null }>()
+  // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277). والسلسلةُ والترتيب (D-349) عمودان قد لا يكونان رُحّلا بعد: قراءتُهما تسقط وحدَها
+  // ثمّ تُقرأ الجملةُ بلا عمودَيهما — فقاعدةٌ قبل 0050 تعمل بتوجيهها كما كانت لا بالافتراض
+  const read = (sql: string) => db.prepare(sql).bind(OWNER_ORG).all<{ task: string; provider: string; model: string; chain?: string | null; order_mode?: string | null }>()
   try {
-    const { results } = await db
-      // إعدادٌ عامّ: يسكن منظّمةَ المالك (D-277)
-      .prepare('SELECT task, provider, model FROM task_routes WHERE org_id = ?')
-      .bind(OWNER_ORG)
-      .all<{ task: string; provider: string; model: string }>()
-    saved = new Map(results.map((r) => [r.task, { provider: r.provider, model: r.model }]))
+    const { results } = await read('SELECT task, provider, model, chain, order_mode FROM task_routes WHERE org_id = ?')
+      .catch(() => read('SELECT task, provider, model FROM task_routes WHERE org_id = ?'))
+    saved = new Map(results.map((r) => [r.task, {
+      provider: r.provider, model: r.model, chain: asChain(r.chain),
+      order: r.order_mode === 'mine' || r.order_mode === 'cheap' ? r.order_mode : null,
+    }]))
   } catch {
     saved = new Map()
   }
@@ -44,6 +69,8 @@ export async function readRoutes(db: Db): Promise<TaskRoute[]> {
       why: fallback.why,
       implemented: IMPLEMENTED.has(task),
       custom: chosen !== undefined,
+      chain: chosen?.chain ?? [],
+      order: chosen?.order ?? DEFAULT_ORDER[task] ?? 'mine',
     }
   })
 }
@@ -65,12 +92,15 @@ export async function routeFor(db: Db, task: TaskName): Promise<{ provider: stri
   return found ?? { provider: ROUTES[task].provider, model: ROUTES[task].model }
 }
 
+
 export async function writeRoute(
   db: Db,
   task: TaskName,
   provider: string,
   model: string,
   by: string,
+  /** السلسلةُ والترتيب (D-349): `undefined` يبقي كلًّا كما هو. */
+  extra?: { readonly chain?: readonly string[]; readonly order?: ChainOrder },
 ): Promise<void> {
   await db
     .prepare(
@@ -83,6 +113,13 @@ export async function writeRoute(
     )
     .bind(task, provider, model, by, OWNER_ORG)
     .run()
+  if (extra?.chain !== undefined) {
+    await db.prepare('UPDATE task_routes SET chain = ? WHERE task = ? AND org_id = ?')
+      .bind(extra.chain.length === 0 ? null : JSON.stringify(extra.chain.slice(0, 4)), task, OWNER_ORG).run()
+  }
+  if (extra?.order !== undefined) {
+    await db.prepare('UPDATE task_routes SET order_mode = ? WHERE task = ? AND org_id = ?').bind(extra.order, task, OWNER_ORG).run()
+  }
 }
 
 /**

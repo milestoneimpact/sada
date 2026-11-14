@@ -37,13 +37,7 @@
  * موضوع المنشور كما كان** — صورةٌ أضعفُ ربطا خيرٌ من منشورٍ بلا صورة.
  * ويُقال ذلك في سبب المخرَج، فلا يُظنّ العطلُ في مكانٍ آخر.
  */
-import { anthropicChat } from '../ai/anthropic'
-import { chatCompletion } from '../ai/openaiCompat'
-import { routeFor } from '../ai/routes'
-import { spentOf, type Spent } from '../ai/spent'
-import { recordCost } from '../cost'
-import { blockerReason, checkProvider } from '../limits'
-import { costOf, getProvider, resolveKey } from '../providers'
+import { callText } from '../ai/textCall'
 import type { Db } from '../tokens'
 import { FALLBACK_COMPOSITION, FALLBACK_PALETTE } from './prompt'
 
@@ -210,97 +204,15 @@ export async function askWriter(
   /** وقع النداءُ فسقط — لا نقصٌ في الضبط قبله. */
   readonly called: boolean
 }> {
-  const route = await routeFor(deps.db, 'draft')
-  const provider = await getProvider(deps.db, route.provider)
-  if (provider === null) {
-    return { text: null, cost: 0, detail: `لا مزوّد للكتابة (${route.provider})`, called: false }
-  }
-
-  /*
-   * **ومزوّدُ الكتابة يمرّ بحارسه هنا كما يمرّ في الكتابة** (D-163).
-   *
-   * `resolveKey` تعيد سرَّ البيئة ولو عُطّل المزوّد، **فكان مزوّدٌ أطفأه المالكُ
-   * يُنادى ويُحاسَب عليه** مع كلّ صورة، وسقفُه اليوميُّ لا يوقفه.
-   */
-  const perProvider = await checkProvider(deps.db, provider.name)
-  if (perProvider !== null) {
-    return { text: null, cost: 0, detail: blockerReason(perProvider), called: false }
-  }
-
-  const secretName = provider.builtin
-    ? provider.name === 'anthropic'
-      ? 'ANTHROPIC_API_KEY'
-      : provider.name === 'gemini'
-        ? 'GEMINI_API_KEY'
-        : undefined
-    : undefined
-  const resolved = await resolveKey(
-    deps.db,
-    deps.encKey,
-    provider.name,
-    secretName === undefined ? undefined : deps.workerSecrets[secretName],
-  )
-  if (resolved.key === null) {
-    return { text: null, cost: 0, detail: `لا مفتاح لـ ${provider.label}`, called: false }
-  }
-
-  // **الكلفةُ قبل القراءة** — النداءُ وقع وحوسِب عليه، وجوابٌ مشوَّهٌ أو
-  // مبتورٌ لا يُلغي كلفةً وقعت (D-008، D-164)
-  const charge = async (spent: Spent): Promise<number> => {
-    const priced = costOf(provider, spent)
-    const units = spent.inputTokens + spent.outputTokens
-    await recordCost(deps.db, {
-      provider: provider.name,
-      operation: `${ask.operation}:${spent.model}`,
-      units,
-      unitCost: units === 0 ? 0 : priced.total / units,
-      ...(ask.refId === undefined ? {} : { refId: ask.refId }),
-    })
-    return priced.total
-  }
-
-  try {
-    if (provider.kind === 'anthropic') {
-      const result = await anthropicChat({
-        apiKey: resolved.key,
-        model: route.model,
-        system: ask.system,
-        user: ask.user,
-        ...(deps.fetchImpl === undefined ? {} : { fetchImpl: deps.fetchImpl }),
-      })
-      return { text: result.text, cost: await charge(result), detail: '', called: true }
-    }
-    if (provider.baseUrl === null) {
-      return { text: null, cost: 0, detail: 'لا عنوان لمزوّد الكتابة', called: false }
-    }
-    const result = await chatCompletion(
-      {
-        baseUrl: provider.baseUrl,
-        apiKey: resolved.key,
-        model: route.model,
-        system: ask.system,
-        user: ask.user,
-        json: true,
-        maxTokens: ask.maxTokens,
-      },
-      deps.fetchImpl,
-    )
-    return {
-      text: result.text,
-      cost: await charge({ ...result.usage, cachedInputTokens: 0, model: result.model }),
-      detail: '',
-      called: true,
-    }
-  } catch (error) {
-    // جوابٌ وصل ثمّ رُدّ: يُسجَّل، وكلفتُه تُعاد مع السبب فلا تُقال صفرا
-    const late = spentOf(error)
-    return {
-      text: null,
-      cost: late === null ? 0 : await charge(late),
-      detail: error instanceof Error ? error.message : 'نداء فشل',
-      called: true,
-    }
-  }
+  // ‏بسلسلة مفاتيح «الكتابة» (D-349): مزوّدُ الكتابة يمرّ بحارسه وسقفه هنا كما يمرّ في الكتابة (D-163)، والمتعذّرُ يُتخطّى
+  const out = await callText(deps, {
+    task: 'draft', system: ask.system, user: ask.user, json: true, maxTokens: ask.maxTokens, operation: ask.operation,
+    skipAllowance: true,
+    ...(ask.refId === undefined ? {} : { refId: ask.refId }),
+  })
+  if (out.kind === 'ok') return { text: out.text, cost: out.cost, detail: '', called: true }
+  // ‏جوابٌ وصل ثمّ رُدّ: كلفتُه تُعاد مع السبب فلا تُقال صفرًا
+  return { text: null, cost: out.kind === 'failed' ? out.cost : 0, detail: out.reason, called: out.kind === 'failed' && out.called }
 }
 
 /** سقفُ الموجز: ثلاثةُ حقولٍ قصيرة، **وتفكيرُ نموذجٍ يفكّر قبلها**. */

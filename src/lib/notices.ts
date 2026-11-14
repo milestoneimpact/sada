@@ -21,7 +21,7 @@ import type { Pulse } from './ops/heartbeat'
 import type { Allowance } from './limits'
 import { isOwnerEmail } from './ownerEmail'
 
-export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security'
+export type NoticeKind = 'publish' | 'reauth' | 'quota' | 'token' | 'pulse' | 'budget' | 'security' | 'key'
 
 /**
  * **من يقرأ الإشعارات** (D-317): بريدُه لإشعارات أمان حسابه، وبصمةُ جلسته كي لا يُرى إشعارُ الدخول في الجلسة التي فُتحت
@@ -156,7 +156,7 @@ export async function collectNotices(
   memory: { readonly pulses: readonly Pulse[]; readonly allowance: Pick<Allowance, 'settings' | 'usage'> | null },
   viewer?: NoticeViewer,
 ): Promise<Notice[]> {
-  const [failed, reauth, quota, tokens, security] = await Promise.all([
+  const [failed, reauth, quota, tokens, security, keys] = await Promise.all([
     db.prepare(
       `SELECT p.id, p.platform, p.text,
               (SELECT pa.response_json FROM publish_attempts pa WHERE pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'failed' ORDER BY pa.at DESC LIMIT 1) AS why,
@@ -184,6 +184,12 @@ export async function collectNotices(
           AND at >= datetime('now', '-7 days') AND COALESCE(target, '') != ?3
         ORDER BY id DESC LIMIT 20`,
     ).bind('org_owner', viewer.email, viewer.handle).all<{ id: number; detail: string | null; ip: string | null; at: string }>()
+      .then((r) => r.results).catch(() => []),
+    // ‏مفتاحُ مزوّدٍ رُفض أو غاب (D-349): السلسلةُ تتخطّاه، والمالكُ يُقال له أيُّها — إعدادٌ عامّ يسكن منظّمةَ المالك
+    db.prepare(`SELECT h.provider, h.why, h.down_until, h.updated_at, p.label FROM provider_health h
+                  LEFT JOIN providers p ON p.name = h.provider AND p.org_id = h.org_id
+                 WHERE h.org_id = 'org_owner' AND h.why IN ('key', 'nokey') AND h.down_until > ?`)
+      .bind(now.toISOString()).all<{ provider: string; why: string; down_until: string; updated_at: string; label: string | null }>()
       .then((r) => r.results).catch(() => []),
   ])
   const out: Notice[] = []
@@ -227,6 +233,13 @@ export async function collectNotices(
       text: `${what}${detail === '' ? '' : ` ${detail}`}${e.ip === null ? '' : ` — من ${e.ip}`}. إن لم تكن أنت فأخرِج الأجهزة الأخرى الآن`,
       href: isOwnerEmail(viewer?.email ?? '') ? '/panel/settings#security' : '/panel/enrol',
       action: isOwnerEmail(viewer?.email ?? '') ? 'الدخول والأجهزة' : 'أمان حسابك', at: e.at.replace(' ', 'T') + (e.at.includes('Z') ? '' : 'Z'),
+    })
+  }
+  for (const k of keys) {
+    out.push({
+      ref: `key:${k.provider}:${k.updated_at}`, kind: 'key', tone: 'bad',
+      text: `${k.why === 'key' ? 'رُفض مفتاح' : 'لا مفتاح لـ'} ${k.label ?? k.provider} — صدى يتخطّاه في السلسلة إلى غيره حتّى تحفظ مفتاحًا جديدًا`,
+      href: '/panel/settings#providers', action: 'المزوّدون', at: k.updated_at.replace(' ', 'T') + (k.updated_at.includes('Z') ? '' : 'Z'),
     })
   }
   out.push(...memoryNotices(memory.pulses, memory.allowance, now))

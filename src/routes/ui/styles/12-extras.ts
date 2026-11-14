@@ -596,6 +596,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .lib-marks{display:grid; gap:var(--s-2); margin-top:var(--s-3)}
 .lib-tags{align-items:center}
 .lib-tag-edit{min-width:0}
+/* سلسلةُ المفاتيح في «توجيه المهامّ» (D-349): الترتيبُ وحلقاتُها صفٌّ ينكسر، وشاراتُ المتخطّى تحتها */
+.chain-row{display:flex; flex-wrap:wrap; gap:var(--s-2); flex-basis:100%}
+.chain-down{display:flex; flex-wrap:wrap; gap:var(--s-2); flex-basis:100%}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
 .rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}

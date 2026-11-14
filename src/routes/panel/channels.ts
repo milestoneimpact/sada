@@ -3,6 +3,7 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { clearHealth } from '../../lib/ai/chain'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
@@ -475,9 +476,12 @@ channels.post('/panel/providers/add', async (c) => {
   const model = String(form.get('model') ?? '').trim()
   const rawUrl = String(form.get('base_url') ?? '')
 
+  // ‏النوعُ للجديد وحدَه (D-348): «Anthropic» مفتاحٌ آخرُ لـ Anthropic بلا عنوان، والقائمُ يبقى بنوعه
+  const kind = existing?.kind ?? (form.get('kind') === 'anthropic' ? 'anthropic' : 'openai_compat')
   // المدمَج لا يُبدَّل عنوانه: عنوانه في الشيفرة
   let baseUrl: string | null = existing?.baseUrl ?? null
-  if (existing === null || !existing.builtin) {
+  if (kind === 'anthropic') baseUrl = null
+  else if (existing === null || !existing.builtin) {
     const verdict = checkProviderUrl(rawUrl)
     if (!verdict.ok) {
       await setFlash(c.env, c.req.raw, { kind: 'bad', text: `العنوان مرفوض: ${verdict.reason}` })
@@ -491,7 +495,7 @@ channels.post('/panel/providers/add', async (c) => {
     {
       name,
       label,
-      kind: existing?.kind ?? 'openai_compat',
+      kind,
       baseUrl,
       model: model === '' ? (existing?.model ?? null) : model,
       priceIn: num(form, 'price_in'),
@@ -540,6 +544,8 @@ channels.post('/panel/providers/key', async (c) => {
 
   try {
     const result = await saveKey(c.env.DB, c.env.TOKEN_ENC_KEY, guard.provider.name, raw, 'panel')
+    // ‏مفتاحٌ جديد: يُرفع علمُ تعذّر القديم فيُجرَّب في السلسلة من جديد (D-349)
+    await clearHealth(c.env.DB, guard.provider.name)
     // **ولا في السجلّ**: التلميحُ وحده — وهو أوّلُ المفتاح وآخرُه لا نصُّه
     await record(
       c.env.DB,
@@ -756,7 +762,23 @@ channels.post('/panel/routes', async (c) => {
     return back('providers')
   }
 
-  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel')
+  // ‏سلسلةُ المفاتيح وترتيبُها (D-349): حقولُها في صفوف المهامّ النصّيّة وحدَها — وغيابُها يبقي ما كان. والحلقةُ مزوّدٌ قائمٌ غيرُ الأوّل
+  // ‏ولا يتكرّر، والفارغُ يُسقَط
+  let extra: { chain?: string[]; order?: 'mine' | 'cheap' } | undefined
+  if (form.has('order')) {
+    const chain: string[] = []
+    for (const k of ['chain_1', 'chain_2', 'chain_3']) {
+      const name = String(form.get(k) ?? '')
+      if (name === '' || name === provider || chain.includes(name)) continue
+      if ((await getProvider(c.env.DB, name)) === null) {
+        await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'حلقةٌ في السلسلة ليست مزوّدًا قائمًا: ' + name })
+        return back('providers')
+      }
+      chain.push(name)
+    }
+    extra = { chain, order: form.get('order') === 'cheap' ? 'cheap' : 'mine' }
+  }
+  await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel', extra)
   await record(
     c.env.DB,
     { actor: 'panel', action: 'route.write', target: task, detail: `${provider} / ${model}` },

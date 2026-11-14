@@ -401,9 +401,11 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
               <input class="w-s" id="np" name="name" dir="ltr" required placeholder="deepseek"></span>
             <span class="field"><label for="nl">الاسم المعروض</label>
               <input class="w-s" id="nl" name="label" placeholder="DeepSeek"></span>
+            <span class="field"><label for="nk">النوع</label>
+              <select class="w-s" id="nk" name="kind"><option value="openai_compat">OpenAI-compatible</option><option value="anthropic">Anthropic (مفتاحٌ آخر)</option></select></span>
             <span class="field grow-field"><label for="nu">العنوان (https)</label>
-              <input class="w-full" id="nu" name="base_url" dir="ltr" required placeholder="https://api.deepseek.com/v1"
-                    ></span>
+              <input class="w-full" id="nu" name="base_url" dir="ltr" placeholder="https://api.deepseek.com/v1" aria-describedby="nu-h">
+              <span class="field-hint" id="nu-h">لـ OpenAI-compatible وحدَه. ونوعُ Anthropic بلا عنوان: يُنادى Anthropic نفسُه بمفتاح هذا الصفّ.</span></span>
           </span>
           <span class="row mt-2">
             <span class="field"><label for="nm">النموذج (مبدئيّ)</label>
@@ -440,6 +442,29 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
     </div>
   </details>`
 
+  // ‏سلسلةُ المفاتيح (D-349): للمهامّ النصّيّة — الترتيبُ، وثلاثُ حلقاتٍ بعد الأوّل، وشارةُ ما يُتخطّى الآن بسببه
+  const CHAIN_TASKS = new Set(['draft', 'plan', 'analyze'])
+  const DOWN_LABEL: Readonly<Record<string, string>> = { key: 'مفتاحُه مرفوض', nokey: 'بلا مفتاح', limit: 'عند الحدّ', busy: 'متعطّلٌ مؤقّتًا', cap: 'بلغ سقفَه' }
+  const labelOf = (name: string): string => d.knownProviders.find((p) => p.name === name)?.label ?? name
+  const chainEditor = (r: (typeof d.routing)[number]): string => {
+    const t = escapeHtml(r.task)
+    const order = r.order ?? 'mine'
+    const slot = (n: number): string => {
+      const current = r.chain?.[n - 1] ?? ''
+      return '<label class="vh" for="rc' + String(n) + '-' + t + '">الحلقة ' + String(n + 1) + '</label>'
+        + '<select id="rc' + String(n) + '-' + t + '" name="chain_' + String(n) + '" class="w-s"><option value="">' + (n === 1 ? 'بلا تالٍ' : '—') + '</option>'
+        + d.knownProviders.filter((p) => p.name !== r.provider)
+          .map((p) => '<option value="' + escapeHtml(p.name) + '"' + (p.name === current ? ' selected' : '') + '>ثمّ ' + escapeHtml(p.label) + '</option>').join('')
+        + '</select>'
+    }
+    const downs = Object.entries(r.down ?? {}).map(([name, x]) =>
+      statusBadge(x.why === 'key' || x.why === 'nokey' ? 'bad' : 'warn', '▲', escapeHtml(labelOf(name)) + ': ' + (DOWN_LABEL[x.why] ?? x.why) + ' حتّى ' + escapeHtml(x.until.slice(11, 16)) + ' UTC')).join('')
+    return '<span class="chain-row"><label class="vh" for="ro-' + t + '">ترتيب التجربة</label>'
+      + '<select id="ro-' + t + '" name="order" class="w-s"><option value="mine"' + (order === 'mine' ? ' selected' : '') + '>بترتيبي</option>'
+      + '<option value="cheap"' + (order === 'cheap' ? ' selected' : '') + '>الأرخص أوّلًا</option></select>'
+      + slot(1) + slot(2) + slot(3) + '</span>' + (downs === '' ? '' : '<span class="chain-down">' + downs + '</span>')
+  }
+
   const providerOptions = (selected: string): string =>
     d.knownProviders
       .map((p) => `<option value="${escapeHtml(p.name)}"${p.name === selected ? ' selected' : ''}>${escapeHtml(p.label)}</option>`)
@@ -452,6 +477,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         <form class="row gap-2" method="POST" action="/panel/routes">
           <input type="hidden" name="task" value="${escapeHtml(r.task)}">
           <select name="provider" class="mp-provider w-s">${providerOptions(r.provider)}</select>
+          ${CHAIN_TASKS.has(r.task) ? chainEditor(r) : ''}
           ${modelPicker({
             id: `rm-${r.task}`,
             provider: r.provider,
