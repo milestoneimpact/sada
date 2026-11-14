@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import { pulses } from '../lib/ops/heartbeat'
 import { sli } from '../lib/ops/slo'
-import { healthCard, type HealthView } from './ui/parts'
+import { healthCard, machineCard, type HealthView } from './ui/parts'
 import { emailLogin } from '../test/emailLogin'
 import { toBase64 } from '../lib/crypto'
 import { fakeDb, fakeKv } from '../test/fakes'
@@ -64,6 +64,22 @@ describe('healthCard (D-321)', () => {
     expect(html).toContain('وفشلت محاولةٌ قبل ساعتين: &lt;script&gt;x&lt;/script&gt;')
     expect(healthCard(view({ lastOk: null, last: null }), BEATS, NOW)).toContain('لا نسخة بعد')
     expect(healthCard(view({ read: false }), BEATS, NOW)).toContain('سجلّ النسخ لم يُقرأ الآن')
+  })
+})
+
+describe('«هل الآلة تعمل؟» والنسخة (مراجعة D-321)', () => {
+  it('النسخةُ بلا دلوٍ خاصّ تُرسم «لا تعمل بعد» محايدةً لا «في موعدها» — وما سواها من `skipped` كما كان', () => {
+    const html = machineCard(pulses([
+      { job: 'backup', at: ago(2), outcome: 'skipped', detail: 'لا دلو خاصّ مربوط بعد — بابُه في «ما عليك»' },
+      { job: 'dispatch', at: ago(0.1), outcome: 'skipped', detail: 'موقوف مؤقّتًا' },
+    ], NOW), NOW)
+    const row = (label: string) => html.split('<li').find((li) => li.includes(label)) ?? ''
+    expect(row('النسخة الاحتياطيّة')).toContain('لا تعمل بعد')
+    expect(row('النسخة الاحتياطيّة')).not.toContain('في موعدها')
+    expect(row('إرسال المجدول')).toContain('في موعدها')
+    // ‏وتُرسم بعد أوّل نسخةٍ «في موعدها» كما تقول علامةُ النجاح في M-51 · ٤
+    const done = machineCard(pulses([{ job: 'backup', at: ago(2), outcome: 'ok', detail: '38 جدولًا' }], NOW), NOW)
+    expect(done.split('<li').find((li) => li.includes('النسخة الاحتياطيّة'))).toContain('في موعدها')
   })
 })
 

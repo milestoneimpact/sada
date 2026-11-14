@@ -6,3 +6,10 @@ dist/
 .DS_Store
 .env
 .env.*
+# ‏نواتجُ الاسترجاع (D-321 · RUNBOOK §٢ و§٣): فيها صفوفُ القاعدة — تُكتب في «mktemp -d» خارج المستودع، وهذا حارسٌ ثانٍ
+*.sada
+*.sqlite
+restore-data.sql
+carry.sql
+live-carry.json
+published-after.json

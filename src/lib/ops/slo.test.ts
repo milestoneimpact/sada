@@ -72,6 +72,17 @@ describe('المؤشّرات (readSlis)', () => {
     expect((await readSlis(db, NOW))[2]).toMatchObject({ good: 2, total: 4, ratio: 0.5 })
   })
 
+  it('مراجعة D-321: طلبٌ يدويٌّ إلى /pulse قبل المراقب لا يبدأ العدّ — يبدأ من أوّل نصف ساعةٍ متّصلةٍ من الأسئلة', async () => {
+    const t = (m: number) => new Date(NOW.getTime() - m * 60_000)
+    // ‏المالكُ يفتح /pulse في المتصفّح (M-47 · ١) قبل يومٍ من إنشاء المراقب
+    await recordProbe(db, t(24 * 60), true)
+    expect((await readSlis(db, NOW))[2]).toMatchObject({ total: 0, ratio: null, budgetLeft: null })
+    // ‏ثمّ المراقبُ كلَّ خمس دقائق منذ ثلاث ساعات: ‏18 خانةً كلُّها حاضرة
+    for (let m = 180; m >= 0; m -= 5) await recordProbe(db, t(m), true)
+    const availability = (await readSlis(db, NOW))[2]!
+    expect(availability).toMatchObject({ good: 18, total: 18, ratio: 1, budgetLeft: 1 })
+  })
+
   it('وجملةٌ واحدة للثلاثة: رحلةٌ واحدةٌ إلى D1 لبطاقة «صحّة صدى»، وسقوطُها «لا قياس» لا عطل', async () => {
     let prepared = 0
     const counting = { ...db, prepare: (q: string) => { prepared += 1; return db.prepare(q) } }

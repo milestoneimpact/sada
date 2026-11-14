@@ -3,7 +3,7 @@
  * ‏تبقى، وما يسقط يُسجَّل، والتمرينُ (`scripts/restore_drill.mjs`) يفتح ما يكتبه الـ Worker نفسُه.
  */
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -11,7 +11,7 @@ import { keyId, toBase64 } from '../crypto'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { saveTokens, upsertAccount } from '../tokens'
 import { KEEP_SNAPSHOTS, latestBackups, pruneSnapshots, snapshotDue, takeSnapshot, type BackupBucket } from './backup'
-import { decodeSnapshot, encodeSnapshot, readSnapshotHeader, SnapshotError, snapshotKid } from './snapshot'
+import { backupKey, backupKid, decodeSnapshot, encodeSnapshot, readSnapshotHeader, SnapshotError, snapshotKid } from './snapshot'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const OTHER = toBase64(crypto.getRandomValues(new Uint8Array(32)))
@@ -135,6 +135,23 @@ describe('takeSnapshot (D-321)', () => {
     expect(await snapshotDue(db, hours(7 * 24 - 2))).toBe(false)
     expect(await snapshotDue(db, hours(7 * 24 - 1))).toBe(true)
   })
+
+  it('مراجعة D-321: مفتاحٌ دُوّر بعد آخر نسخة ← مستحقّةٌ في الفجر التالي، لا بعد أسبوع (النسخُ بالقديم لا يفكّها الجديد)', async () => {
+    await takeSnapshot({ db, bucket: fakeBucket(), encKey: KEY, env: 'staging', now: NOW })
+    const tomorrow = new Date(NOW.getTime() + 86_400_000)
+    expect(await snapshotDue(db, tomorrow, await snapshotKid(KEY))).toBe(false)
+    expect(await snapshotDue(db, tomorrow, await snapshotKid(OTHER))).toBe(true)
+  })
+
+  it('مراجعة D-321: نسخةٌ نجحت ثمّ واحدٌ وعشرون سقوطًا يوميًّا — «آخرُ نسخةٍ نجحت» ما تزال تُقرأ، لا «لا نسخة بعد»', async () => {
+    await takeSnapshot({ db, bucket: fakeBucket(), encKey: KEY, env: 'staging', now: NOW })
+    for (let day = 1; day <= 21; day += 1) {
+      await takeSnapshot({ db, bucket: fakeBucket(true), encKey: KEY, env: 'staging', now: new Date(NOW.getTime() + day * 86_400_000) })
+    }
+    const { last, lastOk } = await latestBackups(db)
+    expect(last).toMatchObject({ status: 'failed' })
+    expect(lastOk).toMatchObject({ status: 'ok', at: '2026-11-16 03:03:00' })
+  })
 })
 
 describe('التمرينُ يفتح ما يكتبه الـ Worker (scripts/restore_drill.mjs)', () => {
@@ -157,6 +174,59 @@ describe('التمرينُ يفتح ما يكتبه الـ Worker (scripts/resto
       const bad = run(OTHER)
       expect(bad.status).toBe(1)
       expect(bad.stdout).toMatch(/لا مفتاحَ معطًى يطابق/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('مراجعة D-321: مفتاحُ النسخ المشتقّ وحدَه يفتحها (لا الخام) — ومن يملكه لا يملك ما يفكّ الرموز', async () => {
+    const bucket = fakeBucket()
+    const out = await takeSnapshot({ db, bucket, encKey: KEY, env: 'staging', now: NOW })
+    if (!out.ok) throw new Error(out.detail)
+    const bytes = bucket.objects.get(out.key)!
+    const derived = await backupKey(KEY)
+    // ‏المشتقُّ غيرُ الخام، ولا يُعرَف الخامُ منه (HKDF)، ويُعرَّف في الرأس ببصمته
+    expect(derived).not.toBe(KEY)
+    expect(readSnapshotHeader(bytes).header.bkid).toBe(await backupKid(derived))
+    expect((await decodeSnapshot(bytes, [derived])).header.rows).toBeGreaterThan(0)
+    const dir = mkdtempSync(join(tmpdir(), 'sada-snap-'))
+    try {
+      const file = join(dir, 'snap.sada')
+      writeFileSync(file, bytes)
+      const run = spawnSync(process.execPath, ['--no-warnings', 'scripts/restore_drill.mjs', file], {
+        encoding: 'utf8', env: { PATH: process.env.PATH ?? '', SADA_BACKUP_KEY: derived },
+      })
+      expect(run.status, run.stdout + run.stderr).toBe(0)
+      expect(run.stdout).toMatch(/العدد يطابق في \d+ جدولًا/)
+      // ‏و`--derive-key` يستخرجه من الخام مرّةً للخزانة
+      const derive = spawnSync(process.execPath, ['--no-warnings', 'scripts/restore_drill.mjs', '--derive-key'], {
+        encoding: 'utf8', env: { PATH: process.env.PATH ?? '', TOKEN_ENC_KEY: KEY },
+      })
+      expect(derive.status, derive.stdout + derive.stderr).toBe(0)
+      expect(derive.stdout).toContain(derived)
+      expect(derive.stdout).not.toContain(KEY)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('مراجعة D-321: مستودعٌ في مسارٍ فيه مسافةٌ وحرفٌ عربيّ («~/Documents/صدى») يسترجع كما يسترجع غيره', async () => {
+    const bucket = fakeBucket()
+    const out = await takeSnapshot({ db, bucket, encKey: KEY, env: 'staging', now: NOW })
+    if (!out.ok) throw new Error(out.detail)
+    const dir = mkdtempSync(join(tmpdir(), 'sada-path-'))
+    try {
+      const repo = join(dir, 'مستودع صدى')
+      for (const p of ['scripts/restore_drill.mjs', 'scripts/restore_carry.sql', 'src/lib/ops/snapshot.ts', 'migrations']) {
+        cpSync(p, join(repo, p), { recursive: true })
+      }
+      const file = join(dir, 'snap.sada')
+      writeFileSync(file, bucket.objects.get(out.key)!)
+      const run = spawnSync(process.execPath, ['--no-warnings', join(repo, 'scripts/restore_drill.mjs'), file], {
+        encoding: 'utf8', env: { PATH: process.env.PATH ?? '', TOKEN_ENC_KEY: KEY },
+      })
+      expect(run.status, run.stdout + run.stderr).toBe(0)
+      expect(run.stdout).toMatch(/العدد يطابق في \d+ جدولًا/)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

@@ -46,6 +46,7 @@ import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { pulseReport } from './lib/ops/pulse'
 import { snapshotDue, takeSnapshot } from './lib/ops/backup'
+import { snapshotKid } from './lib/ops/snapshot'
 import { prunePulseSlots, recordProbe } from './lib/ops/slo'
 import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
@@ -1096,8 +1097,9 @@ async function providersTick(env: Env): Promise<void> {
 }
 
 /**
- * ‏**النسخةُ الاحتياطيّة** (D-321) — تُسأل في الدورة اليوميّة وتُؤخذ كلَّ سبعة أيّام (`snapshotDue`)، فما يسقط اليومَ يُعاد غدًا لا
- * ‏بعد أسبوع، ولا جدولَ خامسٌ في `wrangler.toml`. وبلا دلوٍ خاصّ (`BACKUP`، M-51) تنبض `skipped` بسببها ولا تكتب في غيره.
+ * ‏**النسخةُ الاحتياطيّة** (D-321) — تُسأل في الدورة اليوميّة وتُؤخذ كلَّ سبعة أيّام (`snapshotDue`)، أو في الفجر التالي لتدوير
+ * ‏المفتاح، فما يسقط اليومَ يُعاد غدًا لا بعد أسبوع، ولا جدولَ خامسٌ في `wrangler.toml`. وبلا دلوٍ خاصّ (`BACKUP`، M-51) تنبض
+ * ‏`skipped` بسببها ولا تكتب في غيره.
  */
 async function backupTick(env: Env): Promise<void> {
   if (env.BACKUP === undefined) {
@@ -1107,7 +1109,8 @@ async function backupTick(env: Env): Promise<void> {
   }
   const now = new Date()
   try {
-    if (!(await snapshotDue(env.DB, now))) return
+    // ‏ومفتاحٌ دُوّر بعد آخر نسخة (M-40) يُستحقّ به نسخةٌ في هذا الفجر: ما قبله لا يفكّه الجديد (مراجعة D-321)
+    if (!(await snapshotDue(env.DB, now, await snapshotKid(env.TOKEN_ENC_KEY)))) return
     const out = await takeSnapshot({ db: env.DB, bucket: env.BACKUP, encKey: env.TOKEN_ENC_KEY, env: env.SADA_ENV, now })
     if (out.ok) {
       console.info({ job: 'backup', tables: out.tables, rows: out.rows, bytes: out.bytes, ms: out.ms, pruned: out.pruned })

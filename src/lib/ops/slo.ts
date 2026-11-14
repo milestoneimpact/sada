@@ -15,7 +15,9 @@
  *     منّا** كلُّ ما ليس ردًّا من المنصّة لما أُرسل إليها: ‏5xx، ومهلةٌ وانقطاع (`status` صفر)، وطابورٌ استنفد محاولاته، وإذنٌ
  *     انتهى (‏401)، وحدُّ المعدّل (‏429). **وما ردّته المنصّةُ ‏4xx سواها** (محتوًى أو حسابٌ أو صلاحيّة) يُعرَض عددُه ولا يُعدّ.
  * ٣ · **التوافرُ من الخارج** (الهدفُ ‏99.5٪): خاناتُ عشرِ دقائق ردّ فيها `/pulse` ‏200 على سؤال المراقب (M-47) ÷ الخاناتُ كلُّها
- *     منذ أوّل سؤال. والخانةُ بلا سؤالٍ غيابٌ لا حضور.
+ *     منذ بدأ المراقبُ يسأل — **أوّلِ ثلاث خاناتٍ متتالية** (`MONITOR_RUN` · مراجعة D-321): `/pulse` بابٌ لكلّ طارق، وطلبٌ يدويٌّ
+ *     من متصفّحٍ أو `curl` قبل المراقب بيوم كان يبدأ العدّ فتُحسب كلُّ خانةٍ بعده غيابًا ويُقال «نفد» وصدى يعمل. والمراقبُ كلَّ خمس
+ *     دقائق يبلغ ثلاثًا في نصف ساعة، ولا يبلغها طارقٌ يسأل مرّةً أو مرّتين. والخانةُ بلا سؤالٍ بعدها غيابٌ لا حضور.
  *
  * ‏**والهامشُ** ما يجوز من السيّئ (`(1 − الهدف) × الكلّ`) وما بقي منه. ومقامٌ صفرٌ يُقال «لا قياس» لا ‏100٪.
  */
@@ -24,6 +26,8 @@ import { ON_TIME_MINUTES } from '../report/success'
 
 export const SLO_WINDOW_DAYS = 28
 export const SLOT_MINUTES = 10
+/** ‏كم خانةً متتاليةً يبدأ بها العدّ: نصفُ ساعةٍ من الأسئلة — مراقبٌ لا طارق. */
+export const MONITOR_RUN = 3
 /** ‏ما يبقى من خانات المراقب: النافذةُ وأسبوعٌ فوقها، ثمّ يُمحى في الدورة اليوميّة. */
 export const PULSE_KEEP_DAYS = 35
 
@@ -99,9 +103,18 @@ const SUCCESS = `SELECT json_object(
                                      WHERE x.post_id = pa.post_id AND x.org_id = pa.org_id
                                        AND x.status IN ('succeeded', 'failed')))`
 
-/** ‏٣ · التوافرُ من الخارج — خاناتُ النافذة (‏`?3` إلى الجارية `?4`، ولا تُعدّ) وأوّلُ خانةٍ سُئل فيها `/pulse` أصلًا. */
-const AVAILABILITY = `SELECT json_object('good', coalesce(sum(ok), 0), 'first', (SELECT min(slot) FROM pulse_slots))
-      FROM pulse_slots WHERE slot >= ?3 AND slot < ?4`
+/** ‏خانةٌ تبدأ سلسلةً من `MONITOR_RUN` متتالية: كلُّ ما بعدها بعشر دقائق حتّى آخرها له صفّ. */
+const RUN_STARTS = Array.from({ length: MONITOR_RUN - 1 }, (_, i) =>
+  `EXISTS (SELECT 1 FROM pulse_slots r WHERE r.slot = strftime('%Y-%m-%d %H:%M', s.slot, '+${(i + 1) * SLOT_MINUTES} minutes'))`).join(' AND ')
+
+/**
+ * ‏٣ · التوافرُ من الخارج — أوّلُ خانةٍ بدأ فيها المراقبُ يسأل (أوّلُ سلسلةٍ متّصلة)، وما حضر منها إلى الجارية (‏`?4`، ولا تُعدّ) في
+ * ‏النافذة (‏`?3`). والفهرسُ الأوّليُّ على `slot` يقرؤها بالترتيب ويقف عند أوّل سلسلة.
+ */
+const AVAILABILITY = `SELECT json_object(
+           'good', coalesce((SELECT sum(ok) FROM pulse_slots WHERE slot >= max(?3, f.first) AND slot < ?4), 0),
+           'first', f.first)
+      FROM (SELECT (SELECT s.slot FROM pulse_slots s WHERE ${RUN_STARTS} ORDER BY s.slot LIMIT 1) AS first) f`
 
 const parse = (v: unknown): Record<string, unknown> => {
   try { return typeof v === 'string' ? (JSON.parse(v) as Record<string, unknown>) : {} } catch { return {} }
@@ -145,7 +158,7 @@ export async function readSlis(db: Db, now: Date): Promise<readonly Sli[]> {
   }
 }
 
-/** ‏الخاناتُ المنتظَرة منذ أوّل سؤالٍ أو بدءِ النافذة، أيّهما أحدث، إلى الخانة الجارية — وما لم يُسأل فيها غياب. */
+/** ‏الخاناتُ المنتظَرة منذ بدأ المراقبُ يسأل أو بدءِ النافذة، أيّهما أحدث، إلى الخانة الجارية — وما لم يُسأل فيها غياب. */
 function availabilityOf(good: number, first: string | null, windowStart: string, current: string): Sli {
   if (first === null) return sli('availability', 0, 0)
   const from = first > windowStart ? first : windowStart

@@ -17,8 +17,8 @@ export interface HealthFacts {
 export async function readHealth(db: Db, now: Date): Promise<HealthFacts> {
   try {
     const row = await db.prepare(`SELECT ${SLI_COLUMNS}, ${BACKUP_COLUMNS}`).bind(...sliBinds(now))
-      .first<{ on_time: unknown; success: unknown; availability: unknown; backups: unknown }>()
-    return { slis: slisOf(row, now), ...backupsOf(row?.backups), read: true }
+      .first<{ on_time: unknown; success: unknown; availability: unknown; backup_last: unknown; backup_ok: unknown }>()
+    return { slis: slisOf(row, now), ...backupsOf(row?.backup_last, row?.backup_ok), read: true }
   } catch (error) {
     console.error({ job: 'health', failed: error instanceof Error ? error.message : 'unexpected_error' })
     return { slis: slisOf(null, now), last: null, lastOk: null, read: false }

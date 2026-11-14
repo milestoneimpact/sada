@@ -14,12 +14,16 @@
  * │SADASNP1│ H (uint32 BE) │ رأسٌ JSON (H بايت) │ iv (12) │ نصٌّ مشفَّر + وسمُ GCM │
  * ```
  *
- * - **الرأسُ مقروءٌ بلا مفتاح**: متى، وأيُّ بيئة، وأيُّ مفتاحٍ يفتحها (`kid` — ثمانيةُ محارف من بصمةٍ لا تُعكَس، كمعرّف D-318)،
- *   والجداولُ بعدد صفوفها، والترحيلاتُ المطبَّقةُ ساعتَها. **ولا قيمةَ فيه**: أسماءٌ وأعداد.
+ * - **الرأسُ مقروءٌ بلا مفتاح**: متى، وأيُّ بيئة، وبأيّ `TOKEN_ENC_KEY` شُفّرت أعمدتُها (`kid` — ثمانيةُ محارف من بصمةٍ لا تُعكَس،
+ *   كمعرّف D-318)، وأيُّ مفتاحِ نسخٍ يفتحها (`bkid`، بوسمٍ غيرِ وسم `kid` فلا يلتبسان)، والجداولُ بعدد صفوفها، والترحيلاتُ
+ *   المطبَّقةُ ساعتَها. **ولا قيمةَ فيه**: أسماءٌ وأعداد.
  * - **والرأسُ مربوطٌ بالنصّ** (AAD = البايتاتُ من الأوّل إلى آخر الرأس): رأسٌ يُعدَّل — عددٌ أو جدولٌ أو `kid` — يُسقط فكَّ التشفير.
  * - **والمتنُ** `gzip(JSON)` لصفوف كلّ جدولٍ بأعمدتها، ثمّ AES-256-GCM بمفتاحٍ مشتقٍّ بـ HKDF-SHA256 من `TOKEN_ENC_KEY`
  *   (`info = backup-v1`، والملحُ `sada:backup:v1`). مفتاحٌ مشتقٌّ لا الخامُ نفسُه: نسخةٌ تتسرّب لا تعطي مفتاحَ الرموز، ورموزٌ تتسرّب
  *   لا تعطي مفتاحَ النسخة.
+ * - **ومفتاحُ النسخ يُحفظ وحدَه** (مراجعة D-321): `backupKey` يستخرجه من الخام مرّةً (`npm run restore -- --derive-key`)، والتمرينُ
+ *   والاسترجاعُ يفكّان به النسخةَ مباشرةً. **وHKDF لا يُعكس**: حاسوبٌ عليه مفتاحُ النسخ وقاعدةٌ مفكوكة لا يملك ما يفكّ رمزًا فيها —
+ *   والخامُ (D-005) يبقى في أسرار Worker، ونسختُه في خزانة المالك للتدوير (M-40) ولضياعه (RUNBOOK §٤) لا غير.
  * - **والأعمدةُ المشفَّرةُ تبقى كما هي** (`tokens.access_enc` وأخواتُه): تُنسَخ نصًّا مشفَّرًا، ثمّ يُشفَّر الملفُّ كلُّه فوقها. فلا
  *   رمزَ يظهر في النسخة مقروءًا ولو فُكّ الملفّ، ولا يُفكّ بها رمزٌ بلا `TOKEN_ENC_KEY` نفسِه.
  */
@@ -27,6 +31,7 @@
 export const SNAPSHOT_MAGIC = 'SADASNP1'
 export const SNAPSHOT_INFO = 'backup-v1'
 const SNAPSHOT_SALT = 'sada:backup:v1'
+const BACKUP_KID_LABEL = 'sada:backup-kid:v1:'
 const KEY_BYTES = 32
 const IV_BYTES = 12
 const HEAD_AT = 12
@@ -41,7 +46,10 @@ export interface SnapshotHeader {
   readonly v: 1
   readonly at: string
   readonly env: string
+  /** ‏معرّفُ `TOKEN_ENC_KEY` الذي شُفّرت به أعمدتُها — ما يلزم الـ Worker ليقرأها بعد الاسترجاع (وإلّا `TOKEN_ENC_KEY_PREV`). */
   readonly kid: string
+  /** ‏معرّفُ مفتاح النسخ الذي يفتحها (`backupKid`). */
+  readonly bkid: string
   readonly tables: readonly SnapshotTable[]
   readonly rows: number
   /** الترحيلاتُ المطبَّقةُ ساعةَ النسخ (`d1_migrations`)، و`null` حين لا جدولَ لها (قاعدةٌ لم تُرحَّل بـ wrangler). */
@@ -79,27 +87,46 @@ function rawKey(material: string): Uint8Array {
   return out
 }
 
-/** ‏معرّفُ المفتاح كما يحسبه `keyId` في `crypto.ts` (D-318) — ويُقارَن به في الاختبار، فلا يفترقان. */
-export async function snapshotKid(material: string): Promise<string> {
-  const raw = rawKey(material)
-  const label = encoder.encode('sada:key-id:v2:')
-  const joined = new Uint8Array(label.byteLength + raw.byteLength)
-  joined.set(label, 0)
-  joined.set(raw, label.byteLength)
+/** ‏بصمةٌ لا تُعكَس: أوّلُ أربعة بايتات من SHA-256 للوسم والمفتاح، ثمانيةُ محارف hex. */
+async function fingerprint(label: string, raw: Uint8Array): Promise<string> {
+  const tag = encoder.encode(label)
+  const joined = new Uint8Array(tag.byteLength + raw.byteLength)
+  joined.set(tag, 0)
+  joined.set(raw, tag.byteLength)
   const hash = new Uint8Array(await crypto.subtle.digest('SHA-256', joined as BufferSource))
   return Array.from(hash.slice(0, 4), (b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-/** ‏مفتاحُ النسخة: HKDF-SHA256 من `TOKEN_ENC_KEY` بـ `info = backup-v1`. */
-export async function snapshotKey(material: string): Promise<CryptoKey> {
-  const base = await crypto.subtle.importKey('raw', rawKey(material) as BufferSource, 'HKDF', false, ['deriveKey'])
-  return crypto.subtle.deriveKey(
+/** ‏معرّفُ المفتاح كما يحسبه `keyId` في `crypto.ts` (D-318) — ويُقارَن به في الاختبار، فلا يفترقان. */
+export async function snapshotKid(material: string): Promise<string> {
+  return fingerprint('sada:key-id:v2:', rawKey(material))
+}
+
+/** ‏بايتاتُ مفتاح النسخ: HKDF-SHA256 من `TOKEN_ENC_KEY` بـ `info = backup-v1` — هي نفسُها مفتاحُ AES-256-GCM. */
+async function backupKeyBytes(material: string): Promise<Uint8Array> {
+  const base = await crypto.subtle.importKey('raw', rawKey(material) as BufferSource, 'HKDF', false, ['deriveBits'])
+  return new Uint8Array(await crypto.subtle.deriveBits(
     { name: 'HKDF', hash: 'SHA-256', salt: encoder.encode(SNAPSHOT_SALT) as BufferSource, info: encoder.encode(SNAPSHOT_INFO) as BufferSource },
     base,
-    { name: 'AES-GCM', length: KEY_BYTES * 8 },
-    false,
-    ['encrypt', 'decrypt'],
-  )
+    KEY_BYTES * 8,
+  ))
+}
+
+/**
+ * ‏**مفتاحُ النسخ** base64 — يُستخرج من `TOKEN_ENC_KEY` مرّةً للخزانة (`npm run restore -- --derive-key`، M-51)، ويفتح النسخَ
+ * ‏ولا يفتح رمزًا فيها. وهو ما يُلصق في التمرين كلَّ ربع (M-52)، لا الخام.
+ */
+export async function backupKey(material: string): Promise<string> {
+  return toB64(await backupKeyBytes(material))
+}
+
+/** ‏معرّفُ مفتاح النسخ في الرأس (`bkid`). */
+export async function backupKid(key: string): Promise<string> {
+  return fingerprint(BACKUP_KID_LABEL, rawKey(key))
+}
+
+async function aesKey(bytes: Uint8Array): Promise<CryptoKey> {
+  return crypto.subtle.importKey('raw', bytes as BufferSource, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 
 async function through(bytes: Uint8Array, stream: CompressionStream | DecompressionStream): Promise<Uint8Array> {
@@ -128,8 +155,10 @@ export async function encodeSnapshot(
   payload: SnapshotPayload,
 ): Promise<{ readonly bytes: Uint8Array; readonly header: SnapshotHeader }> {
   const tables = Object.entries(payload.tables).map(([name, t]) => ({ name, rows: t.rows.length }))
+  const derived = await backupKeyBytes(material)
   const header: SnapshotHeader = {
     format: 'sada-snapshot', v: 1, at: meta.at, env: meta.env, kid: await snapshotKid(material),
+    bkid: await fingerprint(BACKUP_KID_LABEL, derived),
     tables, rows: tables.reduce((n, t) => n + t.rows, 0), migrations: meta.migrations,
     cipher: 'AES-256-GCM', kdf: 'HKDF-SHA256', info: SNAPSHOT_INFO, compression: 'gzip',
   }
@@ -141,7 +170,7 @@ export async function encodeSnapshot(
   const iv = crypto.getRandomValues(new Uint8Array(IV_BYTES))
   const packed = await through(encoder.encode(JSON.stringify(payload)), new CompressionStream('gzip'))
   const sealed = new Uint8Array(await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv, additionalData: prefix as BufferSource }, await snapshotKey(material), packed as BufferSource,
+    { name: 'AES-GCM', iv, additionalData: prefix as BufferSource }, await aesKey(derived), packed as BufferSource,
   ))
   const bytes = new Uint8Array(prefix.byteLength + IV_BYTES + sealed.byteLength)
   bytes.set(prefix, 0)
@@ -169,27 +198,32 @@ export function readSnapshotHeader(bytes: Uint8Array): { readonly header: Snapsh
 }
 
 /**
- * ‏يفكّ النسخة بأوّل مفتاحٍ يطابق `kid` رأسِها — الحاليّ ثمّ السابق في التدوير (D-318) — ويتحقّق أنّ عددَ كلّ جدولٍ في المتن هو
- * ‏ما في الرأس. ويرمي `SnapshotError` بسببٍ مسمّى، ولا يعيد نصفَ نسخة.
+ * ‏يفكّ النسخة بأوّل مفتاحٍ يطابق رأسَها: **مفتاحُ النسخ** (`bkid`، ما يُحفظ للتمرين) أو `TOKEN_ENC_KEY` الخام (`kid`، فيُشتقّ منه)،
+ * ‏الحاليُّ ثمّ السابق في التدوير (D-318) — ويتحقّق أنّ عددَ كلّ جدولٍ في المتن هو ما في الرأس. ويرمي `SnapshotError` بسببٍ مسمّى،
+ * ‏ولا يعيد نصفَ نسخة.
  */
 export async function decodeSnapshot(
   bytes: Uint8Array,
   materials: readonly string[],
-): Promise<{ readonly header: SnapshotHeader; readonly payload: SnapshotPayload }> {
+): Promise<{ readonly header: SnapshotHeader; readonly payload: SnapshotPayload; readonly by: 'backup' | 'raw' }> {
   const { header, end } = readSnapshotHeader(bytes)
-  let material: string | undefined
+  let key: Uint8Array | undefined
+  let by: 'backup' | 'raw' = 'backup'
   for (const m of materials) {
     if (m.trim() === '') continue
-    if ((await snapshotKid(m)) === header.kid) { material = m; break }
+    if (typeof header.bkid === 'string' && (await backupKid(m)) === header.bkid) { key = rawKey(m); by = 'backup'; break }
+    if ((await snapshotKid(m)) === header.kid) { key = await backupKeyBytes(m); by = 'raw'; break }
   }
-  if (material === undefined) {
-    throw new SnapshotError(`لا مفتاحَ معطًى يطابق المفتاحَ الذي شُفّرت به (kid ${header.kid}) — أهو TOKEN_ENC_KEY قبل تدويرٍ؟`)
+  if (key === undefined) {
+    throw new SnapshotError(
+      `لا مفتاحَ معطًى يطابق ما شُفّرت به (مفتاحُ النسخ bkid ${String(header.bkid)} · TOKEN_ENC_KEY kid ${header.kid}) — أهو مفتاحٌ قبل تدويرٍ أو لبيئةٍ أخرى؟`,
+    )
   }
   let packed: Uint8Array
   try {
     packed = new Uint8Array(await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: bytes.slice(end, end + IV_BYTES) as BufferSource, additionalData: bytes.slice(0, end) as BufferSource },
-      await snapshotKey(material),
+      await aesKey(key),
       bytes.slice(end + IV_BYTES) as BufferSource,
     ))
   } catch {
@@ -200,5 +234,5 @@ export async function decodeSnapshot(
     const got = payload.tables[t.name]?.rows.length
     if (got !== t.rows) throw new SnapshotError(`«${t.name}»: في الرأس ${t.rows} صفًّا وفي المتن ${String(got)}`)
   }
-  return { header, payload }
+  return { header, payload, by }
 }

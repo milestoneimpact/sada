@@ -226,7 +226,9 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   const rows = pulses
     .map((p) => {
       const mark =
-        p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
+        // ‏‏النسخةُ بلا دلوٍ خاصّ تدور كلَّ فجرٍ ولا تأخذ شيئًا: «في موعدها» بالأخضر يُطمئن على ما لم يقع (مراجعة D-321)
+        p.job === 'backup' && p.state === 'ok' && p.beat?.outcome === 'skipped' ? statusBadge('idle', '○', 'لا تعمل بعد')
+        : p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
         : p.state === 'late' ? statusBadge('bad', '▲', `تأخّرت ${duration(p.lateBy)}`)
         : p.state === 'failed' ? statusBadge('bad', '✕', 'سقطت')
         : statusBadge('idle', '○', 'لم تدُر بعد')

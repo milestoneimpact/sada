@@ -119,10 +119,16 @@ export async function readTables(db: Db, tables: readonly string[]): Promise<Sna
   return { tables: out }
 }
 
-/** ‏أمضى أسبوعٌ (إلّا ساعة) على آخر نسخةٍ نجحت؟ — وما لا نسخةَ له مستحقّ. */
-export async function snapshotDue(db: Db, now: Date): Promise<boolean> {
-  const row = await db.prepare("SELECT max(at) AS at FROM backups WHERE status = 'ok'").first<{ at: string | null }>()
+/**
+ * ‏أمضى أسبوعٌ (إلّا ساعة) على آخر نسخةٍ نجحت؟ — وما لا نسخةَ له مستحقّ. **ومفتاحٌ دُوّر بعدها** (`kid` غيرُ `kid` آخر نسخة، مراجعة
+ * ‏D-321) يجعلها مستحقّةً في الفجر التالي: النسخُ السابقةُ كلُّها بالمفتاح القديم، فلا تمضي أسبوعًا بلا نسخةٍ يفتحها الجديد.
+ */
+export async function snapshotDue(db: Db, now: Date, kid?: string): Promise<boolean> {
+  const row = await db
+    .prepare("SELECT at, kid FROM backups WHERE status = 'ok' ORDER BY at DESC, rowid DESC LIMIT 1")
+    .first<{ at: string | null; kid: string | null }>()
   if (row?.at == null) return true
+  if (kid !== undefined && row.kid !== kid) return true
   const last = Date.parse(`${row.at.replace(' ', 'T')}Z`)
   if (Number.isNaN(last)) return true
   return now.getTime() - last >= (SNAPSHOT_EVERY_SECONDS - DUE_SLACK_SECONDS) * 1000
@@ -203,34 +209,38 @@ export async function takeSnapshot(deps: {
   }
 }
 
-/** ‏آخرُ عشرين محاولةً مصفوفةَ JSON في عمودٍ واحد — تقرؤها `latestBackups`، و«صحّة صدى» في جملة مؤشّراتها (`ops/health.ts`). */
-export const BACKUP_COLUMNS = `(SELECT json_group_array(json_object(
-      'n', n, 'id', id, 'at', at, 'status', status, 'object_key', object_key, 'table_count', table_count,
-      'row_count', row_count, 'byte_count', byte_count, 'kid', kid, 'ms', ms, 'pruned', pruned, 'detail', detail))
-    FROM (SELECT rowid AS n, id, at, status, object_key, table_count, row_count, byte_count, kid, ms, pruned, detail
-            FROM backups ORDER BY at DESC, rowid DESC LIMIT 20)) AS backups`
+const BACKUP_FIELDS = `'id', id, 'at', at, 'status', status, 'object_key', object_key, 'table_count', table_count,
+      'row_count', row_count, 'byte_count', byte_count, 'kid', kid, 'ms', ms, 'pruned', pruned, 'detail', detail`
 
-/** ‏آخرُ محاولةٍ وآخرُ نسخةٍ نجحت من عمود `BACKUP_COLUMNS`. والترتيبُ يُعاد هنا: التجميعُ لا يَعِد به. */
-export function backupsOf(json: unknown): { readonly last: BackupRow | null; readonly lastOk: BackupRow | null } {
-  let list: Record<string, unknown>[] = []
-  try { list = typeof json === 'string' ? (JSON.parse(json) as Record<string, unknown>[]) : [] } catch { list = [] }
+/**
+ * ‏آخرُ محاولةٍ وآخرُ نسخةٍ نجحت، عمودين في `SELECT` واحد — تقرؤهما `latestBackups`، و«صحّة صدى» في جملة مؤشّراتها
+ * ‏(`ops/health.ts`). **والناجحةُ في عمودها**، لا من بين آخر عشرين (مراجعة D-321): الساقطةُ تُعاد كلَّ يوم، فبعد عشرين يومًا من
+ * ‏السقوط كانت آخرُ نسخةٍ قائمةٍ تُقرأ «لا نسخة بعد» ويختفي معها تحذيرُ التقادُم.
+ */
+export const BACKUP_COLUMNS = `(SELECT json_object(${BACKUP_FIELDS})
+      FROM backups ORDER BY at DESC, rowid DESC LIMIT 1) AS backup_last,
+    (SELECT json_object(${BACKUP_FIELDS})
+      FROM backups WHERE status = 'ok' ORDER BY at DESC, rowid DESC LIMIT 1) AS backup_ok`
+
+/** ‏آخرُ محاولةٍ وآخرُ نسخةٍ نجحت من عمودَي `BACKUP_COLUMNS`. */
+export function backupsOf(lastJson: unknown, okJson: unknown): { readonly last: BackupRow | null; readonly lastOk: BackupRow | null } {
+  return { last: backupRow(lastJson), lastOk: backupRow(okJson) }
+}
+
+function backupRow(json: unknown): BackupRow | null {
+  let r: Record<string, unknown> | null = null
+  try { r = typeof json === 'string' ? (JSON.parse(json) as Record<string, unknown>) : null } catch { r = null }
+  if (r === null || typeof r !== 'object') return null
   const n = (v: unknown): number => (typeof v === 'number' ? v : 0)
   const t = (v: unknown): string | null => (typeof v === 'string' ? v : null)
-  const rows: (BackupRow & { readonly n: number })[] = list.map((r) => ({
-    n: n(r.n), id: String(r.id), at: String(r.at), status: r.status === 'ok' ? 'ok' : 'failed', objectKey: t(r.object_key),
+  return {
+    id: String(r.id), at: String(r.at), status: r.status === 'ok' ? 'ok' : 'failed', objectKey: t(r.object_key),
     tables: n(r.table_count), rows: n(r.row_count), bytes: n(r.byte_count), kid: t(r.kid), ms: n(r.ms), pruned: n(r.pruned), detail: t(r.detail),
-  }))
-  rows.sort((a, b) => (a.at === b.at ? b.n - a.n : a.at < b.at ? 1 : -1))
-  const strip = (r: (BackupRow & { readonly n: number }) | undefined): BackupRow | null => {
-    if (r === undefined) return null
-    const { n: _n, ...row } = r
-    return row
   }
-  return { last: strip(rows[0]), lastOk: strip(rows.find((r) => r.status === 'ok')) }
 }
 
 /** ‏آخرُ محاولةٍ وآخرُ نسخةٍ نجحت. */
 export async function latestBackups(db: Db): Promise<{ readonly last: BackupRow | null; readonly lastOk: BackupRow | null }> {
-  const row = await db.prepare(`SELECT ${BACKUP_COLUMNS}`).first<{ backups: unknown }>()
-  return backupsOf(row?.backups)
+  const row = await db.prepare(`SELECT ${BACKUP_COLUMNS}`).first<{ backup_last: unknown; backup_ok: unknown }>()
+  return backupsOf(row?.backup_last, row?.backup_ok)
 }
