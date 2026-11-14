@@ -371,7 +371,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* ‏محتوى البند والأصول (D-260): المختارُ يُرى مختارًا، والمعاينةُ بنسبةٍ ثابتة لا تقفز */
 #board .pb-card .btn[aria-pressed="true"],.lib-chips .btn[aria-current="page"]{background:var(--hover); border-color:var(--ink-2)}
 .lib-thumb{width:100%; aspect-ratio:4/3; object-fit:cover; border-radius:var(--r-control); margin-bottom:var(--s-3); background:var(--surface-2)}
-.lib-ico{display:grid; place-items:center; font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink-2)}
+.lib-ico{display:grid; place-items:center; font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--accent); background:var(--selected)}
+.lib-ico svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
 /* ‏الرحلةُ في ستّ خطوات: ما مضى بعلامته، والحاليّةُ بارزة، وما بعدها خافت */
 .flow{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:var(--s-2); counter-reset:none}
 .flow li{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2);
@@ -564,6 +565,12 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   gap:var(--s-2); padding:var(--s-3) var(--s-4); margin-bottom:var(--s-4)}
 .rv-bulk[hidden]{display:none}
 .rv-day + .rv-day{margin-top:var(--s-6)}
+/* ‏**الأيّامُ شبكةٌ تملأ العرض** (D-355): كان كلُّ يومٍ سطرًا ببطاقةٍ في ثلث الشاشة والباقي فارغ. واليومُ الواحد يأخذ عمودًا،
+   والمزدحمُ يتمدّد في عموده نزولًا */
+.rv-days{display:grid; gap:var(--s-6) var(--s-5); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
+.rv-days > .rv-day + .rv-day{margin-top:0}
+.rv-days > .rv-day .rv-cards{grid-template-columns:minmax(0,1fr)}
+.rv-days > p{grid-column:1 / -1}
 .rv-dh{margin:0 0 var(--s-3); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; scroll-margin-block-start:var(--s-16)}
 .rv-cards{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
 .rv{display:flex; flex-direction:column; gap:var(--s-3); scroll-margin-block-start:var(--s-16)}
@@ -611,7 +618,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-dot{width:var(--s-4); height:var(--s-4)}
 .rv-cd.is-wait{border:var(--bd-dash)}
 /* ── لوحةُ الشهر (D-330): اليومُ بمصغَّرات منشوراته، وهدفُ إفلاتٍ حين تُسحب إليه مصغَّرة ── */
-.rv-prog{display:block; inline-size:100%; block-size:var(--s-2); accent-color:var(--accent)}
+.rv-prog{display:block; inline-size:100%; block-size:var(--s-2); appearance:none; border:0; border-radius:var(--r-pill); background:var(--surface-2); overflow:hidden}
+.rv-prog::-webkit-progress-bar{background:var(--surface-2); border-radius:var(--r-pill)}
+.rv-prog::-webkit-progress-value{background:var(--accent); border-radius:var(--r-pill)}
+.rv-prog::-moz-progress-bar{background:var(--accent); border-radius:var(--r-pill)}
 .rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}

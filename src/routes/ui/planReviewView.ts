@@ -360,7 +360,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="delay">أخّرها يومًا</button>
       <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="أزِل البنودَ المحدَّدة من الخطّة؟">أزِلها</button>
     </form>
-    ${list}
+    <div class="rv-days">${list}</div>
     ${table}
     ${add}
     ${versions}
