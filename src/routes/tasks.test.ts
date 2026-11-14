@@ -301,6 +301,23 @@ describe('«تفتح قدرة» صفحتُها، وسطرُها في «ما عل
     expect(html.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
   })
 
+  /**
+   * ‏**وهي أختٌ في شريط عائلتها** (D-342، دمجُ متابعة D-324 على main): «ما عليك» عائلةٌ بألسنتها، فصفحةٌ خرجت منها ولا لسانَ لها
+   * ‏تُبلَغ من سطرٍ في رأس «ما عليك» وحده، ولا تقول وهي مفتوحةٌ أين هي من أخواتها.
+   */
+  it('ولسانُها في شريط «ما عليك» بعد «المهامّ»، وهو الحاليّ فيها وحدَها', async () => {
+    const strip = (h: string): string => /<nav class="tab-bar" aria-label="ما عليك" id="family">[\s\S]*?<\/nav>/.exec(h)?.[0] ?? ''
+    const here = strip(await later())
+    expect(here).toContain('<a class="tab-item" href="/panel/tasks/later" aria-current="page"><span>تفتح قدرة</span></a>')
+    expect(here.match(/aria-current="page"/g)).toHaveLength(1)
+    const hrefs = [...here.matchAll(/href="([^"]+)"/g)].map((m) => m[1])
+    expect(hrefs).toEqual(['/panel/tasks', '/panel/tasks/later', '/panel/gates', '/panel/help'])
+    // ‏وفي أخواتها لسانُها بلا علامة الحاليّ
+    for (const sister of [await open(), await gates()]) {
+      expect(strip(sister)).toContain('<a class="tab-item" href="/panel/tasks/later"><span>تفتح قدرة</span></a>')
+    }
+  })
+
   /** ‏**والرابطُ إلى مهمّةٍ خرجت يصل صفحتَها** — بمرساة عنوانها، لا «ما عليك» التي لم تعد تحملها. */
   it('ورابطُ «ما عليك لتُجاز» في صفحة YouTube يصل M-28 في «تفتح قدرة»', async () => {
     const html = await open(env, '/panel/channels/youtube?tab=setup')

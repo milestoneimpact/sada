@@ -406,10 +406,10 @@ writeAudited(
 )
 
 // ── «تفتح قدرة» (متابعة D-324): مهامُّ القدرة خرجت من «ما عليك» إلى صفحتها، فتُرسَم كما تُخدَم ────
-// ‏والعودةُ إلى «ما عليك» والرافدةُ عليها كما في المسار
+// ‏والعودةُ إلى «ما عليك» والرافدةُ عليها وشريطُ عائلتها (D-342) كما في المسار، فيُقاس وزنُها كما يصل
 writeAudited(
   '/tmp/screen-tasks-later.html',
-  soloPage(laterTitle(), { href: '/panel/tasks', label: sectionLabel('tasks') },
+  soloPage(laterTitle(), { href: '/panel/tasks', label: sectionLabel('tasks'), at: '/panel/tasks/later' },
     laterScreen({ env: 'staging', rows: OWNER_ROWS }), 'n', '',
     buildCommands({ onPanel: false }), soloNav('tasks')),
 )

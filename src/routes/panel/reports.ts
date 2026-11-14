@@ -22,7 +22,7 @@ import { reportScreen } from '../ui/reportView'
 import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from '../ui/timelineView'
 import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../../lib/gantt'
 import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
-import { ownerRows, TASKS_PAGE } from '../../lib/owner'
+import { ownerRows, TASKS_LATER, TASKS_PAGE } from '../../lib/owner'
 import { gatesScreen, laterScreen, laterTitle, tasksScreen } from '../ui/tasksView'
 import { vitalsSummary } from '../../lib/vitals'
 import { rejectsLately } from '../../lib/forms'
@@ -81,7 +81,8 @@ reports.get('/panel/tasks/later', async (c) => {
   const body = laterScreen({ rows: ownerRows(facts), env: c.env.SADA_ENV })
 
   return page((nonce) =>
-    soloPage(laterTitle(), { href: TASKS_PAGE, label: sectionLabel('tasks') },
+    // ‏و`at` يرسم شريطَ عائلتها (D-342): «المهامّ · تفتح قدرة · البوّابات · المساعدة»، وهي الحاليّة
+    soloPage(laterTitle(), { href: TASKS_PAGE, label: sectionLabel('tasks'), at: TASKS_LATER },
       injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('tasks')),
   )

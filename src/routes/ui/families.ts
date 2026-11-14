@@ -27,9 +27,14 @@ export const FAMILIES: Readonly<Record<string, { readonly label: string; readonl
     label: 'الخطّة',
     members: [{ href: '/panel/plan/review', label: 'الخطّة' }, { href: '/panel/plan/view', label: 'عرضٌ للطباعة' }, { href: '/panel/plan/new', label: 'خطّة جديدة' }],
   },
+  // ‏و«تفتح قدرة» أختُ «المهامّ» بعدها (دمجُ متابعة D-324 على main): مهامُّ القدرة خرجت إلى صفحتها، فلا تُبلَغ من سطرٍ وحده.
+  // ‏واسمُها هنا اسمُ رأسها (`LATER_LABEL` في `tasksView.ts`، واختبارٌ يطابقهما) — ولا يُستورَد: tasksView يرسم بـ shell، وshell يقرأ هذا الملفّ
   todo: {
     label: 'ما عليك',
-    members: [{ href: '/panel/tasks', label: 'المهامّ' }, { href: '/panel/gates', label: 'البوّابات' }, { href: '/panel/help', label: 'المساعدة' }],
+    members: [
+      { href: '/panel/tasks', label: 'المهامّ' }, { href: '/panel/tasks/later', label: 'تفتح قدرة' },
+      { href: '/panel/gates', label: 'البوّابات' }, { href: '/panel/help', label: 'المساعدة' },
+    ],
   },
 }
 
