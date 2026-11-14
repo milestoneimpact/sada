@@ -297,6 +297,17 @@ export interface PanelProvider {
   readonly spendToday: number
   readonly verifiedAt: string | null
   readonly updatedAt: string | null
+  /** آخرُ الاختبارات، الأقدمُ أوّلًا (D-348) — منه الحالُ وأعمدةُ الأسبوع وسطرُ العاقبة. */
+  readonly checks: readonly ProviderCheck[]
+}
+
+export interface ProviderCheck {
+  readonly ok: boolean
+  readonly status: number | null
+  readonly ms: number | null
+  readonly detail: string
+  readonly source: 'panel' | 'daily'
+  readonly at: string
 }
 
 export interface PanelFlash {

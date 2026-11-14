@@ -13,6 +13,7 @@ import { ICON } from '../icons'
 import { escapeHtml } from '../escape'
 import { RUNG_MARK, bar, pathArrows } from '../parts'
 import { statusBadge } from '../components/badge'
+import { html, raw } from '../html'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -164,13 +165,36 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
     const id = escapeHtml(p.name)
     const locked = p.source === 'worker_secret'
 
+    /*
+     * ‏**الحالُ من آخر اختبارٍ لا من «اختُبر مرّةً»** (D-348): كان الوسمُ يقول «اختُبر قبل يوم» ومفتاحُه يُرفض الآن، لأنّ الفشلَ
+     * ‏لم يُكتب. فآخرُ صفٍّ في `provider_checks` يحكم: نجح بزمنه، أو فشل بسببه. وما لا تاريخَ له يرجع إلى ما كان.
+     */
+    const last = p.checks.at(-1)
+    const when = (at: string): string => 'tabindex="0" data-tip="' + escapeHtml(stamp(at, d.zone ?? null)) + '"'
     const status = !p.configured
       ? statusBadge('bad', '✕', 'لا مفتاح')
       : !p.enabled
         ? statusBadge('warn', '▲', 'معطَّل')
-        : p.verifiedAt === null
-          ? statusBadge('idle', '○', 'لم يُختبر')
-          : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `tabindex="0" data-tip="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
+        : last !== undefined
+          ? last.ok
+            ? statusBadge('ok', '✓', 'يعمل · ' + String(last.ms ?? 0) + ' ملّي ث', when(last.at))
+            : statusBadge('bad', '✕', last.status === 429 ? 'بلغ الحدّ' : last.status === null ? 'تعذّر الوصول' : 'مرفوض (' + String(last.status) + ')', when(last.at))
+          : p.verifiedAt === null
+            ? statusBadge('idle', '○', 'لم يُختبر')
+            : `${statusBadge('ok', '✓', `اختُبر ${escapeHtml(relativeTime(p.verifiedAt, d.now))}`, `tabindex="0" data-tip="${escapeHtml(stamp(p.verifiedAt, d.zone ?? null))}"`)}`
+
+    /*
+     * ‏أعمدةُ آخر سبعة اختبارات: الطولُ من زمن الردّ بخمس درجات، والفاشلُ قصيرٌ أحمر. والدرجةُ سمةٌ لا `style`: السياسةُ
+     * ‏لا تقبل أنماطًا مكتوبة في السطر.
+     */
+    const okCount = p.checks.filter((x) => x.ok).length
+    const spark = p.checks.length === 0 ? '' : html`<span class="pspark" role="img" aria-label="آخر ${p.checks.length} اختبارات: ${okCount} نجحت">${
+      p.checks.map((x) => html`<i data-h="${x.ok ? Math.min(5, Math.max(1, Math.ceil((x.ms ?? 0) / 300))) : 1}"${x.ok ? '' : raw(' data-fail')}></i>`)}</span>`
+
+    /* ‏**وما يتوقّف إن بقي العطل** — المهامُّ الموجَّهة إليه بأسمائها، لا «المزوّد معطّل» وحدها. */
+    const routed = d.routing.filter((r) => r.provider === p.name).map((r) => TASK_LABEL[r.task]?.split(' — ')[0] ?? r.task)
+    const consequence = last === undefined || last.ok || !p.enabled ? '' : html`<p class="pconseq"><b>إن بقي:</b> ${
+      routed.length === 0 ? 'لا مهمّةَ موجَّهةً إليه الآن، فلا يتوقّف شيء.' : 'تقف ' + routed.join(' و') + ' حتّى يُستبدل المفتاح.'}</p>`
 
     const priceNote = p.priceIn === null && p.priceOut === null
       ? 'سعر غير مضبوط — تُسجَّل الكلفة صفرا ولا يُخمَّن رقم'
@@ -183,14 +207,16 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
             p.builtin ? ' · مدمَج' : ''}${locked ? ' · سرّ Worker' : ''}</span></span>
         <span class="pm mono">${escapeHtml(p.model ?? '—')}</span>
         <span class="card card-inset pv">${money(p.spendToday)}<i>اليوم</i></span>
-        <span class="pst">${status}</span>
+        ${spark}
+        <span class="pst" id="pst-${id}">${status}</span>
         <span class="ptog"><span class="lbl-open">تفاصيل</span><span class="lbl-close">إغلاق</span></span>
       </summary>
 
       <div class="pbody">
+        ${consequence}
         <div class="row mb-3">
           ${p.configured ? `
-          <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جار الاختبار…">
+          <form class="inline" method="POST" action="/panel/providers/verify" data-busy="جار الاختبار…" data-inline-test="pst-${id}">
             <input type="hidden" name="provider" value="${id}">
             <button class="btn btn-primary btn-sm" type="submit">اختبر المفتاح</button></form>` : ''}
           ${locked ? '' : `
@@ -261,7 +287,10 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
         </form>
       </div>
     </details>`
-  }).join('')}</div>`
+  }).join('')}${
+    /* ‏قالبا الوسم لزرّ «اختبر» داخل البطاقة (D-348): السكربتُ ينسخ أحدهما ويكتب نصَّه، ولا يبني رمزًا ولا وسمًا بيده */
+    html`<template id="st-tpl-ok">${raw(statusBadge('ok', '✓', ''))}</template><template id="st-tpl-bad">${raw(statusBadge('bad', '✕', ''))}</template>`
+  }</div>`
 
   /**
    * مزوّدون جاهزون — **والبيانةُ كاملةٌ لا العنوانُ وحده**.

@@ -115,6 +115,10 @@ const data: PanelData = {
       secretName: 'ANTHROPIC_API_KEY', howToGet: 'console.anthropic.com ← API Keys',
       calls: 47, spend: 18.2, source: 'vault', hint: 'sk-ant-…_QAA', enabled: true,
       dailyCap: null, priceIn: 5, priceOut: 25, spendToday: 1.84, verifiedAt: null, updatedAt: ago(1),
+      // ‏مفتاحٌ سقط بعد أسبوعٍ سليم (D-348): الوسمُ «مرفوض» وسطرُ العاقبة
+      checks: [610, 540, 700, 580, 620].map((ms, i) => ({ ok: true, status: 200, ms, detail: 'المفتاح يعمل', source: 'daily' as 'daily' | 'panel', at: ago(24 * (6 - i)) }))
+        .concat([{ ok: false, status: 401, ms: 210, detail: 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغ', source: 'daily' as const, at: ago(24) },
+                 { ok: false, status: 401, ms: 190, detail: 'المفتاح مرفوض — تحقّق أنّه صحيح ولم يُلغ', source: 'panel' as const, at: ago(3) }]),
     },
     {
       name: 'gemini', label: 'Gemini', kind: 'openai_compat',
@@ -122,7 +126,7 @@ const data: PanelData = {
       model: 'gemini-2.5-flash', builtin: true, configured: false,
       secretName: 'GEMINI_API_KEY', howToGet: 'aistudio.google.com/apikey',
       calls: 0, spend: 0, source: 'none', hint: null, enabled: true,
-      dailyCap: null, priceIn: null, priceOut: null, spendToday: 0, verifiedAt: null, updatedAt: ago(400),
+      dailyCap: null, priceIn: null, priceOut: null, spendToday: 0, verifiedAt: null, updatedAt: ago(400), checks: [],
     },
     {
       name: 'deepseek', label: 'DeepSeek', kind: 'openai_compat',
@@ -130,6 +134,7 @@ const data: PanelData = {
       configured: true, secretName: null, howToGet: '', calls: 12, spend: 5.21,
       source: 'vault', hint: 'sk-8f3a…c19d', enabled: true, dailyCap: 2,
       priceIn: 0.27, priceOut: 1.1, spendToday: 0.32, verifiedAt: ago(20), updatedAt: ago(20),
+      checks: [420, 380, 1500, 410, 390, 450, 400].map((ms, i) => ({ ok: true, status: 200, ms, detail: 'المفتاح يعمل', source: 'daily' as const, at: ago(24 * (6 - i)) })),
     },
   ],
   routing: [

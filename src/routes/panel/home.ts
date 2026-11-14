@@ -10,6 +10,7 @@ import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { type TaskName } from '../../lib/ai/registry'
 import { readRoutes, type TaskRoute } from '../../lib/ai/routes'
+import { recentChecks } from '../../lib/ai/health'
 import { dailySpend, spendByProvider, spendRows, spendThisMonth, spendTodayFor } from '../../lib/ai/spend'
 import { cfAccountId, cfAccountOf } from '../../lib/ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate, type SlideGate } from '../../lib/image/gate'
@@ -350,10 +351,11 @@ function workerSecretOf(c: PanelContext, p: { readonly name: string; readonly bu
 
 /** حال كلّ مزوّد: مدمَجا كان أو مضافا من اللوحة — والمفتاحُ والإنفاقُ اليوميُّ لكلٍّ معًا. */
 async function loadProviders(c: PanelContext): Promise<ProviderLoad> {
-  const [stored, spend, routes] = await Promise.all([
+  const [stored, spend, routes, checks] = await Promise.all([
     listProviders(c.env.DB),
     spendByProvider(c.env.DB, 30).catch((): Awaited<ReturnType<typeof spendByProvider>> => ({})),
     readRoutes(c.env.DB),
+    recentChecks(c.env.DB),
   ])
   const cards = await Promise.all(
     stored.map(async (p): Promise<PanelProvider> => {
@@ -384,6 +386,7 @@ async function loadProviders(c: PanelContext): Promise<ProviderLoad> {
         spendToday: Number.isFinite(today) ? today : 0,
         verifiedAt: p.verifiedAt,
         updatedAt: p.updatedAt,
+        checks: checks[p.name] ?? [],
       }
     }),
   )
@@ -506,7 +509,7 @@ function routingOf(p: ProviderLoad, mediaReady: MediaReady): PanelData['routing'
       why: r.why,
       implemented: r.implemented,
       ready: r.implemented && (dot === undefined
-        ? p.cards.some((x) => x.name === r.provider && x.configured && x.enabled)
+        ? p.cards.some((x) => x.name === r.provider && x.configured && x.enabled && x.checks.at(-1)?.ok !== false)
         : dot.state === 'done'),
       ...(r.implemented && dot?.state === 'now' ? { pending: dot.note } : {}),
     }

@@ -6,7 +6,6 @@
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
-import { verifyKey } from '../../lib/ai/verify'
 import { listModels } from '../../lib/ai/models'
 import { cfAccountId } from '../../lib/ai/cloudflare'
 import { type Platform } from '../../lib/draft/prompt'
@@ -23,10 +22,10 @@ import {
 import { verifyAppCredentials } from '../../lib/oauth/verify'
 import { disconnectAccount, findLinked, REVOKE_PAGE } from '../../lib/oauth/disconnect'
 import {
-  deleteProvider, getProvider, markVerified, normalizeName, resolveKey, saveKey, setEnabled, upsertProvider, type Provider,
+  deleteProvider, getProvider, normalizeName, resolveKey, saveKey, setEnabled, upsertProvider, type Provider,
 } from '../../lib/providers'
 import { checkProviderUrl } from '../../lib/ai/urlGuard'
-import { verifyCompat } from '../../lib/ai/openaiCompat'
+import { testProviderKey } from '../../lib/ai/health'
 import { readRoutes, routeMismatch, writeRoute } from '../../lib/ai/routes'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession, type Session } from '../../lib/session'
@@ -574,7 +573,7 @@ channels.post('/panel/providers/key', async (c) => {
  * يُنسَخ. والنسخُ يفترق: يُضاف مدمَجٌ إلى `BUILTIN_SECRET` فيراه أحدُهما
  * ولا يراه الآخر.
  */
-async function providerKey(env: Env, provider: Provider): Promise<string | null> {
+export async function providerKey(env: Env, provider: Provider): Promise<string | null> {
   const secretName = provider.builtin ? BUILTIN_SECRET[provider.name] : undefined
   const resolved = await resolveKey(
     env.DB,
@@ -630,24 +629,17 @@ channels.post('/panel/providers/models', async (c) => {
   })
 })
 
-/** الاختبار يمرّ بلهجة المزوّد: لكلٍّ نقطةُ تحقّقها. */
+/**
+ * الاختبار يمرّ بلهجة المزوّد، **ويُحفظ صفُّه** (D-348): نتيجتُه ورمزُه وزمنُه في `provider_checks`، ومنه أعمدةُ الأسبوع
+ * والإشعار. ومن يطلب JSON (زرُّ «اختبر» داخل البطاقة) يأخذ النتيجةَ بلا إعادة تحميل؛ وغيرُه يعود برسالةٍ كما كان.
+ */
 channels.post('/panel/providers/verify', async (c) => {
   const guard = await providerGuard(c)
   if ('denied' in guard) return guard.denied
   const provider = guard.provider
+  const wantsJson = (c.req.header('accept') ?? '').includes('application/json')
 
-  const key = await providerKey(c.env, provider)
-  if (key === null) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `${provider.label}: لا مفتاح لاختباره.` })
-    return back('providers')
-  }
-
-  const result =
-    provider.kind === 'anthropic'
-      ? await verifyKey('anthropic', key)
-      : provider.baseUrl === null
-        ? { ok: false as const, detail: 'لا عنوان لهذا المزوّد', status: null }
-        : await verifyCompat(provider.baseUrl, key)
+  const result = await testProviderKey(c.env.DB, provider, await providerKey(c.env, provider), 'panel')
 
   await record(
     c.env.DB,
@@ -655,18 +647,19 @@ channels.post('/panel/providers/verify', async (c) => {
       actor: 'panel',
       action: 'provider.verify',
       target: provider.name,
-      detail: result.ok ? 'نجح' : `فشل — ${result.detail}`,
+      detail: result.ok ? `نجح · ${result.ms}ms` : `فشل — ${result.detail}`,
     },
     c.req.raw,
   )
 
-  if (result.ok) {
-    await markVerified(c.env.DB, provider.name)
-    await setFlash(c.env, c.req.raw, { kind: 'ok', text: `${provider.label}: ${result.detail}.` })
-  } else {
-    // لا تُمحى شهادةٌ سابقة على فشلٍ قد يكون من الخدمة لا المفتاح
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: `${provider.label}: ${result.detail}.` })
+  if (wantsJson) {
+    return c.json({ ok: result.ok, detail: result.detail, status: result.status, ms: result.ms, at: result.at, label: provider.label })
   }
+  // ‏ولا تُمحى شهادةٌ سابقة على فشلٍ قد يكون من الخدمة لا المفتاح — الفشلُ صفٌّ في التاريخ لا محوٌ لـ«اختُبر»
+  await setFlash(c.env, c.req.raw, {
+    kind: result.ok ? 'ok' : 'bad',
+    text: result.ok ? `${provider.label}: ${result.detail} · ${result.ms} ملّي ث.` : `${provider.label}: ${result.detail}.`,
+  })
   return back('providers')
 })
 
