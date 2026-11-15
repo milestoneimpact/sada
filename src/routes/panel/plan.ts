@@ -7,6 +7,9 @@ import { sourceNames } from './client'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
 import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
+import { planPreviewScreen } from '../ui/planPreviewView'
+import { widenPlan } from '../../lib/plan/widen'
+import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
@@ -1008,9 +1011,62 @@ plan.post('/panel/plan/import', async (c) => {
     org,
   )
   if (table.kind === 'error') return bad(table.reason)
+  // ‏«هذا ما فهمته»: يُقرأ ويُكمَّل ولا يُسكَّن شيء — يُحفظ ساعةً ويُعرض، والبناءُ بزرٍّ بعده
   const now = new Date()
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, now)
-  const { csv, filled } = await fillGaps(c.env.DB, org, table.csv, weekStart(now), facts.zone)
+  const wide = widenPlan(table.csv)
+  const { csv, filled } = await fillGaps(c.env.DB, org, wide.csv, weekStart(now), facts.zone)
+  const key = crypto.randomUUID()
+  await c.env.KV.put('plan-preview:' + key, JSON.stringify({
+    org, csv, filled: Object.fromEntries([...filled].map(([l, n]) => [String(l), n])),
+    via: table.via, widened: wide.widened, cost: table.cost, imageStyle,
+  }), { expirationTtl: 3600 })
+  return c.redirect('/panel/plan/import/preview?k=' + key, 303)
+})
+
+interface StoredPreview { org: string; csv: string; filled: Record<string, string>; via: string; widened: boolean; cost: number; imageStyle: PlanImageStyle | null }
+
+async function loadPreview(kv: Env['KV'], key: string, org: string): Promise<StoredPreview | null> {
+  if (!/^[0-9a-f-]{36}$/.test(key)) return null
+  const raw = await kv.get('plan-preview:' + key)
+  if (raw === null) return null
+  const p = JSON.parse(raw) as StoredPreview
+  return p.org === org ? p : null
+}
+
+plan.get('/panel/plan/import/preview', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const key = c.req.query('k') ?? ''
+  const p = await loadPreview(c.env.KV, key, activeOrg(session.record))
+  if (p === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.' })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost })
+  return page((nonce) =>
+    soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
+      '', buildCommands({ onPanel: false }), soloNav('plan')),
+  )
+})
+
+plan.post('/panel/plan/import/confirm', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const key = String(gate.form.get('k') ?? '')
+  const bad = async (text: string): Promise<Response> => {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  const p = await loadPreview(c.env.KV, key, org)
+  if (p === null) return bad('انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.')
+  await c.env.KV.delete('plan-preview:' + key)
+  const table = { via: p.via }
+  const imageStyle = p.imageStyle
+  const csv = p.csv
+  const filled = new Map(Object.entries(p.filled).map(([l, n]) => [Number(l), n]))
+  const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
   const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle)
   await record(c.env.DB, {
     actor: 'panel', action: 'plan.import.seat', target: seated.planId,

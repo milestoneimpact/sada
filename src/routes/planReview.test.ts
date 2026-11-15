@@ -497,12 +497,27 @@ describe('«عندي خطّة» (D-287)', () => {
     body.set('_csrf', csrf); body.set('image_style', 'none')
     body.set('file', new File([csv], 'خطتي.csv', { type: 'text/csv' }))
     const res = await app.request('/panel/plan/import', { method: 'POST', body, headers: { Cookie: cookie } }, env)
-    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    const to = res.headers.get('Location') ?? ''
+    expect(to).toMatch(/^\/panel\/plan\/import\/preview\?k=/)
+    // ‏«هذا ما فهمته»: لا يُسكَّن شيءٌ قبل الزرّ
+    expect(db.raw.prepare("SELECT count(*) AS n FROM plans WHERE status <> 'superseded'").get()).toEqual({ n: 0 })
+    const preview = await (await app.request(to, { headers: { Cookie: cookie } }, env)).text()
+    expect(preview).toContain('هذا ما فهمته')
+    expect(preview).toContain('2099-02-01 إلى 2099-02-03')
+    expect(preview).toContain('الساعةُ أرجحُ ساعات المنصّة')
+    expect(preview).toContain('ابنِ الخطّة من ملفّي')
+    const k = new URL(to, 'http://x').searchParams.get('k') ?? ''
+    const ok = new FormData(); ok.set('_csrf', csrf); ok.set('k', k)
+    const built = await app.request('/panel/plan/import/confirm', { method: 'POST', body: ok, headers: { Cookie: cookie } }, env)
+    expect(built.headers.get('Location')).toBe('/panel/plan/review')
     const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(review).toContain('سُكّن 2 منشورًا في خطّتك')
     expect(review).toContain('ملاحظة: ')
     expect(review).toContain('الساعةُ أرجحُ ساعات المنصّة')
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status = 'queued'").get()).toEqual({ n: 0 })
+    // ‏والمفتاحُ لا يُبنى مرّتين
+    const again = await app.request('/panel/plan/import/confirm', { method: 'POST', body: ok, headers: { Cookie: cookie } }, env)
+    expect(again.headers.get('Location')).toBe('/panel/plan/import')
     const paste = new FormData()
     paste.set('_csrf', csrf); paste.set('pasted', 'الأحد: منشورٌ عن الحوكمة على LinkedIn')
     const refused = await app.request('/panel/plan/import', { method: 'POST', body: paste, headers: { Cookie: cookie } }, env)
