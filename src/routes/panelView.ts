@@ -39,7 +39,7 @@ import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, motionSwitch, shell, themeSwitch, bell } from './ui/shell'
 import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
-import { alertChannel, bar, fileName, glyph, machineCard, pageHead, pathArrows, pct, type OutboxRow } from './ui/parts'
+import { alertChannel, bar, fileName, glyph, healthCard, machineCard, pageHead, pathArrows, pct, type HealthView, type OutboxRow } from './ui/parts'
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
 import { field } from './ui/components/field'
@@ -410,6 +410,8 @@ export interface PanelData {
   readonly pivot: PivotView
   /** آخرُ ما خرج من الصندوق — **ولا صمتٌ يُظنّ نجاحا**. */
   readonly outbox: readonly OutboxRow[]
+  /** ‏«صحّة صدى» (D-321): للمالك وحدَه، فما لا يُحمَّل لغيره غائبٌ لا فارغ. */
+  readonly health?: HealthView
   /** الوجهاتُ الحيّة للجدولة — مربوطةٌ وإذنُها قائم. */
   readonly targets: readonly Target[]
   /** منصّاتٌ حساباتُها الحيّةُ صفحاتٌ لا أشخاص — فالنشرُ باسمها لم يُبنَ (D-087). */
@@ -524,7 +526,7 @@ export type AccountsData = Pick<PanelData, 'channels'>
 export type SettingsData = Pick<PanelData,
   'dashboardTiles' | 'analysisCap' | 'usedAnalyses' | 'spendCap' | 'usedSpend' | 'videoCap' | 'usedClips' | 'promoCap'
   | 'autoEnqueue' | 'autoImage' | 'imageCap' | 'usedImages' | 'alertWebhook' | 'outbox' | 'imageOverlay' | 'slide'
-  | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl' | 'adminApi'>
+  | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl' | 'adminApi' | 'health'>
 
 /** «التحليل»: اللوحُ المحوريّ. */
 export type ResultsData = Pick<PanelData, 'pivot'>
@@ -1573,6 +1575,7 @@ ${ownerView ? `<div data-sub id="security-all">
   <h2>النظام</h2>
   <p class="hint">هل يدور صدى في مواعيده. <b>والإيقاف المؤقّت في «الإنفاق والحدود»</b>.</p>
   ${machineCard(d.pulses, d.now)}
+  ${d.health === undefined ? '' : '<div class="mt-3">' + healthCard(d.health, d.pulses, d.now) + '</div>'}
   </div>
 <div id="providers" class="mt-5">
   <h2>خدمات الكتابة والصور</h2>

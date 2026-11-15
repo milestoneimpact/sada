@@ -20,6 +20,8 @@
  *     `wait` (أوّلُ جوابٍ قد يردّه البناءُ القديم)؛ أو لا ينشر ما نجح من ci المشغَّل يدويًّا على main.
  * ٨ · (مراجعة D-319) ci.yml يتخطّى المسوّدات باسم `ci` (المتخطّى «ناجحٌ» في الفحص المشروط، M-43)، أو يلغي الجاري على main
  *     (إعادةُ ci على التزامٍ قديم تلغي ci الأحدث فلا يُنشَر).
+ * ٩ · (D-321) deploy.yml لا يأخذ علامةَ Time Travel قبل الترحيل (`id: bookmark` بـ`wrangler d1 time-travel info --json` تقرؤها
+ *     `deploy_checks.mjs bookmark`)، أو يأخذها بعده، أو لا يطبعها في ملخّص العمل — فترحيلٌ يكسر القاعدةَ يبقى بلا أمرِ رجوعٍ مكتوب.
  *
  * `--self-test` يزرع كلَّ علّةٍ في نسخةٍ مؤقّتة ويتحقّق أنّها تُمسَك، ويُجري خطوةَ «رأس main» نفسَها بـ`gh` مزيَّف، ثمّ يفحص المستودع.
  */
@@ -198,6 +200,21 @@ export function auditDelivery(root) {
     notes.push('deploy.yml لا ينشر ما نجح من ci المشغَّل يدويًّا على main (`workflow_run.event == \'workflow_dispatch\'`)')
   }
 
+  // ٩ · (D-321) علامةُ Time Travel قبل الترحيل، وفي ملخّص العمل
+  const codeOf = (st) => st.block.split('\n').map(code).join('\n')
+  const migrate = steps.findIndex((st) => /wrangler d1 migrations apply\b/.test(codeOf(st)))
+  const mark = steps.findIndex((st) => /^\s*id:\s*bookmark\s*$/m.test(st.block))
+  if (mark < 0) {
+    notes.push('deploy.yml لا يأخذ علامةَ Time Travel قبل الترحيل (`id: bookmark`) — فترحيلٌ يكسر القاعدةَ بلا أمرِ رجوع')
+  } else {
+    const body = codeOf(steps[mark])
+    if (!/wrangler d1 time-travel info\b[^\n]*--json/.test(body) || !/deploy_checks\.mjs bookmark\b/.test(body)) {
+      notes.push('deploy.yml: خطوةُ العلامة لا تسأل `wrangler d1 time-travel info … --json` أو لا تقرؤها بـ`deploy_checks.mjs bookmark`')
+    }
+    if (!/GITHUB_STEP_SUMMARY/.test(body)) notes.push('deploy.yml: علامةُ Time Travel لا تُطبع في ملخّص العمل')
+    if (migrate >= 0 && mark > migrate) notes.push('deploy.yml يأخذ علامةَ Time Travel بعد الترحيل — والعلامةُ لما قبله')
+  }
+
   // ٨ · (مراجعة D-319) ci.yml: المتخطّى لا يُعدّ `ci`، والجاري على main لا يُلغى
   const ciLive = ci.split('\n').map(code).join('\n')
   if (/pull_request\.draft/.test(ciLive) && !/^\s*name:\s*\$\{\{[^}\n]*draft[^}\n]*\}\}\s*$/m.test(ciLive)) {
@@ -234,6 +251,19 @@ function selfTest() {
     ['ci اليدويُّ على main لا ينشر', '.github/workflows/deploy.yml', (s) => s.replace(" || github.event.workflow_run.event == 'workflow_dispatch'", ''), /المشغَّل يدويًّا/],
     ['المسوّدةُ تُبلَّغ باسم ci', '.github/workflows/ci.yml', (s) => s.replace(/ {4}name: \$\{\{ github\.event\.pull_request\.draft[^\n]*\n/, ''), /يتخطّى المسوّدات باسم `ci`/],
     ['الأقدمُ يلغي الأحدثَ على main', '.github/workflows/ci.yml', (s) => s.replace("cancel-in-progress: ${{ github.event_name == 'pull_request' }}", 'cancel-in-progress: true'), /يلغي الجاري خارج طلبات الدمج/],
+    // ‏D-321
+    ['لا علامةَ قبل الترحيل', '.github/workflows/deploy.yml', (s) => s.replace('        id: bookmark\n', '        id: mark\n'), /لا يأخذ علامةَ Time Travel قبل الترحيل/],
+    ['العلامةُ بعد الترحيل', '.github/workflows/deploy.yml', (s) => {
+      const at = s.indexOf('      - name: علامةُ الاسترجاع قبل الترحيل')
+      const end = s.indexOf('\n\n', s.indexOf('GITHUB_STEP_SUMMARY', at)) + 2
+      if (at < 0 || end < 2) return s
+      const step = s.slice(at, end)
+      const rest = s.slice(0, at) + s.slice(end)
+      const after = rest.indexOf('      - name: الطوابير')
+      return rest.slice(0, after) + step + rest.slice(after)
+    }, /يأخذ علامةَ Time Travel بعد الترحيل/],
+    ['العلامةُ لا تُطبع في الملخّص', '.github/workflows/deploy.yml', (s) => s.replace('          } >> "$GITHUB_STEP_SUMMARY"\n\n      # الترحيل', '          }\n\n      # الترحيل'), /لا تُطبع في ملخّص العمل/],
+    ['العلامةُ بنصّ البشر', '.github/workflows/deploy.yml', (s) => s.replace('--env "$TARGET" --json > "$RUNNER_TEMP/bookmark.json"', '--env "$TARGET" > "$RUNNER_TEMP/bookmark.json"'), /لا تسأل `wrangler d1 time-travel info … --json`/],
   ]
   let missed = 0
   for (const [label, file, mutate, expect] of plants) {
@@ -253,6 +283,57 @@ function selfTest() {
   if (missed > 0) { console.log(`✕ self-test: ${missed} من ${plants.length} لم يقع كما يجب`); process.exit(1) }
   console.log(`  ✓ الفحصُ الذاتيّ: العللُ المزروعة الـ${plants.length} أُمسكت`)
   headStepCases()
+  bookmarkStepCases()
+}
+
+/**
+ * ‏خطوةُ «علامةُ الاسترجاع قبل الترحيل» نفسُها تُجرى بـbash (D-321)، و`npx` مزيَّفٌ يردّ ما يردّه wrangler (أو يسقط): العلامةُ في
+ * ‏المخرَج وفي الملخّص بأمر الرجوع كاملًا وبقاعدة البيئة، **وما لا يُقرأ يوقف العملَ قبل الترحيل**.
+ */
+function bookmarkStepCases() {
+  const script = stepRun(readFileSync(join(ROOT, '.github', 'workflows', 'deploy.yml'), 'utf8'), 'bookmark')
+  if (script === null) { console.log('✕ self-test: لا خطوةَ `id: bookmark` بـ`run: |` في deploy.yml'); process.exit(1) }
+  const BM = '00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683'
+  //  [الحالة، البيئة، ما يطبعه npx (null = يسقط)، الخروج، القاعدة]
+  const cases = [
+    ['staging ← العلامةُ والأمرُ في الملخّص', 'staging', JSON.stringify({ bookmark: BM }, null, 2), 0, 'sada-staging'],
+    ['الإنتاج ← قاعدتُه هو', 'production', JSON.stringify({ bookmark: BM }), 0, 'sada'],
+    ['wrangler يسقط ← أحمرُ قبل الترحيل', 'staging', null, 1, 'sada-staging'],
+    ['نصُّ البشر بلا --json ← أحمر', 'staging', `⚠️ The current bookmark is '${BM}'`, 1, 'sada-staging'],
+  ]
+  let missed = 0
+  for (const [label, target, answer, wantCode, db] of cases) {
+    const dir = mkdtempSync(join(tmpdir(), 'sada-bookmark-'))
+    try {
+      const npx = join(dir, 'npx')
+      writeFileSync(npx, '#!/bin/sh\necho "$*" >> "$FAKE_LOG"\n[ "$FAKE_FAIL" = 1 ] && exit 1\nprintf \'%s\\n\' "$FAKE_OUT"\n')
+      chmodSync(npx, 0o755)
+      const out = join(dir, 'out')
+      const log = join(dir, 'log')
+      const summary = join(dir, 'summary')
+      for (const f of [out, log, summary]) writeFileSync(f, '')
+      const r = spawnSync('bash', ['--noprofile', '--norc', '-eo', 'pipefail', '-c', script], {
+        cwd: ROOT,
+        encoding: 'utf8',
+        env: {
+          PATH: `${dir}:${process.env.PATH}`, TARGET: target, RUNNER_TEMP: dir, GITHUB_OUTPUT: out, GITHUB_STEP_SUMMARY: summary,
+          CLOUDFLARE_API_TOKEN: 'dummy', FAKE_LOG: log, FAKE_OUT: answer ?? '', FAKE_FAIL: answer === null ? '1' : '0',
+        },
+      })
+      const got = /^bookmark=(.*)$/m.exec(readFileSync(out, 'utf8'))?.[1] ?? ''
+      const asked = readFileSync(log, 'utf8').includes(`wrangler d1 time-travel info ${db} --env ${target} --json`)
+      const told = readFileSync(summary, 'utf8').includes(`npx wrangler d1 time-travel restore ${db} --env ${target} --bookmark=${BM}`)
+      const ok = wantCode === 0 ? r.status === 0 && got === BM && asked && told : r.status !== 0 && got === '' && asked
+      if (!ok) {
+        console.log(`  ✕ «${label}»: خرج ${r.status} والعلامة «${got || '∅'}» و${asked ? 'سُئل' : 'لم يُسأل'} و${told ? 'في الملخّص' : 'ليست في الملخّص'} (${(r.stdout + r.stderr).trim()})`)
+        missed += 1
+      }
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  }
+  if (missed > 0) { console.log(`✕ self-test: ${missed} من ${cases.length} حالاتِ «العلامة» لم تقع كما يجب`); process.exit(1) }
+  console.log(`  ✓ خطوةُ «علامةُ الاسترجاع» تُجرى بـbash: ${cases.length} حالات (staging، والإنتاجُ بقاعدته، وwrangler يسقط، ونصٌّ بلا --json)`)
 }
 
 /**
@@ -313,4 +394,4 @@ if (notes.length > 0) {
   for (const n of notes) console.log(`  ${n}`)
   process.exit(1)
 }
-console.log('  ✓ التوريدُ والتسليم: الإجراءاتُ بمعرّفاتها، والرمزُ على خطوات wrangler وحدها، وبوّابةُ الاعتماديّات، وDependabot، وأصلٌ واحدٌ ونسختُه')
+console.log('  ✓ التوريدُ والتسليم: الإجراءاتُ بمعرّفاتها، والرمزُ على خطوات wrangler وحدها، وبوّابةُ الاعتماديّات، وDependabot، وأصلٌ واحدٌ ونسختُه، وعلامةُ Time Travel قبل الترحيل')

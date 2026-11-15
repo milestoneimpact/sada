@@ -60,8 +60,15 @@ describe('pulses', () => {
     expect(p.find((x) => x.job === 'publish')?.state).toBe('ok')
   })
 
-  it('الترتيب ثابت بسبع دورات', () => {
-    expect(pulses([], now).map((x) => x.job)).toEqual(['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report'])
+  // ‏‏ثمانٍ منذ D-321: النسخةُ الاحتياطيّة دورةٌ تُرى في «هل الآلة تعمل؟» — آخرًا، والسبعُ قبلها بترتيبها كما كانت
+  it('الترتيب ثابت بثماني دورات', () => {
+    expect(pulses([], now).map((x) => x.job)).toEqual(['renew', 'dispatch', 'publish', 'metrics', 'scan', 'alerts', 'report', 'backup'])
+  })
+
+  it('النسخة الاحتياطيّة أسبوعيّة: تتأخّر بعد أسبوعين بلا نبض، و`skipped` (بلا دلوٍ خاصّ) ليس سقوطًا', () => {
+    expect(pulses([b('backup', 60 * 24 * 13)], now).find((x) => x.job === 'backup')?.state).toBe('ok')
+    expect(pulses([b('backup', 60 * 24 * 15)], now).find((x) => x.job === 'backup')?.state).toBe('late')
+    expect(pulses([{ ...b('backup', 60), outcome: 'skipped' }], now).find((x) => x.job === 'backup')?.state).toBe('ok')
   })
 })
 

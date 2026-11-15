@@ -55,6 +55,8 @@ import { relyingParty } from '../../lib/security/rp'
 import { record, recentAudit, type AuditRow } from '../../lib/audit'
 import { saveWebhook } from '../../lib/alerts/webhook'
 import { pulses, readHeartbeats } from '../../lib/ops/heartbeat'
+import { readHealth } from '../../lib/ops/health'
+import type { HealthView } from '../ui/parts'
 import { memoryNotices, unreadNotices } from '../../lib/notices'
 import {
   panelPage, type LibraryData, type OverviewData, type PanelData, type PaneView, type PanelFactors, type PanelFlash,
@@ -776,7 +778,7 @@ async function libraryData(load: Load): Promise<LibraryData> {
 async function settingsData(load: Load): Promise<SettingsData> {
   const { c, org, session, allowance } = load
   const owner = (session.record.role ?? 'owner') === 'owner'
-  const [usedImages, outbox, sessions, factors, audit, p] = await Promise.all([
+  const [usedImages, outbox, sessions, factors, audit, p, health] = await Promise.all([
     // ‏ما وُلّد اليوم من صور — بجانب سقفها في «الإنفاق والحدود» (D-255)
     c.env.DB
       .prepare("SELECT COUNT(*) AS n FROM media WHERE org_id = ? AND created_at >= date('now') AND mime LIKE 'image/%'")
@@ -790,6 +792,8 @@ async function settingsData(load: Load): Promise<SettingsData> {
     load.factors(),
     load.audit(),
     load.providers(),
+    // ‏«صحّة صدى» (D-321) للمالك وحدَه: جملةٌ واحدة — المؤشّراتُ الثلاثةُ وسجلُّ النسخ معًا
+    owner ? loadHealth(c, load.now) : Promise.resolve(undefined),
   ])
   const { slide, mediaReady } = readiness(load, p)
   const s = allowance.settings
@@ -820,7 +824,13 @@ async function settingsData(load: Load): Promise<SettingsData> {
     cfAccountId: (c.env.CF_AI_ACCOUNT_ID ?? '') === '' ? null : (c.env.CF_AI_ACCOUNT_ID ?? null),
     baseUrl: c.env.PUBLIC_BASE_URL,
     adminApi: s.adminApi,
+    ...(health === undefined ? {} : { health }),
   }
+}
+
+/** ‏«صحّة صدى» (D-321): المؤشّراتُ وآخرُ النسخ في جملةٍ واحدة — وسقوطُها «لا قياس» و«لم يُقرأ»، ولا يُسقط «الضبط». */
+async function loadHealth(c: PanelContext, now: Date): Promise<HealthView> {
+  return { ...(await readHealth(c.env.DB, now)), bound: c.env.BACKUP !== undefined }
 }
 
 /**

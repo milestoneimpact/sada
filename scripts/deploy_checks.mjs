@@ -30,7 +30,12 @@
  * — لا بديلَ workers.dev: نشرٌ يصل عنوانًا آخر ولا يصل النطاقَ ليس نشرًا. **ويكتب في `<body>` جوابَ النسخة التي طابقت**
  * (مراجعة D-319): فحوصُ الخدمة والقاعدة و`ready` بعده تقرؤه هو، لا أوّلَ جوابٍ ردّه البناءُ القديم قبل أن يُستبدَل.
  *
- * الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait> … | --self-test
+ * ## ٤ · `bookmark <json>` — علامةُ Time Travel قبل الترحيل (D-321)
+ *
+ * من مخرَج `wrangler d1 time-travel info <db> --json` (`{"bookmark": "…"}`)، لا من نصٍّ مطبوعٍ للبشر. وتُطابَق بشكلها (أربعةُ
+ * مقاطعَ ستّ عشريّة، ‏8-8-8-32): علامةٌ لا تُقرأ لا يُرحَّل بعدها، **فالترحيلُ الذي يكسر القاعدةَ لا يبقى بلا طريقٍ إلى ما قبله**.
+ *
+ * الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait|bookmark> … | --self-test
  */
 import { appendFileSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
@@ -122,6 +127,23 @@ export async function waitVersion({ get, sleep, log, expected, tries, intervalMs
   return { ok: false, served }
 }
 
+/** ‏شكلُ علامة D1 (وثائق Time Travel): ‏`00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683`. */
+const BOOKMARK = /^[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{8}-[0-9a-f]{32}$/
+
+/** علامةُ Time Travel من مخرَج `--json` — كاملًا، أو من أوّل سطرٍ JSON فيه (ما قبله تحذيرٌ لا يُقرأ)، أو `null`. */
+export function bookmarkOf(text) {
+  const candidates = [text, ...text.split('\n')]
+  const start = text.indexOf('{')
+  if (start > 0) candidates.push(text.slice(start))
+  for (const c of candidates) {
+    let v
+    try { v = JSON.parse(c) } catch { continue }
+    const b = v !== null && typeof v === 'object' ? v.bookmark : undefined
+    if (typeof b === 'string' && BOOKMARK.test(b)) return b
+  }
+  return null
+}
+
 const sleepReal = (ms) => new Promise((r) => setTimeout(r, ms))
 const out = (line) => { if (process.env.GITHUB_OUTPUT) appendFileSync(process.env.GITHUB_OUTPUT, `${line}\n`) }
 
@@ -185,7 +207,19 @@ async function main(argv) {
     console.log(`::error::${a} يخدم «${r.served ?? 'ما لا يُقرأ'}» لا «${b}» الذي نُشر للتوّ — بناءٌ قديمٌ ما يزال يخدم، أو النطاقُ لغير هذا الـ Worker، أو جوابُه ليس جوابَ صدى (قالبٌ قديم).`)
     return 1
   }
-  console.log('الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait> … | --self-test')
+  if (cmd === 'bookmark') {
+    let text = ''
+    try { text = readFileSync(a, 'utf8') } catch { text = '' }
+    const b = bookmarkOf(text)
+    if (b === null) {
+      // ‏إلى stderr: stdout يُلتقَط في `BOOKMARK=$(…)`
+      console.error(`::error::لم تُقرأ علامةُ Time Travel من ${a} — لا ترحيلَ بلا طريقٍ إلى ما قبله. أعد التشغيل؛ وإن تكرّر فأرسل مخرَجَ الخطوة.`)
+      return 1
+    }
+    console.log(b)
+    return 0
+  }
+  console.log('الاستعمال: node scripts/deploy_checks.mjs <ci-gate|deployed|wait|bookmark> … | --self-test')
   return 2
 }
 
@@ -249,7 +283,15 @@ async function selfTest() {
   const matched = await waitVersion({ ...quiet, tries: 3, expected: NEW, get: gets(oldOk, newBroken) })
   eq('جوابُ النسخة الجديدة هو ما يُعاد', [matched.ok, JSON.parse(matched.text ?? 'null')?.database], [true, 'error'])
 
-  // ٥ · الأوامرُ نفسُها: ملفُّ المخرَج والخروج
+  // ٥ · علامةُ Time Travel (D-321)
+  const BM = '00000085-0000024c-00004c6d-8e61117bf38d7adb71b934ebbf891683'
+  eq('علامةٌ من --json', bookmarkOf(JSON.stringify({ bookmark: BM }, null, 2)), BM)
+  eq('تحذيرٌ قبل الـJSON', bookmarkOf(`▲ [WARNING] Proxy environment variables detected\n${JSON.stringify({ bookmark: BM }, null, 2)}`), BM)
+  eq('نصُّ البشر لا يُقرأ', bookmarkOf(`⚠️ The current bookmark is '${BM}'`), null)
+  eq('علامةٌ بشكلٍ آخر', bookmarkOf('{"bookmark":"not-a-bookmark"}'), null)
+  eq('فارغ', bookmarkOf(''), null)
+
+  // ٦ · الأوامرُ نفسُها: ملفُّ المخرَج والخروج
   const dir = mkdtempSync(join(tmpdir(), 'sada-deploy-'))
   try {
     const file = join(dir, 'out.ndjson')
@@ -262,6 +304,12 @@ async function selfTest() {
     const codeOk = await main(['deployed', file])
     const first = printed.trim()
     const codeMissing = await main(['deployed', join(dir, 'missing.ndjson')])
+    const bm = join(dir, 'bookmark.json')
+    writeFileSync(bm, JSON.stringify({ bookmark: BM }))
+    printed = ''
+    const codeBookmark = await main(['bookmark', bm])
+    const bookmarkPrinted = printed.trim()
+    const codeNoBookmark = await main(['bookmark', join(dir, 'missing.json')])
     const codeEmpty = await main(['wait', 'https://sada2.basserh.com', ''])
     // ‏مراجعة D-319: `wait` يكتب جوابَ النسخة التي طابقت في الملفّ الذي تقرؤه فحوصُ الخدمة والقاعدة و`ready` بعده.
     // ‏خادمٌ محلّيٌّ يردّ النسخةَ الجديدة وقاعدتُها لا تصل — فالملفُّ يجب أن يقول `error`، لا ما ردّه البناءُ القديم قبلها.
@@ -278,6 +326,8 @@ async function selfTest() {
     Object.assign(console, { log, error })
     eq('deployed يطبع المعرّف وحده', [codeOk, first], [0, NEW])
     eq('deployed بلا ملفّ يسقط', codeMissing, 1)
+    eq('bookmark يطبع العلامةَ وحدَها', [codeBookmark, bookmarkPrinted], [0, BM])
+    eq('bookmark بلا ملفّ يسقط', codeNoBookmark, 1)
     eq('wait بلا نسخة يسقط', codeEmpty, 2)
     eq('wait يكتب جوابَ النسخة الجديدة', [codeWait, JSON.parse(readFileSync(body, 'utf8')).database], [0, 'error'])
   } finally {
@@ -289,7 +339,7 @@ async function selfTest() {
     for (const f of fails) console.log(`  ${f}`)
     return 1
   }
-  console.log('✓ self-test: حكمُ ci (ثلاثَ عشرةَ حالة) والانتظارُ (أربع) ومعرّفُ ما نُشر (ثلاث) والنطاقُ يخدمه (سبع) والأوامرُ (أربعة)')
+  console.log('✓ self-test: حكمُ ci (ثلاثَ عشرةَ حالة) والانتظارُ (أربع) ومعرّفُ ما نُشر (ثلاث) والنطاقُ يخدمه (سبع) وعلامةُ Time Travel (خمس) والأوامرُ (ستّة)')
   return 0
 }
 

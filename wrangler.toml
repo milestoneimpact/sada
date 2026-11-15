@@ -89,6 +89,12 @@ binding = "IMAGES"
 binding = "MEDIA"
 bucket_name = "sada-media-staging"
 
+# ‏**دلوُ النسخ الاحتياطيّة الخاصّ** (D-321): ربطُ `BACKUP` لا يُكتب قبل أن يُنشئ المالكُ الدلوَ بلا وصولٍ عامّ (M-51) — ربطٌ بدلوٍ لا
+# ‏وجودَ له يُسقط النشرَ كلَّه. وبدونه تنبض النسخةُ `skipped` ولا تُكتب في `MEDIA`. وحين يُنشأ تُرفع العلامةُ عن الأسطر الثلاثة:
+# [[env.staging.r2_buckets]]
+# binding = "BACKUP"
+# bucket_name = "sada-backup-staging"
+
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.
 # ويشترط أن يكون العنوانُ «مُتحقَّقًا» في Email Routing (M-31)
@@ -197,6 +203,8 @@ binding = "AI"
 [[env.production.r2_buckets]]
 binding = "MEDIA"
 bucket_name = "sada-media"
+
+# ‏ودلوُ نسخ الإنتاج يومَ M-22 (D-321 · M-51): `binding = "BACKUP"` و`bucket_name = "sada-backup"`، بعد أن يُنشأ لا قبله.
 
 # رمزُ الدخول بالبريد (D-245) — Email Routing على basserh.com.
 # **والوجهةُ مقيَّدةٌ بعنوان المالك**: لا يُرسَل إلى غيره ولو أخطأت الشيفرة.

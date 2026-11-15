@@ -6,11 +6,13 @@
  * وتنكسر في التشغيل حين يتبدّل ترتيبُ الحزم.
  */
 import { escapeHtml } from './escape'
-import { html } from './html'
+import { html, raw, type Html, type HtmlValue } from './html'
 import { glyph, ICON } from './icons'
 import { statusBadge, type Tone } from './components/badge'
 import { card } from './components/card'
-import type { Pulse } from '../../lib/ops/heartbeat'
+import type { Job, Pulse } from '../../lib/ops/heartbeat'
+import type { Sli, SliKey } from '../../lib/ops/slo'
+import type { BackupRow } from '../../lib/ops/backup'
 import { relativeTime } from '../../lib/format'
 import type { RungState } from '../../lib/platform/readiness'
 import { counted, duration, NOUNS } from '../../lib/format'
@@ -224,7 +226,9 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   const rows = pulses
     .map((p) => {
       const mark =
-        p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
+        // ‏‏النسخةُ بلا دلوٍ خاصّ تدور كلَّ فجرٍ ولا تأخذ شيئًا: «في موعدها» بالأخضر يُطمئن على ما لم يقع (مراجعة D-321)
+        p.job === 'backup' && p.state === 'ok' && p.beat?.outcome === 'skipped' ? statusBadge('idle', '○', 'لا تعمل بعد')
+        : p.state === 'ok' ? statusBadge('ok', '●', 'في موعدها')
         : p.state === 'late' ? statusBadge('bad', '▲', `تأخّرت ${duration(p.lateBy)}`)
         : p.state === 'failed' ? statusBadge('bad', '✕', 'سقطت')
         : statusBadge('idle', '○', 'لم تدُر بعد')
@@ -249,3 +253,98 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
   })
 }
 
+
+/** ‏ما ترسمه «صحّة صدى» (D-321) — يُحمَّل للمالك وحدَه في «الضبط ← متقدّم ← النظام». */
+export interface HealthView {
+  readonly slis: readonly Sli[]
+  /** ‏أمربوطٌ دلوُ النسخ الخاصّ (`BACKUP`، M-51)؟ */
+  readonly bound: boolean
+  readonly last: BackupRow | null
+  readonly lastOk: BackupRow | null
+  /** ‏قُرئ سجلُّ النسخ؟ — قاعدةٌ لم تردّ تُرسم «لم يُقرأ» لا «لا نسخة». */
+  readonly read: boolean
+}
+
+const SLI_LABEL: Readonly<Record<SliKey, string>> = {
+  on_time: 'في موعده',
+  success: 'نجاح النشر',
+  availability: 'التوافر من الخارج',
+}
+const SLI_WHAT: Readonly<Record<SliKey, string>> = {
+  on_time: 'خرج خلال 16 دقيقة من موعده',
+  success: 'آخر محاولة لكلّ منشور',
+  availability: 'ردّ /pulse بـ200 على المراقب الخارجيّ',
+}
+const SLI_NONE: Readonly<Record<SliKey, string>> = {
+  on_time: 'لا قياس: لم يحلّ موعد منشور مجدول',
+  success: 'لا قياس: لم تُحسم محاولة نشر',
+  availability: 'لا قياس: لم يسأل المراقب الخارجيّ بعد',
+}
+/** ‏الدوراتُ التي تقول «هل يعمل الآن»: الإرسالُ والتجديدُ ومستهلكُ النشر (`/pulse`) والنسخة. */
+const HEALTH_JOBS: readonly Job[] = ['dispatch', 'renew', 'publish', 'backup']
+/** ‏نسخةٌ أقدمُ من ثمانية أيّام فاتها أسبوعُها. */
+const BACKUP_STALE_SECONDS = 8 * 24 * 60 * 60
+
+/** ‏نسبةٌ بمنزلةٍ عشريّة، **تُقصّ ولا تُقرَّب**: ‏99.96٪ لا تُقرأ «100.0٪» وفيها خطأ. */
+const percent = (r: number): string => (Math.floor(r * 1000) / 10).toFixed(1) + '٪'
+const target = (t: number): string => String(Number((t * 100).toFixed(1))) + '٪'
+/** ‏شارةُ الحال موسومةً: `statusBadge` يرسم نصًّا من ثوابته ومن نصٍّ يُهرَّب قبله (`components/badge.ts`). */
+const badge = (tone: Tone, g: string, text: string) => raw(statusBadge(tone, g, escapeHtml(text)))
+
+function budgetCell(b: number | null): HtmlValue {
+  if (b === null) return '—'
+  if (b <= 0) return badge('bad', '▲', 'نفد')
+  if (b >= 1) return badge('ok', '●', 'لم يُمسّ')
+  return badge(b < 0.5 ? 'warn' : 'ok', b < 0.5 ? '▲' : '●', 'بقي ' + Math.floor(b * 100) + '٪')
+}
+
+function backupLine(h: HealthView, now: Date): Html {
+  if (!h.read) return html`<p class="hint">${badge('idle', '○', 'سجلّ النسخ لم يُقرأ الآن')}</p>`
+  if (!h.bound) {
+    return html`<p class="hint">${badge('warn', '▲', 'لا نسخة احتياطيّة')} الدلو الخاصّ لم يُربط بعد — بابُه في <a href="/panel/tasks">ما عليك</a>.</p>`
+  }
+  const ok = h.lastOk
+  const failedAfter = h.last !== null && h.last.status === 'failed' && (ok === null || h.last.id !== ok.id)
+    ? html`<p class="hint">وفشلت محاولةٌ ${relativeTime(h.last.at, now)}: ${h.last.detail ?? 'بلا سبب مكتوب'}</p>`
+    : ''
+  if (ok === null) return html`<p class="hint">${badge('idle', '○', 'لا نسخة بعد')} تُؤخذ الأولى في الدورة اليوميّة التالية.</p>${failedAfter}`
+  const at = Date.parse(ok.at.replace(' ', 'T') + 'Z')
+  const stale = Number.isFinite(at) && now.getTime() - at > BACKUP_STALE_SECONDS * 1000
+  const size = String(Math.max(1, Math.ceil(ok.bytes / 1024))) + 'KB'
+  return html`<p class="hint">${badge(stale ? 'warn' : 'ok', stale ? '▲' : '●', 'آخر نسخة احتياطيّة')} ${relativeTime(ok.at, now)} · ${counted(ok.tables, NOUNS.table)} · ${counted(ok.rows, NOUNS.row)} · ${size}</p>${failedAfter}`
+}
+
+/**
+ * ‏**«صحّة صدى»** (D-321 · `docs/SLO.md`): المؤشّراتُ الثلاثة على ثمانيةٍ وعشرين يومًا بهدفها وما بقي من هامشها، وآخرُ نسخةٍ
+ * ‏احتياطيّة، وعمرُ آخر دورةٍ لما يقول «هل يعمل الآن». **ولا زرَّ فيها**: تقرأ ولا تفعل، وما يُفعل بابُه في «ما عليك».
+ */
+export function healthCard(h: HealthView, pulses: readonly Pulse[], now: Date): string {
+  const measured = h.slis.filter((s) => s.ratio !== null)
+  const head = h.slis.some((s) => s.budgetLeft !== null && s.budgetLeft <= 0)
+    ? badge('bad', '▲', 'نفد هامش مؤشّر')
+    : measured.length === 0
+      ? badge('idle', '○', 'لا قياس بعد')
+      : badge('ok', '●', 'في أهدافها')
+  const rows = h.slis.map((s) => {
+    const value = s.ratio === null
+      ? html`<span class="hint">${SLI_NONE[s.key]}</span>`
+      : html`<b>${percent(s.ratio)}</b> <span class="sub">${s.good} من ${s.total}</span>${
+          s.excluded > 0 ? html` <span class="sub">· ${s.excluded} ردّتها المنصّة لا تُعدّ</span>` : ''}`
+    return html`<tr><th scope="row">${SLI_LABEL[s.key]}<div class="sub">${SLI_WHAT[s.key]}</div></th><td>${value}</td><td>${target(s.target)}</td><td>${budgetCell(s.budgetLeft)}</td></tr>`
+  })
+  const ages = HEALTH_JOBS.map((job) => {
+    const p = pulses.find((x) => x.job === job)
+    return (p?.label ?? job) + ' ' + (p?.beat == null ? 'لم تدُر بعد' : relativeTime(p.beat.at, now))
+  })
+  return card({
+    id: 'health',
+    title: 'صحّة صدى',
+    action: head.value,
+    desc: 'آخر 28 يومًا، للحسابات كلّها. والهامش ما يجوز من الخطأ قبل أن يقف الجديد ليُصلَح القديم.',
+    body: html`<div class="scroll"><table>
+      <thead><tr><th>المؤشّر</th><th>آخر 28 يومًا</th><th>الهدف</th><th>الهامش</th></tr></thead>
+      <tbody>${rows}</tbody></table></div>
+    ${backupLine(h, now)}
+    <p class="hint m-0">آخر دورة: ${ages.join(' · ')}</p>`.value,
+  })
+}

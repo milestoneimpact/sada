@@ -43,7 +43,8 @@ const CEILING: Readonly<Record<string, number>> = {
   '/panel/library': 16,
   // ‏القنواتُ في الهيكل أصلًا: لا جملةَ فوقه
   '/panel/accounts': 10,
-  '/panel/settings': 23,
+  // ‏و«صحّة صدى» (D-321): المؤشّراتُ الثلاثة وآخرُ نسخةٍ جملةٌ واحدة، فوق ما رفعه main إلى 23
+  '/panel/settings': 24,
   '/panel/analysis': 10,
 }
 
