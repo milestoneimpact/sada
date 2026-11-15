@@ -49,7 +49,7 @@ export function teamScreen(d: TeamData): string {
     <p class="hint">يدخل برمزٍ إلى بريده كما تدخل. <b>والرمزُ يصله بعد أن يتحقّق من بريده عند Cloudflare</b> (M-33)، ودعوةُ بريدٍ مدعوٍّ تعدّل دورَه وشركاتِه — <b>ومن صار مديرًا أو ناشرًا بلا عاملٍ ثانٍ يُعاد إلى الدخول ليسجّله</b>.</p>
     <form method="POST" action="/panel/team/invite" class="stack">
       <div class="field"><label for="tm-email">البريد</label><input id="tm-email" type="email" name="email" dir="ltr" required></div>
-      <fieldset class="field"><legend>الدور</legend><div class="stack">${roles}</div></fieldset>
+      <fieldset class="field"><legend>الدور</legend><div class="role-grid">${roles}</div></fieldset>
       <fieldset class="field"><legend>الشركات</legend><div class="row gap-2">
         <label class="vpf"><input type="checkbox" name="all" value="1" checked><span class="vpf-b"><b>كلّ الشركات</b></span></label>${orgs}</div>
         <p class="hint">«كلّ الشركات» تشمل ما يُنشأ لاحقًا. أزلها واختر شركاتٍ بعينها لتقصره عليها.</p></fieldset>

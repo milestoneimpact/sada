@@ -899,8 +899,7 @@ describe('رأس بطاقة الجدول المحوريّ (D-137)', () => {
     ] as never
     const html = pivotPane({ rows: 'platform', cols: 'status', measure: 'count', sinceDays: 30, table: pivot(rows, { rows: 'platform', cols: 'status', measure: 'count' }), capped: false, cap: 5000 } as never)
     expect(html).toContain('<h1>النتائج</h1>')
-    // ‏والجدولُ تبويبُ «تحليلٌ مفصّل» في «النتائج»، ومرساتُه القديمةُ قسمُه (D-204)
-    expect(html).toContain('<a class="tab-item" href="#pivot" aria-current="page"><span>تحليل مفصّل</span></a>')
+    // ‏‏D-356: شريطُ «أقسام النتائج» القديم سقط — شريطُ العائلة (D-342) يقولها مرّةً واحدة فوق الصفحة. والمرساةُ القديمةُ قسمُه
     expect(html).toContain('<div data-sub id="pivot">')
     const split = html.indexOf('<div class="split">')
     const acts = html.indexOf('<div class="row acts">', split)
