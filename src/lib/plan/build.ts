@@ -12,9 +12,10 @@
  * وكم مضى. والمستهلكُ يخطّط (جزءًا جزءًا، وكلُّ جزءٍ يُحدَّث حالُه)، ثمّ يرسل بنودَ الخطّة للكتابة، ثمّ يختم الحالَ «تمّ» فتنتقل
  * الشاشةُ إلى الخطّة حيث تظهر المنشوراتُ تباعًا. **والمالكُ يغادر متى شاء**: البناءُ لا يتعلّق بصفحته.
  *
- * ## والحالُ في KV لا في القاعدة
+ * ## والحالُ في D1 (D-362)
  *
- * حالٌ عابرٌ يُقرأ كلَّ ثانيتين ويموت بعد ساعة: لا ترحيلَ له ولا جدول. ومفتاحُه المنظّمة، فبناءٌ واحدٌ لكلّ عميلٍ في المرّة —
+ * كان في KV، وقراءةُ KV من غير موضع كتابتها قد تتأخّر دقيقة: فشل البناءُ في 39 ثانية وبقيت الشاشةُ على «تنتظر». صار صفًّا في
+ * `plan_builds` (`d1BuildStore`) يُقرأ كما كُتب. ومفتاحُه المنظّمة، فبناءٌ واحدٌ لكلّ عميلٍ في المرّة —
  * **وضغطةٌ ثانيةٌ والأوّلُ يجري تفتح شاشتَه ولا تبدأ نداءً مدفوعًا ثانيًا**.
  */
 export type BuildState = 'queued' | 'planning' | 'done' | 'failed'
@@ -39,6 +40,21 @@ export interface BuildStore {
 }
 
 const TTL_SECONDS = 60 * 60
+
+/** المخزنُ في D1 — بواجهة KV نفسِها، فلا يتغيّر قارئٌ ولا كاتب. وما انقضت مدّتُه لا يُقرأ. */
+export function d1BuildStore(db: { prepare(sql: string): { bind(...v: unknown[]): { first<T>(): Promise<T | null>; run(): Promise<unknown> } } }): BuildStore {
+  return {
+    async get(key) {
+      const row = await db.prepare("SELECT value FROM plan_builds WHERE key = ? AND expires_at > datetime('now')").bind(key).first<{ value: string }>()
+      return row?.value ?? null
+    },
+    async put(key, value, options) {
+      const ttl = Math.max(60, options?.expirationTtl ?? TTL_SECONDS)
+      await db.prepare(`INSERT INTO plan_builds (key, value, expires_at) VALUES (?, ?, datetime('now', '+' || ? || ' seconds'))
+        ON CONFLICT(key) DO UPDATE SET value = excluded.value, expires_at = excluded.expires_at`).bind(key, value, ttl).run()
+    },
+  }
+}
 /** بناءٌ لم يتحرّك حالُه ربعَ ساعةٍ انقطع: طابورُ Cloudflare يمهل المستهلكَ ربعَ ساعة، وما بعدها لا أحدَ يكمله. */
 export const STALE_MS = 15 * 60 * 1000
 

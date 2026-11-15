@@ -43,7 +43,7 @@ import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
 import { approvePlan, ideaOf, latestPlan, planSpan, planWindows } from '../../lib/plan/job'
-import { readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
+import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
 import type { PlanDeps } from '../../lib/plan/job'
 import { readSettings } from '../../lib/settings'
@@ -135,7 +135,7 @@ plan.post('/panel/plan/generate', async (c) => {
    */
   const queue = c.env.GENERATE_QUEUE as Env['GENERATE_QUEUE'] | undefined
   if (f.get('then') === 'review' && queue !== undefined && !(await readSettings(c.env.DB)).paused) {
-    if (running(await readBuild(c.env.KV, org), new Date())) return c.redirect('/panel/plan/building', 303)
+    if (running(await readBuild(d1BuildStore(c.env.DB), org), new Date())) return c.redirect('/panel/plan/building', 303)
     const params: PlanBuildParams = {
       span, channels, cadence: cadence as Cadence, sources, ideas, imageStyle, imageStyles: imageStyles as PlanChoices['imageStyles'], times,
       zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
@@ -143,7 +143,7 @@ plan.post('/panel/plan/generate', async (c) => {
       ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
     }
     const build: PlanBuild = { id: crypto.randomUUID(), state: 'queued', done: 0, total: planWindows(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? startRaw : weekStart(new Date()), span, cadence as Cadence).length, startedAt: new Date().toISOString() }
-    await writeBuild(c.env.KV, org, build)
+    await writeBuild(d1BuildStore(c.env.DB), org, build)
     await queue.sendBatch([{ body: { planBuild: { org, jobId: build.id, params } } }])
     await record(c.env.DB, { actor: 'panel', action: 'plan.generate', target: build.id, detail: 'queued' }, c.req.raw)
     return c.redirect('/panel/plan/building', 303)
@@ -1150,9 +1150,9 @@ export interface PlanBuildMessage {
  */
 export async function runPlanBuild(env: Env, body: PlanBuildMessage['planBuild']): Promise<void> {
   const { org, jobId, params } = body
-  const current = await readBuild(env.KV, org)
+  const current = await readBuild(d1BuildStore(env.DB), org)
   if (current === null || current.id !== jobId || current.state === 'done' || current.state === 'failed') return
-  const save = (patch: Partial<PlanBuild>): Promise<void> => writeBuild(env.KV, org, { ...current, ...patch })
+  const save = (patch: Partial<PlanBuild>): Promise<void> => writeBuild(d1BuildStore(env.DB), org, { ...current, ...patch })
   try {
     await save({ state: 'planning' })
     const outcome = await planSpan({
@@ -1176,7 +1176,7 @@ export async function runPlanBuild(env: Env, body: PlanBuildMessage['planBuild']
 plan.get('/panel/plan/building', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  const found = await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record))
   if (found === null) return c.redirect('/panel/plan', 303)
   const body = planBuildScreen(shownBuild(found, new Date()), new Date())
   return page((nonce) =>
@@ -1189,7 +1189,7 @@ plan.get('/panel/plan/building', async (c) => {
 plan.get('/panel/plan/build.json', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.json({ state: 'none' }, 401)
-  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  const found = await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record))
   if (found === null) return c.json({ state: 'none' }, 404)
   const b = shownBuild(found, new Date())
   return c.json({ state: b.state, done: b.done, total: b.total, line: planningLine(b.done, b.total) }, 200, { 'Cache-Control': 'private, no-store' })
@@ -1204,6 +1204,6 @@ plan.get('/panel/plan', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   const current = await latestPlan(c.env.DB, activeOrg(session.record))
   // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
-  if (running(await readBuild(c.env.KV, activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
+  if (running(await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
   return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
 })

@@ -7,6 +7,7 @@
  * **وتعمل بلا سكربت**: الحالُ مرسومٌ من الخادم وزرُّ «حدّث» يعيد قراءتَه. والسكربتُ يسأل `/panel/plan/build.json` كلَّ ثانيتين
  * ونصف فيحدّث الشريطَ والخطوةَ، وينتقل إلى الخطّة حين تتمّ.
  */
+import { panelHref } from '../../lib/nav/panes'
 import { html, raw, type Html } from './html'
 import { pageHead } from './parts'
 import { card } from './components/card'
@@ -54,7 +55,7 @@ export function planBuildScreen(build: PlanBuild, now: Date): string {
     <p class="hint m-0 mt-3" id="pb-time" role="status">${failed || done ? '' : mins === 0 ? 'بدأ للتوّ. يأخذ التخطيطُ عادةً من نصف دقيقةٍ إلى ثلاث دقائق لكلّ جزء.' : 'منذ ' + AR(mins) + (mins === 1 ? ' دقيقة' : ' دقائق') + '. يأخذ التخطيطُ عادةً من نصف دقيقةٍ إلى ثلاث دقائق لكلّ جزء.'}</p>
     ${failed ? html`<p class="m-0 mt-3" role="alert"><b>السبب:</b> ${build.note ?? 'عطلٌ غير متوقّع'}</p>` : html``}
     <div class="row gap-2 mt-4">${failed
-      ? raw(button({ label: 'عُد إلى «خطّة جديدة»', variant: 'primary', href: '/panel/plan/new' }))
+      ? html`${raw(button({ label: 'عُد إلى «خطّة جديدة»', variant: 'primary', href: '/panel/plan/new' }))}${/توجيه المهامّ|نموذج/.test(build.note ?? '') ? raw(button({ label: 'اضبط النموذج', variant: 'secondary', href: panelHref('providers') })) : ''}`
       : done
         ? raw(button({ label: 'افتح الخطّة', variant: 'primary', href: '/panel/plan/review' }))
         : raw(button({ label: 'حدّث الحال', href: '/panel/plan/building' }))}</div>`
@@ -83,9 +84,12 @@ export const PLAN_BUILD_SCRIPT = `(function(){
         if(line&&j.line)line.textContent=j.line;
         if(j.state==='planning')badge('pb-plan','warn','تجري الآن','now');
         if(j.state==='done'){badge('pb-plan','ok','تمّت','done'); badge('pb-write','warn','تجري الآن','now'); location.href='/panel/plan/review'; return;}
-        var m=Math.floor((Date.now()-started)/60000);
-        if(time&&m>0)time.textContent='منذ '+m.toLocaleString('ar-u-nu-latn')+(m===1?' دقيقة':' دقائق')+'. يأخذ التخطيطُ عادةً من نصف دقيقةٍ إلى ثلاث دقائق لكلّ جزء.';
       }).catch(function(){});
   }
-  setInterval(tick,2500); tick();
+  // ‏العدّادُ كلَّ ثانية، لا كلَّ دقيقة: المالكُ يرى أنّ شيئًا يجري (D-362)
+  function clock(){
+    if(!time)return; var s=Math.max(0,Math.floor((Date.now()-started)/1000)), m=Math.floor(s/60);
+    time.textContent='منذ '+(m===0?s+' ثانية':m+(m===1?' دقيقة و':' دقائق و')+(s%60)+' ثانية')+'. يأخذ التخطيطُ عادةً من نصف دقيقةٍ إلى ثلاث دقائق لكلّ جزء.';
+  }
+  setInterval(tick,2000); setInterval(clock,1000); tick(); clock();
 })();`
