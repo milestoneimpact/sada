@@ -16,6 +16,10 @@ import { statusBadge } from '../components/badge'
 import { button } from '../components/button'
 import { html, raw } from '../html'
 import { echo } from '../echo'
+import { card } from '../components/card'
+import { field } from '../components/field'
+import { pageHead } from '../parts'
+import { THINKING_NOTE, type CatalogGroup } from '../../../lib/ai/modelCatalog'
 
 /**
  * **ولكلّ مهمّةٍ في `ROUTES` سطرٌ هنا** (D-091).
@@ -23,7 +27,7 @@ import { echo } from '../echo'
  * كانت ثلاثا وفي `ROUTES` أربع، فيُعرَض `plan` بمفتاحه الخام. ومفتاحٌ
  * إنجليزيٌّ في جدولٍ عربيٍّ يُقرأ عطلا لا مهمّة.
  */
-const TASK_LABEL: Readonly<Record<string, string>> = {
+export const TASK_LABEL: Readonly<Record<string, string>> = {
   analyze: 'الفهم — الحكم على المصدر',
   draft: 'الكتابة — صياغة المنشور',
   plan: 'الخطّة — منطق الأسبوع',
@@ -497,6 +501,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
           })}
           <button class="btn btn-secondary btn-sm" type="submit">حفظ</button>
         </form>
+        ${button({ label: 'اختر من قائمة المزوّد', variant: 'quiet', size: 'sm', href: '/panel/routes/pick?task=' + encodeURIComponent(r.task) + '&provider=' + encodeURIComponent(r.provider) })}
       </td>
       <td data-label="الحال">${r.ready
         ? statusBadge('ok', '●', 'جاهز')
@@ -508,4 +513,60 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
             : statusBadge('idle', '○', 'لم تُبن')}</td></tr>`).join('')
 
   return { strip, rows, add, routing }
+}
+
+/**
+ * ‏خياراتُ الدرج من الفهرس (D-364) — مجموعاتٌ بأسمائها، والمعرّفُ في نصّ الخيار لا في تلميحه وحده، **والكتابةُ اليدويّة باقية**.
+ * ‏والمحفوظُ إن لم يكن في الفهرس يبقى أوّلَ خيارٍ مختارًا: تعذّرُ الجلب أو سحبُ النموذج لا يمحو ما يعمل الآن.
+ */
+export function catalogOptions(groups: readonly CatalogGroup[], current: string): string {
+  const all = groups.flatMap((g) => g.items.map((i) => i.id))
+  const kept = current !== '' && !all.includes(current)
+    ? html`<option value="${current}" selected>${current} — المحفوظ الآن</option>`
+    : current === '' ? raw('<option value="" selected>— اختر نموذجا —</option>') : ''
+  const opt = (i: CatalogGroup['items'][number]) => html`<option value="${i.id}"${raw(i.id === current ? ' selected' : '')}${
+    raw(i.thinking ? ' data-thinking="1"' : '')} data-pin="${i.priceIn ?? ''}" data-pout="${i.priceOut ?? ''}">${i.text}</option>`
+  return html`${kept}${groups.map((g) => html`<optgroup label="${g.label}">${g.items.map(opt)}</optgroup>`)}<option value="__manual__">اكتبه يدويّا…</option>`.value
+}
+
+export interface RoutePickInput {
+  readonly task: string
+  readonly provider: string
+  readonly current: string
+  readonly providers: readonly { readonly name: string; readonly label: string }[]
+  /** ‏`null` حين تعذّر الجلب، ومعه سببُه. */
+  readonly groups: readonly CatalogGroup[] | null
+  readonly detail: string
+}
+
+/**
+ * ‏بطاقةُ اختيار النموذج بلا سكربت (D-364): نموذجُ `GET` يبدّل المزوّد فتُرسَم القائمةُ من عنده، ونموذجُ `POST` يحفظ إلى
+ * ‏`/panel/routes` كما يحفظ الجدول. ومع السكربت لا حاجةَ إليها: الدرجُ في الجدول يمتلئ عند تبديل المزوّد.
+ */
+export function routePickScreen(d: RoutePickInput): string {
+  const items = (d.groups ?? []).flatMap((g) => g.items)
+  const thinking = items.some((i) => i.thinking)
+  const recs = items.filter((i) => i.recommended && i.why !== null)
+  const body = html`<form class="row gap-2" method="GET" action="/panel/routes/pick">
+      <input type="hidden" name="task" value="${d.task}">
+      ${raw(field({ id: 'pk-provider', label: 'المزوّد', control: html`<select name="provider" class="w-s">${d.providers.map((p) =>
+          html`<option value="${p.name}"${raw(p.name === d.provider ? ' selected' : '')}>${p.label}</option>`)}</select>`.value }))}
+      <div class="self-end">${raw(button({ label: 'اعرض نماذجه', type: 'submit' }))}</div>
+    </form>
+    <form class="mt-3" method="POST" action="/panel/routes">
+      <input type="hidden" name="task" value="${d.task}">
+      <input type="hidden" name="provider" value="${d.provider}">
+      <input type="hidden" name="return" value="pick">
+      ${d.groups === null
+        ? html`<p class="hint">${raw(statusBadge('warn', '!', 'تعذّر الجلب'))} ${d.detail.replace(/[.\s]+$/, '')}. اكتب المعرّف كما هو عند المزوّد.</p>`
+        : raw(field({ id: 'pk-model', label: 'النموذج', hint: html`${d.detail} الآن عند المزوّد · قائمة لحظيّة لا محفوظة.`.value,
+            control: '<select name="model" class="w-m">' + catalogOptions(d.groups, d.current) + '</select>' }))}
+      ${raw(field({ id: 'pk-manual', label: 'أو اكتب المعرّف يدويًّا', optional: true,
+        control: html`<input class="w-m" name="model_manual" dir="ltr" autocomplete="off" value="${d.groups === null ? d.current : ''}">`.value }))}
+      ${recs.length === 0 ? '' : html`<ul class="sub mt-2">${recs.map((r) => html`<li>★ <span class="mono">${r.id}</span>: ${r.why}</li>`)}</ul>`}
+      ${thinking ? html`<p class="sub mt-2">«يفكّر»: ${THINKING_NOTE} — والأسلمُ للفهم والخطّة نموذجٌ لا يفكّر.</p>` : ''}
+      <div class="mt-3">${raw(button({ label: 'احفظ التوجيه', variant: 'primary', type: 'submit' }))}</div>
+    </form>`.value
+  return pageHead('توجيه المهامّ', TASK_LABEL[d.task] ?? d.task, 'اختر المزوّد فتظهر نماذجه كما هي عنده الآن، ثمّ احفظ.') +
+    card({ title: 'المزوّد والنموذج', body })
 }

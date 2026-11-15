@@ -49,11 +49,12 @@ export function folderOf(a: Pick<Asset, 'kind' | 'origin' | 'at'>): string {
 const kindOf = (mime: string): AssetKind =>
   mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'doc'
 
-const REF = /^([mufs]):([A-Za-z0-9:_-]{1,200})$/
+const REF = /^([mufsd]):([A-Za-z0-9:_-]{1,200})$/
 
-export function parseRef(ref: string): { readonly tag: 'm' | 'u' | 'f' | 's'; readonly id: string } | null {
+/** و`d:` وسيطةُ المالك من مجلّد Drive للوسائط (D-363) بمعرّف Drive — ما نُزّل منها إلى R2 وحده يُربط. */
+export function parseRef(ref: string): { readonly tag: 'm' | 'u' | 'f' | 's' | 'd'; readonly id: string } | null {
   const m = REF.exec(ref)
-  return m === null ? null : { tag: m[1] as 'm' | 'u' | 'f' | 's', id: m[2]! }
+  return m === null ? null : { tag: m[1] as 'm' | 'u' | 'f' | 's' | 'd', id: m[2]! }
 }
 
 type Row = Record<string, string | number | null>
@@ -167,6 +168,11 @@ export async function findAsset(db: Db, org: string, ref: string): Promise<Asset
       return r === null ? null : { ref, origin: 'upload', kind: 'image', name: str(r['name']), mime: str(r['mime']),
         bytes: num(r['bytes']), at: at(r), preview: `/panel/assets/raw/${ref}`, drive: null }
     }
+    case 'd': {
+      const r = await one("SELECT name, mime, bytes FROM drive_media WHERE drive_file_id = ? AND org_id = ? AND missing = 0 AND r2_key IS NOT NULL")
+      return r === null ? null : { ref, origin: 'upload', kind: kindOf(str(r['mime'])), name: str(r['name']), mime: str(r['mime']),
+        bytes: num(r['bytes']), at: '', preview: `/panel/assets/raw/${ref}`, drive: null }
+    }
     case 's': {
       const r = await one('SELECT drive_file_id, name, mime, last_seen_at AS at FROM sources WHERE id = ? AND org_id = ?')
       return r === null ? null : { ref, origin: 'drive', kind: kindOf(str(r['mime'])), name: str(r['name']), mime: str(r['mime']),
@@ -178,8 +184,10 @@ export async function findAsset(db: Db, org: string, ref: string): Promise<Asset
 /** مفتاحُ R2 ونوعُه لمعاينةٍ خلف الجلسة — للمرفوعات وحدها (`/panel/media/:id` يخدم المولَّدة). */
 export async function rawObject(db: Db, org: string, ref: string): Promise<{ readonly key: string; readonly mime: string } | null> {
   const p = parseRef(ref)
-  if (p === null || (p.tag !== 'u' && p.tag !== 'f')) return null
-  const table = p.tag === 'u' ? "uploads WHERE id = ? AND org_id = ? AND status = 'ready'" : 'library_files WHERE id = ? AND org_id = ?'
+  if (p === null || (p.tag !== 'u' && p.tag !== 'f' && p.tag !== 'd')) return null
+  const table = p.tag === 'u' ? "uploads WHERE id = ? AND org_id = ? AND status = 'ready'"
+    : p.tag === 'd' ? 'drive_media WHERE drive_file_id = ? AND org_id = ? AND missing = 0 AND r2_key IS NOT NULL'
+      : 'library_files WHERE id = ? AND org_id = ?'
   const r = await db.prepare(`SELECT r2_key, mime FROM ${table}`).bind(p.id, org).first<{ r2_key: string; mime: string }>().catch(() => null)
   return r === null ? null : { key: r.r2_key, mime: r.mime }
 }
@@ -200,7 +208,12 @@ export function attachStatement(db: Db, org: string, postId: string, ref: string
     : p.tag === 'u'
       ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'upload', 0, 'ready', ?3, width, height, org_id, brand_id
            FROM uploads WHERE id = ?4 AND org_id = ?5 AND status = 'ready'`
-      : `SELECT ?1, ?2, r2_key, mime, bytes, '', 'library', 0, 'ready', ?3, width, height, org_id, brand_id
+      : p.tag === 'd'
+        // ‏وسيطةُ Drive (D-363): صورةٌ نُزّلت إلى R2 وحاضرةٌ في المجلّد — والمقطعُ يُنشر من «فيديوهاتك» لا من هنا
+        ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'drive', 0, 'ready', ?3, NULL, NULL, org_id,
+               coalesce((SELECT brand_id FROM posts WHERE id = ?2), 'brand_owner')
+             FROM drive_media WHERE drive_file_id = ?4 AND org_id = ?5 AND missing = 0 AND kind = 'image' AND r2_key IS NOT NULL`
+        : `SELECT ?1, ?2, r2_key, mime, bytes, '', 'library', 0, 'ready', ?3, width, height, org_id, brand_id
            FROM library_files WHERE id = ?4 AND org_id = ?5`
   return db.prepare(`INSERT OR IGNORE INTO media
       (id, post_id, r2_key, mime, bytes, prompt, model, cost_usd, status, idempotency_key, width, height, org_id, brand_id) ${from}`).bind(crypto.randomUUID(), postId, key, p.id, org)

@@ -21,6 +21,9 @@ function platformColumn(h: string): { platform: string; field: 'format' | 'time'
 
 const TEXT_HEADS = /^(العنوان\s*\/\s*الفكرة|العنوان|الفكرة|الموضوع|title|idea|topic)$/i
 const DATE_HEADS = /^(التاريخ|date|day)$/i
+/** عمودا وسائط المالك (D-363): يمرّان مع كلّ منشورٍ من يومه فيطابقه `readPlan` بمكتبة Drive. */
+const ITEM_HEADS = /^(رقم المادة|رقم المادّة|المادة|المادّة|item)$/i
+const MEDIA_HEADS = /^(الملف|الملفّ|الوسيطة|file|media)$/i
 const EMPTY = /^(|-|—|لا|لا يوجد|none|n\/a)$/i
 
 export interface Widened {
@@ -47,7 +50,10 @@ export function widenPlan(csv: string): Widened {
   const di = head.findIndex((h) => DATE_HEADS.test(h))
   const ti = head.findIndex((h) => TEXT_HEADS.test(h))
   if (cols.size === 0 || di < 0 || ti < 0) return { csv, widened: false, platforms: [] }
-  const out = ['التاريخ,الوقت,المنصة,النص']
+  const ii = head.findIndex((h) => ITEM_HEADS.test(h))
+  const mi = head.findIndex((h) => MEDIA_HEADS.test(h))
+  const extra = ii >= 0 || mi >= 0
+  const out = ['التاريخ,الوقت,المنصة,النص' + (extra ? ',رقم المادة,الملف,الشكل' : '')]
   for (const { cells } of records.slice(1)) {
     const idea = (cells[ti] ?? '').trim()
     if (idea === '') continue
@@ -56,7 +62,9 @@ export function widenPlan(csv: string): Widened {
       const time = c.time === undefined ? '' : (cells[c.time] ?? '').trim()
       if (c.format !== undefined && EMPTY.test(format)) continue
       const text = format === '' ? idea : idea + ' (الصيغة: ' + format + ')'
-      out.push([(cells[di] ?? '').trim(), time, platform, text].map(cell).join(','))
+      const base = [(cells[di] ?? '').trim(), time, platform, text]
+      const at = (i: number): string => (i < 0 ? '' : (cells[i] ?? '').trim())
+      out.push((extra ? [...base, at(ii), at(mi), format] : base).map(cell).join(','))
     }
   }
   return { csv: out.join('\n'), widened: true, platforms: [...cols.keys()] }

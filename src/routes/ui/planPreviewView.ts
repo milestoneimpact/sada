@@ -22,6 +22,8 @@ export interface PreviewData {
   readonly widened: boolean
   readonly cost: number
   readonly rules?: PlanRules | null
+  /** رقمُ السطر ← سطرُ وسيطته من مكتبة Drive (D-363، `mediaLine`) — HTML مهرَّبٌ من قبل. */
+  readonly media?: Readonly<Record<string, string>>
 }
 
 const SHOWN = 60
@@ -53,7 +55,7 @@ export function planPreviewScreen(d: PreviewData): string {
     <tbody>${rows.slice(0, SHOWN).map(({ cells, line }) => {
       const note = d.filled[String(line)]
       return html`<tr><td dir="ltr">${g(cells, di)}</td><td dir="ltr">${g(cells, ti)}</td><td>${g(cells, pi)}</td>
-        <td>${g(cells, xi).replace(/\s+/g, ' ').slice(0, 140)}</td><td>${note === undefined ? 'من ملفّك' : note}</td></tr>`
+        <td>${g(cells, xi).replace(/\s+/g, ' ').slice(0, 140)}${raw(d.media?.[String(line)] ?? '')}</td><td>${note === undefined ? 'من ملفّك' : note}</td></tr>`
     })}</tbody></table></div>
     ${rows.length > SHOWN ? html`<p class="hint m-0">وغيرُها ${counted(rows.length - SHOWN, NOUNS.post)} تظهر في المراجعة.</p>` : html``}`
   const cost = d.cost > 0 ? 'كلّفت القراءةُ $' + d.cost.toFixed(3) + ' في الدفتر. ' : ''

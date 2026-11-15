@@ -107,6 +107,21 @@ export function classifyTask(raw: unknown): ModelTask | null {
   return 'other'
 }
 
+/**
+ * ‏صنفُ المهمّة من المعرّف وحده (D-364) — **لفهرسٍ لا يقول صنفَه**.
+ *
+ * ‏فهرسُ DeepSeek وOpenAI بلهجتهما `{ id, object, owned_by }` لا غير، فكان صنفُ `deepseek-chat` فارغًا. والمعرّفُ يقول ما يكفي:
+ * ‏ما فيه «embed» للفهرسة، وما فيه اسمُ صورةٍ أو مقطعٍ لهما، وما للصوت والرقابة «آخر»، **والباقي نصّ** — فهو أغلبُ ما تخدمه هذه اللهجة.
+ */
+export function taskFromId(id: string): ModelTask {
+  const m = id.toLowerCase()
+  if (m.includes('embed')) return 'embedding'
+  if (/(video|veo|sora|i2v|t2v)/.test(m)) return 'video'
+  if (/(dall-e|image|imagen|flux|sdxl|stable-diffusion)/.test(m)) return 'image'
+  if (/(whisper|tts|audio|transcribe|moderation|realtime)/.test(m)) return 'other'
+  return 'text'
+}
+
 function sortChoices(models: ModelChoice[]): ModelChoice[] {
   return models.sort((a, b) => a.id.localeCompare(b.id))
 }
@@ -210,7 +225,8 @@ function readCompat(payload: Record<string, unknown>): ModelChoice[] {
     out.push({
       id,
       label: typeof name === 'string' && name !== '' ? `${name} (${id})` : id,
-      task: classifyTask(modality),
+      // ‏وفهرسٌ بلا `architecture` (DeepSeek وOpenAI) يُصنَّف من معرّفه لا يُترَك فارغًا (D-364)
+      task: classifyTask(modality) ?? taskFromId(id),
       priceIn: perMillion(pricing['prompt']),
       priceOut: perMillion(pricing['completion']),
     })

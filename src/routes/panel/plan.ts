@@ -24,10 +24,11 @@ import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
+import { readDriveMedia } from '../../lib/drive/media'
 import {
   applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
-import { planImportExpired, planImportScreen } from '../ui/planImportView'
+import { mediaLine, planImportExpired, planImportScreen } from '../ui/planImportView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
 import { taskReadyAlone } from './home'
 import { allows } from '../../lib/access'
@@ -508,6 +509,8 @@ async function planFacts(env: Env, org: string, cookie: string | null, now: Date
     zone: (await ownerZone(env.DB, cookie)) ?? DEFAULT_ZONE,
     publishable: new Set(CHANNELS.filter((c) => c.stage === 'publish').map((c) => c.id)),
     scheduled,
+    // ‏وسائطُ المالك من مجلّد Drive (D-363): المعاينةُ تقول لكلّ صفٍّ وسيطتَه، والاعتمادُ يربطها
+    library: await readDriveMedia(env.DB, org),
   }
 }
 
@@ -1045,7 +1048,11 @@ plan.get('/panel/plan/import/preview', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.' })
     return c.redirect('/panel/plan/import', 303)
   }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null })
+  // ‏ووسيطةُ كلّ صفٍّ من مكتبة Drive (D-363): «وسيطته من مكتبتك» أو «تنقصه وسيطة» — قراءةٌ بلا كتابة
+  const facts = await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date())
+  const media: Record<string, string> = {}
+  for (const r of readPlan(p.csv, facts).rows) { const line = mediaLine(r); if (line !== '') media[String(r.line)] = line }
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),

@@ -255,3 +255,27 @@ describe('مراجعة D-322: ما يُرسم يوافق ما يقبله الخ�
     expect(count(`SELECT COUNT(*) AS n FROM posts WHERE id = '${POST}'`)).toBe(1)
   })
 })
+
+describe('مراجعة D-363: مجلّدُ وسائط Drive للمالك وحدَه', () => {
+  /*
+   * ‏`DRIVE_FOLDER_ID` و`GOOGLE_SA_JSON` مجلّدُ المالك. كان «زامن الآن» يأخذ منظّمةَ الجلسة، فمديرُ عميلٍ آخر ينسخ وسائطَ المالك
+   * ‏إلى `drive_media` وR2 تحت منظّمته، فتدخل مطابقةَ خطّته وتصديرَه.
+   */
+  it('منظّمةٌ أخرى تُردّ عن المزامنة واسم المجلّد، ولا ترى البطاقة؛ والمالكُ يراها', async () => {
+    const owner = cookieOf(await emailLogin(app, env))
+    expect(await (await app.request('/panel/assets', { headers: { Cookie: owner } }, env)).text()).toContain('id="drive-media"')
+    const csrf = await csrfOf(owner, '/panel/assets')
+    const key = `session:${owner.split('=')[1]!}`
+    const record = JSON.parse((await kv.get(key))!) as Record<string, unknown>
+    record['org'] = 'org_a'
+    await kv.put(key, JSON.stringify(record))
+    expect(await (await app.request('/panel/assets', { headers: { Cookie: owner } }, env)).text()).not.toContain('id="drive-media"')
+    const sync = await post('/panel/scan/media', owner, { _csrf: csrf })
+    expect(sync.status).toBe(303)
+    const named = await post('/panel/scan/media-folder', owner, { _csrf: csrf, folder: 'وسائطي' })
+    expect(named.status).toBe(303)
+    expect(count("SELECT COUNT(*) AS n FROM audit_log WHERE action LIKE 'drive.media.%'")).toBe(0)
+    expect(count('SELECT COUNT(*) AS n FROM drive_media_folder')).toBe(0)
+    expect(count('SELECT COUNT(*) AS n FROM drive_media')).toBe(0)
+  })
+})

@@ -9,9 +9,10 @@ import { escapeHtml } from './escape'
 import { html, raw } from './html'
 import { button } from './components/button'
 import { field } from './components/field'
+import { card } from './components/card'
 import { pageHead } from './parts'
 import { notice, toastRegion } from './components/toast'
-import { kb } from '../../lib/format'
+import { counted, kb, NOUNS } from '../../lib/format'
 import { folderOf, KIND_LABEL, LIBRARY_MIMES, ORIGIN_LABEL, searchAssets, type Asset, type AssetKind, type AssetOrigin } from '../../lib/library'
 import { assetMarks, assetSearch } from './sections/assetMarks'
 
@@ -32,6 +33,23 @@ export interface LibraryData {
   /** البحثُ والمفضّلة (D-347). */
   readonly q?: string
   readonly fav?: boolean
+  /** مجلّدُ وسائط المالك في Drive (D-363) — اسمُه وعددُ ما فيه. */
+  readonly driveMedia?: { readonly folder: string; readonly count: number }
+}
+
+/**
+ * بطاقةُ «وسائطك من Drive» (D-363) — اسمُ المجلّد يُغيَّر، و«زامن الآن» نموذجٌ يعمل بلا سكربت (D-328). والخطّةُ تختار منه لكلّ مادّة.
+ */
+export function driveMediaCard(dm: { readonly folder: string; readonly count: number }): string {
+  const body = '<p class="hint">صورُك ومقاطعُك في مجلّد <bdi dir="ltr">' + escapeHtml(dm.folder) + '</bdi> ومجلّداته الفرعيّة («01-…» لكلّ مادّة، و«داكن» أو «فاتح» في الاسم). '
+    + (dm.count === 0 ? 'لم يُزامَن منه شيءٌ بعد.' : 'في المكتبة منه ' + counted(dm.count, NOUNS.file) + '، وتختار الخطّةُ منها لكلّ مادّة.') + '</p>'
+    + '<form method="POST" action="/panel/scan/media-folder">'
+    + field({ id: 'dm-folder', label: 'اسم المجلّد', hint: 'كما في Drive، تحت مجلّد المصادر المشارَك.',
+      control: '<input type="text" id="dm-folder" name="folder" dir="ltr" maxlength="100" required value="' + escapeHtml(dm.folder) + '">' })
+    + '<div class="row gap-2 mt-3">' + button({ label: 'احفظ الاسم', size: 'sm', type: 'submit' }) + '</div></form>'
+    + '<form class="inline mt-3" method="POST" action="/panel/scan/media" data-busy="جار المزامنة…">'
+    + button({ label: 'زامن الآن', variant: 'primary', size: 'sm', type: 'submit' }) + '</form>'
+  return card({ variant: 'inset', id: 'drive-media', title: 'وسائطك من Drive', titleId: 'dm-h', attrs: 'aria-labelledby="dm-h"', body })
 }
 
 // ‏أيقوناتُ العُدّة لا حروفُ رموزٍ يرسمها خطُّ النظام (D-347)
@@ -136,6 +154,7 @@ export function libraryScreen(d: LibraryData): string {
   <div class="row gap-2 mb-4 lib-chips" role="group" aria-label="المنشأ">${chips(d, ORIGIN_LABEL, d.origin, 'origin', (v) => d.assets.filter((a) => v === null || a.origin === v).length)}</div>
   ${assetSearch(d.q ?? '', d.fav === true, keep)}
   ${upload}
+  ${d.driveMedia === undefined ? '' : driveMediaCard(d.driveMedia)}
   ${folders.size === 0
     ? '<p class="hint mt-4">لا شيءَ هنا بعد — ارفع صورة، أو ولّد صورةً لمسوّدة، أو أضف ملفًّا إلى مجلّد Drive.</p>'
     : [...folders].map(([f, list]) => `<section class="mt-4" aria-label="${escapeHtml(f)}">

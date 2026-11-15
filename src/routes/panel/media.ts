@@ -15,8 +15,8 @@ import { buildCommands } from '../ui/command'
 import { generateForPost, rejectMedia, resumeWaiting, waitingImages } from '../../lib/image/job'
 import { animateForPost, bindingFor } from '../../lib/media/video'
 import { NO_CREDIT } from '../../lib/media/workersAi'
-import { kb, money } from '../../lib/format'
-import { activeOrg } from '../../lib/tenancy'
+import { counted, kb, money, NOUNS } from '../../lib/format'
+import { activeOrg, OWNER_ORG } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { linkStates, listAccounts } from '../../lib/channels'
 import { validZone, zoneNote } from '../../lib/time/zone'
@@ -26,6 +26,7 @@ import { editPlanItem } from '../../lib/plan/edit'
 import { thumbFor, thumbWidth } from '../../lib/media/thumb'
 import { addLibraryFile, attachToPost, markAsset, libraryProblem, listLibrary, rawObject } from '../../lib/library'
 import { libraryScreen } from '../ui/libraryView'
+import { mediaFolderName, readDriveMedia, scanDriveMedia, setMediaFolderName } from '../../lib/drive/media'
 import { captionIssues, captionsFor, readCaptions, saveCaptions } from '../../lib/media/captions'
 import { momentLabel, presetAt } from '../../lib/time/local'
 import { injectCsrf, soloPage } from '../ui/shell'
@@ -59,11 +60,55 @@ media.get('/panel/assets', async (c) => {
     flash: await takeFlash(c.env, c.req.raw),
     q: (c.req.query('q') ?? '').slice(0, 80),
     fav: c.req.query('fav') === '1',
+    // ‏مجلّدُ وسائط المالك في Drive (D-363): اسمُه وعددُ ما زُومن
+    // ‏ومجلّدُ Drive المربوطُ مجلّدُ المالك وحدَه، فلا تُرى البطاقةُ لعميلٍ آخر
+    ...(org === OWNER_ORG ? { driveMedia: { folder: await mediaFolderName(c.env.DB, org), count: (await readDriveMedia(c.env.DB, org)).length } } : {}),
   })
   return page((nonce) =>
     soloPage('صدى — الأصول', { href: '/panel/library', label: 'المكتبة', at: '/panel/assets' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('library')),
   )
+})
+
+/**
+ * **مجلّدُ وسائطك في Drive** (D-363): اسمُه يُحفظ، و«زامن الآن» يسرده وينزّل ما نقص بسقفه — بلا نداءٍ مدفوع.
+ * وتحت `/panel/scan` فللمدير فما فوق كمسح المصادر (`access.ts`). **وللمالك وحدَه**: `DRIVE_FOLDER_ID` و`GOOGLE_SA_JSON` مجلّدُه،
+ * فمنظّمةٌ أخرى تُردّ ولا يُنسخ إليها من وسائطه شيء.
+ */
+async function ownerOnly(c: Context<{ Bindings: Env }>, org: string): Promise<Response | null> {
+  if (org === OWNER_ORG) return null
+  await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'مجلّدُ وسائط Drive لمنظّمة المالك وحدَها.' })
+  return c.redirect('/panel/assets', 303)
+}
+
+media.post('/panel/scan/media-folder', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const refused = await ownerOnly(c, org)
+  if (refused !== null) return refused
+  const saved = await setMediaFolderName(c.env.DB, org, String(gate.form.get('folder') ?? ''))
+  if (saved.ok) await record(c.env.DB, { actor: 'panel', action: 'drive.media.folder', target: saved.name }, c.req.raw)
+  await setFlash(c.env, c.req.raw, saved.ok ? { kind: 'ok', text: 'مجلّدُ وسائطك «' + saved.name + '» — زامنه الآن أو انتظر المسح اليوميّ.' } : { kind: 'bad', text: saved.reason })
+  return c.redirect('/panel/assets#drive-media', 303)
+})
+
+media.post('/panel/scan/media', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const refused = await ownerOnly(c, org)
+  if (refused !== null) return refused
+  const report = await scanDriveMedia({
+    db: c.env.DB, org, serviceAccountJson: c.env.GOOGLE_SA_JSON ?? '', rootFolderId: c.env.DRIVE_FOLDER_ID ?? '', bucket: c.env.MEDIA,
+  })
+  await record(c.env.DB, { actor: 'panel', action: 'drive.media.sync', target: report.folder,
+    detail: report.ok ? [report.seen, '+' + String(report.added), '~' + String(report.changed), 'R2 ' + String(report.fetched)].join(' · ') : report.reason.slice(0, 200) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, report.ok
+    ? { kind: 'ok', text: 'زُومن «' + report.folder + '»: ' + counted(report.seen, NOUNS.file) + '، جديدٌ ' + String(report.added) + '، ونُزّل ' + String(report.fetched)
+      + (report.deferred > 0 ? '، وبقي ' + String(report.deferred) + ' للمزامنة التالية' : '') + '.' }
+    : { kind: 'bad', text: report.reason })
+  return c.redirect('/panel/assets#drive-media', 303)
 })
 
 /**
