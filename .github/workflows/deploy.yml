@@ -84,7 +84,7 @@ jobs:
 
       # ‏كلُّ إجراءٍ بمعرّف التزامٍ كامل لا بوسم (D-319): الوسمُ يتحرّك، ومن ملكه غيّر ما يجري هنا بلا أن يتغيّر سطرٌ في المستودع.
       # ‏والإصدارُ في التعليق يقرؤه Dependabot فيرفع الاثنين معا.
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         if: steps.head.outputs.go == 'true'
         with:
           ref: ${{ env.SHA }}
