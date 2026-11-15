@@ -11,6 +11,7 @@ import { pageHead } from './parts'
 import { card } from './components/card'
 import { button } from './components/button'
 import { html, raw } from './html'
+import type { PlanRules } from '../../lib/plan/guidelines'
 
 export interface PreviewData {
   readonly key: string
@@ -20,6 +21,7 @@ export interface PreviewData {
   readonly via: string
   readonly widened: boolean
   readonly cost: number
+  readonly rules?: PlanRules | null
 }
 
 const SHOWN = 60
@@ -63,6 +65,8 @@ export function planPreviewScreen(d: PreviewData): string {
   return html`${raw(pageHead('الخطّة', 'هذا ما فهمته', 'لم يُبنَ شيءٌ بعد. راجع ما قرأتُه من ملفّك، فإن صحّ فابنِ.'))}
     <div class="stack">
       ${raw(card({ title: 'الخلاصة', level: 2, body: facts.value }))}
+      ${d.rules == null ? html`` : raw(card({ title: 'قواعد الكتابة من ورقة الإرشادات', level: 2, body: html`<div class="pv-rules">${Object.entries(d.rules).map(([p, list]) => html`<section><h3 class="m-0">${p}</h3>
+        <dl class="pv-facts">${list.map((r) => html`<div><dt>${r.item}</dt><dd>${r.value}</dd></div>`)}</dl></section>`)}</div>`.value }))}
       ${raw(card({ title: 'الصفوف', level: 2, body: table.value }))}
       ${act}
     </div>`.value

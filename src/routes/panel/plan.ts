@@ -9,6 +9,7 @@ import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { planPreviewScreen } from '../ui/planPreviewView'
 import { widenPlan } from '../../lib/plan/widen'
+import type { PlanRules } from '../../lib/plan/guidelines'
 import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
@@ -1019,12 +1020,12 @@ plan.post('/panel/plan/import', async (c) => {
   const key = crypto.randomUUID()
   await c.env.KV.put('plan-preview:' + key, JSON.stringify({
     org, csv, filled: Object.fromEntries([...filled].map(([l, n]) => [String(l), n])),
-    via: table.via, widened: wide.widened, cost: table.cost, imageStyle,
+    via: table.via, widened: wide.widened, cost: table.cost, imageStyle, rules: table.rules ?? null,
   }), { expirationTtl: 3600 })
   return c.redirect('/panel/plan/import/preview?k=' + key, 303)
 })
 
-interface StoredPreview { org: string; csv: string; filled: Record<string, string>; via: string; widened: boolean; cost: number; imageStyle: PlanImageStyle | null }
+interface StoredPreview { org: string; csv: string; filled: Record<string, string>; via: string; widened: boolean; cost: number; imageStyle: PlanImageStyle | null; rules?: PlanRules | null }
 
 async function loadPreview(kv: Env['KV'], key: string, org: string): Promise<StoredPreview | null> {
   if (!/^[0-9a-f-]{36}$/.test(key)) return null
@@ -1043,7 +1044,7 @@ plan.get('/panel/plan/import/preview', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.' })
     return c.redirect('/panel/plan/import', 303)
   }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost })
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),
@@ -1067,7 +1068,7 @@ plan.post('/panel/plan/import/confirm', async (c) => {
   const csv = p.csv
   const filled = new Map(Object.entries(p.filled).map(([l, n]) => [Number(l), n]))
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
-  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle)
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null)
   await record(c.env.DB, {
     actor: 'panel', action: 'plan.import.seat', target: seated.planId,
     detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',

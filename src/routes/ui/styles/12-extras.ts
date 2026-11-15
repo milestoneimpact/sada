@@ -848,4 +848,5 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pv-table{inline-size:100%; border-collapse:collapse; font-size:.9375rem}
 .pv-table th,.pv-table td{padding:var(--s-2); border-block-end:1px solid var(--line); text-align:start; vertical-align:top}
 .pv-table td:last-child{color:var(--ink-2); white-space:nowrap}
+.pv-rules{display:grid; gap:var(--s-4)}
 `
