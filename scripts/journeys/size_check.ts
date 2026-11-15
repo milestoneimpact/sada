@@ -13,7 +13,7 @@ const browser = await chromium.launch({ executablePath: CHROMIUM })
 try {
   const page = await browser.newPage()
   await login(page, stack)
-  for (const path of ['/panel', '/panel/library', '/panel/accounts', '/panel/settings', '/panel/analysis', '/panel/report', '/panel/tasks']) {
+  for (const path of ['/panel', '/panel/library', '/panel/accounts', '/panel/settings', '/panel/analysis', '/panel/report', '/panel/tasks', '/panel/tasks/later']) {
     const res = await page.request.get(`${stack.url}${path}`)
     const body = await res.body()
     const html = body.toString('utf8')

@@ -61,6 +61,7 @@ import { button } from './components/button'
 import { card } from './components/card'
 import { dialog } from './components/dialog'
 import { REVOKE_PAGE } from '../../lib/oauth/disconnect'
+import { taskHref } from '../../lib/owner'
 
 /** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
 export interface PostMedia {
@@ -841,7 +842,7 @@ function reachCard(platform: 'youtube' | 'tiktok', isPublic: boolean, noScope = 
          <b>وإن لم تكن ${who} قد أجازت تطبيقك</b> فسيصل خاصًّا رغم ذلك — أعده خاصًّا حتّى تُجاز.</p>`
     : `<p class="hint">${why} فيصل كلّ مقطع خاصًّا، وتنشره أنت ${where}.
          <b>وبعد أن تُجيز ${who} تطبيقَك</b> اقلب هذا، ${after}
-         <a class="tap" href="/panel/tasks">ما عليك لتُجاز</a></p>`
+         <a class="tap" href="${taskHref(platform === 'youtube' ? 'M-28' : 'M-29')}">ما عليك لتُجاز</a></p>`
   const confirm = isPublic
     ? `يعود كلّ مقطع على ${platformLabel(platform)} خاصًّا تنشره أنت ${where}. أتمضي؟`
     : `أأجازت ${who} تطبيقك؟ قبل الإجازة يصل المقطع خاصًّا مهما طُلب. من الآن يُطلب لكلّ مقطع على ${platformLabel(platform)} النشر للعامّة.`

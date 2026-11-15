@@ -13,7 +13,8 @@ import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
 import { byUrgency, draftsSection } from './sections/drafts'
-import { gatesScreen, tasksScreen } from './tasksView'
+import { gatesScreen, laterScreen, tasksScreen } from './tasksView'
+import { ownerRows, OWNER_TASKS, taskHref, type OwnerFacts } from '../../lib/owner'
 import { commandTrigger } from './command'
 import { railHtml } from './rail'
 import { GLYPH_ICON, ICON } from './icons'
@@ -217,17 +218,105 @@ describe('ما يُكتب في الوسم يُرسَم في الورقة', () =>
   })
 
   it('«ما عليك» يقول ما بقي أوّلًا: ما تمّ مطويّ، والشرحُ مرّةً، والبوّاباتُ سطرٌ إلى صفحتها (EASE-PLAN · دمج D-318 مع D-324)', () => {
-    const r = (code: string, state: boolean) => ({ code, title: code, ifLeft: 'يقف', unblocks: 'capability', state, measured: '', done: () => state }) as never
+    // ‏حارسٌ لا قدرة: القدرةُ في صفحتها منذ متابعة D-324، فالصفوفُ هنا ممّا يبقى في «ما عليك»
+    const r = (code: string, state: boolean) => ({ code, title: code, ifLeft: 'يقف', unblocks: 'guard', state, measured: '', done: () => state }) as never
     const html = tasksScreen({ phase: '3', env: 'staging', rows: [r('M-01', true), r('M-02', false), r('M-03', true)] })
     const open = html.slice(0, html.indexOf('<details class="setup mt-3">'))
     expect(open).toContain('M-02')
     expect(open).not.toContain('M-01')
     expect(html).toContain('<summary>تمّت (2)</summary>')
-    expect(html.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
+    expect(html.match(/ويبدو محروسا/g)).toHaveLength(1)
     // ‏كانت طيّةً بشرحها وبطاقاتها (‏0.95KB مضغوطًا)، وصارت سطرًا يقول المرحلةَ ويحيل
     expect(html).toContain('<a class="tap" href="/panel/gates">بوّابات المراحل</a> · أنت في المرحلة 3')
     expect(html).not.toContain('<details class="setup mt-6">')
     expect(tasksScreen({ phase: null, env: 'staging', rows: [] })).toContain('href="/panel/gates">بوّابات المراحل</a> · اجتِزن كلُّهنّ')
+  })
+
+  /**
+   * ‏**القائمةُ بنوعها في صفحتين** (متابعة D-324): «ما عليك» ‏14.0KB مضغوطًا من ‏14KB، والمهمّةُ نحو ‏0.19KB، ومهامُّ قرارين
+   * ‏قادمة. فما يوقف مرحلةً أو يحرس يبقى، وما يفتح قدرةً في «تفتح قدرة»، وسطرٌ في رأس «ما عليك» يحيل إليها بعدد ما عليك منها.
+   */
+  it('و«ما عليك» لما يوقف أو يحرس، وما يفتح قدرةً في صفحته بسطرٍ يعدّه (متابعة D-324)', () => {
+    const r = (code: string, unblocks: string, state: boolean | null) =>
+      ({ code, title: `عنوان ${code}`, ifLeft: 'يقف', unblocks, state, measured: '', done: () => state }) as never
+    const rows = [r('M-01', 'gate', false), r('M-02', 'guard', null), r('M-03', 'capability', false), r('M-04', 'capability', false), r('M-05', 'capability', true)]
+    const html = tasksScreen({ phase: '0', env: 'staging', rows })
+    for (const code of ['M-01', 'M-02']) expect(html, code).toContain(`>${code}</bdi>`)
+    for (const code of ['M-03', 'M-04', 'M-05']) expect(html, code).not.toContain(`>${code}</bdi>`)
+    // ‏والرأسُ يسمّي ما يعدّه (مراجعة متابعة D-324): كان «<b>1</b> عليك، منها» فيُقرأ عن القائمة كلّها
+    expect(html).toMatch(/<b>1<\/b> عليك ممّا يوقف أو يحرس، منها\s+<b>1<\/b> توقف بوّابة مرحلة\./)
+    expect(html).toContain('<a class="tap" href="/panel/tasks/later">تفتح قدرة</a> · 2 عليك، ولا ينكسر شيء بتركها.')
+    // ‏وشرحُ «قدرة» في صفحتها لا هنا، و«بوّابة» و«حارس» هنا مرّةً
+    expect(html).not.toContain('تُفتَح قدرة جديدة')
+    expect(html.match(/مرحلة لا تُجتاز بدونها/g)).toHaveLength(1)
+    // ‏ولا شيء عليك منها: السطرُ يقوله ولا يغيب
+    expect(tasksScreen({ phase: '0', env: 'staging', rows: [r('M-01', 'gate', false), r('M-05', 'capability', true)] }))
+      .toContain('<a class="tap" href="/panel/tasks/later">تفتح قدرة</a> · لا شيء عليك ممّا يُعرَف منها، ولا ينكسر شيء بتركها.')
+
+    const page = laterScreen({ env: 'staging', rows })
+    expect(page).toContain('<h1>تفتح قدرة</h1>')
+    for (const code of ['M-03', 'M-04', 'M-05']) expect(page, code).toContain(`>${code}</bdi>`)
+    for (const code of ['M-01', 'M-02']) expect(page, code).not.toContain(`>${code}</bdi>`)
+    expect(page).toContain('<b>2</b> عليك')
+    expect(page).toContain('<span class="chip">1 تمّت · 2 عليك · 0 لا تُعرَف</span>')
+    expect(page).toContain('<summary>تمّت (1)</summary>')
+    expect(page.match(/<details class="setup task[^"]*" open>/g)).toHaveLength(1)
+    expect(page.match(/تُفتَح قدرة جديدة/g)).toHaveLength(1)
+    // ‏والبوّاباتُ وسرعةُ اللوحة في «ما عليك» وحدَها
+    expect(page).not.toContain('href="/panel/gates"')
+    expect(page).not.toContain('سرعةُ اللوحة عندك')
+  })
+
+  /**
+   * ‏**ورأسُ كلّ صفحةٍ يسمّي ما يعدّه** (مراجعة متابعة D-324): كان رأسُ «ما عليك» يعدّ البوّابةَ والحارسَ وحدهما ويقول «N عليك» كما
+   * ‏كان يعدّ الكلّ، وحين لا شيء منهما يقول «لا شيء عليك ممّا يُعرَف من هنا» وسطرُ «تفتح قدرة» تحته «2 عليك» — في الشاشة الأولى
+   * ‏نفسِها. وهذا حالُ المالك العاديّ بعد أن يُغلق البوّابات والحرّاس والقدرةُ مفتوحة.
+   */
+  it('ورأسُ كلّ صفحةٍ يسمّي ما يعدّه، فلا يقول «لا شيء عليك» وسطرُ «تفتح قدرة» تحته يعدّ (مراجعة متابعة D-324)', () => {
+    const r = (code: string, unblocks: string, state: boolean | null) =>
+      ({ code, title: `عنوان ${code}`, ifLeft: 'يقف', unblocks, state, measured: '', done: () => state }) as never
+    const lede = (h: string): string =>
+      (/<p class="lede">([\s\S]*?)<\/p>/.exec(h)?.[1] ?? '').replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()
+    const laterLine = (h: string): string => /href="\/panel\/tasks\/later">تفتح قدرة<\/a> · ([^،]+)،/.exec(h)?.[1] ?? ''
+
+    // ‏البوّابةُ والحارسُ تمّا والقدرةُ عليك: الرأسُ يسمّي ما يعدّه، والسطرُ تحته يعدّ القدرة
+    const closed = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-01', 'gate', true), r('M-02', 'guard', true), r('M-03', 'capability', false), r('M-04', 'capability', false)] })
+    expect(lede(closed)).toBe('لا شيء عليك ممّا يوقف أو يحرس، فيما يُعرَف من هنا.')
+    expect(laterLine(closed)).toBe('2 عليك')
+
+    // ‏وما بقي منهما لا يُعرَف من هنا (حالُ العيّنة بعد M-04 وM-16 وM-18): يُقال المجهول، ولا يُقرأ الفراغُ «تمّ كلُّ شيء»
+    const unread = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-31', 'gate', null), r('M-16', 'guard', true), r('M-19', 'capability', false), r('M-17', 'capability', false)] })
+    expect(lede(unread)).toBe('لا شيء عليك ممّا يوقف أو يحرس، فيما يُعرَف من هنا — و1 لا تُقرأ من اللوحة، تُراجَع في بوّابة المنصّة.')
+    expect(laterLine(unread)).toBe('2 عليك')
+
+    // ‏والعددُ يسمّي ما يعدّه: البوّابةَ والحارسَ، لا القدرةَ التي سطرُها تحته
+    const pending = tasksScreen({ phase: '0', env: 'staging', rows: [r('M-01', 'gate', false), r('M-02', 'guard', false), r('M-03', 'capability', false)] })
+    expect(lede(pending)).toBe('2 عليك ممّا يوقف أو يحرس، منها 1 توقف بوّابة مرحلة.')
+    expect(laterLine(pending)).toBe('1 عليك')
+
+    // ‏و«تفتح قدرة» حين لا شيء منها عليك لا تقول «لا شيء عليك» والبوّابةُ معلّقةٌ في «ما عليك»
+    const page = laterScreen({ env: 'staging', rows: [r('M-01', 'gate', false), r('M-03', 'capability', true), r('M-05', 'capability', null)] })
+    expect(lede(page)).toBe('لا شيء عليك ممّا يفتح قدرة، فيما يُعرَف من هنا — و1 لا تُقرأ من اللوحة، تُراجَع في بوّابة المنصّة.')
+    expect(lede(laterScreen({ env: 'staging', rows: [r('M-03', 'capability', true)] }))).toBe('لا شيء عليك ممّا يفتح قدرة، فيما يُعرَف من هنا.')
+
+    // ‏ولا رأسَ يقول «لا شيء عليك» بلا اسمِ ما يعدّه
+    for (const h of [closed, unread, pending, page]) expect(lede(h)).not.toMatch(/^لا شيء عليك ممّا يُعرَف/)
+  })
+
+  /** ‏**والرابطُ إلى مهمّةٍ يتبع نوعَها** (متابعة D-324): صفحتُها ومرساةُ عنوانها فيها، فمهمّةٌ يتبدّل نوعُها يتبعها كلُّ رابط. */
+  it('ورابطُ كلّ مهمّةٍ يصل صفحةَ نوعها وعنوانَها فيها', () => {
+    const facts: OwnerFacts = {
+      secrets: new Set(), vars: new Set(), linked: new Set(), appsConfigured: new Set(), appsVerified: new Set(),
+      anyPublished: false, videoPriced: false, tilesChosen: 0, promoCapUsd: 0, linkedInVersionDue: false,
+    }
+    const rows = ownerRows(facts)
+    const pages = { '/panel/tasks': tasksScreen({ phase: null, env: 'staging', rows }), '/panel/tasks/later': laterScreen({ env: 'staging', rows }) }
+    for (const t of OWNER_TASKS) {
+      const [path, anchor] = taskHref(t.code).split('#') as [keyof typeof pages, string]
+      expect(path, t.code).toBe(t.unblocks === 'capability' ? '/panel/tasks/later' : '/panel/tasks')
+      expect(pages[path], t.code).toContain(`id="${anchor}"`)
+    }
+    expect(() => taskHref('M-00')).toThrow()
   })
 
   it('وصفحةُ البوّابات: رأسُها يقول المرحلة، والشرحُ مرّةً، ولكلّ بوّابةٍ بطاقتُها بدليل كلّ بند', () => {
@@ -1204,7 +1293,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
     }
     const html = section([draft('d1')], { mediaReady: noBrowser })
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit" disabled aria-describedby="why-info-d1">ولّد إنفوجرافيك</button>')
-    expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
+    expect(html).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks/later#task-t-M-19">ما عليك</a>')
     expect(html).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
 
     // ‏ونموذجُ الكتابة الساقطُ ينتظرك ولا يُعطِّل: المحتوى من النصّ مباشرةً
@@ -1264,7 +1353,7 @@ describe('نقاط الجاهزيّة تحت زرَّي الصورة والمق�
       mediaReady: withImage(slideGate({ overlay: true, hasBrowserKey: false, hasAccount: true })),
     })
     expect(waiting).toContain('<button class="btn btn-secondary btn-sm" type="submit">ولّد صورةً فنّيّة</button>')
-    expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks">ما عليك</a>')
+    expect(waiting).toContain('<span class="ago">بلا مفتاح المتصفّح</span><a class="tap" href="/panel/tasks/later#task-t-M-19">ما عليك</a>')
   })
 
   /*

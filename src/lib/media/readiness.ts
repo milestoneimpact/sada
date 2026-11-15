@@ -30,6 +30,7 @@ import type { Blocker, VideoCapGate } from '../limits'
 import type { RungState } from '../platform/readiness'
 import type { ImageRefusal, SlideGate } from '../image/gate'
 import type { VideoFace } from './video'
+import { taskHref } from '../owner'
 
 export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips' | 'browser' | 'writer'
 
@@ -65,7 +66,8 @@ export interface MediaLine {
 
 const LIMITS = { label: 'افتح الحدود', href: '#limits' } as const
 const PROVIDERS = { label: 'افتح المزوّدين', href: '#providers' } as const
-const TASKS = { label: 'ما عليك', href: '/panel/tasks' } as const
+// ‏مفتاحُ المتصفّح ومعرّفُ الحساب مهمّةُ M-19، وهي قدرةٌ في «تفتح قدرة» منذ متابعة D-324: الرابطُ يصل صفحتَها وعنوانَها فيها
+const TASKS = { label: 'ما عليك', href: taskHref('M-19') } as const
 
 /**
  * سببُ الحارس في ستّ كلماتٍ فأقلّ — **شاملٌ للأنواع الخمسة**.

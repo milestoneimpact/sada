@@ -14,8 +14,9 @@
 // ‏و«الرئيسيّةُ الخالية» بحسابيها (D-326): قائمةُ البدء و«منصّاتٌ لاحقة» مفتوحة — وضعٌ يُشحَن فيُدقَّق
 const PANEL = ['panel', 'panel-library', 'panel-accounts', 'panel-settings', 'panel-results', 'panel-first',
   'panel-first-accounts', 'panel-zero', 'panel-zero-accounts', 'panel-editor', 'panel-editor-queued', 'panel-week', 'panel-plan-off']
-// ‏و«بوّابات المراحل» بجانب «ما عليك» (دمجُ D-318 مع D-324): خرجت منها إلى صفحتها، فتُدقَّق حيثما دُقّقت هي
-const SCREENS = ['screen-tasks', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
+// ‏و«بوّابات المراحل» بجانب «ما عليك» (دمجُ D-318 مع D-324): خرجت منها إلى صفحتها، فتُدقَّق حيثما دُقّقت هي.
+// ‏و«تفتح قدرة» كذلك (متابعة D-324): مهامُّ القدرة خرجت من «ما عليك» إلى صفحتها
+const SCREENS = ['screen-tasks', 'screen-tasks-later', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
   'screen-tiktok', 'screen-link-only', 'screen-yt-setup', 'screen-instagram', 'screen-unbuilt', 'screen-refused',
   'screen-journey', 'screen-spread', 'screen-notices', 'screen-plan-new', 'screen-plan-build', 'screen-plan-review', 'screen-assets', 'screen-plan-seat', 'screen-plan-doc', 'screen-timeline', 'screen-login', 'screen-2fa', 'screen-enrol', 'screen-stepup', 'screen-resume', 'screen-resume-invite', 'screen-resume-cut', 'screen-404', 'screen-landing',
   'screen-500']
@@ -25,9 +26,9 @@ export const GROUPS = {
   base: BASE,
   kit: [...PANEL, ...SCREENS, 'screen-kit', 'privacy'],
   copy: [...PANEL, ...SCREENS, 'screen-connected', 'privacy'],
-  text: [...PANEL, 'screen-tasks', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-journey', 'screen-spread', 'screen-notices', 'screen-plan-new', 'screen-plan-build', 'screen-plan-review', 'screen-plan-seat', 'screen-plan-doc', 'screen-linkedin',
+  text: [...PANEL, 'screen-tasks', 'screen-tasks-later', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-journey', 'screen-spread', 'screen-notices', 'screen-plan-new', 'screen-plan-build', 'screen-plan-review', 'screen-plan-seat', 'screen-plan-doc', 'screen-linkedin',
     'screen-li-setup', 'screen-login', 'screen-2fa', 'screen-enrol', 'screen-stepup', 'screen-resume', 'screen-resume-invite', 'screen-resume-cut', 'screen-404', 'screen-landing', 'screen-500', 'privacy'],
-  print: ['privacy', 'screen-plan-doc', 'screen-report', 'screen-journey', 'screen-tasks', 'screen-gates', 'screen-spread', 'screen-timeline'],
+  print: ['privacy', 'screen-plan-doc', 'screen-report', 'screen-journey', 'screen-tasks', 'screen-tasks-later', 'screen-gates', 'screen-spread', 'screen-timeline'],
 }
 
 const group = process.argv[2] ?? 'base'

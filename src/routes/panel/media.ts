@@ -360,10 +360,10 @@ media.post('/panel/media/animate', async (c) => {
             }
           : outcome.kind === 'blocked'
             ? { kind: 'warn', text: outcome.reason }
-            // ‏نفادُ الرصيد مهمّةٌ لا عطل (D-214): يُقال ما تفعله، والتفصيلُ في «ما عليك»
+            // ‏نفادُ الرصيد مهمّةٌ لا عطل (D-214): يُقال ما تفعله، والتفصيلُ في «ما عليك» ← «تفتح قدرة» (M-30 قدرة، متابعة D-324)
             : outcome.reason.startsWith(NO_CREDIT)
               ? { kind: 'warn', text: 'لم يُحرَّك المقطع: رصيد AI Gateway نفد. أضِف رصيدًا من لوحة Cloudflare، ' +
-                  'والخطوات في «ما عليك» تحت «رصيد AI Gateway». ولم يُصرف شيء.' }
+                  'والخطوات في «تفتح قدرة» من «ما عليك»، تحت «رصيد AI Gateway». ولم يُصرف شيء.' }
               : { kind: 'bad', text: `تعذّر تحريك الصورة: ${outcome.reason}` }
 
   await record(

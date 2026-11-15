@@ -48,6 +48,17 @@ describe('من يملك ماذا (D-272)', () => {
     }
   })
 
+  /**
+   * ‏**وصفحةُ «تفتح قدرة» بدور «ما عليك» نفسِه** (متابعة D-324): مهامُّ القدرة كانت في «ما عليك» فلا يراها إلّا من يراها،
+   * ‏وخرجت إلى صفحتها لوزن الأولى. والبابُ الجديد تحت `/panel/tasks/` فيقع في قاعدة «ما عليك» نفسِها، وهذا يحرسه أن يبقى.
+   */
+  it('و«تفتح قدرة» بدور «ما عليك» لا أدنى', () => {
+    for (const method of ['GET', 'HEAD']) {
+      expect(requiredRole(method, '/panel/tasks/later', null)).toBe(requiredRole(method, '/panel/tasks', null))
+      expect(requiredRole(method, '/panel/tasks/later', null)).toBe('admin')
+    }
+  })
+
   it('وبابٌ جديدٌ لم يُصنَّف للمالك وحدَه — يُغلَق لا يُفتح', () => {
     expect(requiredRole('POST', '/panel/something-new', null)).toBe('owner')
   })
