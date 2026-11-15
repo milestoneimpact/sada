@@ -11,6 +11,7 @@ import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
+import { planFollowScreen } from '../ui/planFollowView'
 import { localToUtc } from '../../lib/time/local'
 import { localParts } from '../../lib/time/zone'
 import { approveMany, decide, saveText } from '../../lib/draft/store'
@@ -429,7 +430,8 @@ plan.post('/panel/plan/approve-all', async (c) => {
     kind: done.done === 0 && done.failed.length === 0 ? 'warn' : done.failed.length === 0 ? 'ok' : done.done === 0 ? 'bad' : 'warn',
     text: sayApprovedAll(done.done, done.failed) + (settled === null ? '' : ' ' + saySettled(settled)),
   })
-  return c.redirect(gate.form.get('back') === 'review' ? '/panel/plan/review' : '/panel/client', 303)
+  // ‏وبعد اعتماد الخطّة كلِّها من المراجعة تنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)
+  return c.redirect(gate.form.get('back') === 'review' ? (done.failed.length === 0 ? '/panel/plan/follow' : '/panel/plan/review') : '/panel/client', 303)
 })
 
 /**
@@ -671,6 +673,52 @@ const toCard = (form: FormData, anchor = true): Response => {
   const index = form.get('index')
   return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + weekOf(form) + (anchor && index !== null && Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
 }
+
+/**
+ * **المتابعة** (الشاشةُ الرابعة: ابنِ ← راجع ← اعتمد ← تابع): ما فشل وما جُدول وما نُشر من الخطّة الحاليّة، بلا تحرير.
+ */
+plan.get('/panel/plan/follow', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null) return c.redirect('/panel/plan/new', 303)
+  const [model, zone, flash] = await Promise.all([
+    reviewModel(c.env.DB, org, current),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    takeFlash(c.env, c.req.raw),
+  ])
+  const body = planFollowScreen(model, zone ?? null) +
+    (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  return page((nonce) =>
+    soloPage('صدى — متابعةُ الخطّة', { href: '/panel/plan/review', label: 'المراجعة', at: '/panel/plan/follow' }, body, nonce,
+      '', buildCommands({ onPanel: false }), soloNav('plan')),
+  )
+})
+
+/**
+ * **«ألغِ الخطّة»**: تصير الخطّةُ مستبدَلة (`superseded`) فلا تفتحها «الخطّة» بعدها، وتُرفض مسوّداتُها التي لم تُجدوَل.
+ * وما جُدول يبقى في موعده — يُسحب من «المنشورات» بيد المالك إن شاء، فالإلغاءُ لا يسحب نشرًا بلا علمه.
+ */
+plan.post('/panel/plan/cancel', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('id') ?? '')
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'صارت للخطّة نسخةٌ أحدث — افتح المراجعة من جديد.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const [drafts] = await c.env.DB.batch([
+    c.env.DB.prepare("UPDATE posts SET status = 'rejected' WHERE org_id = ? AND plan_id = ? AND status IN ('draft', 'approved')").bind(org, id),
+    c.env.DB.prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND id = ?").bind(org, id),
+  ])
+  const rejected = drafts?.meta?.changes ?? 0
+  await record(c.env.DB, { actor: 'panel', action: 'plan.cancel', target: id, detail: String(rejected) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُلغيت الخطّة، ورُفضت ' + String(rejected) + ' من مسوّداتها. ابنِ خطّةً جديدة متى شئت.' })
+  return c.redirect('/panel/plan/new', 303)
+})
 
 /**
  * **«أعد كتابة ما تعذّر»** (PL-23): يرسل رسالةَ كتابةٍ لكلّ بندٍ بلا مسوّدةٍ قيل سببُ تعذّره، بضغطة المالك لا وحدَه — نداءٌ مدفوع
