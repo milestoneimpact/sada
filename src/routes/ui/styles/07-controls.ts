@@ -10,30 +10,45 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
   border:var(--bd-clear); padding:var(--s-2) var(--s-4); min-height:var(--tap);
   min-width:var(--tap); box-sizing:border-box; display:inline-flex; align-items:center;
   justify-content:center; gap:var(--s-2); text-decoration:none; white-space:nowrap;
-  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-1) var(--ease),
+  transition:background var(--dur-1) var(--ease), border-color var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease),
     transform var(--dur-1) var(--ease);
   border-radius:var(--r-control)}
 /* ‏والضغطة تصغير خفيف لا إزاحة (D-246): «scale» لا يهزّ الصفّ لأنّه لا يغيّر التخطيط */
 .btn:active:not(:disabled):not([aria-disabled="true"]){transform:scale(.97)}
-@media(hover:hover){.btn-primary:hover,.btn-secondary:hover{box-shadow:var(--sh-2)}}
-/* ‏الأوّليّ: فعلٌ واحدٌ في كلّ منطقة، بتمريرٍ وضغطٍ مسمّيين (D-187) */
-.btn-primary{background:var(--brand); color:var(--on-brand)}
-.btn-primary:active:not(:disabled){background:var(--brand-press)}
-/* ‏والثانويُّ بحدٍّ وظيفيٍّ يبلغ ‏3:1 على السطح (WCAG 1.4.11): كان ‏١٫٧٦:١ فلا يُرى زرًّا */
-.btn-secondary{background:var(--surface); color:var(--ink); border-color:var(--field); box-shadow:none}
-@media(hover:hover){.btn-secondary:hover{background:var(--hover)}}
-.btn-secondary:active:not(:disabled){background:var(--press)}
+/* ── زجاجٌ هادئ (صفاء): كلُّ زرٍّ قطعةُ بلّورٍ من العائلة نفسِها — خيطُ ضوءٍ أعلاه بلا تمويه، والمادّةُ تختلف.
+   **ولا تمويهَ في ظلٍّ داخليّ**: الخيطان «0 1px 0» حادّان، والظلُّ المموَّه «--sh-*» وحدَه (audit_tokens) */
+/* ‏الأوّليّ: لوحُ زجاجٍ ملوّن بثلاث درجاتٍ من الهويّة مخبوزةٍ في الرموز، يرتفع بكسلًا عند التمرير */
+.btn-primary{background:var(--brand); background-image:linear-gradient(180deg,var(--brand-hi),var(--brand) 55%,var(--brand-lo)); color:var(--on-brand);
+  box-shadow:var(--crystal), var(--sh-1)}
+@media(hover:hover){.btn-primary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-hover); background-image:linear-gradient(180deg,var(--brand-hover-hi),var(--brand-hover));
+  box-shadow:var(--crystal), var(--sh-2); transform:translateY(calc(-1 * var(--ul)))}}
+.btn-primary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-press); background-image:linear-gradient(180deg,var(--brand-press),var(--brand-press));
+  box-shadow:var(--crystal-in)}
+/* ‏والثانويُّ زجاجٌ مُصقَّع بلمسة تركواز، وحدُّه «--field» الذي يبلغ ‏3:1 (WCAG 1.4.11) */
+.btn-secondary{background:var(--surface); background-image:linear-gradient(180deg,var(--surface),var(--surface-2)); color:var(--ink); border-color:var(--field);
+  box-shadow:var(--gleam-hi), var(--sh-1)}
+@media(hover:hover){.btn-secondary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--hover); background-image:linear-gradient(180deg,var(--hover),var(--hover)); box-shadow:var(--gleam-hi), var(--sh-2)}}
+.btn-secondary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--press); background-image:none; box-shadow:inset 0 0 0 var(--stroke) var(--line)}
 /* ‏والهادئُ رابطٌ بهيئة زرّ: بلا أرضٍ ولا حدّ، حبرُ الرابط **وخطٌّ تحته دائمًا** — «--link» و
-   «--ink-2» ليلًا متقاربان ضوءًا (‏١٫٠٨:١)، فاللون وحدَه لا يكفي؛ والخطّ يثخن عند التمرير */
+   «--ink-2» ليلًا متقاربان ضوءًا، فاللون وحدَه لا يكفي؛ والخطّ يثخن عند التمرير على غسلةٍ من الهويّة */
 .btn-quiet{background:transparent; border-color:transparent; color:var(--link);
   text-decoration:underline; text-decoration-thickness:var(--ul); text-underline-offset:var(--ul-off)}
-@media(hover:hover){.btn-quiet:hover{text-decoration-thickness:var(--stroke)}}
-/* ‏والخطِرُ ثانويٌّ بحبر «--bad» وحدِّه — والمصمتُ الأحمرُ لحوار ما لا رجعةَ فيه وحدَه */
-.btn-danger{background:var(--surface); color:var(--bad); border-color:color-mix(in srgb,var(--bad) 34%,transparent)}
-@media(hover:hover){.btn-danger:hover{background:var(--bad-wash)}}
+@media(hover:hover){.btn-quiet:hover{text-decoration-thickness:var(--stroke); background:var(--tint-wash)}}
+/* ‏والخطِرُ زجاجٌ مُصقَّعٌ بحمرة: حبرُ «--bad» وحدُّه — والمصمتُ الأحمرُ لحوار ما لا رجعةَ فيه وحدَه */
+.btn-danger{background:var(--surface); background-image:linear-gradient(180deg,var(--surface),var(--bad-wash) 260%); color:var(--bad);
+  border-color:color-mix(in oklab,var(--bad) 34%,transparent); box-shadow:var(--gleam-hi), var(--sh-1)}
+@media(hover:hover){.btn-danger:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--bad-wash); background-image:linear-gradient(180deg,var(--bad-wash),var(--bad-wash)); box-shadow:var(--gleam-hi), var(--sh-2)}}
 /* ‏وزرُّ الأيقونة مربّعُ الهدف نفسِه، واسمُه في «aria-label» وتلميحُه في «title» (3.4) */
 .btn-icon{padding:0; width:var(--tap); background:transparent; color:var(--ink-2)}
-@media(hover:hover){.btn-icon:hover{background:var(--hover); color:var(--ink)}}
+@media(hover:hover){.btn-icon:hover:not(:disabled):not([aria-disabled="true"]){background:var(--hover); color:var(--ink); box-shadow:var(--gleam-hi)}}
+@media(prefers-reduced-motion:reduce) and (hover:hover){.btn-primary:hover{transform:none}}
+/* ‏وفي الألوان القسريّة: «border-color» وحدَه — «var(--bd) ButtonText» لونان في قيمةٍ واحدة فتسقط القيمة كلُّها،
+   وكلُّ حالات الأوّليّ تُسمّى، وإلّا صار «HighlightText» على «Canvas» عند التمرير فاختفى النصّ */
+@media(forced-colors:active){.btn{box-shadow:none; text-shadow:none; border-color:ButtonText}
+  .btn-quiet,.btn-icon{border-color:transparent}
+  .btn-primary,.btn-primary:active:not(:disabled):not([aria-disabled="true"]){background:Highlight; color:HighlightText; forced-color-adjust:none}
+  .btn-primary:disabled,.btn-primary[aria-disabled="true"]{background:Canvas; color:GrayText; border-color:GrayText}}
+@media(forced-colors:active) and (hover:hover){.btn-primary:hover:not(:disabled):not([aria-disabled="true"]){background:Highlight; color:HighlightText}}
 /* «الصغير» أضيقُ حشوا لا أقصرُ قامة ولا أصغرُ حرفًا: زرٌّ في جدولٍ يزدحم عرضا لا
    طولا، وتقصيرُه يُسقطه دون حدّ الهدف — وهو ما كان يقع. **وحرفُه حرف الأزرار** (D-185). */
 .btn-sm{padding:var(--s-1) var(--s-3)}
@@ -48,7 +63,7 @@ a.chip>svg{width:var(--icon-xs); height:var(--icon-xs); flex:none; vertical-alig
    و«disabled» الأصليّ للنماذج التي لم تُنقَل بعد. وكلاهما نصف شفافيّة، والسبب نصّ تحته
    مربوط بـ«aria-describedby» — زرّ رماديّ بلا سبب يُضغَط مرّات ثمّ يُترَك. **والضغطة بلا
    إزاحة**: كانت «translateY(1px)» تهزّ الصفّ كلَّه ببكسل، والأثر لون الضغط وحدَه. */
-button:disabled,.btn[aria-disabled="true"]:not([aria-busy="true"]){opacity:.5; cursor:not-allowed}
+button:disabled,.btn[aria-disabled="true"]:not([aria-busy="true"]){opacity:.5; box-shadow:none; cursor:not-allowed}
 /* ‏والمشغولُ لا يبهت: الدوّارةُ والنصُّ يقولان حالَه، ولا يُضغَط ثانيةً */
 .btn[aria-busy="true"]{cursor:progress}
 .btn-why{display:block; margin-top:var(--s-1); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}

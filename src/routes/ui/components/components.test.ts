@@ -79,7 +79,7 @@ describe('الزرّ (7.1)', () => {
     expect(press.some((d) => d.at === '' && d.value === 'scale(.97)')).toBe(true)
     expect(press.filter((d) => d.value === 'none').every((d) => d.at.includes('prefers-reduced-motion'))).toBe(true)
     expect(css.rule(':focus-visible')).toMatchObject({ outline: 'var(--stroke) solid var(--focus)', 'outline-offset': 'var(--stroke)' })
-    expect(css.rule('.btn-primary:active:not(:disabled)').background).toBe('var(--brand-press)')
+    expect(css.rule('.btn-primary:active:not(:disabled):not([aria-disabled="true"])')['background-color']).toBe('var(--brand-press)')
   })
 
   it('والهادئ خطّ تحته دائمًا (لا باللون وحدَه)، يثخن عند التمرير', () => {
