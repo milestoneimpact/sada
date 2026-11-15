@@ -30,7 +30,7 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
    فيُقرأ المربّع لطخةً — وهي عين العلّة التي مُنعت في رمز التبويب. */
 /* والعلامةُ وحدها تجمع اللونين: نعناعٌ على عمقٍ ثابتان في الوضعين («MARK»، D-196؛ وكانا حبرًا
    ونحاسًا منذ D-144) — ولا يتكرّر هذا الجمع في موضع آخر، فيبقى للعلامة معناها، **وهي أوّل
-   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٤:١ — تذوب**،
+   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٢:١ — تذوب**،
    فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
 .glyph{display:grid; place-items:center; flex:none; width:var(--s-10); height:var(--s-10); border-radius:var(--r-control);
   background:var(--mark-bg); color:var(--mark-fg);
@@ -66,7 +66,8 @@ nav.tabs .tight{display:none}
    مواضع الذهب الثلاثة** (D-187 · D-196)، وفي شريط الجوّال مخفيّ حتّى المرحلة ٢ب.
    **ورمزُ الحاليّ بحبر الرابط** (D-196): نهارًا كان التركوازُ لا يُرى إلّا في الأزرار والروابط،
    فالهويّة في الصفحة تُقرأ زرًّا داكنًا على ورق. والرمز ليس نصًّا (‏3:1 على المحدَّد) ولا ذهبًا */
-nav.tabs a[aria-current=page]{background:var(--selected); color:var(--ink); position:relative; font-weight:600}
+nav.tabs a[aria-current=page]{background:var(--selected); color:var(--ink); position:relative; font-weight:600;
+  box-shadow:var(--gleam-hi), inset 0 0 0 var(--ul) color-mix(in oklab,var(--link) 18%,transparent)}
 /* ‏والحاليّ بأرض الهويّة الخافتة «--selected» (D-246)، والحدّ يبقى لوضع التباين العالي */
 nav.tabs a[aria-current=page]::before{content:''; position:absolute; inset-block:var(--s-2);
   inset-inline-start:0; border-radius:var(--r-pill); width:var(--stroke); background:var(--au)}
@@ -113,9 +114,10 @@ details.ladder .verdict.bad{color:var(--bad)}
      وهي اليوم من الثيم (D-144) وعلى «--bg» (D-187)، والرافدة لا يمرّ تحتها شيء
      فلا زجاج لها. والشريط يمرّ تحته المحتوى، وأرضُه من ثيم الصفحة نفسِه. */
   .topbar{
-    background:color-mix(in srgb,var(--bg) 82%,transparent);
+    background:color-mix(in srgb,var(--bg) 80%,transparent); box-shadow:var(--gleam-lo);
     -webkit-backdrop-filter:blur(14px) saturate(1.4);
     backdrop-filter:blur(14px) saturate(1.4)}
+  .topbar.lifted{box-shadow:var(--gleam-lo), var(--sh-2)}
 }
 /* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
 .topbar .glyph.tb{display:none; width:var(--s-8); height:var(--s-8); border-radius:var(--r-control)}

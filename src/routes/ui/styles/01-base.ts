@@ -9,7 +9,10 @@ html{font-family:var(--font-ui); font-synthesis:none; scroll-behavior:smooth;
   /* ما يُركَّز أو يُقصَد بمرساةٍ لا يختفي خلف الشريط اللاصق ولا شريط الجوّال (D-149) */
   scroll-padding-top:calc(var(--topbar) + var(--s-3)); scroll-padding-bottom:calc(var(--tap) + var(--s-6))}
 body{
-  margin:0; background:var(--bg); color:var(--ink); direction:rtl;
+  margin:0; color:var(--ink); direction:rtl;
+  /* ‏غسلةُ هويّةٍ واحدةٌ أعلى الصفحة (صفاء): ‏٧٪ من التركواز تخبو قبل منتصف الشاشة — لا تدرّجَ غيرُها على الأرض */
+  /* ‏وقياسُها من نافذة العرض لا نسبةٌ من طول الصفحة (D-365): ‏120٪ من صفحةٍ طويلة كانت تمدّها حتّى أسفلها */
+  background:radial-gradient(120vw 60vh at 50% -6vh,var(--tint-wash),transparent 70%) var(--bg) no-repeat;
   /* المتنُ هو الأصل، وكلُّ دورٍ يكتب حجمَه وسطرَه معًا (D-185): سطرٌ بالبكسل يُورَث
      بقيمته، فعنصر يكتب حجمًا بلا سطر يرث سطر أبيه ويخرج نمطًا خارج القائمة */
   font-size:var(--t-body); line-height:var(--lh-body); -webkit-font-smoothing:antialiased;

@@ -982,7 +982,7 @@ describe('الطبعة الرابعة — الحبر والنحاس (D-144)', ()
     // ‏ومنذ D-246 الزرّ تركوازُ التصميم المعتمد ‏#0e6b64 بحبرٍ أبيض
     expect(css.rule(':root')).toMatchObject({ '--brand': '#0e6b64', '--on-brand': '#ffffff', '--au': '#7b5e20' })
     // ‏والليلُ بطريقيه: الزرُّ الصريح، وتفضيلُ النظام حين لا يُختار النهار — رملٌ بحبرٍ عميق
-    const NIGHT = { '--brand': '#e3f1ef', '--on-brand': '#06201e' }
+    const NIGHT = { '--brand': '#1a766e', '--on-brand': '#ffffff' }
     expect(css.rule(':root[data-theme="dark"]')).toMatchObject(NIGHT)
     expect(css.rule(':root:not([data-theme="light"])', '@media(prefers-color-scheme:dark)')).toMatchObject(NIGHT)
     // ‏الزمرّدُ المتقاعد لا يعود في قيمة — والتعليقُ الذي يؤرّخه لا يُسقط شيئًا
@@ -1536,7 +1536,7 @@ describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
     // ‏**مجمَّدان** (D-196): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
     // ‏(ΔE_OK ‏٩٫٥)؛ وأرضُ النهار والتحذيرُ عليها على الحدّ (‏4.5:1). من يدفئ الأرضَ أو يُميل التحذيرَ يبدّل هنا
     expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f2823b', '#231206'])
-    expect(THEME.light['--bg']).toBe('#f6f7f8')
+    expect(THEME.light['--bg']).toBe('#f4f7f6')
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
@@ -1570,7 +1570,7 @@ describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
   })
 
   it('الرابط والزرّ الهادئ بحبر «--link» وخطّ تحته', () => {
-    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#d1d5db', '#a9dbd4'])
+    expect([THEME.dark['--ink-2'], THEME.dark['--link']]).toEqual(['#c5d3d1', '#a9dbd4'])
     for (const s of ['.g-tog', '.setup>summary', '.history .bar-name', '.todo>li>a.btn']) {
       expect(css.rule(s), s).toMatchObject({ color: 'var(--link)', 'text-decoration': 'underline' })
     }
@@ -1656,18 +1656,18 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
   it('اللوحة من القسم 3.2 قيمةً قيمة في الوضعين', () => {
     // ‏اللوحةُ من لوحة الهويّة (D-196 · docs/BRAND.md): ورقٌ على رمل نهارًا، وأرضُ الغلاف ليلًا
     expect(THEME.light).toMatchObject({
-      '--bg': '#f6f7f8', '--surface': '#ffffff', '--surface-2': '#f3f4f6', '--surface-3': '#e9ebee',
-      '--line': '#e5e7eb', '--line-soft': '#eef0f2', '--field': '#6b7280',
-      '--ink': '#111827', '--ink-2': '#374151', '--ink-3': '#4b5563',
-      '--brand': '#0e6b64', '--brand-hover': '#09504b', '--brand-press': '#074440', '--on-brand': '#ffffff',
-      '--link': '#0e6b64', '--selected': '#ecf5f4', '--selection': '#cceae7', '--au': '#7b5e20',
+      '--bg': '#f4f7f6', '--surface': '#ffffff', '--surface-2': '#eef3f2', '--surface-3': '#e4ecea',
+      '--line': '#dde6e4', '--line-soft': '#eaf0ef', '--field': '#5a6b6a',
+      '--ink': '#0f1d1e', '--ink-2': '#3a4b4a', '--ink-3': '#4f605f',
+      '--brand': '#0e6b64', '--brand-hover': '#0b5c56', '--brand-press': '#084b46', '--on-brand': '#ffffff',
+      '--link': '#0e6b64', '--selected': '#e9f3f1', '--selection': '#cceae7', '--au': '#7b5e20',
       '--ok': '#065f46', '--ok-wash': '#d1fae5', '--bad': '#991b1b', '--bad-wash': '#fee2e2',
     })
     expect(THEME.dark).toMatchObject({
-      '--bg': '#0b0f14', '--surface': '#121821', '--surface-2': '#1a212c', '--surface-3': '#232b37',
-      '--line': '#273140', '--line-soft': '#1c2430', '--field': '#6b7686', '--ink-3': '#9ca3af',
-      '--brand': '#e3f1ef', '--brand-hover': '#d2e8e4', '--brand-press': '#c2ddd9', '--on-brand': '#06201e',
-      '--selected': '#13302d', '--selection': '#164a45', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#2a1414', '--ok-wash': '#0f1f17',
+      '--bg': '#0a1213', '--surface': '#121d1e', '--surface-2': '#18272a', '--surface-3': '#1f3134',
+      '--line': '#24363a', '--line-soft': '#1a2a2d', '--field': '#6f8583', '--ink-3': '#93a7a5',
+      '--brand': '#1a766e', '--brand-hover': '#1c7a72', '--brand-press': '#17736b', '--on-brand': '#ffffff',
+      '--selected': '#16302f', '--selection': '#164a45', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#2a1414', '--ok-wash': '#0f1f17',
     })
     // ‏ورموزُ ما قبل اللوحة لا تعود في أيّ سياق: لا سطحَ ثالثَ ولا حدَّ «أقوى» ولا مادّةَ ولا وهج
     for (const gone of ['--chrome', '--line-strong', '--brand-soft', '--brand-wash', '--glow', '--hair', '--sheen', '--bloom']) {
@@ -1685,10 +1685,12 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
   })
 
   it('رموز التفاعل باسمها: التمرير والضغط والمحدَّد والتحديد والستارة والحوار', () => {
-    expect(css.rule('.btn-secondary:hover', '@media(hover:hover)').background).toBe('var(--hover)')
-    expect(css.rule('.btn-secondary:active:not(:disabled)').background).toBe('var(--press)')
-    expect(css.rule('.btn-primary:hover', '@media(hover:hover)').background).toBe('var(--brand-hover)')
-    expect(css.rule('.btn-primary:active:not(:disabled)').background).toBe('var(--brand-press)')
+    // ‏ولونُ الأرض وحدَه لا الاختصار «background» الذي يمحو زجاجَ الزرّ، ولا تمريرَ لمعطّل (D-365)
+    const HOV = ':not(:disabled):not([aria-disabled="true"])'
+    expect(css.rule(`.btn-secondary:hover${HOV}`, '@media(hover:hover)')['background-color']).toBe('var(--hover)')
+    expect(css.rule('.btn-secondary:active:not(:disabled):not([aria-disabled="true"])')['background-color']).toBe('var(--press)')
+    expect(css.rule(`.btn-primary:hover${HOV}`, '@media(hover:hover)')['background-color']).toBe('var(--brand-hover)')
+    expect(css.rule('.btn-primary:active:not(:disabled):not([aria-disabled="true"])')['background-color']).toBe('var(--brand-press)')
     expect(css.rule('nav.tabs a[aria-current=page]').background).toBe('var(--selected)')
     expect(css.rule('::selection')).toMatchObject({ background: 'var(--selection)', color: 'var(--ink)' })
     expect(css.rule('.cmdk-veil').background).toBe('var(--scrim)')
@@ -1704,8 +1706,8 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
     }
-    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(17,24,39,.05)')
-    expect(THEME.dark['--sh-3']).toBe('0 16px 40px rgba(0,0,0,.6), 0 2px 6px rgba(0,0,0,.4)')
+    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(11,47,49,.06), 0 1px 1px rgba(11,47,49,.04)')
+    expect(THEME.dark['--sh-3']).toBe('0 4px 8px rgba(0,0,0,.5), 0 28px 56px -12px rgba(0,0,0,.7)')
     expect(css.rule('.ch:hover', '@media(hover:hover)')).toMatchObject({
       'box-shadow': 'var(--sh-2)', 'border-color': 'var(--field)',
     })

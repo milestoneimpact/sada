@@ -200,7 +200,11 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .card-head h3{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 /* ‏حشوُ ما نُقل إلى البطاقة من مكوّنٍ يسبقها في الورقة (٢ج): قاعدتُه قبل «.card» فيغلبه
    «--pad-card» بالترتيب، فيُثبَّت هنا بمحدّد مركّب لا بإعادة إعلان الصنف */
-.card-alert.next{padding:var(--s-5) var(--s-6); border-radius:var(--r-hero)}
+/* ‏والبطلُ (صفاء): الموضعُ الوحيدُ الذي تحمل فيه بطاقةٌ تدرّجًا — غسلةُ هويّةٍ من أعلى، وخيطُ ضوءٍ حادّ.
+   **وبقيت البطاقاتُ الأخرى بلا مادّة** (D-187): الخيطُ للأزرار والبطل والرافدة والمختار وحدها */
+.card-alert.next{padding:var(--s-5) var(--s-6); border-radius:var(--r-hero);
+  background:linear-gradient(180deg,var(--tint-wash),transparent 70%) var(--surface);
+  box-shadow:var(--gleam-hi), var(--sh-2)}
 @media${below('sm')}{.card-alert.next{padding:var(--s-4)}}
 /* ‏و«.card > p» قاعدةٌ عامّةٌ لفقرة البطاقة (هامشٌ وحرفٌ صغيرٌ وحبرٌ ثانٍ) — وفقراتُ هذه
    المكوّنات لها قياسُها في قواعدها، فلا ترثها حين صارت بطاقة. والسهم في الرحلة وباب
