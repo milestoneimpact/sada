@@ -329,6 +329,10 @@ export interface PlanChoices {
   readonly times: Readonly<Partial<Record<PlanPlatform, readonly string[]>>>
   /** منطقةُ المالك التي كُتبت بها `times` — و`''` الرياض. */
   readonly zone: string
+  /** أفكارُ الخطّة المرفوعة (D-361): بندُ `idea:i<n>` يُكتب من نصّها. وغيابُها خطّةٌ لم تُرفع. */
+  readonly importIdeas?: readonly string[]
+  /** قواعدُ ورقة الإرشادات لكلّ منصّة (D-360). */
+  readonly rules?: Readonly<Record<string, readonly { readonly item: string; readonly value: string }[]>>
 }
 
 export type PlanImageStyle = 'infographic' | 'illustration'
@@ -395,7 +399,22 @@ export function readChoices(raw: unknown): PlanChoices {
     imageStyles,
     times,
     zone: typeof v.zone === 'string' ? v.zone : '',
+    ...(Array.isArray(v.importIdeas) ? { importIdeas: strings(v.importIdeas, 200) } : {}),
+    ...(typeof v.rules === 'object' && v.rules !== null ? { rules: readRules(v.rules) } : {}),
   }
+}
+
+function readRules(raw: object): Record<string, { item: string; value: string }[]> {
+  const out: Record<string, { item: string; value: string }[]> = {}
+  for (const [k, list] of Object.entries(raw).slice(0, 8)) {
+    if (!Array.isArray(list)) continue
+    out[k.slice(0, 30)] = list.flatMap((r: unknown) => {
+      const o = r as { item?: unknown; value?: unknown } | null
+      return o !== null && typeof o === 'object' && typeof o.item === 'string' && typeof o.value === 'string'
+        ? [{ item: o.item.slice(0, 60), value: o.value.slice(0, 300) }] : []
+    }).slice(0, 20)
+  }
+  return out
 }
 
 function within(day: string, week: string, length = 7): boolean {

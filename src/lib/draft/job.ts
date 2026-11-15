@@ -362,6 +362,8 @@ export async function draftFromIdea(
   platform: Platform,
   /** ‏سلسلةُ X لبندٍ في الخطّة (D-324) — كما في `draftPost`. */
   shape: DraftShape = 'single',
+  /** قواعدُ المنصّة من ورقة إرشادات الخطّة (D-361) — قسمٌ بعد صوت العميل، وفارغٌ كما كان. */
+  rules = '',
 ): Promise<DraftOutcome> {
   const spec = PLATFORMS[platform]
   const thread = shape === 'thread' && platform === 'x'
@@ -387,7 +389,7 @@ export async function draftFromIdea(
   // ‏`cost_usd` على الصفّ، ونسبتُها إلى المنشور في الدفتر أيضًا تعدّها مرّتين على شاشته
   const out = await writeOnce(deps, {
     org,
-    system: systemPrompt(spec, 'idea', voiceSection(await readBrief(deps.db, org)), thread),
+    system: systemPrompt(spec, 'idea', [voiceSection(await readBrief(deps.db, org)), rules].filter((x) => x !== '').join('\n\n'), thread),
     user: ideaPrompt(idea, thread),
     schema: DRAFT_SCHEMA,
     operation: `draft:${platform}`,

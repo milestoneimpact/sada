@@ -9,7 +9,7 @@ import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { planPreviewScreen } from '../ui/planPreviewView'
 import { widenPlan } from '../../lib/plan/widen'
-import type { PlanRules } from '../../lib/plan/guidelines'
+import { rulesSection, type PlanRules } from '../../lib/plan/guidelines'
 import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
@@ -335,6 +335,7 @@ function draftMessage(plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>,
       sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
       ...(i.asset === undefined ? {} : { asset: i.asset }),
       ...(idea === null ? {} : { idea }),
+      ...(rulesSection(plan.choices.rules, i.platform) === '' ? {} : { rules: rulesSection(plan.choices.rules, i.platform) }),
       ...(legacy ? {} : { autoImage: image !== 'none' }),
       imageStyle: image === 'none' ? plan.choices.imageStyle : image,
       ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
@@ -1068,13 +1069,29 @@ plan.post('/panel/plan/import/confirm', async (c) => {
   const csv = p.csv
   const filled = new Map(Object.entries(p.filled).map(([l, n]) => [Number(l), n]))
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
-  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null)
+  // ‏«اكتب من الفكرة» (D-361): نداءٌ مدفوعٌ لكلّ بند، بضغطة المالك وعددُه على الزرّ (D-006 · D-008)
+  const write = gate.form.get('write') === '1'
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write)
   await record(c.env.DB, {
-    actor: 'panel', action: 'plan.import.seat', target: seated.planId,
+    actor: 'panel', action: write ? 'plan.import.write' : 'plan.import.seat', target: seated.planId,
     detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
   }, c.req.raw)
   if (seated.planId === null) {
     return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
+  }
+  if (write) {
+    // ‏كلُّ بندٍ رسالةُ كتابةٍ في الطابور بقواعد منصّته، والمراجعةُ تعدّ ما كُتب وما تعذّر (PL-23)
+    const current = await latestPlan(c.env.DB, org)
+    if (current !== null && current.id === seated.planId) {
+      const msgs = current.plan.items.map((i) => draftMessage(current, i, org))
+      for (let at = 0; at < msgs.length; at += 100) await c.env.GENERATE_QUEUE.sendBatch(msgs.slice(at, at + 100))
+    }
+    await setFlash(c.env, c.req.raw, {
+      kind: seated.skipped.length === 0 ? 'ok' : 'warn',
+      text: 'تُكتب ' + String(seated.seated) + ' منشورًا من أفكار خطّتك بقواعد كلّ منصّة — تظهر في المراجعة كلّما كُتبت' +
+        (seated.skipped.length === 0 ? '.' : '. وتعذّر ' + String(seated.skipped.length) + '.'),
+    })
+    return c.redirect('/panel/plan/review', 303)
   }
   // ‏والصورُ إن اختيرت تُرسم في الخلفيّة بحرّاسها وسقفها اليوميّ (D-255 · D-285)، والمراجعةُ تقول «بلا صورة» حتّى تصل
   if (imageStyle !== null) {

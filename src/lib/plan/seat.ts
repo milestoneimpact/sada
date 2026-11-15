@@ -207,6 +207,8 @@ export async function seatPlan(
   db: Db, org: string, csv: string, facts: PlanFacts, filled: ReadonlyMap<number, string>, imageStyle: PlanImageStyle | null,
   /** قواعدُ ورقة الإرشادات — تُحفظ مع اختيارات الخطّة. */
   rules: PlanRules | null = null,
+  /** «اكتب من الفكرة» (D-361): يُسكَّن البندُ فكرةً بلا مسوّدة، ويكتبه الطابورُ بقواعد منصّته. */
+  write = false,
 ): Promise<SeatOutcome> {
   const read = readPlan(csv, facts)
   if (read.fileProblems.length > 0) return { planId: null, seated: 0, skipped: read.fileProblems.map((r) => ({ line: 1, reason: r })) }
@@ -229,7 +231,18 @@ export async function seatPlan(
   const planId = crypto.randomUUID()
   const items: PlanItem[] = []
   const posts: { id: string; row: PlanRow; ref: string; key: string }[] = []
+  const importIdeas: string[] = []
   for (const r of within) {
+    if (write) {
+      importIdeas.push(r.text.slice(0, 2000))
+      const notes = [filled.get(r.line) ?? ''].filter((x) => x !== '')
+      items.push({
+        sourceId: 'idea:i' + String(importIdeas.length), platform: r.platform as PlanPlatform, kind: 'text',
+        angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
+        ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
+      })
+      continue
+    }
     const key = await rowKey(r)
     const dup = await db.prepare("SELECT id FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'").bind(org, key).first<{ id: string }>()
     if (dup !== null) { skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' }); continue }
@@ -246,7 +259,7 @@ export async function seatPlan(
   }
   if (items.length === 0) return { planId: null, seated: 0, skipped }
   const channels = [...new Set(items.map((i) => i.platform))]
-  const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }) }
+  const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }), ...(write ? { importIdeas } : {}) }
   const statements = [
     db.prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND week_start = ? AND span = ? AND status <> 'superseded'").bind(org, start, span),
     db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, start, span),

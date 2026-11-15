@@ -59,9 +59,10 @@ export function planPreviewScreen(d: PreviewData): string {
   const cost = d.cost > 0 ? 'كلّفت القراءةُ $' + d.cost.toFixed(3) + ' في الدفتر. ' : ''
   const act = html`<form method="POST" action="/panel/plan/import/confirm" class="stack">
     <input type="hidden" name="k" value="${d.key}">
-    <p class="hint m-0">${cost}البناءُ بلا كلفة: يضع المنشوراتِ في المراجعة، ولا يُكتب نصٌّ ولا يُجدوَل شيءٌ قبل أن تعتمد.</p>
-    <div class="row gap-2">${raw(button({ label: 'ابنِ الخطّة من ملفّي', type: 'submit', variant: 'primary' }))}
-      ${raw(button({ label: 'ارفع غيره', href: '/panel/plan/import', variant: 'secondary' }))}</div></form>`
+    <p class="hint m-0">${cost}«اكتب» يكتب كلَّ منشورٍ من فكرته بقواعد منصّته: ${counted(rows.length, NOUNS.post)}، نداءٌ مدفوعٌ لكلٍّ في الدفتر وتحت سقفك اليوميّ. و«ابنِ كما هي» يضع النصوصَ كما في ملفّك بلا كلفة. ولا يُجدوَل شيءٌ قبل أن تعتمد.</p>
+    <div class="row gap-2">${raw(button({ label: 'اكتب الخطّة من أفكارها', type: 'submit', variant: 'primary', name: 'write', value: '1' }))}
+      ${raw(button({ label: 'ابنِ كما هي', type: 'submit', variant: 'secondary', name: 'write', value: '0' }))}
+      ${raw(button({ label: 'ارفع غيره', href: '/panel/plan/import', variant: 'quiet' }))}</div></form>`
   return html`${raw(pageHead('الخطّة', 'هذا ما فهمته', 'لم يُبنَ شيءٌ بعد. راجع ما قرأتُه من ملفّك، فإن صحّ فابنِ.'))}
     <div class="stack">
       ${raw(card({ title: 'الخلاصة', level: 2, body: facts.value }))}

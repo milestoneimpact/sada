@@ -35,3 +35,14 @@ export function readGuidelines(csv: string): PlanRules | null {
   return Object.values(out).some((r) => r.length > 0) ? out : null
 }
 
+
+/** قواعدُ المنصّة قسمًا في موجّه الكتابة (D-361) — بيانٌ يُراعى، والقيودُ أعلاه أعلى منه. وفارغٌ بلا قواعد. */
+export function rulesSection(rules: PlanRules | null | undefined, platform: string): string {
+  if (rules == null) return ''
+  const names: Readonly<Record<string, RegExp>> = { x: /^(x|twitter|إكس|اكس|تويتر)$/i, linkedin: /^(linkedin|لينكدإن|لينكد إن)$/i }
+  const key = Object.keys(rules).find((k) => k.toLowerCase() === platform || (names[platform]?.test(k) ?? false))
+  const list = key === undefined ? [] : rules[key]!
+  if (list.length === 0) return ''
+  return ['## قواعد العميل لهذه المنصّة (من ورقة إرشاداته — وصفٌ يُراعى، والقيودُ أعلاه أعلى منه)',
+    ...list.map((r) => `- ${r.item}: ${r.value}`)].join('\n').slice(0, 2400)
+}

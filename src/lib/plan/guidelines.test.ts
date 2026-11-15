@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readGuidelines } from './guidelines'
+import { readGuidelines, rulesSection } from './guidelines'
 import { markdownTables } from './seat'
 
 const SHEET = [
@@ -19,6 +19,9 @@ describe('ورقةُ الإرشادات', () => {
     expect(r['LinkedIn']).toContainEqual({ item: 'الممنوعات', value: 'الأسعار، التدقيقات، أرقام أثر غير موثّقة' })
     expect(r['LinkedIn']).toContainEqual({ item: 'الهوية', value: 'تناوب النسخة الداكنة والفاتحة' })
     expect(r['X']).toContainEqual({ item: 'الدور', value: 'شرارة سريعة وفكرة واحدة' })
+    expect(rulesSection(r, 'x')).toContain('- الدور: شرارة سريعة وفكرة واحدة')
+    expect(rulesSection(r, 'linkedin')).toContain('- الطول: 150–250 كلمة')
+    expect(rulesSection(r, 'youtube')).toBe('')
   })
   it('جدولٌ بلا أعمدة منصّاتٍ ليس إرشادات', () => {
     expect(readGuidelines('التاريخ,الوقت,المنصة,النص\n2099-01-01,09:00,X,نص')).toBeNull()
