@@ -833,4 +833,6 @@ details.card .nt-list{margin-top:var(--s-4)}
   .pc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .pc-day[data-empty]{display:none}
 }
+/* ‏الأدوارُ الأربعة شبكةٌ من عمودين (D-356): كانت عمودًا بعرض الصفحة لكلّ بطاقةٍ سطرُها */
+.role-grid{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))}
 `

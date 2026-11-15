@@ -6,7 +6,6 @@
  */
 import { escapeHtml } from './escape'
 import { pageHead } from './parts'
-import { resultsTabs } from './results'
 import { emptyState } from './components/empty'
 import { counted, NOUNS } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -56,7 +55,7 @@ export function insightsScreen(d: InsightsData): string {
   const head = pageHead('القياس', 'ما ينجح',
     'متى تنشر، وبأيّ شكل وطول — <b>من تاريخ حسابك وحده</b>. والتفاعلُ إعجابٌ وتعليقٌ ومشاركة في أوّل ‏24 ساعة.')
   if (w.dims === null) {
-    return `${resultsTabs('insights')}${head}${switcher(d)}
+    return `${head}${switcher(d)}
     <div class="card">${emptyState({
       title: 'لا حكمَ بعد',
       html: `${escapeHtml(w.why ?? '')}. <b>ولا يُقترَح وقتٌ لم يُقَس</b>: «التاسعة صباحًا» في مدوّنات التسويق ليست قياسًا لحسابك.
@@ -82,7 +81,7 @@ export function insightsScreen(d: InsightsData): string {
       <td>${f.impressions === null ? '—' : f.impressions.toLocaleString('en-US')}</td>
       <td><a class="tap" href="/panel/journey/${escapeHtml(encodeURIComponent(f.id))}">رحلتُه</a></td></tr>`).join('')
 
-  return `${resultsTabs('insights')}${head}${switcher(d)}
+  return `${head}${switcher(d)}
   ${slot}
   <div class="card mb-4"><h2>ما يقوله تاريخُك</h2>${advice}</div>
   <div class="grid c2 mb-4">${w.dims.map(dimCard).join('')}</div>

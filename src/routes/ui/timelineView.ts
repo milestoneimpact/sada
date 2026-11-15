@@ -13,7 +13,6 @@ import { escapeHtml } from './escape'
 import { counted, NOUNS } from '../../lib/format'
 import { pageHead } from './parts'
 import { sectionLabel } from './command'
-import { resultsTabs } from './results'
 import { emptyState } from './components/empty'
 import { notice, toastRegion } from './components/toast'
 import { clock, dayKey, dayLabel, dayRange, stamp } from '../../lib/time/zone'
@@ -190,7 +189,7 @@ export function timelineScreen(d: TimelineView): string {
     ? ''
     : notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad',
         g: d.flash.kind === 'ok' ? '●' : d.flash.kind === 'warn' ? '!' : '▲' }))
-  return `${flash}${resultsTabs('timeline')}
+  return `${flash}
   ${pageHead('المحفظة', 'الخطّ الزمنيّ', `كلّ منشور في كلّ حساب شريط من كتابته إلى خروجه، والخطط الأسبوعيّة فوقها.
     <b>والشريط رابط إلى رحلته</b>، والمجدول يُسحَب إلى يوم آخر.`)}
   ${controls(d)}

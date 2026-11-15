@@ -13,7 +13,6 @@ import { escapeHtml } from '../escape'
 import { counted, NOUNS } from '../../../lib/format'
 import { pageHead } from '../parts'
 import { sectionLabel } from '../command'
-import { resultsTabs } from '../results'
 import { PLATFORM_LABEL } from '../../../lib/oauth/providers'
 import {
   cellText, DIMENSION_LABEL, DIMENSIONS, keyLabel, MEASURE_LABEL, MEASURES,
@@ -134,7 +133,6 @@ export function pivotPane(d: PivotView): string {
 
   return `<section data-pane="results" hidden>
   ${pageHead('القياس', sectionLabel('results'), 'تختار الصفوف والأعمدة والقياس، فيُعاد بناء الجدول. <b>والعنوان يحمل عرضَك</b> — انسخه تعُد إليه كما تركته.')}
-  ${resultsTabs('pivot')}
   <div data-sub id="pivot">
 
   <div class="card">

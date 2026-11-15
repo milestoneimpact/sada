@@ -24,7 +24,6 @@ import { counted, money, NOUNS, relativeTime } from '../../lib/format'
 import type { PlatformSlice, ReportPost, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
-import { resultsTabs } from './results'
 import { windowLabel } from '../../lib/metrics/job'
 import { dayMonth, dayRange } from '../../lib/time/zone'
 import { ON_TIME_MINUTES, type SuccessMetrics } from '../../lib/report/success'
@@ -433,5 +432,5 @@ export function reportScreen(d: ReportScreenData): string {
 
   // ‏ومقاييسُ النجاح بعد التقرير وقبل التوصية (D-324): جوابُ «أينجح صدى؟» تحت جواب «ماذا جلب الأسبوع؟»
   const success = d.success === undefined ? '' : successCard(d.success)
-  return `${resultsTabs('week')}${head}${success}${promo}${past}`
+  return `${head}${success}${promo}${past}`
 }
