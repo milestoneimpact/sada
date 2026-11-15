@@ -835,4 +835,10 @@ details.card .nt-list{margin-top:var(--s-4)}
 }
 /* ‏الأدوارُ الأربعة شبكةٌ من عمودين (D-356): كانت عمودًا بعرض الصفحة لكلّ بطاقةٍ سطرُها */
 .role-grid{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,20rem),1fr))}
+/* ‏متابعةُ الخطّة (D-358): صفٌّ لكلّ منشور — الحالُ والموعدُ والمنصّةُ وسطرٌ من النصّ، والصفُّ كلُّه رابطٌ إلى رحلته */
+.pf-stack{display:grid; gap:var(--s-4)}
+.pf-list{display:grid; gap:var(--s-1); margin:0}
+.pf-row a{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; padding-block:var(--s-2); color:inherit; text-decoration:none; border-block-end:1px solid var(--line)}
+.pf-when{font-variant-numeric:tabular-nums; color:var(--ink-2)}
+.pf-text{flex:1 1 16rem; min-width:0; color:var(--ink-2)}
 `

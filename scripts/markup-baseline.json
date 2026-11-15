@@ -95,7 +95,7 @@
     "inputs": 10
   },
   "routes/ui/planReviewView.ts": {
-    "buttons": 6,
+    "buttons": 4,
     "cards": 3,
     "inputs": 1
   },

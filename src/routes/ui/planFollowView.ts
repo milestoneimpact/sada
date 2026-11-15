@@ -43,7 +43,7 @@ export function planFollowScreen(m: ReviewModel, zone: string | null): string {
   const back = waiting === 0 ? html``
     : html`<p class="m-0"><a class="tap" href="/panel/plan/review">${counted(waiting, NOUNS.post)} تنتظر قرارك في المراجعة</a></p>`
   return html`${raw(head)}
-    <div class="stack gap-4">
+    <div class="stack pf-stack">
       ${back}
       ${failed.length === 0 ? html`` : raw(group('فشلت — افتح كلًّا لترى سببه وتصلحه', failed, zone, ''))}
       ${raw(group('مجدولة', queued, zone, 'لا شيء مجدول بعد. اعتمد من المراجعة فيُجدوَل في موعده.'))}
