@@ -149,7 +149,7 @@ const PAD = 28
  */
 function quickMove(id: string): string {
   const buttons = PRESETS.map((p) =>
-    `<button class="btn btn-secondary btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
+    `<button class="btn btn-quiet btn-sm" type="submit" name="preset" value="${p.kind}">${escapeHtml(p.label)}</button>`).join('')
   return `<form class="pc-line" method="POST" action="/panel/drafts/reschedule" data-busy="جار…" data-swap
       aria-label="انقل الموعد إلى">
       <input type="hidden" name="id" value="${escapeHtml(id)}">
