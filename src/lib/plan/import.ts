@@ -17,6 +17,8 @@ import { isThread, longestTweet, THREAD_MAX, tweetsOf } from '../draft/thread'
 import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
+import { attachStatement } from '../library'
+import { matchMedia, type LibraryMedia, type MediaMatch } from '../drive/media'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
 
 /** أكبرُ ملفٍّ يُقرأ، وأكثرُ صفوفٍ تُستورَد مرّة — خطّةُ شهرٍ كثيفةٍ دونهما. */
@@ -47,13 +49,18 @@ const PLATFORM_NAMES: Readonly<Record<string, PlanPlatform>> = {
 }
 
 /** أعمدةُ الملفّ — والعنوانُ بالعربيّة أو بالإنجليزيّة. */
-const COLUMNS: Readonly<Record<string, 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone'>> = {
+type Column = 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone' | 'item' | 'media' | 'format'
+const COLUMNS: Readonly<Record<string, Column>> = {
   date: 'date', 'التاريخ': 'date', day: 'date',
   time: 'time', 'الوقت': 'time', 'الساعة': 'time',
   platform: 'platform', 'المنصة': 'platform', 'المنصّة': 'platform',
   text: 'text', caption: 'text', 'النص': 'text', 'النصّ': 'text', 'نص المنشور': 'text', 'نصّ المنشور': 'text',
   video: 'video', 'الفيديو': 'video', 'المقطع': 'video',
   timezone: 'zone', zone: 'zone', 'المنطقة': 'zone', 'المنطقة الزمنية': 'zone',
+  // ‏ووسائطُ المالك من مكتبته (D-363): رقمُ المادّة، وتلميحُ الملفّ، والشكلُ الذي يقول صورةً أم مقطعًا أم نصًّا فقط
+  item: 'item', 'رقم المادة': 'item', 'رقم المادّة': 'item', 'المادة': 'item', 'المادّة': 'item',
+  file: 'media', media: 'media', 'الملف': 'media', 'الملفّ': 'media', 'الوسيطة': 'media',
+  format: 'format', 'الشكل': 'format', 'الصيغة': 'format', 'نوع المحتوى': 'format', 'القالب': 'format',
 }
 
 /**
@@ -207,6 +214,14 @@ export interface PlanRow {
   readonly accountId: string | null
   readonly accountName: string | null
   readonly uploadId: string | null
+  /** رقمُ المادّة كما في الملفّ (D-363) — فارغٌ إن خلا منه. */
+  readonly item: string
+  /** تلميحُ الوسيطة («04-media/01-…/ (داكن أو فاتح بالتناوب)»). */
+  readonly mediaHint: string
+  /** الشكلُ («فيديو مربع 1080 + نص»، «اقتباس (نص فقط)»). */
+  readonly format: string
+  /** وسيطتُه من مكتبة Drive — و`null` للصفّ الذي لا رقمَ مادّةٍ له. */
+  readonly media: MediaMatch | null
   /** ما يمنع هذا الصفّ — والصفُّ بلا مشكلةٍ وحدَه يُعتمَد. */
   readonly problems: readonly string[]
 }
@@ -230,6 +245,8 @@ export interface PlanFacts {
    * موعدٍ آخر» قبل أن يُنشر مرّتين. واختياريٌّ: الاختبارُ بلا قاعدةٍ لا يحتاجه.
    */
   readonly scheduled?: readonly { readonly platform: string; readonly text: string; readonly at: string }[]
+  /** وسائطُ المالك من Drive (D-363) — اختياريّة: بلاها لا يُطابَق شيء. */
+  readonly library?: readonly LibraryMedia[]
 }
 
 /** مفتاحُ مقارنةٍ للاسم: بلا فراغٍ زائدٍ ولا حالةِ أحرف. */
@@ -262,7 +279,7 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
     return { rows: [], fileProblems: [`${body.length} صفًّا — والحدّ ${MAX_PLAN_ROWS} في الملفّ الواحد. قسّمه ملفّين`] }
   }
 
-  const cell = (r: string[], k: 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone'): string => {
+  const cell = (r: string[], k: Column): string => {
     const i = header.indexOf(k)
     return i < 0 ? '' : (r[i] ?? '').trim()
   }
@@ -351,10 +368,13 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
     return {
       line, platform, platformRaw, date, time, zone, zoneCell: zoneRaw, text, video, whenUtc,
       understoodUtc: at === null ? null : at.toISOString().slice(0, 16), local: when?.local ?? null,
-      accountId: account?.id ?? null, accountName: account?.displayName ?? null, uploadId, problems,
+      accountId: account?.id ?? null, accountName: account?.displayName ?? null, uploadId,
+      item: cell(r, 'item'), mediaHint: cell(r, 'media'), format: cell(r, 'format'), media: null, problems,
     }
   })
-  return { rows, fileProblems: [] }
+  // ‏والمطابقةُ بعد الصفوف كلِّها: التناوبُ بين الداكن والفاتح يعدّ صفوفَ المادّة الواحدة بترتيبها
+  const matches = matchMedia(rows.map((r) => (r.item === '' ? null : { item: r.item, hint: r.mediaHint, format: r.format })), facts.library ?? [])
+  return { rows: rows.map((r, i) => (matches[i] === null ? r : { ...r, media: matches[i]! })), fileProblems: [] }
 }
 
 /**
@@ -372,6 +392,23 @@ export async function rowKey(row: PlanRow): Promise<string> {
   const raw = [row.platform, day, clock, row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   return `plan:${[...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
+}
+
+/**
+ * مرجعُ وسيطة Drive في المكتبة (`d:<معرّف Drive>`، D-363) — **الصورةُ لمنشورٍ نصّيّ على LinkedIn أو X وحدها**: المقطعُ ينشر من
+ * «فيديوهاتك» بعمود المقطع، وما لم يُنزَّل إلى R2 بعد لا يُربط.
+ */
+export function driveAssetRef(row: PlanRow): string | null {
+  const m = row.media
+  if (m === null || m.kind !== 'matched' || m.media.r2Key === null || m.media.kind !== 'image') return null
+  if (row.platform !== 'linkedin' && row.platform !== 'x') return null
+  return 'd:' + m.media.id
+}
+
+/** صفُّ `media` لوسيطة Drive بـ`attachStatement` نفسِه — مفتاحُه من المرجع والمنشور (D-004) و`OR IGNORE`: إعادةُ الملفّ لا تكرّره. */
+export function driveMediaRow(db: Db, org: string, postId: string, row: PlanRow): DbStatement | null {
+  const ref = driveAssetRef(row)
+  return ref === null ? null : attachStatement(db, org, postId, ref)
 }
 
 export interface ApplyOutcome {
@@ -461,6 +498,9 @@ export async function applyPlan(
       if (row.uploadId !== null && upload !== null) statements.push(uploadMediaRow(db, postId, row.uploadId, upload))
       await atomically(db, statements)
     }
+    // ‏وسيطتُه من مكتبة Drive (D-363) تُربط كما يُختار من المكتبة — ولا تُولَّد له صورة
+    const drive = driveMediaRow(db, org, postId, row)
+    if (drive !== null) await drive.run()
     const scheduled = await schedulePost(db, postId, row.accountId, row.whenUtc, now)
     out.push(scheduled.ok
       ? { line: row.line, result: 'scheduled' }

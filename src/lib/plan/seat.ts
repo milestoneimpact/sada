@@ -30,7 +30,7 @@ import { checkAllowance, blockerReason } from '../limits'
 import { askWriter, type BriefDeps } from '../image/brief'
 import { readPeaks } from '../schedule/peak'
 import { localParts } from '../time/zone'
-import { parseCsvRecords, readPlan, rowKey, type PlanFacts, type PlanRow } from './import'
+import { driveAssetRef, driveMediaRow, parseCsvRecords, readPlan, rowKey, type PlanFacts, type PlanRow } from './import'
 import { PLAN_CHANNELS, spanDays, type PlanItem, type PlanPlatform, type PlanSpan, type PlanImageStyle } from './prompt'
 import { cleanConverted, type ToMarkdown } from '../sources/ingest'
 import { readGuidelines, type PlanRules } from './guidelines'
@@ -240,6 +240,8 @@ export async function seatPlan(
         sourceId: 'idea:i' + String(importIdeas.length), platform: r.platform as PlanPlatform, kind: 'text',
         angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
         ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
+        // ‏ووسيطتُه من مكتبة Drive (D-363) على البند: `draftMessage` يحملها، والطابورُ يربطها بالمسوّدة بـ`attachStatement` فلا تُرسم أخرى
+        ...(driveAssetRef(r) === null ? {} : { asset: driveAssetRef(r)! }),
       })
       continue
     }
@@ -269,6 +271,8 @@ export async function seatPlan(
       .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id)
                 VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?)`)
       .bind(p.id, p.row.platform, isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text', p.row.text, p.key, planId, JSON.stringify([p.ref]), org)),
+    // ‏وسيطةُ المالك من مكتبة Drive تُربط بمسوّدتها (D-363) — فلا تُرسم لها صورة (`seatedPosts` يتخطّاها)
+    ...posts.flatMap((p) => { const m = driveMediaRow(db, org, p.id, p.row); return m === null ? [] : [m] }),
   ]
   if (db.batch !== undefined) await db.batch(statements)
   else for (const st of statements) await st.run()
@@ -277,6 +281,9 @@ export async function seatPlan(
 
 /** معرّفاتُ مسوّدات خطّةٍ مسكَّنة — لرسم صورها في الخلفيّة إن اختيرت. */
 export async function seatedPosts(db: Db, org: string, planId: string): Promise<string[]> {
-  const { results } = await db.prepare("SELECT id FROM posts WHERE org_id = ? AND plan_id = ? AND status = 'draft'").bind(org, planId).all<{ id: string }>()
+  // ‏وما رُبطت به وسيطةٌ من المكتبة لا يُرسم له شيء (D-363)
+  const { results } = await db
+    .prepare("SELECT id FROM posts WHERE org_id = ? AND plan_id = ? AND status = 'draft' AND NOT EXISTS (SELECT 1 FROM media m WHERE m.post_id = posts.id)")
+    .bind(org, planId).all<{ id: string }>()
   return results.map((r) => r.id)
 }

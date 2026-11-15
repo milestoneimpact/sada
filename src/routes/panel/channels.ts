@@ -3,10 +3,10 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
-import { listModels } from '../../lib/ai/models'
+import { listModels, type ModelList } from '../../lib/ai/models'
 import { cfAccountId } from '../../lib/ai/cloudflare'
 import { type Platform } from '../../lib/draft/prompt'
 import {
@@ -47,6 +47,8 @@ import { injectCsrf, soloPage } from '../ui/shell'
 import { notFoundResponse } from '../errors'
 import { record } from '../../lib/audit'
 import { modelName } from '../../lib/ai/modelName'
+import { catalogGroups } from '../../lib/ai/modelCatalog'
+import { routePickScreen } from '../ui/sections/providers'
 import { type PanelFlash } from '../panelView'
 import {
   BUILTIN_SECRET, deciderOf, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, rejectForm,
@@ -540,6 +542,8 @@ channels.post('/panel/providers/key', async (c) => {
 
   try {
     const result = await saveKey(c.env.DB, c.env.TOKEN_ENC_KEY, guard.provider.name, raw, 'panel')
+    // ‏ومفتاحٌ جديدٌ قد يرى نماذجَ غيرَ ما رآه القديم: القائمةُ المخبوءةُ تُمحى (D-364)
+    await c.env.KV.delete(MODEL_LIST_CACHE + guard.provider.name).catch(() => undefined)
     // **ولا في السجلّ**: التلميحُ وحده — وهو أوّلُ المفتاح وآخرُه لا نصُّه
     await record(
       c.env.DB,
@@ -628,6 +632,76 @@ channels.post('/panel/providers/models', async (c) => {
       priceOut: m.priceOut,
     })),
   })
+})
+
+/**
+ * ‏فهرسُ مزوّدٍ مجموعاتٍ لمهمّة (D-364) — يقرؤه نداءُ JSON وصفحةُ الاختيار بلا سكربت، فلا يفترقان.
+ * ‏قراءةٌ لا توليد: لا `cost_ledger` ولا `audit`. **والمفتاحُ لا يخرج من هنا**: يُمرَّر إلى المزوّد وحده.
+ */
+async function catalogFor(env: Env, provider: Provider, task: string): Promise<{ ok: boolean; detail: string; groups: ReturnType<typeof catalogGroups> }> {
+  // ‏والقائمةُ مخبوءةٌ في KV دقائقَ (مراجعة D-364): فتحُ الصفحة مرّاتٍ لا يفكّ المفتاحَ ولا ينادي المزوّدَ في كلّ مرّة
+  const cacheKey = MODEL_LIST_CACHE + provider.name
+  const cached = await env.KV.get(cacheKey).catch(() => null)
+  if (cached !== null) {
+    const models = JSON.parse(cached) as ModelList['models']
+    return { ok: true, detail: String(models.length) + ' نموذجًا', groups: catalogGroups(models, { provider: provider.name, task }) }
+  }
+  const key = await providerKey(env, provider)
+  if (key === null) return { ok: false, detail: 'لا مفتاح لهذا المزوّد. احفظه أوّلًا', groups: [] }
+  const list = await listModels({ name: provider.name, kind: provider.kind, baseUrl: provider.baseUrl, apiKey: key, builtin: provider.builtin })
+  if (list.ok) await env.KV.put(cacheKey, JSON.stringify(list.models), { expirationTtl: MODEL_LIST_TTL }).catch(() => undefined)
+  return { ok: list.ok, detail: list.detail, groups: list.ok ? catalogGroups(list.models, { provider: provider.name, task }) : [] }
+}
+
+/** ‏مفتاحُ القائمة المخبوءة لكلّ مزوّد، ومدّتُها خمسُ دقائق — وحفظُ مفتاحٍ جديدٍ يمحوها. */
+const MODEL_LIST_CACHE = 'model-list:'
+const MODEL_LIST_TTL = 300
+
+/**
+ * ‏قراءةٌ بـ`GET` تفكّ مفتاحًا وتنادي مزوّدًا (مراجعة D-364): **لا تُطلَق من موقعٍ آخر**. `<img src>` من صفحةٍ غريبة يحمل
+ * ‏`Sec-Fetch-Site: cross-site`؛ فالمقبولُ `same-origin` أو `none` (عنوانٌ كُتب في الشريط)، أو رمزُ الجلسة في `csrf`.
+ */
+function crossSite(c: Context<{ Bindings: Env }>, csrf: string): boolean {
+  const site = c.req.header('Sec-Fetch-Site') ?? ''
+  if (site === 'same-origin' || site === 'none') return false
+  const token = c.req.query('csrf') ?? ''
+  return !(token !== '' && token === csrf)
+}
+
+/** ‏الفهرسُ بـ`GET` للسكربت (D-364): قراءةٌ خلف الجلسة لا تغيّر شيئًا، ومن اللوحة وحدها (`crossSite`) — ولا تُخزَّن عند المتصفّح. */
+channels.get('/panel/providers/models', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return c.json({ ok: false, detail: 'انتهت الجلسة', groups: [] }, 401)
+  if (crossSite(c, session.record.csrf)) return c.json({ ok: false, detail: 'طلبٌ من خارج اللوحة', groups: [] }, 403)
+  const provider = await getProvider(c.env.DB, c.req.query('provider') ?? '')
+  if (provider === null) return c.json({ ok: false, detail: 'لا مزوّد بهذا الاسم', groups: [] }, 404)
+  const out = await catalogFor(c.env, provider, c.req.query('task') ?? 'analyze')
+  return c.json(out, 200, { 'Cache-Control': 'no-store' })
+})
+
+/** ‏صفحةُ الاختيار بلا سكربت (D-364): `?provider=` يعيد رسمَ البطاقة بقائمة ذلك المزوّد. */
+channels.get('/panel/routes/pick', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  if (crossSite(c, session.record.csrf)) return c.redirect('/panel/settings#providers', 303)
+  const task = c.req.query('task') ?? ''
+  if (!KNOWN_TASKS.has(task)) return notFoundResponse(c.req.raw, 'لا مهمّة بهذا الاسم')
+  const [providers, routes] = await Promise.all([listProviders(c.env.DB), readRoutes(c.env.DB)])
+  const route = routes.find((r) => r.task === task)
+  const name = c.req.query('provider') ?? route?.provider ?? ''
+  const provider = providers.find((p) => p.name === name) ?? null
+  if (provider === null) return notFoundResponse(c.req.raw, 'لا مزوّد بهذا الاسم')
+  const cat = await catalogFor(c.env, provider, task)
+  const current = route !== undefined && route.provider === provider.name ? route.model : ''
+  const body = routePickScreen({
+    task, provider: provider.name, current,
+    providers: providers.map((p) => ({ name: p.name, label: p.label })),
+    groups: cat.ok ? cat.groups : null, detail: cat.detail,
+  })
+  return page((nonce) =>
+    soloPage('صدى — توجيه المهامّ', { href: '/panel/settings#providers', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, '',
+      buildCommands({ onPanel: false }), soloNav('settings')),
+  )
 })
 
 /**
@@ -764,7 +838,15 @@ channels.post('/panel/routes', async (c) => {
 
   const task = String(form.get('task') ?? '')
   const provider = String(form.get('provider') ?? '')
-  const model = String(form.get('model') ?? '').trim()
+  // ‏والكتابةُ اليدويّة تغلب الدرج (D-364): من كتب معرّفًا قصده، والدرجُ قد يبقى على خياره الأوّل
+  const manual = String(form.get('model_manual') ?? '').trim()
+  const picked = String(form.get('model') ?? '').trim()
+  const model = manual !== '' ? manual : picked === '__manual__' ? '' : picked
+  // ‏ومن جاء من صفحة الاختيار بلا سكربت يعود إليها برفضه، فلا يضيع المزوّدُ وقائمتُه (مراجعة D-364)
+  const fromPick = form.get('return') === 'pick' && KNOWN_TASKS.has(task)
+  const refuse = (): Response => fromPick
+    ? Response.redirect(new URL('/panel/routes/pick?task=' + encodeURIComponent(task) + '&provider=' + encodeURIComponent(provider), c.req.url).toString(), 303)
+    : back('providers')
 
   if (!KNOWN_TASKS.has(task)) return c.json({ error: 'unknown_task' }, 400)
   const target = await getProvider(c.env.DB, provider)
@@ -773,7 +855,7 @@ channels.post('/panel/routes', async (c) => {
   }
   if (model === '') {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'اسم النموذج مطلوب.' })
-    return back('providers')
+    return refuse()
   }
 
   /*
@@ -791,7 +873,7 @@ channels.post('/panel/routes', async (c) => {
   )
   if (mismatch !== null) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: mismatch })
-    return back('providers')
+    return refuse()
   }
 
   await writeRoute(c.env.DB, task as TaskName, provider, model, 'panel')

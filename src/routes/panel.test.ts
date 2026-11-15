@@ -1262,6 +1262,55 @@ describe('توجيه المهامّ يصير للمالك', () => {
     expect((await post(cookie, '/panel/routes', { task: 'analyze', provider: 'ghost', model: 'x' })).status).toBe(400)
   })
 
+  it('اختيار المزوّد بلا سكربت يرسم نماذجه من عنده، والمعرّف ظاهر، والمفتاح لا يُرسَم', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', { name: 'deepseek', label: 'DeepSeek', base_url: 'https://api.deepseek.com/v1' })
+    await post(cookie, '/panel/providers/key', { provider: 'deepseek', key: 'sk-secret-deep-1234567' })
+    const real = globalThis.fetch
+    const seen: string[] = []
+    globalThis.fetch = (async (input: unknown) => {
+      seen.push(typeof input === 'string' ? input : (input as Request).url)
+      return Response.json({ object: 'list', data: [{ id: 'deepseek-chat' }, { id: 'deepseek-reasoner' }] })
+    }) as typeof fetch
+    try {
+      const same = { headers: { 'Sec-Fetch-Site': 'same-origin' } }
+      // ‏ومن موقعٍ آخر (‹img src›) لا يُفكّ مفتاحٌ ولا يُنادى مزوّد (مراجعة D-364)
+      const away = { headers: { 'Sec-Fetch-Site': 'cross-site' } }
+      expect((await app.request('/panel/providers/models?provider=deepseek&task=plan', withSession(cookie, away), env)).status).toBe(403)
+      expect((await app.request('/panel/routes/pick?task=plan&provider=deepseek', withSession(cookie, away), env)).status).toBe(303)
+      expect(seen).toEqual([])
+      const page = await app.request('/panel/routes/pick?task=plan&provider=deepseek', withSession(cookie, same), env)
+      expect(page.status).toBe(200)
+      const html = await page.text()
+      expect(seen).toContain('https://api.deepseek.com/v1/models')
+      expect(html).toMatch(/<option value="deepseek-chat"[^>]*>[^<]*deepseek-chat/)
+      expect(html).toContain('موصى به لهذه المهمّة')
+      expect(html).not.toContain('sk-secret-deep')
+
+      const json = await app.request('/panel/providers/models?provider=deepseek&task=plan&csrf=' + encodeURIComponent(csrf), withSession(cookie), env)
+      const body = await json.json() as { ok: boolean; groups: { items: { id: string }[] }[] }
+      expect(body.ok).toBe(true)
+      // ‏والقائمةُ مخبوءةٌ دقائق: الطلبُ الثاني لا ينادي المزوّد
+      expect(seen.filter((u) => u.endsWith('/models')).length).toBe(1)
+      expect(body.groups[0]?.items[0]?.id).toBe('deepseek-chat')
+      expect(JSON.stringify(body)).not.toContain('sk-secret-deep')
+    } finally {
+      globalThis.fetch = real
+    }
+    expect((await app.request('/panel/providers/models?provider=deepseek', {}, env)).status).toBe(401)
+  })
+
+  it('الكتابة اليدويّة تغلب الدرج عند الحفظ', async () => {
+    const cookie = await login()
+    await post(cookie, '/panel/providers/add', { name: 'deepseek', label: 'DeepSeek', base_url: 'https://api.deepseek.com/v1' })
+    await post(cookie, '/panel/routes', { task: 'draft', provider: 'deepseek', model: '__manual__', model_manual: 'deepseek-chat' })
+    const row = db.raw.prepare("SELECT model FROM task_routes WHERE task='draft'").get() as { model: string }
+    expect(row.model).toBe('deepseek-chat')
+    // ‏ورفضُ صفحة الاختيار يعود إليها بمزوّدها، لا إلى الإعدادات (مراجعة D-364)
+    const refused = await post(cookie, '/panel/routes', { task: 'draft', provider: 'deepseek', model: '__manual__', model_manual: '', return: 'pick' })
+    expect(refused.headers.get('Location')).toContain('/panel/routes/pick?task=draft&provider=deepseek')
+  })
+
   it('بلا جلسة لا يُغيَّر توجيه', async () => {
     const body = new FormData()
     body.set('task', 'analyze')

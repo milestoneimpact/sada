@@ -902,7 +902,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   // «يُفرَّغ الدرجُ حين يتبدّل المزوّد» (D-083): نماذجُ مزوّدٍ معروضةً
   // تحت اسم آخر ليست إزعاجا — هي حفظُ توجيهٍ لا يعمل
   var mpClear=function(sel,placeholder){
-    while(sel.options.length)sel.remove(0);
+    while(sel.firstChild)sel.removeChild(sel.firstChild);
     var o=document.createElement('option');
     o.value=''; o.textContent=placeholder; o.selected=true;
     sel.appendChild(o);
@@ -938,44 +938,52 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       // الجلبَ، وزرٌّ معطَّلٌ في تلك اللحظة يقفز عنه Tab — قِيس فوُجد
       // «حدّث» لا يُبلَغ بلوحة المفاتيح. و«busy» يحرس التكرار.
       busy=true; btn.setAttribute('aria-busy','true'); note.textContent='تُجلَب نماذج '+name+'…';
-      post('/panel/providers/models',{provider:name}).then(function(r){
+      // ‏قراءةٌ بـGET خلف الجلسة (D-364): المجموعاتُ مرتّبةٌ من الخادم — الموصى به أوّلًا، والمعرّفُ في نصّ كلّ خيار
+      var tf=box.closest('form'); var ti=tf?tf.querySelector('[name=task]'):null;
+      fetch('/panel/providers/models?provider='+encodeURIComponent(name)+'&task='+encodeURIComponent(ti?ti.value:(box.dataset.task||'analyze'))+'&csrf='+encodeURIComponent(csrf),
+        {credentials:'same-origin',headers:{Accept:'application/json'},cache:'no-store'}).then(function(r){
         return r.json();
       }).then(function(d){
         busy=false; btn.removeAttribute('aria-busy');
-        var models=(d&&d.models)||[];
-        if(!d||!d.ok||!models.length){
+        var groups=(d&&d.groups)||[];
+        if(!d||!d.ok||!groups.length){
           note.textContent=(d&&d.detail)||'تعذّر الجلب — اكتب الاسم يدويّا.';
           return;
         }
         loadedFor=name;
-        // يُصفّى إلى صنف المهمّة، وصنفٌ مجهولٌ يبقى: إخفاءُ نموذجٍ موجود
-        // أسوأُ من عرضِ نموذجٍ لا يناسب
-        var want=box.dataset.task||'';
-        var keep=models.filter(function(m){return !want||!m.task||m.task===want;});
-        var filtered=keep.length<models.length;
-        if(!keep.length){keep=models;filtered=false;}
-        // القيمةُ السابقة تبقى «إن كانت لهذا المزوّد»؛ وإلّا سقطت معه
         var chosen=silent?last:'';
-        while(sel.options.length)sel.remove(0);
+        while(sel.firstChild)sel.removeChild(sel.firstChild);
         var ph=document.createElement('option');
         ph.value=''; ph.textContent='— اختر نموذجا —';
         sel.appendChild(ph);
-        keep.forEach(function(m){
-          var o=document.createElement('option');
-          o.value=m.id; o.textContent=m.name||m.label||m.id; o.title=m.id;
-          if(m.priceIn!==null&&m.priceIn!==undefined)o.dataset.pin=String(m.priceIn);
-          if(m.priceOut!==null&&m.priceOut!==undefined)o.dataset.pout=String(m.priceOut);
-          sel.appendChild(o);
+        var count=0,thinks=false;
+        groups.forEach(function(g){
+          var og=document.createElement('optgroup'); og.label=g.label;
+          g.items.forEach(function(m){
+            var o=document.createElement('option');
+            o.value=m.id; o.textContent=m.text; o.title=m.why||m.id;
+            if(m.thinking){o.dataset.thinking='1';thinks=true;}
+            if(m.priceIn!==null&&m.priceIn!==undefined)o.dataset.pin=String(m.priceIn);
+            if(m.priceOut!==null&&m.priceOut!==undefined)o.dataset.pout=String(m.priceOut);
+            og.appendChild(o); count++;
+          });
+          sel.appendChild(og);
         });
         mpManual(sel);
         var has=false,i;
         for(i=0;i<sel.options.length;i++)
           if(chosen&&sel.options[i].value===chosen){has=true;break;}
-        sel.value=has?chosen:'';
+        // ‏والمحفوظُ الغائبُ عن الفهرس يبقى أوّلَ خيارٍ مختارًا كما يرسمه الخادم (catalogOptions): لا يُمحى ما يعمل الآن
+        if(chosen&&!has){
+          var kept=document.createElement('option');
+          kept.value=chosen; kept.textContent=chosen+' — المحفوظ الآن';
+          sel.insertBefore(kept,ph.nextSibling);
+        }
+        sel.value=chosen||'';
         last=sel.value;
-        note.textContent=keep.length+' نموذجا الآن عند '+name
-          +(filtered?' (صُفّيت من '+models.length+')':'')
-          +(chosen&&!has?' — والنموذج السابق ليس منها، فاختر واحدا.':'')
+        note.textContent=count+' نموذجا الآن عند '+name
+          +(chosen&&!has?' — والمحفوظ الآن ليس منها، فبقي مختارا.':'')
+          +(thinks?' · «يفكّر» قد يُنفق حدَّ الرموز قبل أن يكتب.':'')
           +' · قائمة لحظيّة لا محفوظة.';
       }).catch(function(){
         busy=false; btn.removeAttribute('aria-busy');

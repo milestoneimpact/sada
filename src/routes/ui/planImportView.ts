@@ -58,12 +58,28 @@ function rowHtml(r: PlanRow, now: Date, reachNow: Reach): string {
     <td data-label="الموعد">${when(r, now)}${zone}<span class="ago">السطر ${r.line}</span></td>
     <td data-label="المنصّة">${escapeHtml(r.platform === null ? r.platformRaw || '—' : platformLabel(r.platform))}${
       r.accountName === null ? '' : `<span class="ago"><bdi>${escapeHtml(r.accountName)}</bdi></span>`}</td>
-    <td class="pi-text" data-label="النصّ">${escapeHtml(r.text.length > 140 ? `${r.text.slice(0, 139)}…` : r.text)}</td>
+    <td class="pi-text" data-label="النصّ">${escapeHtml(r.text.length > 140 ? `${r.text.slice(0, 139)}…` : r.text)}${mediaLine(r)}</td>
     <td data-label="المقطع">${r.video === '' ? '—' : `<bdi>${escapeHtml(r.video)}</bdi>`}</td>
     <td data-label="الحال">${ok
       ? `${statusBadge('ok', '●', 'جاهز')}${reach === null ? '' : `<span class="ago">${escapeHtml(reach)}</span>`}`
       : `<ul class="pi-why">${r.problems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>`}</td>
   </tr>`
+}
+
+/**
+ * وسيطةُ الصفّ من مكتبة Drive (D-363) — «وسيطته من مكتبتك: الاسم» أو «تنقصه وسيطة» بالنوع الذي يطلبه شكلُه.
+ * والصفُّ بلا رقم مادّةٍ لا يُقال له شيء؛ و«نصّ فقط» يُقال كما هو.
+ */
+export function mediaLine(r: PlanRow): string {
+  const m = r.media
+  if (m === null) return ''
+  if (m.kind === 'text') return '<span class="ago">نصّ فقط — بلا وسيطة</span>'
+  if (m.kind === 'missing') {
+    return '<span class="ago">' + statusBadge('warn', '!', 'تنقصه وسيطة') + ' ' + (m.want === 'video' ? 'مقطع' : 'صورة')
+      + ' للمادّة <bdi dir="ltr">' + escapeHtml(r.item) + '</bdi> — ضعها في مجلّد الوسائط ثمّ «زامن الآن»</span>'
+  }
+  const late = m.media.r2Key === null ? ' — تُنزَّل في المزامنة التالية' : ''
+  return '<span class="ago">وسيطته من مكتبتك: <bdi dir="ltr">' + escapeHtml(m.media.name) + '</bdi>' + late + '</span>'
 }
 
 /**

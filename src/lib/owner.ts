@@ -598,6 +598,15 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏حكمٌ قانونيٌّ وعقدٌ مع العميل — لا أثرَ له يُقرأ من هنا (D-061)
     done: () => null,
   },
+  {
+    code: 'M-54',
+    title: 'مجلّد 04-media في Drive ثمّ «زامن الآن» (بعد D-363)',
+    ifLeft: 'الخطّةُ تُجدوَل كما كانت، وصفوفُ المادّة تُقال «تنقصه وسيطة» — تأجيلٌ لا خطر.',
+    // ‏قدرةٌ لا حارس: صورُ المالك تُستعمل، وبلاها لا ينكسر شيء
+    unblocks: 'capability',
+    // ‏ما في مجلّد Drive لا يُقرأ من حقائق «ما عليك»؛ وأثرُه يُرى في بطاقة «وسائطك من Drive» (D-061)
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

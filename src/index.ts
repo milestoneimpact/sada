@@ -20,6 +20,7 @@ import { resolveKey } from './lib/providers'
 import { spendByProvider } from './lib/ai/spend'
 import { blockerReason, checkAllowance } from './lib/limits'
 import { enqueueForAnalysis, scanDrive } from './lib/drive/job'
+import { scanDriveMedia } from './lib/drive/media'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { claimDelivery, dispatchDue, sweepStuck } from './lib/schedule/job'
 import { expireStaleUploads } from './lib/media/uploads'
@@ -843,6 +844,11 @@ async function scanTick(env: Env): Promise<void> {
       deferred: report.toAnalyze.length - enqueued,
     })
     await beat(env.DB, 'scan', 'ok', `رأى ${report.seen} · جديد ${report.added.length} · تغيّر ${report.changed.length}`)
+    // ‏ووسائطُ المالك من مجلّد «04-media» (D-363) بالدورة نفسِها — بلا نداءٍ مدفوع، وعطلُها لا يُسقط مسحَ المصادر
+    const media = await scanDriveMedia({
+      db: env.DB, org: OWNER_ORG, serviceAccountJson: env.GOOGLE_SA_JSON, rootFolderId: env.DRIVE_FOLDER_ID, bucket: env.MEDIA,
+    })
+    console.info({ job: 'drive-media', ok: media.ok, ...(media.ok ? { seen: media.seen, added: media.added, fetched: media.fetched, deferred: media.deferred } : { reason: media.reason }) })
   } catch (error) {
     console.error({
       job: 'drive-scan',
