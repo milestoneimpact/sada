@@ -9,6 +9,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { scopeSet } from '../lib/oauth/scopes'
+import { RETENTION } from '../lib/privacy/retention'
+import { counted, NOUNS } from '../lib/format'
+import { RETENTION_DAYS as VITALS_DAYS } from '../lib/vitals'
+import { UNDO_SECONDS } from '../lib/privacy/trash'
+import { CODE_TTL_SECONDS } from '../lib/security/loginCode'
 
 let db: FakeDb
 
@@ -179,5 +184,84 @@ describe('كلّ تصل إلى الأخرى', () => {
   it('السياسة تشير إلى الشروط والعكس', async () => {
     expect(await (await app.request('/privacy', {}, env())).text()).toContain('href="/terms"')
     expect(await (await app.request('/terms', {}, env())).text()).toContain('href="/privacy"')
+  })
+})
+
+/**
+ * ‏**السياسةُ تقول ما يقع** (D-322). كانت تقول «ليس لصدى مستخدمون» وله فريقٌ وعملاء، و«خلف عاملين» والعاملُ اختياريٌّ لبعض
+ * ‏الأدوار، و«حتّى يحذفها المشغّل» أربعَ مرّاتٍ ولا بابَ يحذف، ولا تسمّي خدمةَ كتابةٍ واحدةً ولا مدّة.
+ */
+describe('سياسةٌ صادقة (D-322)', () => {
+  it('لا تقول ما لم يعد صحيحًا', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const stale of ['وليس لصدى مستخدمون', 'خلف عاملين', 'حتّى يحذفها المشغّل', 'يشغّلها شخص واحد']) expect(html).not.toContain(stale)
+  })
+
+  /*
+   * ‏**مراجعة D-322**: «لا يخرج منشور إلّا بعد أن يعتمده المشغّل بيده» بقيت في «ما لا يقع» و«ويعتمده بيده» في صفّ المنشورات، والناشرُ
+   * ‏المدعوُّ يعتمد ويجدول (D-272 · `access.ts`)؛ و«حين يؤكّده المشغّل» في الفصل، والمديرُ يفصل. والإنجليزيّةُ وحدَها صُحّحت.
+   */
+  it('**ومن يعتمد ويفصل كما في الشيفرة**: المشغّلُ أو ناشرٌ من فريقه، والمشغّلُ أو مديرٌ — في السياسة والشروط', async () => {
+    const policy = (await (await app.request('/privacy', {}, env())).text()).replace(/\s+/g, ' ')
+    const terms = (await (await app.request('/terms', {}, env())).text()).replace(/\s+/g, ' ')
+    for (const stale of ['يعتمده المشغّل بيده', 'يكتبه المشغّل، ويعتمده بيده', 'وحين يؤكّده المشغّل يقع', 'المشغّل ويعتمده بيده']) {
+      expect(policy, stale).not.toContain(stale)
+      expect(terms, stale).not.toContain(stale)
+    }
+    expect(terms).not.toContain('until the owner reads and approves it')
+    expect(policy).toContain('المشغّل أو ناشرٌ من فريقه')
+    expect(policy).toContain('المشغّل أو مديرٌ من فريقه')
+    expect(terms).toContain('المشغّل أو ناشرٌ من فريقه')
+  })
+
+  it('تسمّي من يدخل ومن يعالج: الفريقَ والعملاء، وكلَّ خدمة كتابةٍ وصور، وCloudflare وDrive والبريد', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const name of ['أعضاءُ فريقٍ', 'عملائه', 'Anthropic', 'Gemini', 'OpenAI', 'Workers AI', 'Drive API', 'Email Routing', 'قناة التنبيهات', 'خارج المملكة']) {
+      expect(html, name).toContain(name)
+    }
+  })
+
+  /*
+   * ‏**مراجعة D-322**: كان الاختبارُ يسأل عن الرقم وحده، و90 و180 يقعان مرّتين (الصندوقُ و«إرسالٌ رُدّ»، والصندوقُ والأذونات)، فحذفُ جملةٍ
+   * ‏كاملة لا يُسقطه؛ والإنجليزيّةُ تُسأل عن مدّةٍ واحدة وقد سقطت منها اثنتان. فلكلّ مدّةٍ جملتُها في اللغتين — **والنوعُ يُلزم مفتاحًا
+   * ‏يُضاف إلى `RETENTION` بجملتيه**.
+   */
+  it('**وكلُّ مدّةٍ في الكنّاس مكتوبةٌ بجملتها** — بالعربيّة والإنجليزيّة، ومعها ثوابتُها الثلاثة', async () => {
+    const html = (await (await app.request('/privacy', {}, env())).text()).replace(/\s+/g, ' ')
+    const d = (n: number): string => counted(n, NOUNS.day, 'gen')
+    const r = RETENTION
+    const ar: Record<keyof typeof RETENTION, string> = {
+      auditDays: `سجلّ النشاط بعد ${d(r.auditDays)}`,
+      ipDays: `يُقصَّر إلى شبكته بعد ${d(r.ipDays)}`,
+      formRejectDays: `و«إرسالٌ رُدّ» بعد ${d(r.formRejectDays)}`,
+      outboxDeliveredDays: `ما وصل بعد ${d(r.outboxDeliveredDays)}`,
+      outboxUndeliveredDays: `وما لم يصل بعد ${d(r.outboxUndeliveredDays)}`,
+      tokenAlertDays: `وتنبيهات الأذونات بعد ${d(r.tokenAlertDays)}`,
+      authAttemptDays: `وعدّادات الدخول بعد ${d(r.authAttemptDays)}`,
+    }
+    const en: Record<keyof typeof RETENTION, string> = {
+      auditDays: `the activity log after ${r.auditDays} days`,
+      ipDays: `to their network after ${r.ipDays} days`,
+      formRejectDays: `rejected form submissions after ${r.formRejectDays} days`,
+      outboxDeliveredDays: `delivered alerts after ${r.outboxDeliveredDays} days`,
+      outboxUndeliveredDays: `undelivered ones after ${r.outboxUndeliveredDays} days`,
+      tokenAlertDays: `token-expiry alerts after ${r.tokenAlertDays} days`,
+      authAttemptDays: `login-attempt counters after ${r.authAttemptDays} days`,
+    }
+    for (const key of Object.keys(RETENTION) as (keyof typeof RETENTION)[]) {
+      expect(html, 'ar ' + key).toContain(ar[key])
+      expect(html, 'en ' + key).toContain(en[key])
+    }
+    // ‏والثوابتُ الثلاثة: عيّناتُ السرعة، ومهلةُ «تراجَع»، ورمزُ الدخول
+    expect(html).toContain(`عيّنات سرعة الصفحات تُمحى بعد ${d(VITALS_DAYS)}`)
+    expect(html).toContain(`speed samples (no identity) are kept ${VITALS_DAYS} days`)
+    expect(html).toContain(`"Undo" for ${Math.round(UNDO_SECONDS / 60)} minutes`)
+    expect(html).toContain(`KV, ${Math.round(CODE_TTL_SECONDS / 60)} minutes`)
+    expect(html).toContain('Time Travel')
+  })
+
+  it('وتقول كيف يُحذف كلُّ شيءٍ ويُصدَّر، وما لا يُحذف وحدَه ولماذا', async () => {
+    const html = await (await app.request('/privacy', {}, env())).text()
+    for (const how of ['احذفها', 'احذف المقطع', '«صدّر»', 'احذف عميلًا وبياناته', 'تراجَع', 'يمنع نشره', 'دفترُ الكلفة']) expect(html, how).toContain(how)
   })
 })

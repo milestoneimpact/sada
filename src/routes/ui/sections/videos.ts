@@ -308,6 +308,9 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
         : `<p class="hint">${hint}</p>`}
     </form>
     ${scheduleAll(u, ctx.reach ?? PRIVATE_ONLY, ctx.zone)}
+    ${/* ‏«احذف المقطع» (D-322) بلا «أتمضي؟»: «تراجَع» في إشعاره، ومنشوراتُه باقيةٌ بمقطعها ما بقيت */''}
+    <form class="row" method="POST" action="/panel/uploads/${id}/delete" data-busy="جار الحذف…"><span class="grow"></span>
+      ${button({ label: 'احذف المقطع', variant: 'danger', size: 'sm', type: 'submit', attrs: 'aria-label="' + escapeHtml('احذف المقطع ' + u.name) + '"' })}</form>
   </div>`
 }
 

@@ -43,6 +43,7 @@ import { alertChannel, bar, fileName, glyph, healthCard, machineCard, pageHead, 
 import { statusBadge } from './ui/components/badge'
 import { notice, noticeText, toastRegion } from './ui/components/toast'
 import { field } from './ui/components/field'
+import { card } from './ui/components/card'
 import { button } from './ui/components/button'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
@@ -273,6 +274,11 @@ export interface PanelSource {
   readonly uses?: number
   /** أللمرفوع أصلٌ في R2 يُنزَّل؟ */
   readonly hasFile?: boolean
+  /**
+   * ‏أما زال ملفُّ Drive في مجلّده؟ — بحكم الخادم نفسِه (`stillInFolder` وآخرُ مسح، مراجعة D-322). **وغيابُه «نعم»** لملفّ Drive:
+   * ‏ما لا يُعرف أغاب لا يُرسم زرُّه مفعَّلًا.
+   */
+  readonly inFolder?: boolean
 }
 
 export interface PanelProvider {
@@ -339,6 +345,11 @@ export interface PanelFlash {
     readonly label: string
     /** حقولٌ يحملها الزرّ مع المعرّف (D-303): الموعدُ والحسابُ لاستعادة سحب */
     readonly fields?: Readonly<Record<string, string>>
+    /**
+     * ‏`false` لما يعود صفًّا لم يعد في الصفحة (D-322 · «تراجَع» عن حذف): تُحمَّل الصفحةُ كلُّها بعده، فالتبديلُ بلا تحميلٍ
+     * ‏يبحث عن بطاقةٍ بمعرّف الزرّ (رمزٌ لا منشور) فلا يجدها، فيعود المنشورُ ولا يُرى حتّى تُحدَّث الصفحة.
+     */
+    readonly swap?: false
   }
 }
 
@@ -644,9 +655,24 @@ function sourceRow(s: PanelSource, now: Date, zone: string | null): string {
   const file = s.hasFile === true
     ? html`<a class="btn btn-secondary btn-sm" href="/panel/sources/${encodeURIComponent(s.id)}/file" download>نزّل الأصل</a>`.value
     : ''
-  const acts = `${action}${open}${origin}${file}`
-
   const seen = Date.parse(s.lastSeenAt.replace(' ', 'T') + 'Z') || 0
+  /*
+   * ‏**«احذف»** (D-322) بلا «أتمضي؟»: الإشعارُ يحمل «تراجَع». وملفُّ Drive يُحذف من مجلّده أوّلًا — وإلّا عاد في المسح التالي
+   * ‏وحُلّل بكلفة. **وحكمُ الزرّ حكمُ الخادم** (`inFolder` من `stillInFolder` وآخرِ مسح): كان لا يُرسَم قبل ستٍّ وعشرين ساعةً من آخر
+   * ‏مسحٍ رآه، والخادمُ يقبل الحذفَ بعد أوّل مسحٍ لا يراه — فالمالكُ يتبع السببَ ثمّ لا يجد زرًّا يومًا كاملًا ولا يُقال لماذا. فما زال
+   * ‏في المجلّد زرُّه **ظاهرٌ معطَّلٌ بسببه** (D-163 · D-325) بلا نموذج، وما غاب نموذجُه يُرسَل (مراجعة D-322).
+   */
+  const inFolder = (s.kind ?? 'drive') === 'drive' && s.inFolder !== false
+  const label = html`aria-label="احذف ${s.name}"`.value
+  const remove = inFolder
+    ? button({
+        label: 'احذف', variant: 'danger', size: 'sm', attrs: label,
+        disabled: { id: 'sdel-' + s.id.replace(/[^A-Za-z0-9_-]/g, '_'), reason: 'ما زال في مجلّد Drive — احذفه منه، ثمّ «مسح Drive الآن»' },
+      })
+    : html`<form class="inline" method="POST" action="/panel/sources/delete" data-busy="جار…"><input type="hidden" name="id" value="${s.id}">${
+        raw(button({ label: 'احذف', variant: 'danger', size: 'sm', type: 'submit', attrs: label }))}</form>`.value
+  const acts = `${action}${open}${origin}${file}${remove}`
+
   return `<tr data-pending="${pending ? '1' : '0'}" data-worth="${s.worth ?? -1}"
       data-name="${escapeHtml(s.name)}" data-seen="${seen}">
     <td><div class="nm">${fileName(s.name)}${s.kind === 'upload' ? ' <span class="chip">مرفوع</span>' : s.kind === 'url' ? ' <span class="chip">رابط</span>' : ''}${used}</div>${body}</td>
@@ -830,9 +856,32 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
       : `<form class="inline" method="POST" action="/panel/orgs/switch">
           <input type="hidden" name="org" value="${escapeHtml(o.id)}">
           ${button({ label: 'انتقل إليها', size: 'sm', type: 'submit' })}</form>`
-    return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td>${action}</td></tr>`
+    // ‏«صدّر» (D-322): ملفُّ بياناته كلِّها بلا رمزٍ ولا سرّ — للمالك وحدَه وبتحقّقٍ للتوّ. **وصفحةٌ لا الملفُّ نفسُه** (مراجعة D-322):
+    // ‏الملفُّ يُنزَّل بترويسة `attachment`، فجلسةٌ تعود إليه بعد «تحقّق للتوّ» تبقى على نموذج التحقّق ورمزُه مستهلَك. فالصفحةُ تقول ما
+    // ‏في الملفّ، وفيها «نزّل الملفّ» ثمّ الخطوةُ التالية
+    const exported = button({
+      label: 'صدّر', size: 'sm', href: '/panel/orgs/exported?org=' + encodeURIComponent(o.id),
+      attrs: html`aria-label="صدّر بيانات ${o.name}"`.value,
+    })
+    return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td><div class="row acts">${action}${exported}</div></td></tr>`
   }).join('')
   const kinds = ORG_KINDS.map((k) => `<option value="${k}">${ORG_KIND_LABEL[k]}</option>`).join('')
+  /*
+   * ‏**حذفُ عميلٍ كلِّه** (D-322) — الفعلُ الوحيدُ في اللوحة الذي لا يُردّ، فيُسأل عنه **بكتابة اسمه** لا بضغطة، وبعد تصديرٍ في
+   * ‏آخر يوم وفصلِ حساباته (يقولها الخادمُ إن نقصت). ومنظّمتُك أنت ليست في القائمة.
+   */
+  const others = orgs.filter((o) => o.id !== OWNER_ORG)
+  const remove = others.length === 0 ? '' : html`<div class="mt-3">${raw(card({
+    id: 'org-delete', title: 'احذف عميلًا وبياناته',
+    desc: 'لا يُردّ. صدّر بياناته أوّلًا، وافصل حساباته، ثمّ اكتب اسمه كما هو. وما في نُسخ الاسترجاع يبقى حتّى تنقضي مدّتُها.',
+    body: html`<form method="POST" action="/panel/orgs/delete" data-busy="جار الحذف…">
+      ${raw(field({ id: 'del-org', label: 'العميل',
+        control: html`<select name="org">${raw(others.map((o) => html`<option value="${o.id}">${o.name}</option>`.value).join(''))}</select>`.value }))}
+      ${raw(field({ id: 'del-confirm', label: 'اكتب اسمه للتأكيد',
+        control: html`<input name="confirm" required autocomplete="off" maxlength="${String(ORG_NAME_MAX)}">`.value }))}
+      ${raw(button({ label: 'احذف عميلًا وبياناته', variant: 'danger', type: 'submit' }))}
+    </form>`.value,
+  }))}</div>`.value
   return `<div class="card"><h2>منظّماتك</h2>
     <p class="hint">تدير كلّ المنظّمات من حسابك هذا. <b>وبيانات كلّ منظّمة معزولة عن غيرها</b>.</p>
     <div class="scroll"><table><thead><tr><th>المنظّمة</th><th>النوع</th><th>العلامات</th><th></th></tr></thead>
@@ -844,7 +893,7 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
       <div class="field"><label for="org-kind">النوع</label>
         <select id="org-kind" name="kind">${kinds}</select></div>
       ${button({ label: 'أنشئ المنظّمة', variant: 'primary', type: 'submit' })}
-    </form></div>`
+    </form></div>${remove}`
 }
 
 /**
@@ -1671,7 +1720,7 @@ export function panelPage(view: PaneView): string {
           html: pathArrows(escapeHtml(d.flash.text)),
           ...(d.flash.undo === undefined ? {} : {
             action: `<form class="inline" method="POST" action="${escapeHtml(d.flash.undo.action)}"
-                        data-busy="جار…" data-swap>
+                        data-busy="جار…"${d.flash.undo.swap === false ? '' : ' data-swap'}>
                     <input type="hidden" name="id" value="${escapeHtml(d.flash.undo.id)}">${
                       Object.entries(d.flash.undo.fields ?? {}).map(([k, v]) =>
                         html`<input type="hidden" name="${k}" value="${v}">`.value).join('')}

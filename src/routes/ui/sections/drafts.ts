@@ -33,7 +33,7 @@ import { containsUrl } from '../../../lib/idempotency'
 import type { LinkState } from '../../../lib/channels'
 import { button } from '../components/button'
 import { maySpend, SPEND_LOCKED } from '../../../lib/access'
-import { menu, menuItem } from '../components/menu'
+import { menu, menuAction, menuItem } from '../components/menu'
 import { field } from '../components/field'
 import { linkLine } from '../reach'
 import { html, raw } from '../html'
@@ -921,6 +921,21 @@ function card(
 
   const more: string[] = []
   more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
+  /*
+   * ‏**«احذفها» بلا «أتمضي؟»** (D-322 · D-303): الإشعارُ يحمل «تراجَع». والمجدولةُ يُسحب موعدُها أوّلًا، والمنشورةُ تبقى سجلًّا لما
+   * ‏خرج باسمك (D-004) — **والسببُ تحت البند المعطَّل** لا بندٌ يختفي فيُبحث عنه (D-163). **وما بلغ منصّتَه أو لم يُعرف أبلغها**
+   * ‏(`d.reach`، بحكم الخادم نفسِه: `publish/reached.ts`) معطَّلٌ كذلك — كان مفعَّلًا لكلّ فاشلٍ فيُضغط ثمّ يُردّ (مراجعة D-322).
+   */
+  const keep = d.status === 'queued' ? 'مجدولة — اسحب موعدها أوّلًا'
+    : d.status === 'published' ? 'نُشرت — تبقى سجلًّا لما خرج باسمك'
+      : d.reach === 'out' ? 'نُشرت كلُّها أو بعضُها — تبقى سجلًّا لما خرج باسمك'
+        : d.reach === 'maybe' ? 'لم يُعرف أبلغت المنصّة — تبقى سجلًّا يمنع نشرها مرّتين'
+          : d.reach === 'open' ? 'تُنشر الآن أو لم يُعرف جوابُها — انتظر نتيجتها'
+            : null
+  more.push(menuAction({
+    label: 'احذفها', action: '/panel/drafts/delete', fields: { id: d.id }, danger: true,
+    ...(keep === null ? {} : { blocked: keep }),
+  }))
 
   const tweets = tweetsOf(d.platform, d.text).length
   const linked = containsUrl(d.text)

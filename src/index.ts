@@ -4,6 +4,7 @@
  * المرحلة صفر: الصحة والجاهزية، وربط الحسابات عبر OAuth.
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
+import { draftRef, recordDraftFailure } from './lib/plan/draftFail'
 import { accessGuard } from './routes/access'
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
@@ -44,6 +45,9 @@ import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
+import { sweepRetention } from './lib/privacy/retention'
+import { purgeDeleted } from './lib/privacy/trash'
+import { record } from './lib/audit'
 import { pulseReport } from './lib/ops/pulse'
 import { snapshotDue, takeSnapshot } from './lib/ops/backup'
 import { snapshotKid } from './lib/ops/snapshot'
@@ -529,10 +533,14 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
     : await draftPost(deps, sourceId, platform, undefined, shape, itemId === undefined ? undefined : { id: itemId, text: message.body.draft.angle ?? '' })
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
-  if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)
+  const planId = message.body.draft.planId
+  // ‏ما تعذّر نهائيًّا يُكتب سببُه (PL-23): المراجعةُ تقوله بدل «يكتب الآن» إلى الأبد. والإعادةُ الأخيرة قبل طابور الأعطال نهائيّةٌ أيضًا
+  const why = outcome.kind === 'blocked' || outcome.kind === 'not_analyzed' ? outcome.reason
+    : outcome.kind === 'failed' && (!outcome.retryable || message.attempts >= 3) ? outcome.reason : null
+  if (why !== null && planId !== undefined) await recordDraftFailure(env.DB, org, planId, draftRef(itemId, sourceId, platform), why)
+  if (outcome.kind === 'failed' && outcome.retryable && message.attempts < 3) return retryLater(message, outcome.kind)
   message.ack()
   // ‏والمسوّدةُ تعرف خطّتها (D-261): منها يُقرأ يومُ البند حين تُجدوَل الخطّة
-  const planId = message.body.draft.planId
   if (outcome.kind === 'drafted' && planId !== undefined) {
     // ‏ومسوّدةُ الفكرة تحمل معرّفَ بندها في `source_refs`، فتجدها جدولةُ الخطّة كما تجد مسوّدةَ المصدر
     // ‏ومعرّفُ البند فيها أيضًا (D-329): به تطابق المراجعةُ والجدولةُ البندَ بمسوّدته حين يتكرّر المصدرُ على المنصّة
@@ -903,6 +911,12 @@ async function queue(
     // ‏التوليدُ يُعاد بزرٍّ أو بالمسح التالي، فيُسجَّل ويُقَرّ
     for (const message of batch.messages) {
       console.error({ job: 'generate-dlq', body: message.body, attempts: message.attempts })
+      // ‏وبندُ خطّةٍ سقط هنا يُقال في المراجعة (PL-23)، لا يبقى «يُكتب الآن»
+      const body = message.body as Partial<PlanDraftMessage>
+      if (body.draft?.planId !== undefined) {
+        const d = body.draft
+        await recordDraftFailure(env.DB, d.org, d.planId!, draftRef(d.itemId, d.sourceId, d.platform), 'تعذّرت الكتابة بعد ثلاث محاولات')
+      }
       message.ack()
     }
     return
@@ -1142,6 +1156,28 @@ async function rotateTick(env: Env): Promise<void> {
   }
 }
 
+/**
+ * **الكنسُ اليوميّ** (D-322) — مع المسح في جدوله (`3 3 * * *`) لا في جدولٍ خامس: ما فات مدّتَه من سجلّ النشاط والصندوق وتنبيهات
+ * الأذونات وعدّادات الدخول يُمحى، وعنوانُ IP يُقصَّر، وبايتاتُ ما حُذف من اللوحة تُمحى من R2 بعد مهلة «تراجَع».
+ *
+ * **وعطلُه لا يُوقف ما بعده**: يُقال في السجلّ ويُعاد غدًا. وأثرُه سطرٌ في سجلّ نشاط المالك بأعداده — بلا نصٍّ ولا عنوان.
+ */
+async function retentionTick(env: Env): Promise<void> {
+  // ‏الكنسُ والمحوُ مستقلّان: R2 أو KV لا يردّ لا يُبقي سجلَّ النشاط بلا كنس، ولا العكس
+  const swept = await sweepRetention(env.DB)
+    .catch((error: unknown) => { console.error({ job: 'retention', failed: String(error) }); return null })
+  const purged = await purgeDeleted({ db: env.DB, kv: env.KV, bucket: env.MEDIA })
+    .catch((error: unknown) => { console.error({ job: 'retention-purge', failed: String(error) }); return null })
+  console.info({ job: 'retention', ...(swept ?? {}), ...(purged ?? {}) })
+  const detail = [
+    swept === null ? 'الكنس تعذّر' : [
+      `نشاط ${swept.audit + swept.formRejects}`, `IP ${swept.ips}`, `صندوق ${swept.outbox}`, `أذونات ${swept.tokenAlerts}`, `دخول ${swept.authAttempts}`,
+    ].join(' · '),
+    purged === null ? 'المحو تعذّر' : `ملفّات ${purged.objects}`,
+  ].join(' · ')
+  await record(env.DB, { actor: 'cron', action: 'retention.sweep', detail, org: OWNER_ORG })
+}
+
 async function scheduled(controller: ScheduledController, env: Env): Promise<void> {
   // ‏حلقةُ المفاتيح قبل أيّ فكّ (D-318)
   registerKeyring(env)
@@ -1157,6 +1193,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
     await providersTick(env)
     await alertTick(env)
     await quotaTick(env)
+    await retentionTick(env)
     // ‏آخرًا (D-321): النسخةُ تقرأ ما كتبه المسحُ، ولا تؤخّر ما يُنتظر
     await backupTick(env)
     await prunePulseSlots(env.DB, new Date()).catch((error: unknown) => {

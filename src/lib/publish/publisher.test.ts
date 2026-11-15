@@ -1012,6 +1012,22 @@ describe('Instagram — تسحب ولا تُدفَع إليها (D-121)', () => 
     expect(f.bodies[0]).toContain('video_url=')
   })
 
+  /*
+   * ‏**ومقطعُ المالك يغلب ما وُلّد بعده ولو حُذف مقطعُه من «فيديوهاتك»** (D-182 · مراجعة D-322): الحذفُ يقطع `upload_id`
+   * ‏(`SET NULL`) ويُبقي صفَّ المنشور بمفتاحه، وكان الترتيبُ يقرأ `upload_id` وحدَه فيُنشر الإنفوجرافيكُ الأحدثُ مكانَ الـ Reel.
+   */
+  it('ومقطعُ المالك الذي حُذف من «فيديوهاتك» يبقى وسيطَه — لا الإنفوجرافيكُ الأحدث', async () => {
+    const postId = await seedInstagram({ media: 'none' })
+    db.raw.prepare(`INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key, upload_id, created_at)
+      VALUES ('m-clip', ?, 'upload/u1.mp4', 'video/mp4', 900, '', 'upload', 'mk-clip', NULL, datetime('now', '-2 hours'))`).run(postId)
+    db.raw.prepare(`INSERT INTO media (id, post_id, r2_key, mime, bytes, prompt, model, idempotency_key, created_at)
+      VALUES ('m-info', ?, 'img/info.png', 'image/png', 900, '{}', 'infographic:steps', 'mk-info', datetime('now', '-1 hours'))`).run(postId)
+    const f = net()
+    const outcome = await publishPost({ ...deps(f), bucket, baseUrl: BASE }, { postId })
+    expect(outcome.kind).toBe('published')
+    expect(f.bodies[0]).toContain('media_type=REELS')
+  })
+
   /** **ولا منشورَ نصّيٌّ فيها** — ويُردّ قبل أن تُنادى المنصّة. */
   it('وبلا وسيط يُردّ ولا يُنادى شيء', async () => {
     const postId = await seedInstagram({ media: 'none' })

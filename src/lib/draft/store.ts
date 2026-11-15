@@ -27,6 +27,7 @@ import { postLength } from './length'
 import { isThread, publishCostOf, threadProblem } from './thread'
 import { captionProblem, isVideoPlatform } from '../media/uploads'
 import { briefError } from '../platform/screen'
+import { attemptReachSql, reachOf, type Reach } from '../publish/reached'
 
 export type DraftStatus = 'draft' | 'approved' | 'edited' | 'rejected' | 'queued' | 'published' | 'failed'
 
@@ -86,6 +87,11 @@ export interface DraftRow {
    * يُقرأ «بلا سببٍ مسجَّل» كما يقرؤه `whyFailed`.
    */
   readonly failure?: string | null
+  /**
+   * ‏**أبلغ منصّتَه؟** (مراجعة D-322 · `publish/reached.ts`) — من محاولاته، لما ليس مسوّدةً ولا مجدولًا ولا منشورًا: `out` نُشر كلُّه
+   * ‏أو بعضُه، و`maybe` لم يُعرف، و`open` يُنشر الآن. فيُرسم «احذفها» معطَّلًا بالحكم الذي يردّ به الخادم. **واختياريٌّ** كـ`failure`.
+   */
+  readonly reach?: Reach
 }
 
 interface Raw {
@@ -109,6 +115,7 @@ interface Raw {
   original_text: string | null
   source_refs?: string | null
   fail_json: string | null
+  reach?: number | null
 }
 
 /**
@@ -157,6 +164,7 @@ function toDraft(row: Raw, platform: PublishPlatform): DraftRow {
     originalText: row.original_text ?? null,
     writtenBy: writerOf(row.source_refs ?? null),
     failure: row.status === 'failed' ? briefError(row.fail_json ?? null) : null,
+    reach: reachOf(row.reach),
   }
 }
 
@@ -212,7 +220,11 @@ async function selectDrafts(
                 CASE WHEN p.status = 'failed' THEN
                   (SELECT pa.response_json FROM publish_attempts pa
                     WHERE pa.post_id = p.id AND pa.status = 'failed'
-                    ORDER BY pa.attempt_no DESC LIMIT 1) END AS fail_json
+                    ORDER BY pa.attempt_no DESC LIMIT 1) END AS fail_json,
+                -- ‏وأبلغ منصّتَه؟ لما قد تكون له محاولة ولم يُحجَب حذفُه بحاله (مراجعة D-322)
+                CASE WHEN p.status NOT IN ('draft', 'queued', 'published') THEN
+                  (SELECT MAX(${attemptReachSql('pa')}) FROM publish_attempts pa
+                    WHERE pa.post_id = p.id AND pa.org_id = p.org_id) END AS reach
            FROM posts p
            LEFT JOIN sources s ON s.id = p.source_id
            LEFT JOIN accounts a ON a.id = p.account_id
