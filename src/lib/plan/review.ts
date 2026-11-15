@@ -18,6 +18,7 @@
  * ويُفرغ `locked_at` — **والإصدارُ المثبَّتُ باقٍ كما ثُبّت**، والمنشوراتُ المجدولةُ لا تتحرّك إلّا بفعلٍ على بطاقتها.
  */
 import type { Db } from '../tokens'
+import { draftFailures, draftRef } from './draftFail'
 import { decide, undoApprove } from '../draft/store'
 import { reschedulePost, unschedule } from '../schedule/job'
 import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
@@ -39,6 +40,8 @@ export interface ReviewCard {
   readonly mediaHeight?: number | null
   /** ما ينقص هذه البطاقةَ وحدَها. */
   readonly gaps: readonly Gap[]
+  /** سببُ تعذّر كتابتها (PL-23) — لبطاقةٍ بلا مسوّدة وحدها. */
+  readonly failed?: string
 }
 
 export type Gap = 'unwritten' | 'no_image' | 'pending' | 'clash'
@@ -75,7 +78,7 @@ export function itemKey(item: PlanItem): string {
 }
 
 export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promise<ReviewModel> {
-  const [meta, posts, media, versions] = await Promise.all([
+  const [meta, posts, media, versions, failures] = await Promise.all([
     db.prepare('SELECT version, locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org)
       .first<{ version: number; locked_at: string | null }>().catch(() => null),
     db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key FROM posts
@@ -91,6 +94,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       .bind(org, plan.id)
       .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
       .then((r) => r.results).catch(() => []),
+    draftFailures(db, org, plan.id),
   ])
   const latestMedia = new Map<string, string>()
   const mimeOf = new Map<string, string>()
@@ -115,6 +119,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
       index, key: itemKey(item), item, mediaId, mediaMime: mediaId === null ? null : mimeOf.get(mediaId) ?? null, gaps,
       mediaWidth: mediaId === null ? null : dimsOf.get(mediaId)?.width ?? null, mediaHeight: mediaId === null ? null : dimsOf.get(mediaId)?.height ?? null,
       post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at },
+      ...(row === null && failures.has(draftRef(item.id, item.sourceId, item.platform)) ? { failed: failures.get(draftRef(item.id, item.sourceId, item.platform))! } : {}),
     }
   })
   const named = await db.prepare('SELECT id, name FROM sources WHERE org_id = ? LIMIT 500').bind(org)

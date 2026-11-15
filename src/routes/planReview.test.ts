@@ -582,3 +582,22 @@ describe('أرقامُ الخطّة غربيّة (D-323)', () => {
     }
   })
 })
+
+describe('ما تعذّرت كتابتُه يُقال ولا يُنتظر (PL-23)', () => {
+  it('بندٌ سقطت كتابتُه: سببُه على بطاقته وفي سطر التقدّم، ولا تحديثَ حيًّا له، و«أعد كتابة ما تعذّر» يرسله ثانيةً', async () => {
+    db.raw.exec(`INSERT INTO audit_log (org_id, actor, action, target, detail) VALUES ('org_owner', 'system', 'plan.draft.failed', 'pl1|s2:x', 'مفتاحُ خدمة الكتابة مرفوض')`)
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('تعذّرت كتابتُه: مفتاحُ خدمة الكتابة مرفوض')
+    expect(html).toContain('وتعذّرت كتابةُ 1: مفتاحُ خدمة الكتابة مرفوض')
+    expect(html).not.toContain('صدى يكتب الباقي الآن')
+    expect(html).not.toContain('data-live="write"')
+    expect(html).toContain('أعد كتابة ما تعذّر (1)')
+    const sent: unknown[] = []
+    env['GENERATE_QUEUE'] = { send: async (b: unknown) => { sent.push(b) }, sendBatch: async (b: { body: unknown }[]) => { for (const m of b) sent.push(m.body) } }
+    const r = await app.request('/panel/plan/review/redraft', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1' }), headers: { Cookie: cookie } }, env)
+    expect(r.status).toBe(303)
+    expect(sent).toHaveLength(1)
+    expect(JSON.stringify(sent[0])).toContain('"platform":"x"')
+  })
+})

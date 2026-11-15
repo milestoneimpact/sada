@@ -113,14 +113,14 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
 function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewView, w: string): Html {
   const planId = m.plan.id
   const local = stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)
-  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(c.post.status)
+  const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
   const hidden = html`<input type="hidden" name="id" value="${planId}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
   // ‏والموعدُ الذي جُدولت إليه يُقال في الشارة: قد يكون أرجحَ ساعات المنصّة لا ساعةَ البند
   const when = status === 'queued' && c.post?.scheduledAt !== null && c.post?.scheduledAt !== undefined ? stamp(c.post.scheduledAt, zone).slice(5, 16) : ''
   const preview = c.post === null
-    ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">صدى يكتبه الآن — يظهر هنا وحدَه.</span></div>`
+    ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">${c.failed !== undefined ? 'تعذّرت كتابتُه: ' + c.failed : 'صدى يكتبه الآن — يظهر هنا وحدَه.'}</span></div>`
     : raw(nativePost({
       platform: c.item.platform as never, id: c.post.id, author: { name: view.authors?.[c.item.platform] ?? view.orgName ?? 'خطّتي', kind: null },
       text: c.post.text, when: local,
@@ -228,7 +228,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
       <a class="rv-cd-h" href="${hrefOf(day)}"><b>${dayLabel(day, 'short')}</b>${said}</a>
       ${cards.map((c) => {
         const st = c.post === null ? 'writing' : waits(c) ? 'wait' : c.post.status === 'published' ? 'done' : c.post.status === 'failed' ? 'bad' : 'set'
-        const text = c.post === null ? 'تُكتب الآن' : face(c.post.status).text
+        const text = c.post === null ? (c.failed !== undefined ? 'تعذّرت كتابتُه' : 'تُكتب الآن') : face(c.post.status).text
         const movable = c.post === null || c.post.status !== 'published'
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
           ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}?w=160" alt="" loading="lazy" decoding="async" width="28" height="28">`}
@@ -281,14 +281,20 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       : html`<span class="st idle">مسوّدة · الإصدار ${AR(m.version)}</span>`
   const head = pageHead('المنشورات', 'خطّةُ النشر', span + ' · ' + dayLabel(m.plan.week) + ' – ' + dayLabel(end))
   const written = m.cards.filter((c) => c.post !== null).length
+  // ‏ما تعذّر لا يُنتظر (PL-23): يُقال سببُه ومعه «أعد كتابة ما تعذّر»، والصفحةُ لا تتحدّث له
+  const failed = m.cards.filter((c) => c.post === null && c.failed !== undefined)
+  const inFlight = m.cards.length - written - failed.length
   const settled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
   // ‏ما يُكتب أو يُرسم الآن: الصفحةُ تعيد تحميلَ نفسها ما دام شيءٌ في الطريق (السكربتُ يقرأ `data-live`)
-  const live = written < m.cards.length ? 'write' : m.gaps.no_image > 0 ? 'image' : ''
+  const live = inFlight > 0 ? 'write' : m.gaps.no_image > 0 ? 'image' : ''
   const progress = html`<div class="rv-progress">
       <progress class="rv-prog" max="${String(Math.max(1, m.cards.length))}" value="${String(settled)}" aria-label="${'مجدولٌ أو منشور: ' + AR(settled) + ' من ' + AR(m.cards.length)}"></progress>
-      <span class="hint" role="status">${written < m.cards.length
+      <span class="hint" role="status">${inFlight > 0
         ? 'كُتب ' + AR(written) + ' من ' + AR(m.cards.length) + ' — صدى يكتب الباقي الآن بصوره، والصفحةُ تتحدّث وحدَها.'
-        : AR(settled) + ' من ' + AR(m.cards.length) + ' مجدولةٌ أو منشورة' + (m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : '')}</span></div>`
+        : failed.length > 0
+        ? 'كُتب ' + AR(written) + ' من ' + AR(m.cards.length) + '، وتعذّرت كتابةُ ' + AR(failed.length) + ': ' + failed[0]!.failed!
+        : AR(settled) + ' من ' + AR(m.cards.length) + ' مجدولةٌ أو منشورة' + (m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : '')}</span>
+      ${inFlight === 0 && failed.length > 0 ? html`<form class="inline" method="POST" action="/panel/plan/review/redraft"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'أعد كتابة ما تعذّر (' + AR(failed.length) + ')', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}</div>`
   const visible = [...m.cards]
     .filter((c) => shown === 0 || weekOfDay(m.plan.week, c.item.day) === shown)
     .sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))
@@ -302,7 +308,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   // ‏عرضُ القائمة (D-337): المعروضُ نفسُه جدولًا مضغوطًا — يومٌ وساعةٌ ومنصّةٌ وحالٌ وأوّلُ النصّ، والصفُّ يفتح لوحَ بطاقته.
   // ‏تبديلُ المنظار بالسكربت وحدَه (D-328)، وبلا سكربتٍ البطاقاتُ كما هي والجدولُ مخفيّ
   const rows = visible.map((c) => {
-    const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(c.post.status)
+    const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
     const text = c.post === null ? c.item.angle : c.post.text.replace(/\s+/g, ' ').trim()
     return html`<tr><td><span class="ago">${dayLabel(c.item.day, 'short')}</span> <bdi dir="ltr" class="mono">${stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)}</bdi></td>
       <td>${platformLabel(c.item.platform as never)}</td><td><span class="st ${st.tone}">${st.text}</span></td>
@@ -384,14 +390,14 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
   const prev = order[at - 1], next = order[at + 1]
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
-  const st = c.post === null ? { tone: 'idle', text: 'تُكتب الآن' } : face(status)
+  const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(status)
   const local = localParts(new Date(c.item.day + 'T' + c.item.time + ':00Z'), zone)
   const two = (n: number): string => String(n).padStart(2, '0')
   const localDay = String(local.year) + '-' + two(local.month) + '-' + two(local.day)
   const localTime = two(local.hour) + ':' + two(local.minute)
   const hidden = html`<input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
   const preview = c.post === null
-    ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">صدى يكتبه الآن — يظهر هنا وحدَه.</span></div>`
+    ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">${c.failed !== undefined ? 'تعذّرت كتابتُه: ' + c.failed : 'صدى يكتبه الآن — يظهر هنا وحدَه.'}</span></div>`
     : raw(nativePost({
       platform: c.item.platform as never, id: c.post.id, author: { name: view.authors?.[c.item.platform] ?? view.orgName ?? 'خطّتي', kind: null },
       text: c.post.text, when: localTime,

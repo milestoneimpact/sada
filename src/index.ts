@@ -4,6 +4,7 @@
  * المرحلة صفر: الصحة والجاهزية، وربط الحسابات عبر OAuth.
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
+import { draftRef, recordDraftFailure } from './lib/plan/draftFail'
 import { accessGuard } from './routes/access'
 import { Hono } from 'hono'
 import type { MessageBatch, ScheduledController } from '@cloudflare/workers-types'
@@ -532,10 +533,14 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
     : await draftPost(deps, sourceId, platform, undefined, shape, itemId === undefined ? undefined : { id: itemId, text: message.body.draft.angle ?? '' })
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)
-  if (outcome.kind === 'failed' && outcome.retryable) return retryLater(message, outcome.kind)
+  const planId = message.body.draft.planId
+  // ‏ما تعذّر نهائيًّا يُكتب سببُه (PL-23): المراجعةُ تقوله بدل «يكتب الآن» إلى الأبد. والإعادةُ الأخيرة قبل طابور الأعطال نهائيّةٌ أيضًا
+  const why = outcome.kind === 'blocked' || outcome.kind === 'not_analyzed' ? outcome.reason
+    : outcome.kind === 'failed' && (!outcome.retryable || message.attempts >= 3) ? outcome.reason : null
+  if (why !== null && planId !== undefined) await recordDraftFailure(env.DB, org, planId, draftRef(itemId, sourceId, platform), why)
+  if (outcome.kind === 'failed' && outcome.retryable && message.attempts < 3) return retryLater(message, outcome.kind)
   message.ack()
   // ‏والمسوّدةُ تعرف خطّتها (D-261): منها يُقرأ يومُ البند حين تُجدوَل الخطّة
-  const planId = message.body.draft.planId
   if (outcome.kind === 'drafted' && planId !== undefined) {
     // ‏ومسوّدةُ الفكرة تحمل معرّفَ بندها في `source_refs`، فتجدها جدولةُ الخطّة كما تجد مسوّدةَ المصدر
     // ‏ومعرّفُ البند فيها أيضًا (D-329): به تطابق المراجعةُ والجدولةُ البندَ بمسوّدته حين يتكرّر المصدرُ على المنصّة
@@ -906,6 +911,12 @@ async function queue(
     // ‏التوليدُ يُعاد بزرٍّ أو بالمسح التالي، فيُسجَّل ويُقَرّ
     for (const message of batch.messages) {
       console.error({ job: 'generate-dlq', body: message.body, attempts: message.attempts })
+      // ‏وبندُ خطّةٍ سقط هنا يُقال في المراجعة (PL-23)، لا يبقى «يُكتب الآن»
+      const body = message.body as Partial<PlanDraftMessage>
+      if (body.draft?.planId !== undefined) {
+        const d = body.draft
+        await recordDraftFailure(env.DB, d.org, d.planId!, draftRef(d.itemId, d.sourceId, d.platform), 'تعذّرت الكتابة بعد ثلاث محاولات')
+      }
       message.ack()
     }
     return

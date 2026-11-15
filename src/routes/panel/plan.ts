@@ -672,6 +672,30 @@ const toCard = (form: FormData, anchor = true): Response => {
   return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + weekOf(form) + (anchor && index !== null && Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
 }
 
+/**
+ * **«أعد كتابة ما تعذّر»** (PL-23): يرسل رسالةَ كتابةٍ لكلّ بندٍ بلا مسوّدةٍ قيل سببُ تعذّره، بضغطة المالك لا وحدَه — نداءٌ مدفوع
+ * يُرى زرُّه وعددُه قبل الضغط (D-006 · D-008)، والسقفُ وسقفُ الإنفاق في الكتابة نفسِها كما هما.
+ */
+plan.post('/panel/plan/review/redraft', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const id = String(gate.form.get('id') ?? '')
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'صارت للخطّة نسخةٌ أحدث — افتح المراجعة من جديد.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const model = await reviewModel(c.env.DB, org, current)
+  const items = model.cards.filter((x) => x.post === null && x.failed !== undefined).map((x) => x.item)
+  if (items.length > 0) await c.env.GENERATE_QUEUE.sendBatch(items.map((i) => draftMessage(current, i, org)))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.redraft', target: id, detail: String(items.length) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, items.length === 0
+    ? { kind: 'ok', text: 'لا بندَ تعذّرت كتابتُه الآن.' }
+    : { kind: 'ok', text: 'أُعيدت كتابةُ ' + String(items.length) + ' — تظهر في مكانها حين تُكتب.' })
+  return c.redirect('/panel/plan/review', 303)
+})
+
 plan.post('/panel/plan/review/approve', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
