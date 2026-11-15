@@ -133,7 +133,7 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/(channels\/disconnect|scan|analyze|sources|images\/quota|report\/promote|plan-import|plan\/import|client\/limits)(\/|$)/, 'admin'],
   // ‏الناشر: كلُّ ما يعتمد أو يجدول أو يُنشر
   [/^\/panel\/drafts\/(approve-many|schedule|reschedule|unschedule|requeue|thread-check|spread\/apply|undo-approve|undo-reject|undo-unschedule)$/, 'publisher'],
-  [/^\/panel\/plan\/(approve|approve-all|start|schedule|pin|review\/approve|review\/bulk|review\/redraft|share|share\/revoke)$/, 'publisher'],
+  [/^\/panel\/plan\/(approve|approve-all|start|schedule|pin|review\/approve|review\/bulk|review\/redraft|cancel|share|share\/revoke)$/, 'publisher'],
   [/^\/panel\/uploads\/[^/]+\/schedule$/, 'publisher'],
   // ‏و«تراجَع» في إشعار الجدولة (D-324) لمن يجدول: يعيد ما فعله قبل ثوانٍ
   [/^\/panel\/drafts\/undo-schedule$/, 'publisher'],

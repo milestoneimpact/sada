@@ -21,7 +21,7 @@ import { LOGOS } from './logos'
 import { nativePost } from './nativePost'
 import { maySpend } from '../../lib/access'
 import { button } from './components/button'
-import { menu, menuAction } from './components/menu'
+import { menu, menuAction, menuItem } from './components/menu'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
@@ -269,6 +269,24 @@ function weekTabs(m: ReviewModel, shown: number): Html {
   return html`<nav class="rv-weeks" aria-label="أسابيع الخطّة">${tabs}</nav>`
 }
 
+/**
+ * **أفعالُ الخطّة كلِّها في مكانٍ واحد** (طلبُ المالك 2026-11-15: «لا أجد طريقةً لتعديل الخطّة أو إلغائها أو إكمالها»):
+ * المتابعة، والعرضُ للطباعة، وإعادةُ البناء، والإلغاء — قائمةٌ ثانويّة بجانب المنظار، والأوّليُّ في الشاشة يبقى «اعتمد».
+ * والإلغاءُ نموذجٌ بلا سكربت (D-328) بتأكيدٍ يقول ما يقع، ولا يمسّ ما جُدول (يُسحب من «المنشورات» إن أراد المالك).
+ */
+function planActions(m: ReviewModel): Html {
+  const scheduled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
+  const drafts = m.cards.filter((c) => c.post !== null && (c.post.status === 'draft' || c.post.status === 'approved')).length
+  const keep = scheduled === 0 ? '' : ' ويبقى ما جُدول (' + AR(scheduled) + ') في موعده؛ تسحبه من «المنشورات» إن شئت.'
+  return html`${raw(menu({ label: 'أفعال الخطّة', variant: 'secondary', size: 'sm', items: [
+    menuItem({ label: 'تابع ما جُدول ونُشر', href: '/panel/plan/follow' }),
+    menuItem({ label: 'اعرض واطبع', href: '/panel/plan/view' }),
+    menuItem({ label: 'أعد بناء الخطّة', href: '/panel/plan/new' }),
+    menuAction({ label: 'ألغِ الخطّة', action: '/panel/plan/cancel', fields: { id: m.plan.id }, danger: true,
+      confirm: 'ألغِ هذه الخطّة؟ تُرفض مسوّداتُها التي لم تُجدوَل (' + AR(drafts) + ')' + keep }),
+  ] }))}`
+}
+
 export function planReviewScreen(m: ReviewModel, zone: string | null, view: ReviewView = {}): string {
   const span = SPAN_LABEL[m.plan.span ?? 'week']
   const end = shift(m.plan.week, spanDays(m.plan.span ?? 'week') - 1)
@@ -353,7 +371,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const weekHref = (day: string): string => '?w=' + String(weekOfDay(m.plan.week, day)) + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
-    <div class="row gap-2 mb-3">${state}<span class="grow"></span>${toggle}<a class="btn btn-secondary btn-sm" href="/panel/plan/view">اعرض واطبع</a><a class="btn btn-secondary btn-sm" href="/panel/plan/new">خطّة جديدة</a></div>
+    <div class="row gap-2 mb-3">${state}<span class="grow"></span>${toggle}${planActions(m)}</div>
     ${progress}
     ${shareBox(m, view)}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) })}

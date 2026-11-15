@@ -128,10 +128,10 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(after).toContain('2 مجدولةً من 3')
   })
 
-  it('«اعتمد الخطّة كاملة» من شاشة الخطّة: تُعتمَد وتُجدوَل وتعود إليها', async () => {
+  it('«اعتمد الخطّة كاملة» من شاشة الخطّة: تُعتمَد وتُجدوَل وتنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)', async () => {
     const { cookie, csrf } = await session()
     const res = await app.request('/panel/plan/approve-all', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', back: 'review' }), headers: { Cookie: cookie } }, env)
-    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    expect(res.headers.get('Location')).toBe('/panel/plan/follow')
     expect(db.raw.prepare("SELECT id, status FROM posts ORDER BY id").all()).toEqual([{ id: 'p1', status: 'queued' }, { id: 'p2', status: 'queued' }])
     expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '1 اعتُمدت · 0 تعثّرت · 2 جُدولت' })
   })
@@ -599,5 +599,23 @@ describe('ما تعذّرت كتابتُه يُقال ولا يُنتظر (PL-23
     expect(r.status).toBe(303)
     expect(sent).toHaveLength(1)
     expect(JSON.stringify(sent[0])).toContain('"platform":"x"')
+  })
+})
+
+describe('شاشاتُ الخطّة الأربع: أفعالُ الخطّة والمتابعةُ والإلغاء', () => {
+  it('المراجعةُ فيها «أفعال الخطّة» (تابع · اعرض · أعد البناء · ألغِ)، والمتابعةُ تجمع المجدولَ والمنشور، والإلغاءُ يرفض المسوّدات ويُبقي المجدول', async () => {
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
+    for (const s of ['أفعال الخطّة', 'href="/panel/plan/follow"', 'أعد بناء الخطّة', 'action="/panel/plan/cancel"']) expect(html).toContain(s)
+    db.raw.exec("UPDATE posts SET status = 'queued', account_id = 'a1', scheduled_at = '2099-01-04 07:00:00' WHERE id = 'p2'")
+    const follow = await (await app.request('/panel/plan/follow', { headers: { Cookie: cookie } }, env)).text()
+    expect(follow).toContain('متابعةُ الخطّة')
+    expect(follow).toContain('href="/panel/journey/p2"')
+    expect(follow).toContain('تنتظر قرارك في المراجعة')
+    const r = await app.request('/panel/plan/cancel', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1' }), headers: { Cookie: cookie } }, env)
+    expect(r.headers.get('Location')).toBe('/panel/plan/new')
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'rejected' })
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
+    expect(db.raw.prepare("SELECT status FROM plans WHERE id = 'pl1'").get()).toEqual({ status: 'superseded' })
   })
 })
