@@ -140,6 +140,14 @@ const DATA: readonly Row[] = [
     howLong: 'حتّى تُحذف — وما نُشر كلُّه أو بعضُه، أو لم يُعرف أنُشر، يبقى ما بقي عميلُه: محاولاتُه هي ما يمنع نشره مرّتين',
   },
   {
+    // ‏رابطُ موافقة العميل (D-353) — دخل main بعد بناء D-322، فصار له صفُّه هنا
+    what: 'رابطُ مراجعة العميل: بصمتُه لا رمزُه، ورأيُ العميل وملحوظتُه على كلّ منشور',
+    from: 'المشغّل أو ناشرٌ من فريقه ينشئ الرابط، والعميلُ يكتب رأيه منه بلا حساب',
+    why: 'أن يقول العميل «موافق» أو «أطلب تعديلًا» على منشورات خطّته قبل نشرها',
+    where: 'Cloudflare D1',
+    howLong: 'الرابطُ أربعة عشر يومًا أو حتّى تُبنى خطّةٌ أحدث أو يُلغى؛ والرأيُ يبقى مع خطّته حتّى تُحذف هي أو عميلُها',
+  },
+  {
     what: 'سجلّ النشاط: من فعل ماذا ومتى، ومن أيّ عنوان IP ومتصفّح',
     from: 'النظام نفسه',
     why: 'معرفة من فعل ماذا، والتحقيق في دخولٍ مريب',
@@ -396,6 +404,7 @@ function policyEnglish(contact: string | null): string {
     <li>OAuth access and refresh tokens — stored in Cloudflare D1, <b>encrypted with AES-GCM</b>; the key lives only in Worker secrets.</li>
     <li>Images and videos uploaded or generated for posts — stored in Cloudflare R2 until deleted.</li>
     <li>Post text, statuses, publish attempts, a cost ledger and an activity log with IP address and browser — in Cloudflare D1.</li>
+    <li>Client review links: a hash of the link, never the link itself (14 days, or until a newer plan or revocation), and each client's verdict and note per post, kept with its plan until that plan or its client is deleted.</li>
     <li>One session cookie for the panel, with the IP and browser it was opened from — three days at most, or until sign-out.</li>
   </ul>
   <h3>Who processes it with us</h3>

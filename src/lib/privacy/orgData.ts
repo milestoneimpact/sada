@@ -35,16 +35,16 @@ export const EXPORT_FRESH_HOURS = 24
  */
 const OWNED = [
   'publish_attempts', 'metrics', 'media_claims', 'promotion_suggestions', 'media', 'posts',
-  'plan_versions', 'plans', 'content_items', 'analysis_claims', 'sources',
-  'token_alerts', 'tokens', 'accounts', 'uploads', 'library_files',
-  'reports', 'settings', 'providers', 'task_routes', 'oauth_apps', 'alert_outbox', 'notice_reads', 'web_vitals',
+  'review_verdicts', 'review_links', 'plan_versions', 'plans', 'content_items', 'analysis_claims', 'sources',
+  'token_alerts', 'tokens', 'accounts', 'uploads', 'asset_marks', 'library_files',
+  'reports', 'settings', 'provider_checks', 'providers', 'task_routes', 'oauth_apps', 'alert_outbox', 'notice_reads', 'web_vitals',
   'audit_log', 'briefs', 'brands',
 ] as const
 
 /** ما يُصدَّر — بترتيبٍ يقرؤه إنسان: العميلُ ثمّ عمله ثمّ أثرُه. */
 const EXPORTED = [
-  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_versions', 'posts', 'publish_attempts',
-  'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'reports', 'token_alerts', 'providers', 'task_routes',
+  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_versions', 'review_links', 'review_verdicts', 'posts', 'publish_attempts',
+  'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'asset_marks', 'reports', 'token_alerts', 'providers', 'task_routes',
   'cost_ledger', 'audit_log',
 ] as const
 
@@ -62,12 +62,15 @@ const NOT_EXPORTED: Readonly<Record<string, string>> = {
   alert_outbox: 'صندوق تنبيهات القناة — نصوصها في سجلّ النشاط',
   notice_reads: 'ما قُرئ من إشعارات اللوحة',
   web_vitals: 'عيّنات سرعة الصفحات بلا هويّة',
+  provider_checks: 'اختبارات مفاتيح المزوّدين (D-348) — حالُ المشغّل لا بيانات عميل',
 }
 
 /** أعمدةٌ لا تخرج أبدًا، أيًّا كان جدولُها — **والنمطُ بعدها شبكةٌ لعمودٍ يُضاف غدًا باسمٍ يشبهها**. */
 const NEVER_COLUMNS = new Set([
   'key_enc', 'key_iv', 'secret_enc', 'secret_iv', 'access_enc', 'access_iv', 'refresh_enc', 'refresh_iv', 'secret_cipher',
   'hint', 'fingerprint', 'public_key', 'credential_id', 'multipart_id', 'ip', 'ua',
+  // ‏بصمةُ رابط العميل (D-353): لا تفتح شيئًا وحدَها، لكنّها اعتمادٌ لا بيانات
+  'token_hash',
 ])
 const NEVER_PATTERN = /(_enc|_iv|secret|cipher|password|passkey|totp|recovery)$/i
 
