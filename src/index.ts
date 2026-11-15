@@ -500,6 +500,8 @@ export interface PlanDraftMessage {
     readonly planId?: string
     /** نصُّ الفكرة حين يكون المصدرُ `idea:<n>` — يُكتب منها بـ `draftFromIdea`. */
     readonly idea?: string
+    /** قواعدُ منصّتها من ورقة الإرشادات (D-361)، قسمًا جاهزًا للموجّه. */
+    readonly rules?: string
     /** اختيارُ الخطّة: صورةٌ مع كلّ منشور؟ وغيابُه الإعدادُ العامّ كما كان. */
     readonly autoImage?: boolean
     /** ونوعُها (D-285) — وغيابُه إنفوجرافيك كما كان. */
@@ -529,7 +531,7 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
   const outcome = sourceId.startsWith('idea:')
     ? idea === undefined || idea === ''
       ? { kind: 'failed' as const, reason: 'بندُ فكرةٍ بلا نصّها', retryable: false }
-      : await draftFromIdea(deps, idea, platform, shape)
+      : await draftFromIdea(deps, idea, platform, shape, (message.body.draft.rules ?? '').slice(0, 2400))
     : await draftPost(deps, sourceId, platform, undefined, shape, itemId === undefined ? undefined : { id: itemId, text: message.body.draft.angle ?? '' })
   console.info({ job: 'plan-draft', source: sourceId, platform, kind: outcome.kind })
   // ‏ما يصلحه الوقتُ يُعاد، وما مُنع بسقفٍ أو كُتب من قبل يُقَرّ (كالنشر)

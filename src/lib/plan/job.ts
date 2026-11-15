@@ -154,6 +154,8 @@ export function ideaSources(ideas: readonly string[]): PlanSource[] {
 
 /** معرّفُ فكرةٍ في الخطّة: `idea:<n>`، ونصُّها في اختياراتها. */
 export function ideaOf(sourceId: string, choices: PlanChoices): string | null {
+  const imported = /^idea:i(\d+)$/.exec(sourceId)
+  if (imported !== null) return choices.importIdeas?.[Number(imported[1]) - 1] ?? null
   const m = /^idea:(\d+)$/.exec(sourceId)
   if (m === null) return null
   return choices.ideas[Number(m[1]) - 1] ?? null

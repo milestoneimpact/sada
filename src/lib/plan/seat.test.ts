@@ -1,7 +1,7 @@
 /** «عندي خطّة» (D-287): كلُّ صيغةٍ جدول، والناقصُ يُكمَّل ويُقال، والسليمُ يُسكَّن بندًا ومسوّدة، وما يمنعه يُسمّى. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { fillGaps, markdownTableToCsv, rowsFromModel, seatPlan, toTable } from './seat'
+import { fillGaps, markdownTables, rowsFromModel, seatPlan, toTable } from './seat'
 import type { PlanFacts } from './import'
 
 let db: FakeDb
@@ -12,8 +12,8 @@ beforeEach(() => { db = fakeDb() })
 
 describe('جدولٌ من كلّ صيغة', () => {
   it('جدولُ Markdown من Excel يصير CSV بلا سطر الفاصل، والخانةُ ذاتُ الفاصلة مقتبسة', () => {
-    expect(markdownTableToCsv('| التاريخ | الوقت | المنصة | النص |\n|---|---|---|---|\n| 2099-01-04 | 09:00 | LinkedIn | first, then second |'))
-      .toBe('التاريخ,الوقت,المنصة,النص\n2099-01-04,09:00,LinkedIn,"first, then second"')
+    expect(markdownTables('| التاريخ | الوقت | المنصة | النص |\n|---|---|---|---|\n| 2099-01-04 | 09:00 | LinkedIn | first, then second |'))
+      .toEqual(['التاريخ,الوقت,المنصة,النص\n2099-01-04,09:00,LinkedIn,"first, then second"'])
   })
   it('جوابُ النموذج يُقرأ متسامحًا: سياجٌ ونصٌّ حوله، والصفُّ بلا نصٍّ يُسقَط', () => {
     expect(rowsFromModel('```json\n{"rows":[{"date":"2099-01-04","time":null,"platform":"x","text":"نص"},{"text":""}]}\n```'))

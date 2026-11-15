@@ -497,16 +497,59 @@ describe('«عندي خطّة» (D-287)', () => {
     body.set('_csrf', csrf); body.set('image_style', 'none')
     body.set('file', new File([csv], 'خطتي.csv', { type: 'text/csv' }))
     const res = await app.request('/panel/plan/import', { method: 'POST', body, headers: { Cookie: cookie } }, env)
-    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    const to = res.headers.get('Location') ?? ''
+    expect(to).toMatch(/^\/panel\/plan\/import\/preview\?k=/)
+    // ‏«هذا ما فهمته»: لا يُسكَّن شيءٌ قبل الزرّ
+    expect(db.raw.prepare("SELECT count(*) AS n FROM plans WHERE status <> 'superseded'").get()).toEqual({ n: 0 })
+    const preview = await (await app.request(to, { headers: { Cookie: cookie } }, env)).text()
+    expect(preview).toContain('هذا ما فهمته')
+    expect(preview).toContain('2099-02-01 إلى 2099-02-03')
+    expect(preview).toContain('الساعةُ أرجحُ ساعات المنصّة')
+    expect(preview).toContain('ابنِ كما هي')
+    const k = new URL(to, 'http://x').searchParams.get('k') ?? ''
+    const ok = new FormData(); ok.set('_csrf', csrf); ok.set('k', k)
+    const built = await app.request('/panel/plan/import/confirm', { method: 'POST', body: ok, headers: { Cookie: cookie } }, env)
+    expect(built.headers.get('Location')).toBe('/panel/plan/review')
     const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(review).toContain('سُكّن 2 منشورًا في خطّتك')
     expect(review).toContain('ملاحظة: ')
     expect(review).toContain('الساعةُ أرجحُ ساعات المنصّة')
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status = 'queued'").get()).toEqual({ n: 0 })
+    // ‏والمفتاحُ لا يُبنى مرّتين
+    const again = await app.request('/panel/plan/import/confirm', { method: 'POST', body: ok, headers: { Cookie: cookie } }, env)
+    expect(again.headers.get('Location')).toBe('/panel/plan/import')
     const paste = new FormData()
     paste.set('_csrf', csrf); paste.set('pasted', 'الأحد: منشورٌ عن الحوكمة على LinkedIn')
     const refused = await app.request('/panel/plan/import', { method: 'POST', body: paste, headers: { Cookie: cookie } }, env)
     expect(refused.headers.get('Location')).toBe('/panel/plan/import')
+  })
+})
+
+describe('«اكتب الخطّة من أفكارها» (D-361)', () => {
+  it('لا يسكّن نصًّا: كلُّ صفٍّ فكرةٌ في الطابور بقواعد منصّته، ولا منشورَ قبل الكتابة', async () => {
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    const { cookie } = await session()
+    const screen = await (await app.request('/panel/plan/import', { headers: { Cookie: cookie } }, env)).text()
+    const csrf = /name="_csrf" value="([^"]+)"/.exec(screen)?.[1] ?? ''
+    const sent: { draft: Record<string, unknown> }[] = []
+    env['GENERATE_QUEUE'] = { async sendBatch(b: { body: { draft: Record<string, unknown> } }[]) { sent.push(...b.map((x) => x.body)) } }
+    const csv = 'التاريخ,العنوان / الفكرة,X: الصيغة,X: الوقت,LinkedIn: الصيغة,LinkedIn: الوقت\n2099-03-01,المَعلَم نقطة قرار,اقتباس,8:00 م,منشور طويل,9:00 ص'
+    const body = new FormData(); body.set('_csrf', csrf); body.set('image_style', 'none')
+    body.set('file', new File([csv], 'خطة.csv', { type: 'text/csv' }))
+    const to = (await app.request('/panel/plan/import', { method: 'POST', body, headers: { Cookie: cookie } }, env)).headers.get('Location') ?? ''
+    const preview = await (await app.request(to, { headers: { Cookie: cookie } }, env)).text()
+    expect(preview).toContain('اكتب الخطّة من أفكارها')
+    expect(preview).toContain('ابنِ كما هي')
+    const k = new URL(to, 'http://x').searchParams.get('k') ?? ''
+    const before = (db.raw.prepare('SELECT count(*) AS n FROM posts').get() as { n: number }).n
+    const ok = new FormData(); ok.set('_csrf', csrf); ok.set('k', k); ok.set('write', '1')
+    const res = await app.request('/panel/plan/import/confirm', { method: 'POST', body: ok, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review')
+    expect((db.raw.prepare('SELECT count(*) AS n FROM posts').get() as { n: number }).n).toBe(before)
+    expect(sent.map((m) => [m.draft['platform'], m.draft['sourceId'], m.draft['idea']])).toEqual([
+      ['x', 'idea:i1', 'المَعلَم نقطة قرار (الصيغة: اقتباس)'],
+      ['linkedin', 'idea:i2', 'المَعلَم نقطة قرار (الصيغة: منشور طويل)'],
+    ])
   })
 })
 

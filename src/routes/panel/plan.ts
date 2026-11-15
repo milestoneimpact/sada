@@ -7,6 +7,10 @@ import { sourceNames } from './client'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
 import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
+import { planPreviewScreen } from '../ui/planPreviewView'
+import { widenPlan } from '../../lib/plan/widen'
+import { rulesSection, type PlanRules } from '../../lib/plan/guidelines'
+import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
@@ -39,7 +43,7 @@ import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
 import { approvePlan, ideaOf, latestPlan, planSpan, planWindows } from '../../lib/plan/job'
-import { readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
+import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
 import type { PlanDeps } from '../../lib/plan/job'
 import { readSettings } from '../../lib/settings'
@@ -131,7 +135,7 @@ plan.post('/panel/plan/generate', async (c) => {
    */
   const queue = c.env.GENERATE_QUEUE as Env['GENERATE_QUEUE'] | undefined
   if (f.get('then') === 'review' && queue !== undefined && !(await readSettings(c.env.DB)).paused) {
-    if (running(await readBuild(c.env.KV, org), new Date())) return c.redirect('/panel/plan/building', 303)
+    if (running(await readBuild(d1BuildStore(c.env.DB), org), new Date())) return c.redirect('/panel/plan/building', 303)
     const params: PlanBuildParams = {
       span, channels, cadence: cadence as Cadence, sources, ideas, imageStyle, imageStyles: imageStyles as PlanChoices['imageStyles'], times,
       zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
@@ -139,7 +143,7 @@ plan.post('/panel/plan/generate', async (c) => {
       ...(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? { startDay: startRaw } : {}),
     }
     const build: PlanBuild = { id: crypto.randomUUID(), state: 'queued', done: 0, total: planWindows(/^\d{4}-\d{2}-\d{2}$/.test(startRaw) ? startRaw : weekStart(new Date()), span, cadence as Cadence).length, startedAt: new Date().toISOString() }
-    await writeBuild(c.env.KV, org, build)
+    await writeBuild(d1BuildStore(c.env.DB), org, build)
     await queue.sendBatch([{ body: { planBuild: { org, jobId: build.id, params } } }])
     await record(c.env.DB, { actor: 'panel', action: 'plan.generate', target: build.id, detail: 'queued' }, c.req.raw)
     return c.redirect('/panel/plan/building', 303)
@@ -331,6 +335,7 @@ function draftMessage(plan: NonNullable<Awaited<ReturnType<typeof latestPlan>>>,
       sourceId: i.sourceId, platform: i.platform, org, planId: plan.id,
       ...(i.asset === undefined ? {} : { asset: i.asset }),
       ...(idea === null ? {} : { idea }),
+      ...(rulesSection(plan.choices.rules, i.platform) === '' ? {} : { rules: rulesSection(plan.choices.rules, i.platform) }),
       ...(legacy ? {} : { autoImage: image !== 'none' }),
       imageStyle: image === 'none' ? plan.choices.imageStyle : image,
       ...(i.id === undefined ? {} : { itemId: i.id, angle: i.angle }),
@@ -1008,16 +1013,85 @@ plan.post('/panel/plan/import', async (c) => {
     org,
   )
   if (table.kind === 'error') return bad(table.reason)
+  // ‏«هذا ما فهمته»: يُقرأ ويُكمَّل ولا يُسكَّن شيء — يُحفظ ساعةً ويُعرض، والبناءُ بزرٍّ بعده
   const now = new Date()
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, now)
-  const { csv, filled } = await fillGaps(c.env.DB, org, table.csv, weekStart(now), facts.zone)
-  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle)
+  const wide = widenPlan(table.csv)
+  const { csv, filled } = await fillGaps(c.env.DB, org, wide.csv, weekStart(now), facts.zone)
+  const key = crypto.randomUUID()
+  await c.env.KV.put('plan-preview:' + key, JSON.stringify({
+    org, csv, filled: Object.fromEntries([...filled].map(([l, n]) => [String(l), n])),
+    via: table.via, widened: wide.widened, cost: table.cost, imageStyle, rules: table.rules ?? null,
+  }), { expirationTtl: 3600 })
+  return c.redirect('/panel/plan/import/preview?k=' + key, 303)
+})
+
+interface StoredPreview { org: string; csv: string; filled: Record<string, string>; via: string; widened: boolean; cost: number; imageStyle: PlanImageStyle | null; rules?: PlanRules | null }
+
+async function loadPreview(kv: Env['KV'], key: string, org: string): Promise<StoredPreview | null> {
+  if (!/^[0-9a-f-]{36}$/.test(key)) return null
+  const raw = await kv.get('plan-preview:' + key)
+  if (raw === null) return null
+  const p = JSON.parse(raw) as StoredPreview
+  return p.org === org ? p : null
+}
+
+plan.get('/panel/plan/import/preview', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const key = c.req.query('k') ?? ''
+  const p = await loadPreview(c.env.KV, key, activeOrg(session.record))
+  if (p === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.' })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null })
+  return page((nonce) =>
+    soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
+      '', buildCommands({ onPanel: false }), soloNav('plan')),
+  )
+})
+
+plan.post('/panel/plan/import/confirm', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const key = String(gate.form.get('k') ?? '')
+  const bad = async (text: string): Promise<Response> => {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text })
+    return c.redirect('/panel/plan/import', 303)
+  }
+  const p = await loadPreview(c.env.KV, key, org)
+  if (p === null) return bad('انتهت القراءة أو لم توجد — ارفع الملفّ ثانية.')
+  await c.env.KV.delete('plan-preview:' + key)
+  const table = { via: p.via }
+  const imageStyle = p.imageStyle
+  const csv = p.csv
+  const filled = new Map(Object.entries(p.filled).map(([l, n]) => [Number(l), n]))
+  const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
+  // ‏«اكتب من الفكرة» (D-361): نداءٌ مدفوعٌ لكلّ بند، بضغطة المالك وعددُه على الزرّ (D-006 · D-008)
+  const write = gate.form.get('write') === '1'
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write)
   await record(c.env.DB, {
-    actor: 'panel', action: 'plan.import.seat', target: seated.planId,
+    actor: 'panel', action: write ? 'plan.import.write' : 'plan.import.seat', target: seated.planId,
     detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
   }, c.req.raw)
   if (seated.planId === null) {
     return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
+  }
+  if (write) {
+    // ‏كلُّ بندٍ رسالةُ كتابةٍ في الطابور بقواعد منصّته، والمراجعةُ تعدّ ما كُتب وما تعذّر (PL-23)
+    const current = await latestPlan(c.env.DB, org)
+    if (current !== null && current.id === seated.planId) {
+      const msgs = current.plan.items.map((i) => draftMessage(current, i, org))
+      for (let at = 0; at < msgs.length; at += 100) await c.env.GENERATE_QUEUE.sendBatch(msgs.slice(at, at + 100))
+    }
+    await setFlash(c.env, c.req.raw, {
+      kind: seated.skipped.length === 0 ? 'ok' : 'warn',
+      text: 'تُكتب ' + String(seated.seated) + ' منشورًا من أفكار خطّتك بقواعد كلّ منصّة — تظهر في المراجعة كلّما كُتبت' +
+        (seated.skipped.length === 0 ? '.' : '. وتعذّر ' + String(seated.skipped.length) + '.'),
+    })
+    return c.redirect('/panel/plan/review', 303)
   }
   // ‏والصورُ إن اختيرت تُرسم في الخلفيّة بحرّاسها وسقفها اليوميّ (D-255 · D-285)، والمراجعةُ تقول «بلا صورة» حتّى تصل
   if (imageStyle !== null) {
@@ -1076,9 +1150,9 @@ export interface PlanBuildMessage {
  */
 export async function runPlanBuild(env: Env, body: PlanBuildMessage['planBuild']): Promise<void> {
   const { org, jobId, params } = body
-  const current = await readBuild(env.KV, org)
+  const current = await readBuild(d1BuildStore(env.DB), org)
   if (current === null || current.id !== jobId || current.state === 'done' || current.state === 'failed') return
-  const save = (patch: Partial<PlanBuild>): Promise<void> => writeBuild(env.KV, org, { ...current, ...patch })
+  const save = (patch: Partial<PlanBuild>): Promise<void> => writeBuild(d1BuildStore(env.DB), org, { ...current, ...patch })
   try {
     await save({ state: 'planning' })
     const outcome = await planSpan({
@@ -1102,7 +1176,7 @@ export async function runPlanBuild(env: Env, body: PlanBuildMessage['planBuild']
 plan.get('/panel/plan/building', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  const found = await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record))
   if (found === null) return c.redirect('/panel/plan', 303)
   const body = planBuildScreen(shownBuild(found, new Date()), new Date())
   return page((nonce) =>
@@ -1115,7 +1189,7 @@ plan.get('/panel/plan/building', async (c) => {
 plan.get('/panel/plan/build.json', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return c.json({ state: 'none' }, 401)
-  const found = await readBuild(c.env.KV, activeOrg(session.record))
+  const found = await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record))
   if (found === null) return c.json({ state: 'none' }, 404)
   const b = shownBuild(found, new Date())
   return c.json({ state: b.state, done: b.done, total: b.total, line: planningLine(b.done, b.total) }, 200, { 'Cache-Control': 'private, no-store' })
@@ -1130,6 +1204,6 @@ plan.get('/panel/plan', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   const current = await latestPlan(c.env.DB, activeOrg(session.record))
   // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
-  if (running(await readBuild(c.env.KV, activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
+  if (running(await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
   return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
 })

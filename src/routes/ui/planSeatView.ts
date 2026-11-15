@@ -19,7 +19,7 @@ export function planSeatScreen(d: { readonly canRead: boolean }): string {
     { v: 'infographic', title: 'إنفوجرافيك', note: 'يُرسم من نصّ كلّ منشور' },
     { v: 'illustration', title: 'رسمٌ فنّيّ', note: 'مسوّدةٌ مجّانيّة، ونهائيّةٌ بعد اعتمادك' },
   ]
-  const form = html`<form method="POST" action="/panel/plan/import" enctype="multipart/form-data" class="card wz pn" data-busy="جار القراءة والتسكين…">
+  const form = html`<form method="POST" action="/panel/plan/import" enctype="multipart/form-data" class="card wz pn" data-busy="جار القراءة…">
     <div class="stack">
       <label class="wz-drop card" id="ps-drop"><input type="file" name="file" accept="${SEAT_EXTENSIONS.map((e) => '.' + e).join(',')}" id="ps-file">
         <span class="wz-big">ارفع ملفّ الخطّة</span>
@@ -33,7 +33,7 @@ export function planSeatScreen(d: { readonly canRead: boolean }): string {
       <p class="hint m-0">الجدولُ يُقرأ بلا كلفة. وPDF وWord والنصُّ الحرّ يقرؤها نموذجُ الكتابة بنداءٍ واحدٍ في الدفتر.</p>
       <div class="row"><a class="btn btn-secondary btn-sm" href="/panel/plan-import/template.csv" download>نزّل نموذج الجدول</a></div>
       ${d.canRead
-        ? html`<div class="row"><button class="btn btn-primary" type="submit">اقرأ الخطّة وسكّنها</button></div>`
+        ? html`<div class="row"><button class="btn btn-primary" type="submit">اقرأ الخطّة</button></div>`
         : html`<p class="m-0">قراءةُ الخطط للمدير فأعلى. <a href="${panelHref('posts')}">عُد إلى المنشورات</a></p>`}
     </div>
   </form>`

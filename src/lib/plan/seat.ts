@@ -33,6 +33,7 @@ import { localParts } from '../time/zone'
 import { parseCsvRecords, readPlan, rowKey, type PlanFacts, type PlanRow } from './import'
 import { PLAN_CHANNELS, spanDays, type PlanItem, type PlanPlatform, type PlanSpan, type PlanImageStyle } from './prompt'
 import { cleanConverted, type ToMarkdown } from '../sources/ingest'
+import { readGuidelines, type PlanRules } from './guidelines'
 import { isThread } from '../draft/thread'
 
 export const SEAT_EXTENSIONS: readonly string[] = ['csv', 'xlsx', 'xls', 'ods', 'pdf', 'docx', 'odt', 'txt', 'md']
@@ -44,18 +45,26 @@ const HEADER = 'التاريخ,الوقت,المنصة,النص'
 const DEFAULT_LOCAL_TIME: Readonly<Record<string, string>> = { linkedin: '09:00', x: '13:00', youtube: '18:00', tiktok: '19:00', instagram: '19:00' }
 
 export type TableOutcome =
-  | { readonly kind: 'table'; readonly csv: string; readonly cost: number; readonly via: 'csv' | 'sheet' | 'model' }
+  | { readonly kind: 'table'; readonly csv: string; readonly cost: number; readonly via: 'csv' | 'sheet' | 'model'; readonly rules?: PlanRules }
   | { readonly kind: 'error'; readonly reason: string }
 
 const cell = (v: string): string => /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v
 
-/** جدولُ Markdown (من `toMarkdown`) إلى CSV — السطورُ التي تبدأ بـ `|`، بلا سطر الفاصل. */
-export function markdownTableToCsv(md: string): string {
-  return md.split('\n')
-    .map((l) => l.trim())
-    .filter((l) => l.startsWith('|') && !/^\|[\s:|-]+\|$/.test(l))
-    .map((l) => l.replace(/^\||\|$/g, '').split('|').map((c) => cell(c.trim())).join(','))
-    .join('\n')
+/**
+ * كلُّ جدولٍ في Markdown على حدة — ورقةُ Excel جدول. كانت الأوراقُ كلُّها تُضمّ جدولًا واحدًا، فتصير صفوفُ
+ * «الإرشادات» منشوراتٍ في الخطّة. والجدولُ سطورٌ متتابعةٌ تبدأ بـ `|`، وما بينها يفصلها.
+ */
+export function markdownTables(md: string): string[] {
+  const tables: string[][] = []
+  let open = false
+  for (const raw of md.split('\n')) {
+    const l = raw.trim()
+    if (!l.startsWith('|')) { open = false; continue }
+    if (/^\|[\s:|-]+\|$/.test(l)) continue
+    if (!open) { tables.push([]); open = true }
+    tables[tables.length - 1]!.push(l.replace(/^\||\|$/g, '').split('|').map((c) => cell(c.trim())).join(','))
+  }
+  return tables.map((t) => t.join('\n'))
 }
 
 const EXTRACT_SYSTEM = `You extract a social media publishing plan from a document. Output ONLY JSON:
@@ -111,9 +120,11 @@ export async function toTable(
       const one = Array.isArray(out) ? out[0] : out
       if (one === undefined || one.format === 'error' || one.data === undefined) return { kind: 'error', reason: 'تعذّرت قراءة الملفّ.' }
       if (SHEETS.has(ext)) {
-        const csv = markdownTableToCsv(one.data)
+        const [csv = '', ...rest] = markdownTables(one.data)
         if (csv.split('\n').length < 2) return { kind: 'error', reason: 'لا جدولَ في الملفّ — أوّلُ ورقةٍ فيه فارغة؟' }
-        return { kind: 'table', csv, cost: 0, via: 'sheet' }
+        // ‏وورقةُ الإرشادات (البند × المنصّة) قواعدُ كتابةٍ لا منشورات
+        const rules = rest.map(readGuidelines).find((r) => r !== null) ?? null
+        return { kind: 'table', csv, cost: 0, via: 'sheet', ...(rules === null ? {} : { rules }) }
       }
       prose = cleanConverted(one.data)
       if (!DOCS.has(ext)) return { kind: 'error', reason: 'صيغةٌ لا تُقرأ.' }
@@ -194,6 +205,10 @@ const SPANS: readonly PlanSpan[] = ['week', '2weeks', 'month', '2months']
  */
 export async function seatPlan(
   db: Db, org: string, csv: string, facts: PlanFacts, filled: ReadonlyMap<number, string>, imageStyle: PlanImageStyle | null,
+  /** قواعدُ ورقة الإرشادات — تُحفظ مع اختيارات الخطّة. */
+  rules: PlanRules | null = null,
+  /** «اكتب من الفكرة» (D-361): يُسكَّن البندُ فكرةً بلا مسوّدة، ويكتبه الطابورُ بقواعد منصّته. */
+  write = false,
 ): Promise<SeatOutcome> {
   const read = readPlan(csv, facts)
   if (read.fileProblems.length > 0) return { planId: null, seated: 0, skipped: read.fileProblems.map((r) => ({ line: 1, reason: r })) }
@@ -216,7 +231,18 @@ export async function seatPlan(
   const planId = crypto.randomUUID()
   const items: PlanItem[] = []
   const posts: { id: string; row: PlanRow; ref: string; key: string }[] = []
+  const importIdeas: string[] = []
   for (const r of within) {
+    if (write) {
+      importIdeas.push(r.text.slice(0, 2000))
+      const notes = [filled.get(r.line) ?? ''].filter((x) => x !== '')
+      items.push({
+        sourceId: 'idea:i' + String(importIdeas.length), platform: r.platform as PlanPlatform, kind: 'text',
+        angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
+        ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
+      })
+      continue
+    }
     const key = await rowKey(r)
     const dup = await db.prepare("SELECT id FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'").bind(org, key).first<{ id: string }>()
     if (dup !== null) { skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' }); continue }
@@ -233,7 +259,7 @@ export async function seatPlan(
   }
   if (items.length === 0) return { planId: null, seated: 0, skipped }
   const channels = [...new Set(items.map((i) => i.platform))]
-  const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start }
+  const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }), ...(write ? { importIdeas } : {}) }
   const statements = [
     db.prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND week_start = ? AND span = ? AND status <> 'superseded'").bind(org, start, span),
     db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, start, span),

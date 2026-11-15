@@ -841,4 +841,12 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pf-row a{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; padding-block:var(--s-2); color:inherit; text-decoration:none; border-block-end:1px solid var(--line)}
 .pf-when{font-variant-numeric:tabular-nums; color:var(--ink-2)}
 .pf-text{flex:1 1 16rem; min-width:0; color:var(--ink-2)}
+.pv-facts{display:grid; grid-template-columns:repeat(auto-fit,minmax(12rem,1fr)); gap:var(--s-3); margin:0}
+.pv-facts dt{color:var(--ink-2); font-size:.875rem}
+.pv-facts dd{margin:0; font-weight:600}
+.pv-scroll{overflow-x:auto; max-inline-size:100%}
+.pv-table{inline-size:100%; border-collapse:collapse; font-size:.9375rem}
+.pv-table th,.pv-table td{padding:var(--s-2); border-block-end:1px solid var(--line); text-align:start; vertical-align:top}
+.pv-table td:last-child{color:var(--ink-2); white-space:nowrap}
+.pv-rules{display:grid; gap:var(--s-4)}
 `
