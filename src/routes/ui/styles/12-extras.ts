@@ -504,7 +504,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-pf-more{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); margin-top:var(--s-4); align-items:start}
 .wz-times input{flex:1 1 6rem; min-width:0}
 .wz-pill{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-1) var(--s-4);
-  border:var(--bd); border-radius:var(--r-pill); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
+  border:var(--bd); border-radius:var(--r-control); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pill input[type=radio]{margin:0; accent-color:var(--accent)}
 .wz-pill:has(input[type=radio]:checked){border-color:var(--accent); background:var(--selected); color:var(--ink)}
 .wz-pill input[type=number]{width:calc(3ch + var(--s-8))}
