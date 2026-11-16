@@ -18,7 +18,8 @@ import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
 import { attachStatement } from '../library'
-import { matchMedia, type LibraryMedia, type MediaMatch } from '../drive/media'
+import { itemNumber, matchMedia, variantOf, type LibraryMedia, type MediaMatch } from '../drive/media'
+import { packageRefFor, type PackagePick } from '../package/pick'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
 
 /** أكبرُ ملفٍّ يُقرأ، وأكثرُ صفوفٍ تُستورَد مرّة — خطّةُ شهرٍ كثيفةٍ دونهما. */
@@ -222,6 +223,8 @@ export interface PlanRow {
   readonly format: string
   /** وسيطتُه من مكتبة Drive — و`null` للصفّ الذي لا رقمَ مادّةٍ له. */
   readonly media: MediaMatch | null
+  /** وسيطتُه من حزمة المحتوى (`g:<sha>`، D-366) — تغلب وسيطةَ Drive، وغيابُها لا يغيّر شيئًا. */
+  readonly packageRef?: string | null
   /** ما يمنع هذا الصفّ — والصفُّ بلا مشكلةٍ وحدَه يُعتمَد. */
   readonly problems: readonly string[]
 }
@@ -247,6 +250,8 @@ export interface PlanFacts {
   readonly scheduled?: readonly { readonly platform: string; readonly text: string; readonly at: string }[]
   /** وسائطُ المالك من Drive (D-363) — اختياريّة: بلاها لا يُطابَق شيء. */
   readonly library?: readonly LibraryMedia[]
+  /** المعتمدُ من حزمة المحتوى (D-366) — اختياريّ: بلاه تبقى مطابقةُ Drive وحدها. */
+  readonly package?: readonly PackagePick[]
 }
 
 /** مفتاحُ مقارنةٍ للاسم: بلا فراغٍ زائدٍ ولا حالةِ أحرف. */
@@ -374,7 +379,14 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
   })
   // ‏والمطابقةُ بعد الصفوف كلِّها: التناوبُ بين الداكن والفاتح يعدّ صفوفَ المادّة الواحدة بترتيبها
   const matches = matchMedia(rows.map((r) => (r.item === '' ? null : { item: r.item, hint: r.mediaHint, format: r.format })), facts.library ?? [])
-  return { rows: rows.map((r, i) => (matches[i] === null ? r : { ...r, media: matches[i]! })), fileProblems: [] }
+  const picks = facts.package ?? []
+  const withPkg = (r: PlanRow): PlanRow => {
+    const item = itemNumber(r.item)
+    if (picks.length === 0 || item === null || r.platform === null) return r
+    const ref = packageRefFor(picks, item, r.platform, variantOf(r.mediaHint))
+    return ref === null ? r : { ...r, packageRef: ref }
+  }
+  return { rows: rows.map((r, i) => withPkg(matches[i] === null ? r : { ...r, media: matches[i]! })), fileProblems: [] }
 }
 
 /**
@@ -399,6 +411,8 @@ export async function rowKey(row: PlanRow): Promise<string> {
  * «فيديوهاتك» بعمود المقطع، وما لم يُنزَّل إلى R2 بعد لا يُربط.
  */
 export function driveAssetRef(row: PlanRow): string | null {
+  // ‏ووسيطةُ الحزمة أوّلًا (D-366): الغلافُ أو المقطعُ المعتمد بالصوت، مطابقًا برقم المادّة ولونها
+  if (row.packageRef !== undefined && row.packageRef !== null) return row.packageRef
   const m = row.media
   if (m === null || m.kind !== 'matched' || m.media.r2Key === null || m.media.kind !== 'image') return null
   if (row.platform !== 'linkedin' && row.platform !== 'x') return null

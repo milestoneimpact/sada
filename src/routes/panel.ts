@@ -18,6 +18,7 @@ import { channels } from './panel/channels'
 import { plan } from './panel/plan'
 import { sources } from './panel/sources'
 import { media } from './panel/media'
+import { pkg } from './panel/package'
 import { reports } from './panel/reports'
 import { drafts } from './panel/drafts'
 import { notices } from './panel/notices'
@@ -46,6 +47,7 @@ panel.route('/', channels)
 panel.route('/', plan)
 panel.route('/', sources)
 panel.route('/', media)
+panel.route('/', pkg)
 panel.route('/', reports)
 panel.route('/', drafts)
 panel.route('/', notices)

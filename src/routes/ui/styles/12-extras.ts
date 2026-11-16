@@ -849,4 +849,16 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pv-table th,.pv-table td{padding:var(--s-2); border-block-end:1px solid var(--line); text-align:start; vertical-align:top}
 .pv-table td:last-child{color:var(--ink-2); white-space:nowrap}
 .pv-rules{display:grid; gap:var(--s-4)}
+/* ‏«ما تغيّر في حزمتك» (D-372): رأسُ أرقامٍ ثلاثة، ثمّ لكلّ مادّةٍ قبلُ وبعدُ متجاوران بهدوء «صفاء» — والقديمُ أخفتُ من الجديد */
+.pk-sum{display:grid; grid-template-columns:repeat(auto-fit,minmax(9rem,1fr)); gap:var(--s-3); margin:0}
+.pk-sum div{padding:var(--s-3); border-radius:var(--r-control); background:var(--surface-2)}
+.pk-sum dt{color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.pk-sum dd{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; font-variant-numeric:tabular-nums}
+.pk-diff{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); gap:var(--s-3)}
+.pk-side{padding:var(--s-3); border:var(--stroke) solid var(--line); border-radius:var(--r-control); min-width:0}
+.pk-side h4{margin:0 0 var(--s-1); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); font-weight:600}
+.pk-old{color:var(--ink-2); background:var(--surface-2)}
+.pk-new{border-color:var(--accent)}
+.pk-text{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit}
+.pk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center}
 `

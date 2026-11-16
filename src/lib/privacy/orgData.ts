@@ -37,6 +37,7 @@ const OWNED = [
   'publish_attempts', 'metrics', 'media_claims', 'promotion_suggestions', 'media', 'posts',
   'review_verdicts', 'review_links', 'plan_versions', 'plans', 'content_items', 'analysis_claims', 'sources',
   'token_alerts', 'tokens', 'accounts', 'uploads', 'asset_marks', 'library_files', 'drive_media', 'drive_media_folder',
+  'package_changes', 'package_revisions', 'package_media', 'package_files', 'package_sources',
   'reports', 'settings', 'provider_checks', 'providers', 'task_routes', 'oauth_apps', 'alert_outbox', 'notice_reads', 'web_vitals',
   'audit_log', 'briefs', 'brands',
 ] as const
@@ -44,7 +45,7 @@ const OWNED = [
 /** ما يُصدَّر — بترتيبٍ يقرؤه إنسان: العميلُ ثمّ عمله ثمّ أثرُه. */
 const EXPORTED = [
   'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_versions', 'review_links', 'review_verdicts', 'posts', 'publish_attempts',
-  'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'asset_marks', 'drive_media', 'drive_media_folder', 'reports', 'token_alerts', 'providers', 'task_routes',
+  'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'asset_marks', 'drive_media', 'drive_media_folder', 'package_sources', 'package_files', 'package_media', 'package_revisions', 'package_changes', 'reports', 'token_alerts', 'providers', 'task_routes',
   'cost_ledger', 'audit_log',
 ] as const
 

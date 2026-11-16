@@ -4,6 +4,7 @@
  * المرحلة صفر: الصحة والجاهزية، وربط الحسابات عبر OAuth.
  * لوحة الاعتماد والنشر المجدول في المرحلة الأولى.
  */
+import { revisePackage } from './lib/package/revision'
 import { draftRef, recordDraftFailure } from './lib/plan/draftFail'
 import { accessGuard } from './routes/access'
 import { Hono } from 'hono'
@@ -61,6 +62,8 @@ import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
 import { runPlanBuild, type PlanBuildMessage } from './routes/panel/plan'
+import type { PackageSyncMessage } from './routes/panel/package'
+import { readSource, sourceById, syncPackage, tokenFor } from './lib/package/sync'
 import { providerKey } from './routes/panel/channels'
 import { dailyChecks } from './lib/ai/health'
 
@@ -568,7 +571,7 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
   }
 }
 
-async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage | PlanBuildMessage>, env: Env): Promise<void> {
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage | PlanBuildMessage | PackageSyncMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلٌ يُرمى يُعاد بتباعد ولا يُسقط الدفعة
     await guarded(message, 'analyze', async (m) => {
@@ -577,6 +580,12 @@ async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessag
         return
       }
       // ‏بناءُ الخطّة في الخلفيّة (D-332): يُقَرّ قبل أن يبدأ — نداءُ التخطيط مدفوع، وإعادةُ الرسالة دفعٌ ثانٍ؛ والفشلُ يُكتب في حاله
+      // ‏مزامنةُ حزمة المحتوى (D-366): من الويب هوك أو الاستكمال — مجّانيّة، والتكرارُ ينتهي إلى «لا جديد» بالتزامه
+      if ('packageSync' in m.body) {
+        m.ack()
+        await packageTick(env, (m.body as PackageSyncMessage).packageSync)
+        return
+      }
       if ('planBuild' in m.body) {
         m.ack()
         await runPlanBuild(env, (m.body as PlanBuildMessage).planBuild)
@@ -945,6 +954,39 @@ async function queue(
  * ولا تُسقط دورةَ الإرسال إن سقطت: القياسُ معرفةٌ، والنشرُ التزامٌ
  * بموعد. فتُغلَّف بـ try، ويُسجَّل عطلُها ولا يُرمى.
  */
+/**
+ * ‏دورةُ حزمةٍ واحدة (D-366) — رسالةُ الطابور تُكمل نفسَها برسالةٍ تالية ما بقي نقلٌ مؤجَّل، **بسقف ثلاثين رسالة** للدفعة الواحدة.
+ */
+async function packageTick(env: Env, job: PackageSyncMessage['packageSync'] & { readonly hop?: number }): Promise<void> {
+  const source = await sourceById(env.DB, job.sourceId)
+  if (source === null) return
+  const token = await tokenFor(source, env.TOKEN_ENC_KEY, env.GITHUB_CONTENT_TOKEN)
+  if (token === null) return
+  const out = await syncPackage({ db: env.DB, bucket: env.MEDIA, token }, source, {
+    ...(job.after === undefined ? {} : { after: job.after }), ...(job.force === true ? { force: true } : {}),
+  })
+  console.info({ job: 'package-sync', kind: out.kind, ...(out.kind === 'synced' ? { stored: out.stored, deferred: out.deferred } : {}) })
+  const hop = job.hop ?? 0
+  if (out.kind === 'synced' && out.deferred > 0 && hop < 30) {
+    await env.GENERATE_QUEUE.send({ packageSync: { sourceId: source.id, force: true, hop: hop + 1 } })
+  }
+  // ‏اكتمل النقلُ (أو بلغ السقف): الدفعةُ مراجعةٌ برقمها (D-370) — والتكرارُ ينتهي إلى صفٍّ واحد بمفتاح الالتزام
+  // ‏ولا جديد في الفرع: مراجعةُ آخر التزامٍ تُعاد إن تعثّرت بعطلٍ عابر — وإلّا فهي «موجودة» بقراءةٍ واحدة من D1
+  const commit = out.kind === 'synced' && (out.deferred === 0 || hop >= 30) ? out.commit : out.kind === 'unchanged' ? source.lastCommit : null
+  if (commit !== null) {
+    const fresh = (await sourceById(env.DB, source.id)) ?? source
+    const rev = await revisePackage({ db: env.DB, token }, fresh, commit)
+    console.info({ job: 'package-revision', kind: rev.kind, ...(rev.kind === 'applied' ? { changes: rev.changes, awaiting: rev.awaiting } : {}) })
+  }
+}
+
+/** ‏الفحصُ الاحتياطيّ الساعيّ (D-366): ETag على الفرع، و304 لا يكتب شيئًا — فلا يفوت دفعٌ ضاع إشعارُه. */
+async function packageHourly(env: Env): Promise<void> {
+  const source = await readSource(env.DB, OWNER_ORG)
+  if (source === null) return
+  await packageTick(env, { sourceId: source.id }).catch((error: unknown) => console.warn({ job: 'package-sync', failed: String(error) }))
+}
+
 async function metricsTick(env: Env): Promise<void> {
   try {
     const summary = await pullDue({ db: env.DB, encKey: env.TOKEN_ENC_KEY })
@@ -1211,6 +1253,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   if (controller.cron === METRICS_CRON) {
     await metricsTick(env)
     await alertTick(env, 'hourly')
+    await packageHourly(env)
   }
   if (controller.cron === REPORT_CRON) await reportTick(env)
 }

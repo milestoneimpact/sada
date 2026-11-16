@@ -108,6 +108,11 @@ export interface Env {
   readonly GEMINI_API_KEY: string
   readonly GOOGLE_SA_JSON: string
   /**
+   * رمزُ قراءة حزمة المحتوى من GitHub (D-366) — fine-grained بصلاحيّة Contents: Read على مستودعٍ واحد. **سرُّ Worker وحده**، واختياريّ:
+   * بلاه لا مزامنة، ولا شيء ينكسر.
+   */
+  readonly GITHUB_CONTENT_TOKEN?: string
+  /**
    * يحرس مسارات `/admin/*`. غيابه يُغلقها لا يفتحها (D-019).
    * ليس من أسرار البوّابة: نظامٌ بلا مسار إدارةٍ ليس معطّلاً.
    */

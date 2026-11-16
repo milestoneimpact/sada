@@ -3,6 +3,8 @@
  *
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك.
  */
+import { statusBadge } from '../ui/components/badge'
+import { awaitingCount, awaitingRevision } from '../../lib/package/revision'
 import { sourceNames } from './client'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
 import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
@@ -25,6 +27,7 @@ import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neu
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
+import { currentPicks, readPackageMedia } from '../../lib/package/sync'
 import {
   applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
@@ -511,6 +514,8 @@ async function planFacts(env: Env, org: string, cookie: string | null, now: Date
     scheduled,
     // ‏وسائطُ المالك من مجلّد Drive (D-363): المعاينةُ تقول لكلّ صفٍّ وسيطتَه، والاعتمادُ يربطها
     library: await readDriveMedia(env.DB, org),
+    // ‏والمعتمدُ من حزمة المحتوى (D-366) يغلبها: مطابقٌ برقم المادّة واللون
+    package: currentPicks(await readPackageMedia(env.DB, org)),
   }
 }
 
@@ -650,7 +655,7 @@ plan.get('/panel/plan/review', async (c) => {
   const org = activeOrg(session.record)
   const current = await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
-  const [model, zone, flash, orgRow, accounts, share, verdicts] = await Promise.all([
+  const [model, zone, flash, orgRow, accounts, share, verdicts, waiting] = await Promise.all([
     reviewModel(c.env.DB, org, current),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     takeFlash(c.env, c.req.raw),
@@ -659,10 +664,15 @@ plan.get('/panel/plan/review', async (c) => {
       .bind(org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
     activeLinks(c.env.DB, org, current.id),
     verdictsFor(c.env.DB, org, current.id),
+    awaitingCount(c.env.DB, org),
   ])
+  // ‏الشارةُ إلى الدفعة التي فيها القرار، لا إلى صفحة الحزمة
+  const waitingAt = waiting === 0 ? null : await awaitingRevision(c.env.DB, org)
   const authors: Record<string, string> = {}
   for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
-  const body = planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
+  // ‏شارةُ الحزمة (D-372): تحديثٌ يمسّ معتمدًا أو مجدولًا لا يُطبَّق بصمت — يُقال هنا ويُقرَّر هناك
+  const pkgBadge = waiting === 0 ? '' : '<p class="m-0"><a href="' + (waitingAt === null ? '/panel/package' : '/panel/package/changes/' + encodeURIComponent(waitingAt)) + '">' + statusBadge('warn', '!', 'في حزمتك تحديث ينتظرك (' + String(waiting) + ')') + '</a></p>'
+  const body = pkgBadge + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
