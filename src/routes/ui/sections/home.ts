@@ -22,7 +22,7 @@ import { html, raw, type Html } from '../html'
 import { card } from '../components/card'
 // ‏باسمٍ آخر: «button» اسمُ حقلٍ في حال المنصّة (`h.button`)، وحارسُ القالب يقرأ الاسم
 import { button as kitButton } from '../components/button'
-import { stamp } from '../../../lib/time/zone'
+import { stamp, todayKey } from '../../../lib/time/zone'
 import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
 import type { StoredPlan } from '../../../lib/plan/job'
 import { dayLabel, shift } from '../planReviewView'
@@ -335,7 +335,7 @@ export function planCard(
       : c.pending > 0
         ? { href: '/panel/plan/review', label: 'راجع واعتمد (' + ar(c.pending) + ')' }
         : { href: '/panel/plan/review', label: 'ثبّت الخطّة' }
-  const today = now.toISOString().slice(0, 10)
+  const today = todayKey(now, zone)
   const next = [...plan.plan.items].filter((i) => i.day >= today).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
   return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
     <div class="card-head"><h2 id="hp-t">خطّةُ ${span === 'شهر' ? 'الشهر' : span}</h2><span class="grow"></span>${state}</div>

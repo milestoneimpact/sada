@@ -244,7 +244,7 @@ client.get('/panel/portfolio', async (c) => {
 client.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const body = teamScreen({ members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
+  const body = teamScreen({ zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
   return page((nonce) =>
     soloPage('صدى — الفريق', { href: '/panel/settings', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, '',
       buildCommands({ onPanel: false }), soloNav('settings')),

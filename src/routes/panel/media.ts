@@ -49,6 +49,7 @@ media.get('/panel/assets', async (c) => {
   const plan = c.req.query('plan') ?? ''
   const index = Number(c.req.query('index'))
   const body = libraryScreen({
+    zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     assets: await listLibrary(c.env.DB, org),
     kind: kind === 'image' || kind === 'video' || kind === 'doc' ? kind : null,
     origin: origin === 'generated' || origin === 'upload' || origin === 'drive' ? origin : null,

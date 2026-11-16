@@ -49,7 +49,11 @@ export async function lastAppliedSnapshot(db: Db, org: string): Promise<Snapshot
   return r === null ? null : (JSON.parse(r.snapshot_json) as Snapshot)
 }
 
-export interface ReviseDeps { readonly db: Db; readonly token: string; readonly fetchImpl?: typeof fetch }
+export interface ReviseDeps {
+  readonly db: Db; readonly token: string; readonly fetchImpl?: typeof fetch
+  /** ‏«زامن الآن» بيد المالك يعيد مراجعةً تعذّرت ولو لم يُعدّ عطلُها عابرًا، تحت سقف المحاولات نفسه. */
+  readonly retryFailed?: boolean
+}
 
 /** سقفُ إعادة المراجعة المتعثّرة بعطلٍ عابر — بعده يبقى السببُ ولا يُعاد. */
 export const MAX_REVISION_ATTEMPTS = 5
@@ -86,7 +90,7 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
   let createdAt: string | null = null
   if (had !== null) {
     // ‏المحسوبةُ أو المعلّقة تُعاد إن تعطّلت وحدها (أقدمُ من عشر دقائق) — لا وهي تُطبَّق في نداءٍ آخر
-    const retry = (had.status === 'failed' && had.retryable === 1 && had.attempts < MAX_REVISION_ATTEMPTS)
+    const retry = (had.status === 'failed' && (had.retryable === 1 || deps.retryFailed === true) && had.attempts < MAX_REVISION_ATTEMPTS)
       || ((had.status === 'analysed' || had.status === 'pending') && had.stale === 1)
     if (!retry) return { kind: 'exists', id: had.id }
     // ‏التزامٌ طُبّق بعده أحدثُ منه: لا يُعاد فيكتب القديمُ فوق الأحدث
@@ -147,7 +151,9 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
     return { kind: 'applied', id, changes: changes.length, awaiting: out.awaiting }
   } catch (error) {
     const reason = error instanceof Error && error.name === 'GitHubError' ? error.message
-      : isTimeout(error) ? 'GitHub لم يردّ في المهلة' : 'تعذّرت قراءة الخطّة أو النصوص'
+      : isTimeout(error) ? 'GitHub لم يردّ في المهلة'
+      : 'تعذّر بناء الخطّة من الحزمة (' + (error instanceof Error ? (error.name + ': ' + error.message).replace(/\s+/g, ' ').slice(0, 160) : 'عطل') + ')'
+    console.error('package revision failed', error)
     const retryable = transientError(error) && attempts + 1 < MAX_REVISION_ATTEMPTS ? 1 : 0
     // ‏صفٌّ «محسوب» سبق العطلَ يصير «تعذّر» بسببه — لا يُتجاهل الإدراج فيبقى محسوبًا بلا تطبيق
     await db.prepare(

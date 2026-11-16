@@ -10,6 +10,7 @@
 import { foldArabic } from './format'
 import type { Db, DbStatement } from './tokens'
 import { driveFileUrl } from './drive/sync'
+import { dayKey } from './time/zone'
 
 export type AssetOrigin = 'generated' | 'upload' | 'drive'
 export type AssetKind = 'image' | 'video' | 'doc'
@@ -42,8 +43,10 @@ export const LIBRARY_MAX_BYTES = 5 * 1024 * 1024
 export const LIBRARY_MIMES: ReadonlySet<string> = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 
 /** **التصنيف**: النوعُ › المنشأ › الشهر — مسارٌ يُقرأ كمجلّد، ويُرتَّب به. */
-export function folderOf(a: Pick<Asset, 'kind' | 'origin' | 'at'>): string {
-  return `${KIND_LABEL[a.kind]} › ${ORIGIN_LABEL[a.origin]} › ${a.at.slice(0, 7)}`
+export function folderOf(a: Pick<Asset, 'kind' | 'origin' | 'at'>, zone: string | null = null): string {
+  // ‏الشهرُ بمنطقة المالك (D-378): منشورُ ليلةِ آخر الشهر لا يقع في الشهر التالي
+  const month = dayKey(a.at, zone).slice(0, 7) || a.at.slice(0, 7)
+  return `${KIND_LABEL[a.kind]} › ${ORIGIN_LABEL[a.origin]} › ${month}`
 }
 
 const kindOf = (mime: string): AssetKind =>

@@ -237,6 +237,17 @@ describe('ما أصلحته المراجعة', () => {
     expect((await readRevision(db, 'org_owner', (await listRevisions(db, 'org_owner')).find((r) => r.commit === '1'.repeat(40))!.id))!.error).toMatch(/401/)
   })
 
+  it('«زامن الآن» يعيد مراجعةً تعذّرت بعطلٍ غير عابر، والسببُ يسمّي العطل', async () => {
+    const { db, source } = await seeded()
+    const broken = github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY }, {}, (u) => { if (u.includes('/contents/')) throw new RangeError('boom'); return null })
+    const bad = await revisePackage({ db, token: 't', fetchImpl: broken }, source, '7'.repeat(40))
+    expect(bad.kind).toBe('failed')
+    if (bad.kind === 'failed') expect(bad.reason).toMatch(/^تعذّر بناء الخطّة من الحزمة \(\w+/)
+    const ok = github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY })
+    expect((await revisePackage({ db, token: 't', fetchImpl: ok }, source, '7'.repeat(40))).kind).toBe('exists')
+    expect(await revisePackage({ db, token: 't', fetchImpl: ok, retryFailed: true }, source, '7'.repeat(40))).toMatchObject({ kind: 'applied', changes: 30 })
+  })
+
   it('مادّةٌ خرجت فأُرشفت ثمّ عادت: يُكتب لها منشورٌ جديد', async () => {
     const { db, source } = await seeded()
     await revisePackage({ db, token: 't', fetchImpl: github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY }) }, source, 'a'.repeat(40))

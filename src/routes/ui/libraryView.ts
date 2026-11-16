@@ -18,6 +18,8 @@ import { assetMarks, assetSearch } from './sections/assetMarks'
 
 export interface LibraryData {
   readonly assets: readonly Asset[]
+  /** منطقةُ المتصفّح (D-378): شهرُ المجلّد بها. */
+  readonly zone?: string | null
   readonly kind: AssetKind | null
   readonly origin: AssetOrigin | null
   /** وجهُ الاختيار: البندُ الذي يُختار له. */
@@ -107,7 +109,7 @@ function tile(a: Asset, d: LibraryData): string {
   return `<article class="card card-inset tile">
     ${media}
     <div class="kv-k"><bdi>${escapeHtml(a.name)}</bdi></div>
-    <div class="note">${escapeHtml(folderOf(a))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}${escapeHtml(used)}</div>
+    <div class="note">${escapeHtml(folderOf(a, d.zone ?? null))}${a.bytes === null ? '' : ` · ${escapeHtml(kb(a.bytes))}`}${escapeHtml(used)}</div>
     <div class="row gap-2 mt-3">${pick}${open}${remove}</div>
     ${assetMarks(a, query(d, {}).split('?')[1] ?? '')}
   </article>`
@@ -122,7 +124,7 @@ export function libraryScreen(d: LibraryData): string {
   // ‏المجلّداتُ بترتيب أحدث ما فيها — وكلُّ مجلّدٍ عنوانٌ وعدد
   const folders = new Map<string, Asset[]>()
   for (const a of shown) {
-    const f = folderOf(a)
+    const f = folderOf(a, d.zone ?? null)
     folders.set(f, [...(folders.get(f) ?? []), a])
   }
   const lead = d.pickPost !== undefined && d.pickPost !== null

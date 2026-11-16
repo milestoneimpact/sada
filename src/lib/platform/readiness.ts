@@ -24,6 +24,7 @@ import type { AppStatus } from '../oauth/apps'
 import type { AccountHealth, PlatformPost, PlatformTally } from './screen'
 import { counted, NOUNS, parseSqliteUtc, relativeTime } from '../format'
 import { whyFailed } from '../publish/reasons'
+import { localWhen } from '../time/zone'
 
 export type RungState = 'done' | 'now' | 'waiting' | 'failed'
 export type RungKey = 'app' | 'account' | 'token' | 'renew' | 'publish'
@@ -53,6 +54,8 @@ export interface ReadinessInput {
   readonly tally: PlatformTally
   readonly posts: readonly PlatformPost[]
   readonly now: Date
+  /** منطقةُ المتصفّح (D-378)، و`null` يعني الرياض. */
+  readonly zone?: string | null
 }
 
 const PASSED: ReadonlySet<string> = new Set(['accepted'])
@@ -163,7 +166,7 @@ export function readiness(input: ReadinessInput): Readiness {
       ? { key: 'renew', title: 'التجديد', state: 'waiting', note: 'يبدأ حين يصحّ الإذن' }
       : h?.refreshedAt === undefined || h.refreshedAt === null
         ? { key: 'renew', title: 'التجديد', state: 'waiting', note: 'لم يُجدَّد بعد — الدورة تجدّده قبل انتهائه بساعتين' }
-        : { key: 'renew', title: 'التجديد', state: 'done', note: `جُدّد آخر مرّة ${h.refreshedAt.slice(0, 16)}` }
+        : { key: 'renew', title: 'التجديد', state: 'done', note: `جُدّد آخر مرّة ${localWhen(h.refreshedAt, input.zone ?? null)}` }
 
   // ٥ · النشر — من المحاولات
   //
