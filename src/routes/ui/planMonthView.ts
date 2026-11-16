@@ -92,9 +92,9 @@ export function monthCalendar(d: Pick<MonthScreenData, 'period' | 'perDay' | 'da
 
 export function monthScreen(d: MonthScreenData): string {
   const head = pageHead('الخطّة', 'شهر ' + d.period, 'كلّ يوم بشارة حمله، والتحذيرات فوقه، والفرق قبل الاعتماد.')
-  const nav = html`<p class="row gap-2">${raw(button({ label: '‹ ' + d.prev, href: '/panel/plan/month?p=' + d.prev, size: 'sm', variant: 'quiet' }))}
+  const nav = html`<div class="row gap-2">${raw(button({ label: '‹ ' + d.prev, href: '/panel/plan/month?p=' + d.prev, size: 'sm', variant: 'quiet' }))}
     ${raw(button({ label: d.next + ' ›', href: '/panel/plan/month?p=' + d.next, size: 'sm', variant: 'quiet' }))}
-    ${raw(button({ label: 'الاستيرادات', href: '/panel/plan/imports', size: 'sm', variant: 'secondary' }))}</p>`.value
+    ${raw(button({ label: 'الاستيرادات', href: '/panel/plan/imports', size: 'sm', variant: 'secondary' }))}</div>`.value
   if (d.planId === null) {
     return head + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ادفع ملفّ ${d.period} إلى 01-plan، أو ابدأ خطّة جديدة.</p>
       <div class="row">${raw(button({ label: 'خطّة جديدة', href: '/panel/plan/new' }))}</div>`.value })
