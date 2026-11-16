@@ -645,8 +645,20 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-mini-img{flex:none; width:var(--s-6); height:var(--s-6); object-fit:cover; border-radius:var(--r-inline)}
 .rv-mini bdi{flex:none}
 /* ‏سطرٌ من الزاوية تحت المصغَّرة (D-351): الساعةُ والشعارُ وحدهما لا يقولان أيُّ منشور. في سطرٍ ثانٍ — في سطرها كان يبقى منه حرفان — يُقصّ بنقاط */
-.rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
-.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1)}
+.rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1); position:relative; overflow:hidden; padding-top:calc(var(--s-1) + var(--stroke))}
+/* ‏شريطٌ علويٌّ بلون المنصّة (§6.2) — زينةٌ تُعين العين، والشعارُ بجانبه يقول المنصّةَ فلا يقع المعنى على اللون وحده */
+.pf-stripe{position:absolute; inset-inline:0; top:0; height:var(--stroke); background:var(--ink-3)}
+.pf-stripe[data-pf=linkedin]{background:var(--pf-linkedin)}
+.pf-stripe[data-pf=x]{background:var(--pf-x)}
+.pf-stripe[data-pf=instagram]{background:var(--pf-instagram)}
+.pf-stripe[data-pf=tiktok]{background:var(--pf-tiktok)}
+.pf-stripe[data-pf=youtube]{background:var(--pf-youtube)}
+.rv-status{flex-wrap:wrap; align-items:center}
+.rv-share{position:relative}
+.rv-share > summary{list-style:none}
+.rv-share > summary::-webkit-details-marker{display:none}
+.rv-share[open]{flex-basis:100%; order:9; padding:var(--s-3); border:var(--bd-soft); border-radius:var(--r-control)}
 /* ‏حالُ المصغَّرة نقطةٌ بلونها، واسمُها نصٌّ لقارئ الشاشة بجانبها — اللونُ لا يقول وحدَه */
 .rv-st{flex:none; margin-inline-start:auto; width:var(--s-2); height:var(--s-2); border-radius:var(--r-pill); background:var(--ink-3)}
 .rv-mini[data-st=wait] .rv-st{background:var(--warn)}
@@ -681,9 +693,10 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   .rv-foot .btn{flex:1 1 auto}
   .rv-wk{flex:1 1 auto}
   /* ‏اللوحةُ على الهاتف شريطُ أيّامٍ بعددها كما كانت — المصغَّراتُ في بطاقات الأسبوع تحتها */
-  .rv-cal.is-board .rv-cd{min-height:var(--tap); padding:0 var(--s-2); align-items:center; justify-content:center}
-  .rv-mini{display:none}
-  .rv-cd-h{flex-direction:column; justify-content:center; gap:0}
+  /* ‏وعلى الهاتف قائمةُ أيّامٍ عموديّة (§6.2): يومٌ صفًّا بمنشوراته تحته — لا سبعةُ أعمدةٍ بعرض ‏40px */
+  .rv-cal.is-board{display:flex; flex-direction:column}
+  .rv-cal.is-board .rv-wd,.rv-cal.is-board .rv-cd:not(.is-on){display:none}
+  .rv-cal.is-board .rv-cd{padding:var(--s-2); gap:var(--s-1)}
   .rv-sheet{inset-block:auto 0; inset-inline:0; width:100%; height:auto; max-height:92%; border-inline-start:0; border-top:var(--bd); border-radius:var(--r-sheet) var(--r-sheet) 0 0}
   /* ‏والمعاينةُ داخل بطاقةٍ أضيقُ من عرض المنصّة عند 320: شريطُ أفعال LinkedIn يفيض بـ2px بالخطّ الأكبر — فتأخذ من حشوة البطاقة */
   .rv-pv{margin-inline:calc(-1 * var(--s-3))}
@@ -817,7 +830,7 @@ details.card .nt-list{margin-top:var(--s-4)}
 .cr-saved{margin:0 0 var(--s-4); padding:var(--s-3) var(--s-4); border-radius:var(--r-control); background:var(--ok-wash); color:var(--ink); font-weight:600}
 .rv-client{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-client q{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.rv-share{margin-bottom:var(--s-4)}
+/* (rv-share: قاعدتُه الواحدة مع شريط الحال) */
 /* ── تقويمُ العملاء في المحفظة (D-354 · رونق) ─────────────
    سبعةُ أيّامٍ في الصفّ، وفي كلّ يومٍ رقائقُ بشعار المنصّة والساعة واسم الشركة. الحالُ شريطٌ على حافّة الرقاقة، واليومُ الفارغ أهدأ. */
 .pc-cal{margin-top:var(--s-8)}

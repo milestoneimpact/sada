@@ -402,7 +402,7 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pc-body{display:flex; align-items:flex-start; gap:var(--s-4)}
 .pc-text{flex:1; min-width:0; margin:0; font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink);
-  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden}
+  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden}
 /* ‏«المكتبة ← الصور» (D-206): شبكةٌ تملأ عرضَها، والصورةُ كاملةٌ لا مقصوصة (contain · D-170) */
 .lib-grid{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,11.75rem),1fr)); margin-top:var(--s-3)}
 .lib-img{display:flex; flex-direction:column; gap:var(--s-2); color:var(--ink); text-decoration:none}
@@ -412,6 +412,15 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
 .lib-cap{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .pc-thumb{flex:none; width:calc(2 * var(--s-12)); height:calc(2 * var(--s-12)); border-radius:var(--r-control);
   object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
+/* ‏وبلا صورةٍ شعارُ المنصّة بحبرٍ خافتٍ على «--surface-2» (§6.3): يقول المنصّةَ ولا يدّعي صورة */
+.pc-ph{display:grid; place-items:center; color:var(--ink-3)}
+.pc-ph svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
+/* ‏قائمةٌ أو شبكة (§6.3): القائمةُ عمودٌ بترتيب الأهمّيّة، والشبكةُ صورتُها ‏16:9 فوق النصّ */
+.dcols[data-layout=list]{columns:1; max-width:48rem}
+.dcols[data-layout=grid]{columns:auto; display:grid; gap:var(--gap-card); grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr))}
+.dcols[data-layout=grid] > *{margin-bottom:0}
+.dcols[data-layout=grid] .pc-body{flex-direction:column-reverse}
+.dcols[data-layout=grid] .pc-thumb{width:100%; height:auto; aspect-ratio:16/9}
 .pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;
   font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .pc-line[data-tone=bad]{color:var(--bad)}

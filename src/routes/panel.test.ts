@@ -2741,7 +2741,7 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
    * **وشريطُ البطاقة يلتصق حيث فيه قرار** (رحلات R-3 وR-6 وR-9): كان صفُّ البطاقة
    * المقروءة يلتصق بأسفل الهاتف بلا زرٍّ فيه، ويغطّي رأسَ البطاقة وحبّةَ حالها.
    */
-  it('البطاقة المختصرة (D-198): «اعتمد» و«عدّل» على المسوّدة وحدَها، والمقروءة «افتح» بلا اعتماد', async () => {
+  it('البطاقة المختصرة (D-198 · D-381 §6.3): «اعتمد» على المسوّدة وحدَها، و«افتح» ثانويٌّ على كلّ بطاقة', async () => {
     const open = await seedPost('linkedin', 'draft')
     const read = await seedPost('x', 'rejected', 'نصّ رُفض على X')
     const cookie = await login()
@@ -2749,7 +2749,7 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     const draft = cardOf(html, open)
     expect(draft).toContain('<div class="pc-foot">')
     expect(draft).toContain('value="approve"')
-    expect(draft).toMatch(new RegExp(`href="/panel\\?open=${open}#ed" data-edit\\s+aria-label="عدّل: [^"]+">عدّل</a>`))
+    expect(draft).toMatch(new RegExp(`href="/panel\\?open=${open}#ed" data-edit\\s+aria-label="افتح: [^"]+">افتح</a>`))
     // ‏والنصُّ ثلاثةُ أسطرٍ تُقرأ، لا مربّعٌ يُحرَّر: التحريرُ في المحرّر
     expect(draft).toContain('class="pc-text"')
     expect(draft).not.toContain('<textarea')

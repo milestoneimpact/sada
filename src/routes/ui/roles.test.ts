@@ -60,7 +60,7 @@ describe('لكلّ لونٍ دورٌ واحد (D-325)', () => {
   })
 
   it('«--pf-*» في قاعدة مربّع شعارٍ وحدها — لا نقطةٌ ولا حدٌّ ولا نصٌّ بلون منصّة', () => {
-    const LOGO = /\.(?:pf-logo|pc-logo|rv-pf|wk-pf)(?![\w-])/
+    const LOGO = /\.(?:pf-logo|pc-logo|rv-pf|wk-pf|pf-stripe)(?![\w-])/
     const off = uses(/var\(--pf-[a-z]+\)/).filter((u) => !LOGO.test(u.sel))
     expect(off.map((u) => `${u.sel}{${u.prop}:${u.value}}`)).toEqual([])
   })

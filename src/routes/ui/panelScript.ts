@@ -739,6 +739,15 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();});
     onFilter('draft-platform',function(b){platform=b.value; refilter();});
     onFilter('draft-order',function(b){order=b.value; reorder();});
+    // ‏قائمةٌ أو شبكة (§6.3): تفضيلُ عرضٍ يُحفظ في المتصفّح وحدَه
+    (function(){
+      var cols=document.querySelector('.dcols'), bs=document.querySelectorAll('[data-dlayout]'); if(!cols||!bs.length)return;
+      function lay(v){if(v!=='grid')v='list'; cols.setAttribute('data-layout',v);
+        bs.forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-dlayout')===v));});
+        try{localStorage.setItem('draft-layout',v);}catch(e){}}
+      try{lay(localStorage.getItem('draft-layout')||'list');}catch(e){}
+      bs.forEach(function(b){b.addEventListener('click',function(){lay(b.getAttribute('data-dlayout'));});});
+    })();
     refilter();
     // ‏رابطٌ إلى بطاقةٍ في «الأرشيف» (‎/panel#d-…‎ من الخطّ الزمنيّ أو إشعار) يفتح «الكلّ» فلا يصل إلى بطاقةٍ مخفيّة
     (function(){

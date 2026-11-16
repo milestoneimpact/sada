@@ -60,7 +60,7 @@ import { changedCount, diffLines } from '../../../lib/draft/diff'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { fileName, glyph, RUNG_MARK } from '../parts'
 import { count, statusBadge, type Tone } from '../components/badge'
-import { shortcutsSwitch } from '../components/tabs'
+import { segmented, shortcutsSwitch } from '../components/tabs'
 import { filterBar } from '../components/filterbar'
 import { emptyState } from '../components/empty'
 import { whyFailed } from '../../../lib/publish/reasons'
@@ -736,14 +736,19 @@ function filterTabs(drafts: readonly DraftRow[]): string {
     { label: 'الأقدم أوّلًا', value: 'old', current: false },
     { label: 'الأغلى نشرًا أوّلًا', value: 'cost', current: false },
   ]
-  const why = `<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">؟</summary>
-    <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
-  </details>`
+  /*
+   * ‏**طريقةُ العرض قائمةً أو شبكة** (D-381 · §6.3): القائمةُ عمودٌ واحدٌ بترتيب الأهمّيّة — والأعمدةُ المتدفّقة كانت تقرأ الأوّلَ
+   * ‏ثمّ الثالثَ بالعين، فتكسر الترتيبَ الذي هو سببُ القائمة. فالافتراضُ القائمة، والشبكةُ لمن يتصفّح بالصور.
+   */
+  const layout = segmented('طريقة العرض', 'dlayout', [
+    { value: 'list', label: 'قائمة', pressed: true },
+    { value: 'grid', label: 'شبكة' },
+  ])
   const bar = filterBar([
     { kind: 'seg', label: 'الحال', name: 'draft-bucket', options: bucketOpts },
     { kind: 'pick', label: 'المنصّة', name: 'draft-platform', options: platformOpts },
     { kind: 'pick', label: 'الترتيب', name: 'draft-order', options: orderOpts },
-  ], 'فرز المسوّدات', why)
+  ], 'فرز المسوّدات', layout)
   return `<div class="draft-filter" id="draft-filter" hidden>${bar}</div>`
 }
 
@@ -833,6 +838,16 @@ function ownerMoment(at: string, zone: string | null, now: Date): string {
 }
 
 /** شعارُ المنصّة على أرض لونها ‏24px (D-198) — في البطاقة المختصرة والمحرّر. */
+/**
+ * ‏**ⓘ بجانب العنوان** (D-381 · §6.3): جملةُ القيد مساعدةٌ تُطلب لا زرٌّ في صفّ الفرز. «details» أصليّ فيُفتح بلا سكربت
+ * ‏وبلوحة المفاتيح، واسمُه ممّا يقوله.
+ */
+export function approvalTip(): string {
+  return html`<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">ⓘ</summary>
+    <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
+  </details>`.value
+}
+
 export function platformMark(p: string): string {
   return `<span class="pc-logo" data-pf="${escapeHtml(p)}" aria-hidden="true">${LOGOS[p] ?? ''}</span>`
 }
@@ -915,8 +930,9 @@ function card(
     : relativeTime(d.createdAt, now)
 
   const thumb = media.find((m) => m.postId === d.id && m.status === 'ready' && !m.mime.startsWith('video/'))
+  // ‏وبلا صورةٍ شعارُ المنصّة على «--surface-2» (§6.3) — لا مربّعٌ رماديٌّ فارغ ولا فجوةٌ تغيّر عرضَ النصّ بين بطاقةٍ وأختها
   const pic = thumb === undefined
-    ? ''
+    ? html`<span class="pc-thumb pc-ph" data-pf="${d.platform}" aria-hidden="true">${raw(LOGOS[d.platform] ?? '')}</span>`.value
     : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="96" height="96">`
 
   const more: string[] = []
@@ -981,7 +997,7 @@ function card(
         ? decideForm(d, targets, media)
         : ''}
       <a class="btn btn-secondary btn-sm" href="${escapeHtml(editorHref(d.id))}" data-edit
-        aria-label="${escapeHtml(`${open ? 'عدّل' : 'افتح'}: ${snippet(d.text)} (${specOf(d.platform).label}، ${relativeTime(d.createdAt, now)})`)}">${open ? 'عدّل' : 'افتح'}</a>
+        aria-label="${escapeHtml(`افتح: ${snippet(d.text)} (${specOf(d.platform).label}، ${relativeTime(d.createdAt, now)})`)}">افتح</a>
       <span class="grow"></span>
       ${d.stale && open
         // ‏والمصدرُ الذي تغيّر بعدها مكانَ العدّاد: سطرٌ مستقلٌّ كان يمدّ البطاقةَ فوق ‏320px على الهاتف
@@ -1302,7 +1318,7 @@ export function draftsParts(input: DraftsInput): { readonly list: string; readon
           html: 'اكتب واحدةً من فكرتك أو من مصدر محلَّل، وستظهر هنا لتقرأها وتقرّر.',
           action: button({ label: 'اكتب من فكرتك', variant: 'primary', size: 'sm', href: '#idea' }),
         })
-      : `<div class="dcols">${byUrgency(drafts)
+      : `<div class="dcols" data-layout="list">${byUrgency(drafts)
           .map((d) =>
             card(d, now, input.targets, input.earliest, input.media, input.pageOnly, input.peaks, lines, input.editing ?? null, input.zone ?? null))
           .join('')}</div>`

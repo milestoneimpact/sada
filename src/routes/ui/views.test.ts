@@ -12,7 +12,7 @@ import { readFileSync } from 'node:fs'
 import { pivot, keyLabel } from '../../lib/pivot'
 import { pivotPane } from './sections/pivot'
 import { reportScreen } from './reportView'
-import { byUrgency, draftsSection } from './sections/drafts'
+import { approvalTip, byUrgency, draftsSection } from './sections/drafts'
 import { gatesScreen, laterScreen, tasksScreen } from './tasksView'
 import { ownerRows, OWNER_TASKS, taskHref, type OwnerFacts } from '../../lib/owner'
 import { commandTrigger } from './command'
@@ -672,7 +672,10 @@ describe('فرز بالمنصّة وترتيب (D-127)', () => {
     expect(bar).toContain('<div class="fb-seg" role="group" aria-label="الحال">')
     expect(bar).toMatch(/aria-pressed="true" data-filter="draft-bucket" value="active" data-of="failed waiting approved queued"[^>]*>قيد العمل<span class="count">2<\/span>/)
     expect(bar).toMatch(/data-filter="draft-bucket" value="all" data-of=""[^>]*>الكلّ<span class="count">2<\/span>/)
-    expect(bar).toContain('class="why-tip"')
+    // ‏والمساعدةُ ⓘ بجانب العنوان لا في صفّ الفرز (D-381 §6.3)، والصفُّ يحمل مبدّلَ القائمة والشبكة
+    expect(bar).not.toContain('class="why-tip"')
+    expect(bar).toContain('data-dlayout="list" aria-pressed="true"')
+    expect(approvalTip()).toContain('<summary aria-label="لماذا الاعتماد؟">ⓘ</summary>')
     expect(html).not.toContain('draft-more" id=')
     expect(html).not.toContain('tab-sub')
     expect(SCRIPT).toContain("onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();})")

@@ -22,7 +22,7 @@ import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channe
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
-import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
+import { approvalTip, draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
 import { earliestLocal } from './ui/when'
 import { tabs } from './ui/components/tabs'
@@ -1319,7 +1319,7 @@ function postsPane(d: ShellData & PostsData): string {
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
   ${/* ‏بلا فقرةٍ (D-274، المرحلة د): جملةُ القيد في «؟» بجانب الفرز، لا سطرٌ فوق كلّ فتحة */''}
-  ${pageHead('التحرير', sectionLabel('posts'), '', headNew())}
+  ${pageHead('التحرير', sectionLabel('posts'), '', headNew(), approvalTip())}
   ${quotaCard(d.imageQuota)}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,

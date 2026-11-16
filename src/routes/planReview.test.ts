@@ -340,7 +340,8 @@ describe('«أضف منشورًا» إلى يومٍ في الخطّة (D-336)', 
     expect(html).toContain('<div class="scroll rv-list"><table>')
     expect((html.match(/<tr><td><span class="ago">/g) ?? []).length).toBe(3)
     expect(html).toMatch(/<a href="#c-0" data-sheet="0">نصُّ المنشور الأوّل/)
-    expect(html).toContain('<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>')
+    expect(html).toContain('<span class="rv-vw" hidden><div class="seg" role="group" aria-label="طريقة العرض">')
+    expect(html).toContain('<button type="button" data-view="cards" aria-pressed="true">بطاقات</button>')
   })
 
   it('من المنشور إلى أصله (D-345): لوحُ البطاقة يسمّي مصدرَها برابطٍ إلى المكتبة، ورحلتُه بعد أن يُجدول', async () => {

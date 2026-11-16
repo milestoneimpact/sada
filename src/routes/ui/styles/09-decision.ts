@@ -186,6 +186,13 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
 /* ‏والمفتوحُ سطرٌ كاملٌ في أيّ صفٍّ يلتفّ (D-294): كان الشرطُ .lede-row وحدَها، فلمّا انتقل «؟» إلى شريط الفلتر (D-276)
    صار يفتح جملتَه في الصفّ نفسِه فتفيض 136px عن يسار الهاتف — وأوقف audit_design سلسلةَ التدقيق كلَّها منذ D-283 */
 .why-tip[open]{flex-basis:100%; order:9; min-width:0}
+/* ‏ⓘ بجانب العنوان (D-381 · §6.3): الجملةُ تلميحٌ يطفو تحت الرمز لا سطرٌ يدفع الرأس */
+.ph-row{display:flex; align-items:flex-start; gap:var(--s-2); position:relative}
+.ph-row .why-tip > summary{border:0; color:var(--ink-2); font-size:var(--t-h3); list-style:none}
+.ph-row .why-tip > summary::-webkit-details-marker{display:none}
+.ph-row .why-tip[open]{flex-basis:auto; order:0}
+.ph-row .why-tip[open] > p{position:absolute; inset-inline:0; top:100%; z-index:20; max-width:28rem; margin-top:var(--s-2);
+  padding:var(--s-3); background:var(--dialog); border:var(--bd); border-radius:var(--r-control); box-shadow:var(--sh-2)}
 /* لوحُ المراجعة — مطويٌّ عمدا (D-090): ملحوظاتُ ذوقٍ لا تزاحم النصَّ
    حتّى تُطلَب، «ولا شارة حمراء» فتُقرأ عطلا. */
 .notes{margin-bottom:var(--s-2); border:var(--bd);
