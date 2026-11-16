@@ -55,4 +55,15 @@ describe('اعتمد الخطّة وجدولها', () => {
     expect(again.scheduled).toEqual([])
     expect(scheduledSay(out.scheduled, out.skipped, 0, 'Asia/Riyadh')).toMatch(/^جُدول منشوران من .+ إلى .+\. وتُخطّي 4: بلا نصّ 1/)
   })
+
+  it('ما يرفضه schedulePost بعد الاعتماد يرجع مسوّدةً بلا اعتماد', async () => {
+    const db = seed()
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-ig', 'instagram', 'member', 'e2', 'صدى', 'active')`)
+    db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, org_id, package_item_no, copy_origin, package_due)
+      VALUES ('p7', 'instagram', 'image', ?, 'draft', 'pkg:p7', 'org_owner', '09', 'package', '2026-11-30 09:00')`).run(TEXT_X + ' صورة')
+    const out = await schedulePackage(db, 'org_owner', 'Asia/Riyadh', NOW, 'panel:email')
+    expect(out.failed.map((f) => f.id)).toEqual(['p7'])
+    expect(db.raw.prepare("SELECT status, approved_by, approved_at FROM posts WHERE id = 'p7'").get())
+      .toEqual({ status: 'draft', approved_by: null, approved_at: null })
+  })
 })

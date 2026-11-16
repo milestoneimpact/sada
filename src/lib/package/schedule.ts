@@ -104,8 +104,13 @@ export async function schedulePackage(db: Db, org: string, zone: string | null, 
       if (!approved.ok) { failed.push({ id: slot.id, reason: approved.reason }); continue }
     }
     const done = await schedulePost(db, slot.id, slot.account, slot.at, now, org)
-    if (done.ok) scheduled.push(slot)
-    else failed.push({ id: slot.id, reason: done.reason })
+    if (done.ok) { scheduled.push(slot); continue }
+    failed.push({ id: slot.id, reason: done.reason })
+    // ما اعتُمد هنا ولم يُجدوَل يرجع مسوّدةً: الاعتمادُ الجماعيّ لا يبقى بلا جدولة.
+    if (slot.draft) {
+      await db.prepare("UPDATE posts SET status = 'draft', approved_by = NULL, approved_at = NULL WHERE id = ? AND org_id = ? AND status = 'approved'")
+        .bind(slot.id, org).run()
+    }
   }
   return { ...plan, scheduled, failed }
 }
