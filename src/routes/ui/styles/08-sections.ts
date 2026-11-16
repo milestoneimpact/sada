@@ -410,7 +410,7 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   background:var(--surface-2); border:var(--bd-soft)}
 @media(hover:hover){.lib-img:hover img{border-color:var(--ink-3)}}
 .lib-cap{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.pc-thumb{flex:none; width:var(--s-16); height:var(--s-16); border-radius:var(--r-control);
+.pc-thumb{flex:none; width:calc(2 * var(--s-12)); height:calc(2 * var(--s-12)); border-radius:var(--r-control);
   object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
 .pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;
   font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}

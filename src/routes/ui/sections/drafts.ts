@@ -917,7 +917,7 @@ function card(
   const thumb = media.find((m) => m.postId === d.id && m.status === 'ready' && !m.mime.startsWith('video/'))
   const pic = thumb === undefined
     ? ''
-    : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="64" height="64">`
+    : `<img class="pc-thumb" src="/panel/media/${escapeHtml(thumb.id)}" alt="" loading="lazy" width="96" height="96">`
 
   const more: string[] = []
   more.push(menuItem({ label: 'رحلة المنشور', href: `/panel/journey/${d.id}`, note: 'من الملفّ إلى الأثر' }))
