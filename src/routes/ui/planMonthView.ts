@@ -117,7 +117,7 @@ export function monthScreen(d: MonthScreenData): string {
 /** رحلةُ الشهر الحاليّ والقادم في الرئيسيّة: المحطّاتُ الخمس بأعدادها، والتنبيهاتُ فوقها. */
 export function monthJourneyCard(months: readonly MonthJourney[]): string {
   const alerts = months.flatMap((m) => m.alerts)
-  const body = html`${alerts.length === 0 ? '' : html`<ul class="plain stack">${alerts.map((a) => html`<li>${raw(statusBadge('warn', '!', a))}</li>`)}</ul>`}
+  const body = html`${alerts.length === 0 ? '' : html`<ul class="plain stack">${alerts.map((a) => html`<li class="row gap-2">${raw(statusBadge('warn', '!', 'تنبيه'))}<span>${a}</span></li>`)}</ul>`}
     ${months.map((m) => html`<div class="row gap-2"><a class="tap mono" href="/panel/plan/month?p=${m.period}">${m.period}</a>
       ${STATIONS.map((s) => {
         const done = m.reached !== null && STATIONS.indexOf(s) <= STATIONS.indexOf(m.reached)
