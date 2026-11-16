@@ -18,6 +18,9 @@ import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
 import { planFollowScreen } from '../ui/planFollowView'
+import { postEditScreen } from '../ui/postEditView'
+import { copyToDraft, holdPost, postHistory, restoreEdit, revisePost, type ReviseResult } from '../../lib/plan/revise'
+import { stageOf } from '../../lib/plan/rights'
 import { localToUtc } from '../../lib/time/local'
 import { checksStrip, rulesScreen } from '../ui/checksView'
 import { hhmm, parseRulesForm, planChecks, planFix, type RuleId } from '../../lib/plan/checks'
@@ -28,7 +31,7 @@ import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
 import { currentPicks, readPackageMedia, readSource } from '../../lib/package/sync'
@@ -1313,4 +1316,83 @@ plan.get('/panel/plan', async (c) => {
   // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
   if (running(await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
   return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
+})
+
+/**
+ * **تعديلُ المنشور وسجلُّه** (D-383 المرحلة ٧): الشاشةُ تسأل `mayDo` لتخفي ما لا يُتاح، والأبوابُ الأربعة تسأله ثانيةً على
+ * الخادم. والدورُ من الجلسة، فلا يُقبل من النموذج.
+ */
+plan.get('/panel/plan/post/:id', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare('SELECT id, status, text, scheduled_at, dispatched_at, rev, edited_in_sada FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org).first<{ id: string; status: string; text: string; scheduled_at: string | null; dispatched_at: string | null; rev: number; edited_in_sada: number }>()
+  if (row === null) return c.redirect('/panel/plan/follow', 303)
+  const [history, zone, flash] = await Promise.all([
+    postHistory(c.env.DB, org, id),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    takeFlash(c.env, c.req.raw),
+  ])
+  const body = postEditScreen({
+    id: row.id, text: row.text, scheduledAt: row.scheduled_at, rev: row.rev, edited: row.edited_in_sada === 1,
+    stage: stageOf(row, new Date()), role: session.record.role ?? 'owner', history,
+  }, zone ?? null) + (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/plan/follow', label: 'المتابعة' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('plan')))
+})
+
+async function editDone(c: Context<{ Bindings: Env }>, id: string, result: ReviseResult | { ok: true; id: string } | { ok: false; reason: string }, to = id): Promise<Response> {
+  if ((c.req.header('Accept') ?? '').includes('application/json')) return c.json(result, result.ok ? 200 : 'conflict' in result && result.conflict === true ? 409 : 400)
+  const text = result.ok ? ('say' in result ? result.say : 'نُسخ مسوّدةً جديدة.') : result.reason
+  await setFlash(c.env, c.req.raw, { kind: result.ok ? 'ok' : 'bad', text })
+  return c.redirect('/panel/plan/post/' + encodeURIComponent(to), 303)
+}
+
+plan.post('/panel/plan/post/revise', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const text = f.get('text')
+  const at = f.get('scheduled_at')
+  const r = await revisePost(c.env.DB, activeOrg(gate.session.record), id, {
+    ...(typeof text === 'string' ? { text } : {}),
+    ...(typeof at === 'string' && at !== '' ? { scheduledAt: at } : {}),
+  }, Number(f.get('rev')), gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.revise', target: id, detail: r.after }, c.req.raw)
+  return editDone(c, id, r)
+})
+
+plan.post('/panel/plan/post/restore', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const r = await restoreEdit(c.env.DB, activeOrg(gate.session.record), String(f.get('edit') ?? ''), Number(f.get('rev')),
+    gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.restore', target: id, detail: String(f.get('edit') ?? '').slice(0, 64) }, c.req.raw)
+  return editDone(c, id, r)
+})
+
+plan.post('/panel/plan/post/hold', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const how = String(f.get('how') ?? '')
+  const r = await holdPost(c.env.DB, activeOrg(gate.session.record), id, how === 'pause' ? { pause: true } : { minutes: Number(how) },
+    gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.hold', target: id, detail: how.slice(0, 16) }, c.req.raw)
+  return editDone(c, id, r)
+})
+
+plan.post('/panel/plan/post/copy', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+  const r = await copyToDraft(c.env.DB, activeOrg(gate.session.record), id, gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.copy', target: id, detail: r.id }, c.req.raw)
+  return editDone(c, id, r, r.ok ? r.id : id)
 })

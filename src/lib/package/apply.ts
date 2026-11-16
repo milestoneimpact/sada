@@ -31,6 +31,8 @@ export interface PackagePost {
   readonly status: string
   readonly text: string
   readonly copyOrigin: string | null
+  /** عدّله أحدٌ في صدى (D-383 المرحلة ٧): ما يخالفه في استيرادٍ لاحق ينتظر المالك. */
+  readonly editedInSada?: boolean
 }
 
 export interface Decision {
@@ -56,6 +58,8 @@ export function dispose(change: Change, post: PackagePost | null): Disposition {
   if (FROZEN.has(post.status)) return 'frozen_published'
   if (LIVE.has(post.status)) return 'awaiting_owner'
   if (change.kind === 'text' && ownerEdited(post, change.before)) return 'awaiting_owner'
+  // ‏«عُدِّل في صدى»: الموعدُ والوسيطُ كالنصّ، لا يدهسها استيرادٌ لاحق
+  if (post.editedInSada === true && change.kind !== 'added') return 'awaiting_owner'
   return 'auto_applied'
 }
 
@@ -82,12 +86,12 @@ export function packageKey(org: string, period: string, item: string, platform: 
 /** منشوراتُ الحزمة الحيّة — أحدثُها لكلّ (شهر، مادّة، منصّة). */
 export async function packagePosts(db: Db, org: string): Promise<PackagePost[]> {
   const { results } = await db.prepare(
-    `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin FROM posts
+    `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin, edited_in_sada FROM posts
       WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC LIMIT 800`,
-  ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null }>()
+  ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null; edited_in_sada: number }>()
   const latest = new Map<string, PackagePost>()
   for (const r of results) {
-    const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin }
+    const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin, editedInSada: r.edited_in_sada === 1 }
     const k = p.period + '|' + p.item + '|' + p.platform
     // ‏المؤرشفُ لا يُحدَّث إن جاء بعده حيّ
     if (latest.get(k) === undefined || p.status !== 'rejected') latest.set(k, p)
