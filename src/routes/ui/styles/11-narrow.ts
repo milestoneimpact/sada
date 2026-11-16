@@ -8,6 +8,7 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
    تليها تُنزله إلى الأسفل بالشرط نفسِه. */
 @media${below('md')}{
   .app{grid-template-columns:1fr}
+  .app::before{display:none}
   .rail{position:static; height:auto; border-inline-start:0; border-bottom:var(--bd)}
   /* ‏رأسُ الصفحة سطرٌ واحد على الهاتف (D-275): العنوانُ وفعلُه جنبًا إلى جنب، واللصيقةُ ساقطة — اسمُ
      الصفحة في شريط الإبهام تحتها (D-248 أ-3). كان الرأسُ ‏197px قبل أوّل بطاقة */
@@ -241,6 +242,7 @@ html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
    والعددُ نقطةٌ على الأيقونة لا رقمٌ يُقصّ */
 @media${atLeast('tab')}{
   html[data-rail=mini] .app{grid-template-columns:var(--rail-mini) minmax(0,1fr)}
+  html[data-rail=mini] .app::before{width:var(--rail-mini)}
   html[data-rail=mini] .rail .brand,html[data-rail=mini] .rail .scope,html[data-rail=mini] nav.tabs .lbl{display:none}
   html[data-rail=mini] .rail-head{flex-direction:column; padding-inline:var(--s-2)}
   html[data-rail=mini] .rail-fold{margin-inline-start:0}
@@ -254,6 +256,7 @@ html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
    أو يدخلها التركيز (لمسٌ أو لوحُ مفاتيح) — فلا تدفع المحتوى ولا تحتاج زرًّا. وزرُّ الطيّ لا معنى له هنا */
 @media${atLeast('md')} and ${below('tab')}{
   .app{grid-template-columns:var(--rail-mini) minmax(0,1fr)}
+  .app::before{width:var(--rail-mini)}
   .rail{width:var(--rail-mini); z-index:45; transition:width var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out)}
   .rail:hover,.rail:focus-within{width:var(--rail-w); box-shadow:var(--sh-3)}
   .rail-fold{display:none}

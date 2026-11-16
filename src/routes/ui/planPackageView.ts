@@ -111,7 +111,7 @@ function act(d: PlanPackageData, p: RevisionPreview): Html {
 }
 
 export function planPackageScreen(d: PlanPackageData): string {
-  const head = pageHead('المنشورات', 'خطّة جديدة', 'من حزمتك في GitHub: اختر نسخة، وانظر ما فهمته منها كاملًا، ثمّ ابن.')
+  const head = pageHead('', 'خطّة جديدة', 'من حزمتك في GitHub: اختر نسخة، وانظر ما فهمته منها كاملًا، ثمّ ابن.')
   const flash = d.flash == null ? html`` : html`<p class="m-0">${raw(statusBadge(d.flash.tone, d.flash.tone === 'ok' ? '✓' : '!', d.flash.text))}</p>`
   const p = d.preview
   const view = p === null

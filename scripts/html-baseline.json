@@ -57,7 +57,7 @@
   "routes/ui/sections/desk.ts": 5,
   "routes/ui/sections/drafts.ts": 83,
   "routes/ui/sections/editor.ts": 51,
-  "routes/ui/sections/home.ts": 15,
+  "routes/ui/sections/home.ts": 13,
   "routes/ui/sections/library.ts": 4,
   "routes/ui/sections/pivot.ts": 18,
   "routes/ui/sections/plan.ts": 13,

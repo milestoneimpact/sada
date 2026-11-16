@@ -44,7 +44,7 @@ export function planBuildScreen(build: PlanBuild, now: Date): string {
   const planning: StepState = failed ? 'bad' : done || build.done >= build.total ? 'done' : build.state === 'planning' ? 'now' : 'wait'
   const writing: StepState = done ? 'now' : 'wait'
   const mins = Math.max(0, Math.floor((now.getTime() - Date.parse(build.startedAt)) / 60_000))
-  const head = pageHead('الخطّة', failed ? 'تعذّر بناءُ الخطّة' : done ? 'خُطّطت — تُكتب منشوراتُها الآن' : 'صدى يبني خطّتك',
+  const head = pageHead('', failed ? 'تعذّر بناءُ الخطّة' : done ? 'خُطّطت — تُكتب منشوراتُها الآن' : 'صدى يبني خطّتك',
     failed ? 'لم تُبنَ الخطّة. السببُ تحت، وما وقع من نداءٍ مسجَّلٌ بكلفته.' : 'لك أن تغادر الصفحة: البناءُ يكمل في الخلفيّة، وتجد الخطّةَ في «الخطّة».')
   const body = html`<ol class="pb-steps">
       ${step('pb-read', 'done', 'قراءةُ اختياراتك ومصادرك', html`المدّةُ والمنصّاتُ وإيقاعُها وأوقاتُها، والمصادرُ المحلَّلة.`)}

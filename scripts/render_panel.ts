@@ -576,4 +576,9 @@ writeAudited('/tmp/panel-week.html', panelPage({ only: 'overview', data: { ...da
 writeAudited('/tmp/panel-plan-off.html', panelPage({ only: null, data: { ...data, plan: null, planReady: false } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
+/*
+ * ‏**وخطّةٌ انقضى أسبوعُها** (SPEC-v1 §6.1 · §8): أسبوعُ ‏23–29 أغسطس واليومُ ‏5 سبتمبر — وسمُ «خطّة منتهية» وزرٌّ أوّليٌّ واحد يبني خطّةَ
+ * ‏الأسبوع الحاليّ. لم ترسمه عيّنةٌ قبل هذا، فلم تُثبته اللقطات
+ */
+writeAudited('/tmp/panel-expired.html', panelPage({ only: null, data: { ...data, plan: { ...data.plan!, week: '2026-08-23' } } }))
 console.log('رُسمت')

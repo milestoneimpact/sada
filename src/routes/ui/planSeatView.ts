@@ -11,7 +11,7 @@ import { panelHref } from '../../lib/nav/panes'
 import { SEAT_EXTENSIONS } from '../../lib/plan/seat'
 
 export function planSeatScreen(d: { readonly canRead: boolean; readonly hasPackage?: boolean }): string {
-  const head = pageHead('المنشورات', 'عندي خطّة', 'ارفع خطّتك كما هي أو الصقها — يقرؤها صدى ويضعها في المراجعة، ولا يُجدوَل شيءٌ قبل أن تثبّتها.')
+  const head = pageHead('', 'عندي خطّة', 'ارفع خطّتك كما هي أو الصقها — يقرؤها صدى ويضعها في المراجعة، ولا يُجدوَل شيءٌ قبل أن تثبّتها.')
   const ways = planWays('import', d.hasPackage === true)
   const styles = [
     { v: 'none', title: 'بلا صورة', note: 'خطّتُك كما هي' },

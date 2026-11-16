@@ -635,7 +635,8 @@ describe('ما تعذّرت كتابتُه يُقال ولا يُنتظر (PL-23
     const { cookie, csrf } = await session()
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('تعذّرت كتابتُه: مفتاحُ خدمة الكتابة مرفوض')
-    expect(html).toContain('وتعذّرت كتابةُ 1: مفتاحُ خدمة الكتابة مرفوض')
+    // ‏والعدُّ «كُتب س من ص» في سطر الحالة وحدَه (§6.2)، وسطرُ التقدّم يقول ما تعذّر وسببَه
+    expect(html).toContain('تعذّرت كتابةُ 1: مفتاحُ خدمة الكتابة مرفوض')
     expect(html).not.toContain('صدى يكتب الباقي الآن')
     expect(html).not.toContain('data-live="write"')
     expect(html).toContain('أعد كتابة ما تعذّر (1)')

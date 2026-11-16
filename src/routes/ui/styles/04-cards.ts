@@ -144,7 +144,6 @@ footer.page-foot{display:block; font-size:var(--t-caption); line-height:var(--lh
 .wk-day[open] > summary{box-shadow:inset 0 0 0 var(--stroke) var(--line)}
 .wk-pop{position:absolute; z-index:2; inset-inline:0; top:calc(100% + var(--s-1)); padding:var(--s-3) var(--s-4);
   background:var(--surface); border:var(--bd); border-radius:var(--r-control); box-shadow:var(--sh-2)}
-.wk-today{display:flex; align-items:center; gap:var(--s-2); margin:var(--s-4) 0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .wk-d{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 /* ‏والاسمُ بقدر عموده (D-325): الكاملُ فوق «sm»، وبلا «ال» تحتها بحجم الشارة، وحرفُه الأوّلُ تحت «xs» («ح ن ث ر خ ج س» كما في
    تقويم الهاتف) — «الخميس» ‏42px و«خميس» ‏36px في عمودٍ ‏33px عند ‏320. والاسمُ الكاملُ لقارئ الشاشة دائمًا («.vh») */

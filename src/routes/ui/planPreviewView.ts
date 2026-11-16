@@ -65,7 +65,7 @@ export function planPreviewScreen(d: PreviewData): string {
     <div class="row gap-2">${raw(button({ label: 'اكتب الخطّة من أفكارها', type: 'submit', variant: 'primary', name: 'write', value: '1' }))}
       ${raw(button({ label: 'ابنِ كما هي', type: 'submit', variant: 'secondary', name: 'write', value: '0' }))}
       ${raw(button({ label: 'ارفع غيره', href: '/panel/plan/import', variant: 'quiet' }))}</div></form>`
-  return html`${raw(pageHead('الخطّة', 'هذا ما فهمته', 'لم يُبنَ شيءٌ بعد. راجع ما قرأتُه من ملفّك، فإن صحّ فابنِ.'))}
+  return html`${raw(pageHead('', 'هذا ما فهمته', 'لم يُبنَ شيءٌ بعد. راجع ما قرأتُه من ملفّك، فإن صحّ فابنِ.'))}
     <div class="stack">
       ${raw(card({ title: 'الخلاصة', level: 2, body: facts.value }))}
       ${d.rules == null ? html`` : raw(card({ title: 'قواعد الكتابة من ورقة الإرشادات', level: 2, body: html`<div class="pv-rules">${Object.entries(d.rules).map(([p, list]) => html`<section><h3 class="m-0">${p}</h3>

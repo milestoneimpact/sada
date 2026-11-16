@@ -3,7 +3,11 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
 /* **«dvh» لا «vh»** (D-086): يحسب iOS مئةً من «vh» بلا شريطِ المتصفّح،
    فيمتدّ العمود تحته ويُقطَع أسفلُه. و«dvh» تتبع المرئيّ وهو يتحرّك.
    والسطر الأوّل احتياط لمتصفّح لا يعرفها — يقرؤه ثمّ يدهسه الثاني. */
-.app{display:grid; grid-template-columns:var(--rail-w) 1fr; min-height:100vh; min-height:100dvh}
+.app{display:grid; grid-template-columns:var(--rail-w) 1fr; min-height:100vh; min-height:100dvh; position:relative; isolation:isolate}
+/* ‏عمودُ الرافدة بسطحها إلى آخر الصفحة (§8): الرافدةُ لاصقةٌ بارتفاع الشاشة، فكان ما تحتها في صفحةٍ طويلة فراغًا بلون الخلفيّة.
+   طبقةٌ خلفها بعرض عمودها، لا تمدُّ الرافدةَ نفسَها (فتبقى لاصقةً ويتمرّر ما فيها وحدَه) */
+.app::before{content:""; position:absolute; z-index:-1; inset-block:0; inset-inline-start:0; width:var(--rail-w);
+  background:var(--surface); border-inline-start:var(--bd)}
 
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--surface); border-inline-start:var(--bd); display:flex;

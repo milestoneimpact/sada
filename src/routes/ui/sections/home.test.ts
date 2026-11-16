@@ -36,19 +36,19 @@ describe('لوحة القيادة (D-194)', () => {
         { platform: 'x', at: '2026-09-30 10:00:00' }, // ‏مضى: لا يُعدّ
       ],
     }), NOW)
-    const wk = html.slice(html.indexOf('<ol class="wk">'), html.indexOf('class="wk-today"'))
+    const wk = html.slice(html.indexOf('<ol class="wk">'), html.indexOf('class="hint wk-hint"'))
     const days = wk.split(/<li(?=[ >])(?! class)/).slice(1).filter((x) => !x.startsWith('><bdi'))
     expect(days).toHaveLength(7)
-    expect(wk).toContain('<li data-today><span class="wk-d">اليوم</span>')
+    expect(wk).toContain('<li data-today><details class="wk-day" name="wk"><summary><span class="wk-d">اليوم</span>')
     expect(days[0]).toContain('data-pf="linkedin"')
     expect(days[0]).not.toContain('data-pf="x"')
     expect(days[1]).toContain('data-pf="x"')
     expect(html).toContain('مجدول 2')
-    // ‏ويومٌ فيه منشوراتٌ غيرُ اليوم يُفتح بقائمته (D-381)، واليومُ بقائمته تحت الشريط
+    // ‏ويومٌ فيه منشوراتٌ يُفتح بقائمته (D-381)، واليومُ منها في خانته المميَّزة — لا صندوقَ «يُنشر اليوم» ثانيًا تحته (§6.1.5)
     expect(days[1]).toContain('<details class="wk-day" name="wk"><summary>')
-    expect(days[0]).not.toContain('<details')
-    const today = html.slice(html.indexOf('class="wk-today"'))
-    expect(today).toContain('LinkedIn')
+    expect(days[0]).toContain('<ol class="td-list wk-pop">')
+    expect(days[0]).toContain('LinkedIn')
+    expect(html).not.toContain('يُنشر اليوم')
   })
   it('وأسبوع فارغ يقول ما يفعله المالك', () => {
     expect(homeTop(facts(), NOW)).toContain('لا شيء مجدول في الأيّام السبعة')
@@ -85,12 +85,16 @@ describe('«يُنشر اليوم» (D-267 · EASE د)', () => {
         { platform: 'x', at: '2026-10-04 22:30:00' }, // ‏01:30 بتوقيت الرياض: الغد
       ],
     }), NOW)
-    const td = html.slice(html.indexOf('<ol class="td-list">'), html.indexOf('</ol>', html.indexOf('<ol class="td-list">')))
+    // ‏في خانة اليوم المميَّزة (§6.1.5): أوّلُ قائمةٍ في الشريط
+    const td = html.slice(html.indexOf('<ol class="td-list wk-pop">'), html.indexOf('</ol>', html.indexOf('<ol class="td-list wk-pop">')))
     expect(td.match(/<li>/g)).toHaveLength(2)
     expect(td.indexOf('LinkedIn')).toBeLessThan(td.indexOf('X'))
   })
   it('ويومٌ فارغٌ يقول ذلك', () => {
-    expect(homeTop(facts(), NOW)).toContain('لا شيء يُنشر اليوم.')
+    const html = homeTop(facts(), NOW)
+    const today = html.slice(html.indexOf('<li data-today>'), html.indexOf('</li>', html.indexOf('<li data-today>')))
+    expect(today).toContain('aria-label="لا منشور"')
+    expect(today).not.toContain('<details')
   })
 })
 

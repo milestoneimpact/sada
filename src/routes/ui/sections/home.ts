@@ -102,18 +102,15 @@ function week(items: readonly { platform: string; at: string }[], now: Date, zon
       <span class="wk-dots" role="img" aria-label="${pfs.length === 0 ? 'لا منشور' : escapeHtml(String(pfs.length) + ' منشور: ' + names)}">${pfs.slice(0, 6).map((pf) =>
         `<span class="wk-pf" data-pf="${escapeHtml(pf)}">${LOGOS[pf] ?? ''}</span>`).join('')}</span>
       <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span>`
-    // ‏واليومُ بقائمته تحت الشريط، فلا يُفتح؛ وغيرُه يُفتح إن كان فيه ما يُنشر
-    const body = i === 0 || list.length === 0 ? cell
+    // ‏واليومُ يُفتح كغيره (§6.1.5): ما يخرج اليومَ في خانته المميَّزة، لا صندوقًا ثانيًا تحت الشريط
+    const body = list.length === 0 ? cell
       : html`<details class="wk-day" name="wk"><summary>${raw(cell)}</summary><ol class="td-list wk-pop">${raw(timed(list))}</ol></details>`.value
     return `<li${i === 0 ? ' data-today' : ''}>${body}</li>`
   }).join('')
-  const todays = by.get(key(now)) ?? []
   return `<div class="card home-card" role="region" aria-labelledby="wk-t">
     <div class="card-head"><h2 id="wk-t">هذا الأسبوع</h2><div class="grow"></div>
       <span class="ago">مجدول ${total}</span></div>
     <ol class="wk">${cols}</ol>
-    <h3 class="wk-today">يُنشر اليوم <span class="count">${todays.length}</span></h3>
-    ${todays.length === 0 ? '<p class="hint m-0">لا شيء يُنشر اليوم.</p>' : `<ol class="td-list">${timed(todays)}</ol>`}
     <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ مربّعٍ منشورٌ بشعار منصّته، وافتح اليوم لترى ساعاته.'}</p>
   </div>`
 }
@@ -287,8 +284,9 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '
   return `${head.value}
   ${box.value}
   ${run === null ? '' : firstRunCard(run, f, now)}
-  ${kpis}
   ${bare ? '' : stats(f)}
+  ${/* ‏وطابورُ القرار بعد الأرقام (§6.1): بطاقةٌ بمنشورين كاملين كانت تدفع الأرقامَ تحت الطيّة، والخطوةُ الأولى في «ما ينتظرك» أصلًا */''}
+  ${kpis}
   ${bare ? '' : html`<div class="home-grid">
     <div class="home-main">${raw(week(f.scheduled ?? [], now, f.zone))}</div>
     <aside class="home-aside" aria-label="رحلة المنشور">
@@ -333,9 +331,8 @@ export function planCard(
    * ‏«تابع الكتابة» لخطّةٍ لن تُنشر. فوسمُ تحذير «خطّة منتهية»، والزرُّ الأوّليُّ الواحدُ يبني خطّةَ الأسبوع الحاليّ (المسارُ القائم).
    * ‏واليومُ بتوقيت المالك لا بـ UTC
    */
-  const lp = localParts(now, zone)
-  const todayKey = `${lp.year}-${String(lp.month).padStart(2, '0')}-${String(lp.day).padStart(2, '0')}`
-  const expired = end < todayKey
+  const today = todayKey(now, zone)
+  const expired = end < today
   const go = expired
     ? { href: '/panel/plan/new', label: 'أنشئ خطّة الأسبوع الحاليّ' }
     : locked
@@ -345,7 +342,7 @@ export function planCard(
       : c.pending > 0
         ? { href: '/panel/plan/review', label: 'راجع واعتمد (' + ar(c.pending) + ')' }
         : { href: '/panel/plan/review', label: 'ثبّت الخطّة' }
-  const next = expired ? [] : [...plan.plan.items].filter((i) => i.day >= todayKey).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
+  const next = expired ? [] : [...plan.plan.items].filter((i) => i.day >= today).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
   return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
     <div class="card-head"><h2 id="hp-t">خطّةُ ${span === 'شهر' ? 'الشهر' : span}</h2><span class="grow"></span>${expired ? html`<span class="st warn">خطّة منتهية</span>` : html``}${state}</div>
     <p class="hint m-0">${dayLabel(plan.week)} — ${dayLabel(end)}</p>

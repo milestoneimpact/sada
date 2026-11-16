@@ -82,7 +82,7 @@ export function pageHead(eyebrow: string, title: string, lede: string, aside = '
   const h1 = '<h1>' + escapeHtml(title) + '</h1>'
   return `<div class="page-head">
     <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
+      ${eyebrow === '' ? '' : '<div class="eyebrow"><span class="ln"></span>' + escapeHtml(eyebrow) + '</div>'}
       ${tip === '' ? h1 : '<div class="ph-row">' + h1 + tip + '</div>'}
       ${lede === '' ? '' : `<p class="lede">${lede}</p>`}
     </div>

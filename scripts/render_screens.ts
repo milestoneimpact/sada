@@ -497,7 +497,7 @@ writeAudited(
     now: new Date('2026-11-02T08:00:00Z'), linked: ['linkedin'], perWeek: 3,
     sources: [{ id: 's1', name: 'تقرير الأثر 2025', kind: 'drive' }, { id: 's2', name: 'مراجعة المحفظة', kind: 'upload' }, { id: 's3', name: 'قيادة القيمة لا تُقاس بالمخرجات', kind: 'url' }],
     perDraft: 0.012, perImage: 0.011, perInfographic: 0.018, freeLeft: { draft: 173, final: 7 }, autoImage: true, ready: true, replacing: false,
-  }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
 )
 
 // ‏مراجعةُ الخطّة (D-286): بطاقةٌ معتمَدةٌ بصورتها، وأخرى تنتظر، وثالثةٌ لم تُكتب، ورابعةٌ مجدولة، وموعدان مكرَّران
@@ -526,7 +526,7 @@ writeAudited(
   writeAudited(
     '/tmp/screen-plan-build.html',
     soloPage('صدى — بناء الخطّة', { href: '/panel#posts', label: 'المنشورات' },
-      planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
   // ‏«كلُّ الأصول» (D-347): البحثُ والمفضّلةُ والوسومُ على بلاطاتها — مولَّدةٌ ومرفوعةٌ ومقطعٌ ومصدرُ Drive
   writeAudited(
@@ -544,14 +544,14 @@ writeAudited(
   )
   writeAudited(
     '/tmp/screen-plan-review.html',
-    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
   writeAudited(
     '/tmp/screen-plan-doc.html',
     soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, planDocScreen({
       model: reviewSample, orgName: 'مؤسّسة المعالم للأثر', authors: { linkedin: 'عمر عبدالحميد', x: '@omar_ah' },
       sources: { s1: 'تقرير الأثر 2025', s2: 'مراجعة المحفظة' }, zone: null,
-    }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+    }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 }
 
@@ -574,7 +574,7 @@ writeAudited(
 writeAudited(
   '/tmp/screen-plan-seat.html',
   soloPage('صدى — عندي خطّة', { href: '/panel#posts', label: 'المنشورات' }, planSeatScreen({ canRead: true }), 'n', PLAN_SEAT_SCRIPT,
-    buildCommands({ onPanel: false }), soloNav('posts')),
+    buildCommands({ onPanel: false }), soloNav('plan')),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

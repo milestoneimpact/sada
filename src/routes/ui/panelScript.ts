@@ -107,6 +107,9 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(m){t.setAttribute('aria-current','page');
         var sp=t.querySelector('span');
         if(sp&&head){head.textContent=sp.textContent; document.title=sp.textContent+' — صدى';}
+        // ‏وتبديلٌ لا ينقل التركيز (الرجوعُ والتقدّمُ في المتصفّح) يُقال في منطقةٍ حيّة مخفيّة: «#pane-title» صدىً مرئيٌّ مخفيٌّ عن قارئ الشاشة
+        var say=document.getElementById('pane-say');
+        if(sp&&say&&!focus&&fromAt>=0&&fromAt!==toAt)say.textContent=sp.textContent;
       }else{t.removeAttribute('aria-current');}
     });
     // ‏وفي اللوح أقسامٌ («المنشورات»: المسوّداتُ واكتب والفيديو والخطّة، D-195): يظهر القسمُ الذي

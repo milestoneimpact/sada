@@ -39,7 +39,7 @@ export function planFollowScreen(m: ReviewModel, zone: string | null): string {
   const queued = by(['queued'])
   const published = by(['published'])
   const waiting = m.cards.filter((c) => c.post === null || c.post.status === 'draft' || c.post.status === 'approved').length
-  const head = pageHead('الخطّة', 'متابعةُ الخطّة', counted(queued.length, NOUNS.post) + ' في موعدها، و' + counted(published.length, NOUNS.post) + ' نُشرت')
+  const head = pageHead('', 'متابعةُ الخطّة', counted(queued.length, NOUNS.post) + ' في موعدها، و' + counted(published.length, NOUNS.post) + ' نُشرت')
   const back = waiting === 0 ? html``
     : html`<p class="m-0"><a class="tap" href="/panel/plan/review">${counted(waiting, NOUNS.post)} تنتظر قرارك في المراجعة</a></p>`
   return html`${raw(head)}

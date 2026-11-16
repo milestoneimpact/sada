@@ -40,6 +40,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   html,body{background:#fff!important; color:#000!important}
   .rail,.topbar,.seg,.skip,footer,nav.tabs,button,.btn,form{display:none!important}
   .app{display:block}
+  .app::before{display:none}
   /* والهوامشُ من @page لا من الحاوية: حاويةٌ بلا حدٍّ أقصى تمدّ السطرَ
      عبر الورقة كلّها، وقيد المقاس على الفقرات يبقى قائما */
   .content,.doc{padding:0; margin:0; max-width:100%}
@@ -653,13 +654,12 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   background:var(--surface); border:var(--bd-soft); color:var(--ink-2); text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption); min-width:0}
 .rv-mini[draggable=true]{cursor:grab}
 .rv-mini.is-drag{opacity:.35}
-.rv-mini-img{flex:none; width:var(--s-6); height:var(--s-6); object-fit:cover; border-radius:var(--r-inline)}
 .rv-mini bdi{flex:none}
 /* ‏سطرٌ من الزاوية تحت المصغَّرة (D-351): الساعةُ والشعارُ وحدهما لا يقولان أيُّ منشور. في سطرٍ ثانٍ — في سطرها كان يبقى منه حرفان — يُقصّ بنقاط */
 .rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
-.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1); position:relative; overflow:hidden; padding-top:calc(var(--s-1) + var(--stroke))}
+.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1); position:relative; overflow:hidden; padding-top:calc(var(--s-1) + var(--s-1))}
 /* ‏شريطٌ علويٌّ بلون المنصّة (§6.2) — زينةٌ تُعين العين، والشعارُ بجانبه يقول المنصّةَ فلا يقع المعنى على اللون وحده */
-.pf-stripe{position:absolute; inset-inline:0; top:0; height:var(--stroke); background:var(--ink-3)}
+.pf-stripe{position:absolute; inset-inline:0; top:0; height:var(--s-1); background:var(--ink-3)}
 .pf-stripe[data-pf=linkedin]{background:var(--pf-linkedin)}
 .pf-stripe[data-pf=x]{background:var(--pf-x)}
 .pf-stripe[data-pf=instagram]{background:var(--pf-instagram)}
@@ -697,8 +697,11 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-wk.is-on{background:var(--selected); border-color:var(--accent)}
 .rv-acts{margin-top:auto}
 .rv-acts form{display:inline-flex; flex-wrap:wrap; gap:var(--s-2)}
-.rv-foot{position:sticky; bottom:var(--s-3); z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
-  margin-top:var(--s-6); padding:var(--s-3) var(--s-4)}
+.rv-foot{position:sticky; bottom:0; z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
+  margin-top:var(--s-6); padding:var(--s-3) var(--s-4) calc(var(--s-3) + var(--safe-b)); background:var(--surface); box-shadow:var(--sh-3);
+  border-end-start-radius:0; border-end-end-radius:0}
+/* ‏والشريطُ اللاصقُ يلامس حافّة الشاشة بسطحٍ مصمت (لا فجوةَ يطلّ منها نصٌّ مقصوص)، والقفزُ إلى بطاقةٍ يتركها فوقه */
+.rv-day,.rv-day .rv{scroll-margin-bottom:calc(var(--s-16) + var(--s-6))}
 @media${below('md')}{.rv-foot{bottom:calc(var(--s-16) + var(--safe-b))}}
 @media${below('sm')}{
   .rv-foot .btn{flex:1 1 auto}
