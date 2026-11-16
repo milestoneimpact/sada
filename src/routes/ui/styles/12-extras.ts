@@ -607,7 +607,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
 .src-drop>svg{width:var(--icon-lg); height:var(--icon-lg); color:var(--ink-3)}
 .src-drop-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
-.src-drop:has(:focus-visible),.src-drop:has(input:hover){border-color:var(--accent); background:var(--selected)}
+.src-drop:has(:focus-visible){border-color:var(--accent); background:var(--selected)}
+@media(hover:hover){.src-drop:has(input:hover){border-color:var(--accent); background:var(--selected)}}
 .add-src .field,.src-drop{min-width:0}
 .src-drop input[type=file]{max-width:100%; min-width:0; font:inherit; font-size:var(--t-ui); color:var(--ink-2); cursor:pointer}
 .src-drop input[type=file]::file-selector-button{min-height:var(--tap); margin-inline-end:var(--s-3); padding:0 var(--s-4);
@@ -750,6 +751,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .ph-echo{position:absolute; top:0; inset-inline-end:0; width:55%; height:100%; z-index:-1; pointer-events:none; opacity:.16; color:var(--accent);
   -webkit-mask-image:linear-gradient(to right, currentColor 35%, transparent); mask-image:linear-gradient(to right, currentColor 35%, transparent)}
 .ph-echo svg{display:block; width:100%; height:100%}
+.page-head:has(.why-tip[open]) .ph-echo{display:none}
 .ph-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--link)}
 .ph-title{margin:0; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .ph-lede{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
@@ -894,7 +896,7 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pk-text{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit}
 .pk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center}
 .pk-prog{gap:var(--s-2)}
-.task-id{flex:none; font-size:var(--t-ui); color:var(--ink-2); margin-inline-end:var(--s-2)}
+.task-id{flex:none; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--ink-2); margin-inline-end:var(--s-2)}
 .task-h{margin:var(--s-3) 0 var(--s-1); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
 .task-h:first-child{margin-top:0}
 .task-how{margin-block:var(--s-2) var(--s-4)}

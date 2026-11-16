@@ -843,7 +843,7 @@ function ownerMoment(at: string, zone: string | null, now: Date): string {
  * ‏وبلوحة المفاتيح، واسمُه ممّا يقوله.
  */
 export function approvalTip(): string {
-  return html`<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">ⓘ</summary>
+  return html`<details class="why-tip"><summary aria-label="لماذا الاعتماد؟">${raw(ICON.info)}</summary>
     <p class="hint m-0">الاعتماد يجيز النشر ولا ينشر وحدَه: <b>لا يُنشر منشور بلا موافقة مسجّلة</b>، والقيد في القاعدة لا في هذه الصفحة.</p>
   </details>`.value
 }

@@ -216,6 +216,8 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   table:not(.pv){min-width:0; display:block}
   table:not(.pv) thead{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0)}
   table:not(.pv) tbody,table:not(.pv) tr,table:not(.pv) td{display:block; width:100%}
+  /* ‏والصفُّ المكدَّسُ بطاقةٌ لا صفُّ جدول: «height» حدٌّ أدنى في الجدول وحدَه، وفي الكتلة والشبكة سقفٌ يُفيض الخلايا على البطاقة التالية */
+  table:not(.pv) tbody tr{height:auto}
   table:not(.pv) tr{border:var(--bd); border-radius:var(--r-card); padding:var(--s-3); margin-bottom:var(--s-2);
     background:var(--surface-2)}
   @media(hover:hover){table:not(.pv) tbody tr:hover{background:var(--surface-2)}}
@@ -253,21 +255,34 @@ html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
   html[data-rail=mini] nav.tabs a .count{position:absolute; top:var(--s-1); inset-inline-end:var(--s-2); margin:0}
 }
 /* ‏اللوحُ (‏768–1023، §4.2): الرافدةُ مطويّةٌ أصلًا بلا سكربت، وتتّسع **طبقةً فوق المحتوى** حين يُمرّ عليها
-   أو يدخلها التركيز (لمسٌ أو لوحُ مفاتيح) — فلا تدفع المحتوى ولا تحتاج زرًّا. وزرُّ الطيّ لا معنى له هنا */
+   أو يدخلها التركيز (لمسٌ أو لوحُ مفاتيح) — فلا تدفع المحتوى ولا تحتاج زرًّا. وزرُّ الطيّ لا معنى له هنا.
+   ‏**والمرورُ بفأرةٍ وحدها** (audit_mobile): اللمسُ لا يمرّ، فيفتحها التركيزُ هناك. والاسمُ المطويُّ يُخفى «display:none»
+   ‏واسمُ الرابط في «aria-label» — لا صندوقَ ‏2px يقصّ نصَّه فيُقرأ اسمًا مبتورًا — وحالُ الذيل في الشريط العلويّ، فلا هدفَ لمسٍ بعرض ‏2px */
 @media${atLeast('md')} and ${below('tab')}{
   .app{grid-template-columns:var(--rail-mini) minmax(0,1fr)}
   .app::before{width:var(--rail-mini)}
-  .rail{width:var(--rail-mini); z-index:45; transition:width var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out)}
-  .rail:hover,.rail:focus-within{width:var(--rail-w); box-shadow:var(--sh-3)}
+  .rail{width:var(--rail-mini); overflow-x:hidden; z-index:45; transition:width var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out)}
+  .rail:focus-within{width:var(--rail-w); box-shadow:var(--sh-3)}
   .rail-fold{display:none}
+}
+@media${atLeast('md')} and ${below('tab')} and (hover:hover){
+  .rail:hover{width:var(--rail-w); box-shadow:var(--sh-3)}
   .rail:not(:hover):not(:focus-within) .brand,.rail:not(:hover):not(:focus-within) .scope,
-  .rail:not(:hover):not(:focus-within) nav.tabs .lbl{display:none}
+  .rail:not(:hover):not(:focus-within) nav.tabs .lbl,.rail:not(:hover):not(:focus-within) .rail-foot .pill{display:none}
   .rail:not(:hover):not(:focus-within) .rail-head{padding-inline:var(--s-2); justify-content:center}
   .rail:not(:hover):not(:focus-within) nav.tabs{padding-inline:var(--s-2)}
   .rail:not(:hover):not(:focus-within) nav.tabs a{justify-content:center; padding-inline:0; position:relative}
-  .rail:not(:hover):not(:focus-within) nav.tabs a > span:not(.count),
-  .rail:not(:hover):not(:focus-within) .rail-foot .pill{position:absolute; width:var(--ul); height:var(--ul); overflow:hidden; clip-path:inset(50%); white-space:nowrap}
+  .rail:not(:hover):not(:focus-within) nav.tabs a > span:not(.count){display:none}
   .rail:not(:hover):not(:focus-within) nav.tabs a .count{position:absolute; top:var(--s-1); inset-inline-end:var(--s-2); margin:0}
+}
+@media${atLeast('md')} and ${below('tab')} and (hover:none){
+  .rail:not(:focus-within) .brand,.rail:not(:focus-within) .scope,
+  .rail:not(:focus-within) nav.tabs .lbl,.rail:not(:focus-within) .rail-foot .pill{display:none}
+  .rail:not(:focus-within) .rail-head{padding-inline:var(--s-2); justify-content:center}
+  .rail:not(:focus-within) nav.tabs{padding-inline:var(--s-2)}
+  .rail:not(:focus-within) nav.tabs a{justify-content:center; padding-inline:0; position:relative}
+  .rail:not(:focus-within) nav.tabs a > span:not(.count){display:none}
+  .rail:not(:focus-within) nav.tabs a .count{position:absolute; top:var(--s-1); inset-inline-end:var(--s-2); margin:0}
 }
 /* ‏الهاتف (§4.3): رأسٌ مختصر — العلامةُ والعنوانُ والجرسُ والحساب؛ والبحثُ في «المزيد»، والحالُ في بطاقة الآلة.
    وذيلُ الرافدة لا يُرى في شريط الإبهام: الإعداداتُ في «المزيد» */
@@ -275,7 +290,7 @@ html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
   .topbar > .cmdk-open,.topbar > .pill{display:none}
   .rail-foot{display:none}
   /* ‏والمحتوى لا يختفي تحت «منشور جديد» العائم: حشوٌ بقدره فوق الشريط */
-  body:has(details.fab) .content{padding-bottom:calc(var(--s-16) + var(--s-16) + var(--safe-b))}
+  body:has(details.fab) .content{margin-bottom:var(--s-16)}
 }
 /* ‏تنبيهُ النظام الواحد (§4.4): أرضُ الخطر الخافتة، وأيقونةٌ ونصٌّ وفعلٌ واحد وإغلاقٌ مؤقّت */
 .sys-banner{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-3); padding:var(--s-3) var(--s-4);
@@ -285,4 +300,6 @@ html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
 .sys-banner.warn{background:var(--warn-wash); border-color:var(--warn)}
 .sys-banner .toast-t{min-width:0; flex:1 1 16rem}
 .sys-banner[hidden]{display:none}
+/* ‏وعلى الهاتف تنزل الجملةُ سطرًا في مجراها لا طافيةً: الطافيةُ كانت تغطّي نقشَ الفراغ تحت الرأس */
+@media${below('sm')}{.ph-row{flex-wrap:wrap} .ph-row .why-tip[open]{flex-basis:100%; order:9} .ph-row .why-tip[open] > p{position:static}}
 `

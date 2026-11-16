@@ -96,6 +96,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .hello-status b{color:var(--ink); font-weight:600}
 .home-waiting{margin-bottom:var(--gap-card)}
 .home-waiting .card-head{margin-bottom:var(--s-2)}
+/* ‏وأفعالُ البطاقة العامّة في طرفها الآخر (D-381): الصفوفُ بقياسها المقروء في البدء، والمسحُ والمراجعةُ ختامٌ في النهاية لا ذيلٌ تحت الصفوف */
+.home-waiting>.row{justify-content:flex-end}
 .todo-next .next-k{font-weight:600; color:var(--ink-2); margin-inline-end:var(--s-1)}
 .empty-ok{padding:var(--s-5); text-align:start}
 .empty-ok .empty-t{display:flex; align-items:center; gap:var(--s-2); font-weight:600; font-size:var(--t-ui); line-height:var(--lh-ui)}
@@ -117,6 +119,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .jsteps li[data-focus][data-state=failed] a{background:var(--bad-wash)}
 .js-dot{grid-area:d; position:relative; z-index:1; display:grid; place-items:center; width:var(--icon-sm); height:var(--icon-sm);
   border-radius:50%; background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--line); color:var(--ink-3); font-size:var(--t-caption); line-height:1}
+.js-dot svg{width:var(--icon-xs); height:var(--icon-xs); display:block}
 .js-dot[data-tone=ok]{color:var(--ok); box-shadow:inset 0 0 0 var(--stroke) var(--ok)}
 .js-dot[data-tone=warn]{color:var(--warn); box-shadow:inset 0 0 0 var(--stroke) var(--warn)}
 .js-dot[data-tone=bad]{color:var(--bad); box-shadow:inset 0 0 0 var(--stroke) var(--bad)}
@@ -130,8 +133,9 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .hc-nums dd{margin:0; font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
 .home-cost > .home-ops{margin-top:var(--s-4); border-top:var(--bd-soft); padding-top:var(--s-2)}
 /* ‏والذيلُ اسمٌ ووقتٌ بخطّ الشرح (D-381 · §6.1): ‏13px بحبرٍ ثالث */
-footer.page-foot{display:block; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-3)}
+footer.page-foot{display:block; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .wk{position:relative; list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
+@media${below('sm')}{.wk{gap:0}}
 .wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
   border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
 .wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--accent)}
@@ -327,7 +331,7 @@ footer.page-foot{display:block; font-size:var(--t-caption); line-height:var(--lh
 .hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .hs-n{font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
 /* ‏والصفرُ بسطرٍ يقول ما يعنيه (D-381 · §5.4): لا رقمَ صفريٌّ بلا سياق */
-.hs-z{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.hs-z{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .daybars{margin:0}
 /* ‏والرقمُ فوق عموده (مراجعة D-323): صفٌّ بعرض الرسم وارتفاعه فوقه، عمودٌ لكلّ يوم بعرض عموده، والرقمُ في عموده على
    ارتفاعٍ يكتبه الخادمُ نسبةً من ارتفاع الرسم — فيعلو رأسَ العمود أيًّا كان عرضُ الشاشة */

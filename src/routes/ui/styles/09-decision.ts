@@ -190,6 +190,7 @@ export const DECISION = `/* ══ مسرحُ القرار (D-100) ════�
 .ph-row{display:flex; align-items:flex-start; gap:var(--s-2); position:relative}
 .ph-row .why-tip > summary{border:0; color:var(--ink-2); font-size:var(--t-h3); list-style:none}
 .ph-row .why-tip > summary::-webkit-details-marker{display:none}
+.why-tip > summary svg{width:var(--icon-sm); height:var(--icon-sm); display:block}
 .ph-row .why-tip[open]{flex-basis:auto; order:0}
 .ph-row .why-tip[open] > p{position:absolute; inset-inline:0; top:100%; z-index:20; max-width:28rem; margin-top:var(--s-2);
   padding:var(--s-3); background:var(--dialog); border:var(--bd); border-radius:var(--r-control); box-shadow:var(--sh-2)}

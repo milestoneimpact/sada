@@ -40,7 +40,9 @@ export const MOMENT = `/* ══ لحظةُ العلامة: الدخولُ وا�
   .moment{min-height:0; padding-block:var(--s-4)}
   .moment .echo,.moment-line{display:none}
   .moment-id{margin-bottom:0}
-  .auth-split .auth{margin:var(--s-4) auto}
+  /* ‏وتنبيهُ الرمز الخاطئ يزيد صفًّا (‏2FA): الزرُّ الثاني كان على حافّة ‏548 تمامًا، والصعودُ ‏5px يدفعه تحتها */
+  .auth-split .wrap{padding-top:var(--s-4)}
+  .auth-split .auth{margin:var(--s-2) auto}
 }
 @media${atLeast('md')}{
   .auth-split{grid-template-columns:minmax(0,5fr) minmax(0,7fr); grid-template-rows:none}

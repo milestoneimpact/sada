@@ -79,7 +79,10 @@ export function railHtml(input: RailInput): string {
       ? `<span>${s.short ?? s.label}</span>`
       : `<span class="wide">${s.short ?? s.label}</span><span class="tight">${escapeHtml(s.tight)}</span>`
     // ‏وفي الرافدة المطويّة (‏72px) يُخفى الاسمُ بصريًّا ولا يُنزَع: قارئُ الشاشة يقرؤه، والمرورُ يفتحها على اللوح
-    return `<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
+    // ‏‏والاسمُ على الرابط نفسِه (D-381 · §4.2): الرافدةُ المطويّةُ على اللوح تُخفي النصَّ «display:none» لا قصًّا بصندوق ‏2px،
+    // ‏‏فيبقى لقارئ الشاشة الاسمُ والعددُ كما يُقرآن مبسوطةً
+    const name = (s.short ?? s.label) + (n > 0 ? ' ' + String(n) : '')
+    return `<a href="${escapeHtml(href)}"${attrs} aria-label="${escapeHtml(name)}">${s.icon}${label}${
       n > 0 ? count(n) : ''
     }</a>`
   }

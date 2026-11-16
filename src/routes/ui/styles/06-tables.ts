@@ -143,7 +143,8 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 /* ‏والمحايدان بحبر «--ink-2» لا «--ink-3» (D-185): لا نصَّ تحت ‏١٥px بالحبر الثالث (خطّة التصميم 4.3).
    **ويفترقان بالرمز لا باللون** (7.2): «pending» ينتظر ساعةً، و«idle» لم يبدأ دائرةً متقطّعة */
 .st.pending{color:var(--ink-2); background:var(--surface-2); border-color:var(--line)}
-/* ‏و«لم يبدأ» بنغمته المسمّاة (مواصفات v1 §5.2 · D-381): «--idle» على «--idle-wash» — ‏5.0:1 نهارًا و‏5.8:1 ليلًا */
+/* ‏و«لم يبدأ» بنغمته المسمّاة (مواصفات v1 §5.2 · D-381): «--idle» على «--idle-wash» — ‏6.3:1 نهارًا و‏5.8:1 ليلًا.
+   ‏ونهارًا أغمقُ من «--ink-3» درجةً: كان يساويه، والحبرُ الثالثُ ممنوعٌ تحت ‏15px (audit_scale) والشارةُ ‏13px */
 .st.idle{color:var(--idle); background:var(--idle-wash); border-color:var(--line)}
 .chip{display:inline-block; padding:var(--s-0) var(--s-2); border-radius:var(--r-pill); font-size:var(--t-caption);
   line-height:var(--lh-caption); font-weight:600;

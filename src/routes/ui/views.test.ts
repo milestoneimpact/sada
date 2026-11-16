@@ -675,7 +675,7 @@ describe('فرز بالمنصّة وترتيب (D-127)', () => {
     // ‏والمساعدةُ ⓘ بجانب العنوان لا في صفّ الفرز (D-381 §6.3)، والصفُّ يحمل مبدّلَ القائمة والشبكة
     expect(bar).not.toContain('class="why-tip"')
     expect(bar).toContain('data-dlayout="list" aria-pressed="true"')
-    expect(approvalTip()).toContain('<summary aria-label="لماذا الاعتماد؟">ⓘ</summary>')
+    expect(approvalTip()).toContain(`<summary aria-label="لماذا الاعتماد؟">${ICON.info}</summary>`)
     expect(html).not.toContain('draft-more" id=')
     expect(html).not.toContain('tab-sub')
     expect(SCRIPT).toContain("onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();})")
@@ -1175,9 +1175,9 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
     const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'الحسابات' }, '<p>x</p>', 'n', '', undefined,
       soloNav('accounts', 'linkedin'))
     expect(html).toContain('<aside class="rail">')
-    expect(html).toContain('<a href="/panel#posts" data-bar>')
-    expect(html).toContain('<a href="/panel/tasks">')
-    expect(html).toContain('<a href="/panel/accounts" aria-current="true">')
+    expect(html).toContain('<a href="/panel#posts" data-bar aria-label="')
+    expect(html).toContain('<a href="/panel/tasks" aria-label="')
+    expect(html).toContain('<a href="/panel/accounts" aria-current="true" aria-label="')
     // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (D-205): الرافدةُ سبعة
     expect(html).not.toContain('class="plat"')
     expect((html.match(/id="theme"/g) ?? []).length).toBe(1)
@@ -1675,7 +1675,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
       '--brand': '#0e6b64', '--brand-hover': '#0b5c56', '--brand-press': '#084b46', '--on-brand': '#ffffff',
       '--link': '#0e6b64', '--selected': '#e9f3f1', '--selection': '#cceae7', '--au': '#7b5e20',
       '--ok': '#0f7a52', '--ok-wash': '#e3f4ec', '--bad': '#b42318', '--bad-wash': '#fdeceb',
-      '--idle': '#596866', '--idle-wash': '#eeeeea',
+      '--idle': '#4a5957', '--idle-wash': '#eeeeea',
     })
     expect(THEME.dark).toMatchObject({
       '--bg': '#0c1414', '--surface': '#121c1c', '--surface-2': '#182424', '--surface-3': '#1f2d2d',
@@ -1911,7 +1911,12 @@ describe('مراجعة المرحلة ٢ب (D-189)', () => {
     expect(css.rule('html[data-rail=mini] .app', `@media${atLeast('tab')}`)['grid-template-columns']).toBe('var(--rail-mini) minmax(0,1fr)')
     const tablet = `@media${atLeast('md')} and ${below('tab')}`
     expect(css.rule('.app', tablet)['grid-template-columns']).toBe('var(--rail-mini) minmax(0,1fr)')
-    for (const sel of ['.rail:hover', '.rail:focus-within']) expect(css.rule(sel, tablet), sel).toMatchObject({ width: 'var(--rail-w)', 'box-shadow': 'var(--sh-3)' })
+    // ‏والمرورُ بفأرةٍ وحدها، والتركيزُ لكلّ مؤشّر (audit_mobile): على اللوح اللمسيّ لا مرور
+    expect(css.rule('.rail:focus-within', tablet)).toMatchObject({ width: 'var(--rail-w)', 'box-shadow': 'var(--sh-3)' })
+    expect(css.rule('.rail:hover', `${tablet} and (hover:hover)`)).toMatchObject({ width: 'var(--rail-w)', 'box-shadow': 'var(--sh-3)' })
+    // ‏والاسمُ المطويُّ على اللوح يُخفى، واسمُ الرابط في «aria-label»
+    expect(css.rule('.rail:not(:focus-within) nav.tabs a > span:not(.count)', `${tablet} and (hover:none)`).display).toBe('none')
+    expect(railHtml({ active: 'overview', inPanel: true })).toMatch(/<a href="#overview" data-bar aria-current="page" aria-label="[^"]+">/)
     const hide = css.rule('html[data-rail=mini] nav.tabs a > span:not(.count)', `@media${atLeast('tab')}`)
     expect(hide).toMatchObject({ position: 'absolute', overflow: 'hidden', 'clip-path': 'inset(50%)' })
     expect(hide.display).toBeUndefined()

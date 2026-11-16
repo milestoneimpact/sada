@@ -30,6 +30,7 @@ import { dayLabel, shift } from '../planReviewView'
 const ar = num
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
+import { glyph } from '../icons'
 import { dayBars } from '../chart'
 import { total } from '../../../lib/home'
 
@@ -51,7 +52,7 @@ function leg(s: JourneyStep, i: number, focus: number): string {
   const mark = RUNG_MARK[shown]
   const tone = shown === 'now' && i !== focus ? 'idle' : mark.cls
   return `<li data-state="${shown}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
-      <span class="js-dot" data-tone="${tone}" aria-hidden="true">${mark.g}</span>
+      <span class="js-dot" data-tone="${tone}" aria-hidden="true">${glyph(mark.g)}</span>
       <span class="js-t"><b>${escapeHtml(s.title)}</b>${statusBadge(tone, mark.g, escapeHtml(STEP_LABEL[shown] ?? mark.label))}</span>
       <span class="js-n num">${s.count}</span>
       <span class="js-note">${escapeHtml(s.note)}</span></a></li>`

@@ -84,8 +84,8 @@ function item(r: OwnerRow, env: string, open: boolean): string {
     <summary><bdi class="task-id mono" dir="ltr">${escapeHtml(r.code)}</bdi><span class="task-t" id="task-t-${escapeHtml(r.code)}">${bold(r.title)}</span>
       <span class="grow"></span>${statusBadge(opens.cls, '●', opens.label)} ${statusBadge(mark.cls, mark.g, mark.label)}</summary>
     <div class="setup-body">
-      ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<h4 class="task-h">ما يقع إن تُرك</h4><div class="sub">${bold(r.ifLeft)}</div>
-      ${r.measured === '' ? '' : `<h4 class="task-h">كيف يُقاس</h4><div class="sub">${bold(r.measured)}</div>`}
+      ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<h3 class="task-h">ما يقع إن تُرك</h3><div class="sub">${bold(r.ifLeft)}</div>
+      ${r.measured === '' ? '' : `<h3 class="task-h">كيف يُقاس</h3><div class="sub">${bold(r.measured)}</div>`}
       ${commandBox(r, env)}
       ${r.state === true ? '' : `<div class="row gap-2 mt-2">
         ${r.go === undefined

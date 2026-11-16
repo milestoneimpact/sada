@@ -169,7 +169,7 @@ h1.empty-t{font-size:var(--t-h3); line-height:var(--lh-h3)}
 .empty-p{margin:0; max-width:var(--measure); font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
 .empty>:is(.btn,form,a):last-child{margin-top:var(--s-2)}
 .empty-echo{display:block; height:var(--s-8); aspect-ratio:5/3; color:var(--ink-3)}
-.empty>:is(.empty-ic,.empty-echo)~.empty-p{margin-top:var(--s-4)}
+.empty>:is(.empty-ic,.empty-echo)~.empty-p{margin-top:var(--s-5)}
 .empty-echo svg{width:100%; height:100%; display:block}
 .empty-ic{display:inline-flex; width:var(--s-8); height:var(--s-8); color:var(--ink-3)}
 .empty-ic svg{width:100%; height:100%; display:block}
@@ -202,6 +202,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
   text-decoration:underline; text-underline-offset:var(--ul-off); text-decoration-thickness:var(--ul)}
 /* ‏وفي «ما ينتظرك» بالرئيسيّة أزرارٌ حقًّا لا روابطُ نصّيّة (SPEC-v1 §2.3 · D-381): ثانويّةٌ، والخطوةُ التالية وحدَها أوّليّة */
 .todo-act>li{padding-block:var(--s-2)}
+.todo-act>li>span:not(.dot,.todo-go){flex:1; min-width:0}
 /* ‏والزرُّ في غلافه، فلا يلبس قاعدةَ الزرّ الهادئ أعلاه («.todo>li>a.btn») — ويبقى ثانويًّا أو أوّليًّا كما رُسم */
 .todo-go{flex:none; margin-inline-start:auto; display:inline-flex}
 
