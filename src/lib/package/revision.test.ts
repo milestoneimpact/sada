@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
-import { choosePlanFile, clock, readPackagePlan } from './plan'
+import { clock, planFiles, readPackagePlan } from './plan'
 import { excelDate, excelTime } from './xlsx'
 import { mergeCopies, parseCopy } from './copy'
 import { diffSnapshots, snapshot, type Snapshot, type SnapshotEntry } from './diff'
@@ -40,7 +40,7 @@ describe('الخطّة من xlsx أصيلًا', () => {
     expect(excelDate('46348')).toBe('2026-11-22')
     expect(excelTime('0.395833')).toBe('09:30')
     expect(clock('8:00 م')).toBe('20:00')
-    expect(choosePlanFile(['01-plan/a-v1.xlsx', '01-plan/a-v2.xlsx', '02-copy/x.md'])).toBe('01-plan/a-v2.xlsx')
+    expect(planFiles(['01-plan/a-v1.xlsx', '01-plan/a-v2.xlsx', '02-copy/x.md'])[0]).toBe('01-plan/a-v2.xlsx')
   })
 })
 
@@ -104,7 +104,9 @@ describe('السياسة', () => {
     expect(dispose(text, post('draft', { copyOrigin: 'manual' }))).toBe('awaiting_owner')
     // ‏عدّلته بيدها ولم تعلّمه: نصُّه غيرُ ما كتبته الحزمة
     expect(dispose(text, post('draft', { text: 'كتبتُه أنا' }))).toBe('awaiting_owner')
-    const removed = diffSnapshots(snap([entry()]), snap([]))[0]!
+    // ‏«حُذف» داخل شهره: الدفعةُ الجديدة فيها نوفمبر بغير المادّة 03 (D-383 المرحلة ٤)
+    const removed = diffSnapshots(snap([entry(), entry({ item: '04' })]), snap([entry({ item: '04' })]))[0]!
+    expect(removed).toMatchObject({ kind: 'removed', item: '03', period: '2026-11' })
     expect(decide([removed], [post('draft')])[0]!.disposition).toBe('auto_applied')
     expect(decide([removed], [post('queued')])[0]!.disposition).toBe('awaiting_owner')
   })
@@ -263,6 +265,25 @@ describe('ما أصلحته المراجعة', () => {
     expect(rows.results.map((r) => r.status).sort()).toEqual(['draft', 'rejected'])
     expect(rows.results.find((r) => r.status === 'draft')!.text).toBe('عاد')
     expect(rev).not.toBe('rev_back')
+  })
+
+  it('أُرشفت مرّتين ثمّ عادت ثالثةً: يُكتب لها منشورٌ جديد بمفتاحٍ لا يصطدم', async () => {
+    const { db, source } = await seeded()
+    await revisePackage({ db, token: 't', fetchImpl: github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY }) }, source, 'a'.repeat(40))
+    const back = (text: string) => ({ item: '03', platform: 'x', kind: 'added' as const, before: null, after: entry({ text, media: null, mediaName: null }) })
+    await db.prepare("INSERT INTO package_revisions (id, org_id, source_id, commit_sha, status) VALUES ('rev_b2', 'org_owner', ?, 'z2', 'analysed'), ('rev_b3', 'org_owner', ?, 'z3', 'analysed')").bind(source.id, source.id).run()
+    const rows = () => db.prepare("SELECT id, status, text FROM posts WHERE package_item_no = '03' AND platform = 'x' ORDER BY created_at, rowid").all<{ id: string; status: string; text: string }>().then((r) => r.results)
+    // ‏الأولى تُؤرشف، وتعود ثانيةً
+    await db.prepare("UPDATE posts SET status = 'rejected' WHERE package_item_no = '03' AND platform = 'x'").run()
+    await applyDecisions({ db, org: 'org_owner', revisionId: 'rev_b2', copySha: 'c' }, decide([back('ثانية')], await packagePosts(db, 'org_owner')))
+    // ‏والثانيةُ تُؤرشف، وتعود ثالثةً
+    await db.prepare("UPDATE posts SET status = 'rejected' WHERE package_item_no = '03' AND platform = 'x'").run()
+    const third = decide([back('ثالثة')], await packagePosts(db, 'org_owner'))
+    expect(third[0]!.post!.id).toBe((await rows())[1]!.id)
+    await applyDecisions({ db, org: 'org_owner', revisionId: 'rev_b3', copySha: 'c' }, third)
+    const all = await rows()
+    expect(all.map((r) => r.status)).toEqual(['rejected', 'rejected', 'draft'])
+    expect(all[2]!.text).toBe('ثالثة')
   })
 
   it('تغييرٌ قديمٌ ينتظر ثمّ جاء أحدثُ منه للمنشور نفسِه: يُطوى القديم ولا يكتب فوق الأحدث، والشارةُ إلى الأحدث', async () => {

@@ -417,29 +417,59 @@ export interface StoredPlan {
   readonly lockedAt?: string | null
 }
 
+/** صفُّ `plans` إلى خطّةٍ مخزونة — مشتركٌ بين `latestPlan` و`planForPeriod`. */
+function storedOf(row: Record<string, string>): StoredPlan {
+  return {
+    id: String(row['id']),
+    week: String(row['week_start']),
+    plan: JSON.parse(String(row['plan_json'])) as Plan,
+    model: String(row['model']),
+    status: row['status'] === 'approved' ? 'approved' : 'draft',
+    createdAt: String(row['created_at']),
+    span: asSpan(row['span']),
+    choices: row['choices_json'] === undefined ? EMPTY_CHOICES : readChoices(row['choices_json']),
+    version: Number(row['version'] ?? 1) || 1,
+    lockedAt: row['locked_at'] === undefined || row['locked_at'] === null ? null : String(row['locked_at']),
+  }
+}
+
+/** خطّةُ الشهر بقيدها الفريد `(org_id, period)` (0061)، أو `null`. */
+export async function planForPeriod(db: Db, org: string, period: string): Promise<StoredPlan | null> {
+  try {
+    const row = await db.prepare(`SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+                                    WHERE org_id = ? AND period = ? AND status <> 'superseded' ORDER BY created_at DESC LIMIT 1`)
+      .bind(org, period).first<Record<string, string>>()
+    return row === null ? null : storedOf(row)
+  } catch {
+    return null
+  }
+}
+
+/** خطّةٌ بمعرّفها في منظّمتها، ما لم تُستبدَل — لما يُرسل معرّفَه (شاشةُ الشهر، والإصلاح، والمراجعة). */
+export async function planForId(db: Db, org: string, id: string): Promise<StoredPlan | null> {
+  try {
+    const row = await db.prepare(`SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+                                    WHERE org_id = ? AND id = ? AND status <> 'superseded'`)
+      .bind(org, id).first<Record<string, string>>()
+    return row === null ? null : storedOf(row)
+  } catch {
+    return null
+  }
+}
+
 /** أحدثُ خطّةٍ لأقرب مدًى. */
 export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan | null> {
   try {
     const row = await db
       .prepare(
         `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
-          WHERE org_id = ? AND status <> 'superseded' ORDER BY week_start DESC, created_at DESC LIMIT 1`,
+          WHERE org_id = ? AND status <> 'superseded' AND model <> 'package' -- ‏خطّةُ الحزمة المعبّأة (0061) لا تُعرض قبل المرحلة ٧
+          ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
       .bind(org)
       .first<Record<string, string>>()
     if (row === null) return null
-    return {
-      id: String(row['id']),
-      week: String(row['week_start']),
-      plan: JSON.parse(String(row['plan_json'])) as Plan,
-      model: String(row['model']),
-      status: row['status'] === 'approved' ? 'approved' : 'draft',
-      createdAt: String(row['created_at']),
-      span: asSpan(row['span']),
-      choices: row['choices_json'] === undefined ? EMPTY_CHOICES : readChoices(row['choices_json']),
-      version: Number(row['version'] ?? 1) || 1,
-      lockedAt: row['locked_at'] === undefined || row['locked_at'] === null ? null : String(row['locked_at']),
-    }
+    return storedOf(row)
   } catch {
     // جدولٌ لم يُرحَّل أو JSON فاسد: لوحةٌ بلا خطّةٍ خيرٌ من لوحةٍ لا تُفتح
     return null

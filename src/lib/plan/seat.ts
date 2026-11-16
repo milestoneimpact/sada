@@ -25,7 +25,8 @@
  * كلُّ صفٍّ سليمٍ يصير **بندًا في خطّةٍ ومسوّدةً بنصّه** (بلا نموذج)، وتُفتح المراجعةُ (D-286): يعتمد ويؤخّر ويحذف، ثمّ
  * «ثبّت». **ولا يُجدوَل شيءٌ قبل التثبيت.** وما لا يُسكَّن (منصّةٌ لا تُعرف، أو موعدٌ مضى، أو نصٌّ فارغ) يُسمّى بسطره.
  */
-import type { Db } from '../tokens'
+import type { Db, DbStatement } from '../tokens'
+import { normalizeImport, type ImportSourceKind, type NormalizedItem } from './normalize'
 import { checkAllowance, blockerReason } from '../limits'
 import { askWriter, type BriefDeps } from '../image/brief'
 import { readPeaks } from '../schedule/peak'
@@ -195,6 +196,8 @@ export interface SeatOutcome {
   readonly planId: string | null
   readonly seated: number
   readonly skipped: readonly { readonly line: number; readonly reason: string }[]
+  /** البصمةُ نفسُها من المصدر نفسِه (D-383): لم يتغيّر شيء. */
+  readonly unchanged?: boolean
 }
 
 const SPANS: readonly PlanSpan[] = ['week', '2weeks', 'month', '2months']
@@ -209,6 +212,8 @@ export async function seatPlan(
   rules: PlanRules | null = null,
   /** «اكتب من الفكرة» (D-361): يُسكَّن البندُ فكرةً بلا مسوّدة، ويكتبه الطابورُ بقواعد منصّته. */
   write = false,
+  /** مصدرُ الاستيراد في `import_jobs` (D-383): ملفٌّ جدوليّ، أو نصٌّ استخرجه النموذج. */
+  source: { readonly kind: ImportSourceKind; readonly ref?: string } = { kind: 'csv' },
 ): Promise<SeatOutcome> {
   const read = readPlan(csv, facts)
   if (read.fileProblems.length > 0) return { planId: null, seated: 0, skipped: read.fileProblems.map((r) => ({ line: 1, reason: r })) }
@@ -228,52 +233,129 @@ export async function seatPlan(
   const within = ok.filter((r) => (Date.parse(r.whenUtc!.slice(0, 10) + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000 < spanDays(span))
   for (const r of ok) if (!within.includes(r)) skipped.push({ line: r.line, reason: 'أبعدُ من شهرين عن أوّل موعد — ارفعه في خطّةٍ تالية' })
 
-  const planId = crypto.randomUUID()
+  // ‏المُطبِّعُ الواحد (D-383): مفتاحُ كلِّ بندٍ وبصمةُ الاستيراد والشهرُ من التواريخ
+  const normalized = await normalizeImport(within, write ? 'idea' : 'draft')
+  const keyOf = new Map(normalized.items.map((n) => [n.row, n]))
+  const kind = source.kind
+  // ‏**البصمةُ نفسُها من المصدر نفسِه لا تغيّر شيئًا** ما دامت خطّتُها قائمة: كلُّ صفٍّ «مُسكَّنٌ من قبل»
+  const prior = await db
+    .prepare(`SELECT j.id, j.plan_id FROM import_jobs j JOIN plans p ON p.id = j.plan_id AND p.org_id = j.org_id
+               WHERE j.org_id = ? AND j.source_kind = ? AND j.content_hash = ? AND p.status <> 'superseded'`)
+    .bind(org, kind, normalized.contentHash).first<{ id: string; plan_id: string }>().catch(() => null)
+  if (prior !== null) {
+    for (const r of within) skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' })
+    return { planId: null, seated: 0, skipped, unchanged: true }
+  }
+
   const items: PlanItem[] = []
-  const posts: { id: string; row: PlanRow; ref: string; key: string }[] = []
+  const rowsOf: { item: PlanItem; n: NormalizedItem | undefined }[] = []
+  const posts: { id: string; row: PlanRow; ref: string; key: string; itemId: string }[] = []
   const importIdeas: string[] = []
   for (const r of within) {
     if (write) {
       importIdeas.push(r.text.slice(0, 2000))
       const notes = [filled.get(r.line) ?? ''].filter((x) => x !== '')
-      items.push({
+      const item: PlanItem = {
         sourceId: 'idea:i' + String(importIdeas.length), platform: r.platform as PlanPlatform, kind: 'text',
         angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
         ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
         // ‏ووسيطتُه من مكتبة Drive (D-363) على البند: `draftMessage` يحملها، والطابورُ يربطها بالمسوّدة بـ`attachStatement` فلا تُرسم أخرى
         ...(driveAssetRef(r) === null ? {} : { asset: driveAssetRef(r)! }),
-      })
+      }
+      items.push(item)
+      rowsOf.push({ item, n: keyOf.get(r) })
       continue
     }
-    const key = await rowKey(r)
+    const key = keyOf.get(r)?.key ?? await rowKey(r)
     const dup = await db.prepare("SELECT id FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'").bind(org, key).first<{ id: string }>()
     if (dup !== null) { skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' }); continue }
     const ref = 'import:' + String(r.line)
     // ‏ما لا يمنع التسكينَ يُكتب على البند: حسابٌ غيرُ مربوط، أو طولٌ زائد، أو ما كمّله صدى
     const notes = [...r.problems.filter((p) => !/موعد|مضى/.test(p)), filled.get(r.line) ?? ''].filter((x) => x !== '')
-    items.push({
+    const item: PlanItem = {
       // ‏ونصُّ X بسطر `---` بندُ سلسلة (D-324)، كما يكتبه الموجّه
       sourceId: ref, platform: r.platform as PlanPlatform, kind: isThread(r.platform ?? '', r.text) ? 'thread' : 'text',
       angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة',
       ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
-    })
-    posts.push({ id: crypto.randomUUID(), row: r, ref, key })
+    }
+    items.push(item)
+    rowsOf.push({ item, n: keyOf.get(r) })
+    posts.push({ id: crypto.randomUUID(), row: r, ref, key, itemId: '' })
   }
   if (items.length === 0) return { planId: null, seated: 0, skipped }
   const channels = [...new Set(items.map((i) => i.platform))]
   const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }), ...(write ? { importIdeas } : {}) }
-  const statements = [
-    db.prepare("UPDATE plans SET status = 'superseded' WHERE org_id = ? AND week_start = ? AND span = ? AND status <> 'superseded'").bind(org, start, span),
-    db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, start, span),
-    db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?)")
-      .bind(planId, start, JSON.stringify({ rationale: 'خطّتُك المرفوعة', items }), org, span, JSON.stringify(choices)),
+  const planJson = JSON.stringify({ rationale: 'خطّتُك المرفوعة', items })
+
+  // ‏**إصدارٌ جديد لا حذف** (D-383): `(org_id, week_start, span)` فريد، فخطّةُ المدى نفسِه تُحدَّث في مكانها برقم إصدارٍ أعلى.
+  // ‏وما ثُبّت منها قبلُ محفوظٌ في `plan_versions`، ومسوّداتُها السابقة تبقى في المنشورات بلا خطّة كما كانت بعد الحذف
+  type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
+  const sameSpan = await db
+    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
+    .bind(org, start, span).first<Existing>()
+  const months = [...new Set(rowsOf.map((x) => x.n?.period ?? x.item.day.slice(0, 7)))]
+  const period = span === 'month' && months.length === 1 ? months[0]! : null
+  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
+  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
+  const holder = period === null ? null : await db
+    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
+    .bind(org, period).first<Existing>()
+  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
+  const existing = intoPackage ? holder : sameSpan
+  const planId = existing?.id ?? crypto.randomUUID()
+  const jobId = crypto.randomUUID()
+  const periodFree = period === null ? false : (await db.prepare('SELECT id FROM plans WHERE org_id = ? AND period = ? AND id <> ?')
+    .bind(org, period, planId).first<{ id: string }>()) === null
+  const planPeriod = periodFree ? period : null
+  const keepPackage = existing?.model === 'package'
+  const itemRows = rowsOf.map(({ item, n }) => ({ id: crypto.randomUUID(), item, n }))
+  // ‏المسوّدةُ تشير إلى بندها (`posts.plan_item_id`) بمرجعها
+  for (const p of posts) p.itemId = itemRows.find((x) => x.item.sourceId === p.ref)!.id
+  const statements: DbStatement[] = []
+  if (existing !== null) {
+    const versions = await db.prepare('SELECT count(*) AS n FROM plan_versions WHERE org_id = ? AND plan_id = ?').bind(org, planId).first<{ n: number }>()
+    // ‏صورةُ الإصدار السابق تُحفظ إن كان قد ثُبّت أو له تاريخ، فلا يضيع شيءٌ اعتمده المالك
+    if (existing.locked_at !== null || (versions?.n ?? 0) > 0) {
+      statements.push(db.prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id, import_job_id)
+                                  VALUES (?, ?, ?, ?, 0, 'import', ?, (SELECT id FROM import_jobs WHERE org_id = ? AND plan_id = ? ORDER BY created_at DESC LIMIT 1))
+                                  ON CONFLICT (plan_id, version) DO NOTHING`)
+        .bind(crypto.randomUUID(), planId, existing.version, existing.plan_json, org, org, planId))
+    }
+    statements.push(
+      // ‏ومنشوراتُ بنود الحزمة تبقى على خطّتها: الاستيرادُ يستبدل صفوفَه وحدها
+      db.prepare(`UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ?
+                    AND NOT EXISTS (SELECT 1 FROM plan_items i WHERE i.id = posts.plan_item_id AND i.source_kind = 'github')`).bind(org, planId),
+      // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)
+      db.prepare("DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github'").bind(org, planId),
+      // ‏وخطّةُ الحزمة تبقى خطّةَ حزمة، ويُضاف مصدرُ الملفّ إلى مصادرها
+      db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL,
+                         created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)
+        .bind(planJson, keepPackage ? 1 : 0, JSON.stringify(choices), planPeriod, JSON.stringify(keepPackage ? ['github', kind] : [kind]), planId, org),
+    )
+  } else {
+    statements.push(db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, period, source_kinds) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?, ?, ?)")
+      .bind(planId, start, planJson, org, span, JSON.stringify(choices), planPeriod, JSON.stringify([kind])))
+  }
+  statements.push(
+    ...itemRows.map(({ id, item, n }) => db
+      .prepare(`INSERT INTO plan_items (id, org_id, plan_id, item_key, platform, due_local, kind, angle, copy, media_ref, content_hash, source_id, source_kind)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (plan_id, item_key, platform) DO NOTHING`)
+      .bind(id, org, planId, n?.key ?? item.sourceId, item.platform, n?.dueLocal ?? item.day + ' ' + item.time, item.kind, item.angle,
+        n?.row.text ?? null, item.asset ?? null, n?.key ?? null, item.sourceId, kind)),
     ...posts.map((p) => db
-      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id)
-                VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?)`)
-      .bind(p.id, p.row.platform, isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text', p.row.text, p.key, planId, JSON.stringify([p.ref]), org)),
+      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id, plan_item_id)
+                VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?, ?)`)
+      .bind(p.id, p.row.platform, isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text', p.row.text, p.key, planId, JSON.stringify([p.ref]), org, p.itemId)),
     // ‏وسيطةُ المالك من مكتبة Drive تُربط بمسوّدتها (D-363) — فلا تُرسم لها صورة (`seatedPosts` يتخطّاها)
     ...posts.flatMap((p) => { const m = driveMediaRow(db, org, p.id, p.row); return m === null ? [] : [m] }),
-  ]
+    // ‏ومهمّةُ الاستيراد ببصمتها: البصمةُ نفسُها بعد حذف خطّتها تُعاد إلى الخطّة الجديدة
+    db.prepare(`INSERT INTO import_jobs (id, org_id, source_kind, source_ref, content_hash, period, status, report_json, plan_id)
+                VALUES (?, ?, ?, ?, ?, ?, 'applied', ?, ?)
+                ON CONFLICT (org_id, source_kind, content_hash) DO UPDATE SET plan_id = excluded.plan_id, status = 'applied',
+                  report_json = excluded.report_json, source_ref = excluded.source_ref, period = excluded.period`)
+      .bind(jobId, org, kind, source.ref ?? null, normalized.contentHash, normalized.periods.length === 1 ? normalized.periods[0]! : null,
+        JSON.stringify({ seated: items.length, skipped: skipped.length, periods: normalized.periods, replaced: existing !== null }), planId),
+  )
   if (db.batch !== undefined) await db.batch(statements)
   else for (const st of statements) await st.run()
   return { planId, seated: items.length, skipped }

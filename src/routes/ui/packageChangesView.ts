@@ -23,6 +23,8 @@ export interface ChangesScreen {
   readonly changes: readonly ChangeView[]
   readonly history: readonly RevisionRow[]
   readonly zone?: string | null
+  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-382). */
+  readonly schedulable?: number
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -128,6 +130,9 @@ export function changesScreen(m: ChangesScreen): string {
     ? raw(card({ title: r.status === 'failed' ? 'تعذّرت قراءة هذه الدفعة' : 'لا تغيير في هذه الدفعة', level: 2,
       body: html`<p class="m-0">${r.error ?? 'الخطّة والنصوص والوسائط كما كانت.'}</p>`.value }))
     : html``
-  return html`${raw(head)}<div class="stack">${flash}${raw(summary(r))}${bulk}${empty}${cards}
+  const n = m.schedulable ?? 0
+  const plan = n === 0 ? html`` : raw(card({ title: 'الخطوة التالية', level: 2, body: html`<p class="m-0">${String(n)} من مسوّدات الحزمة جاهزة بنصّها وموعدها.</p>
+    <div class="row">${raw(button({ label: 'اعتمد الخطّة وجدولها', variant: 'primary', href: '/panel/plan/package/schedule?from=changes&rev=' + r.id }))}</div>`.value }))
+  return html`${raw(head)}<div class="stack">${flash}${raw(summary(r))}${plan}${bulk}${empty}${cards}
     <p class="m-0">${raw(button({ label: 'عودة إلى حزمة المحتوى', variant: 'quiet', href: '/panel/package' }))}</p></div>`.value
 }

@@ -11,20 +11,37 @@ import type { Db } from '../tokens'
 import { schedulePost } from '../schedule/job'
 import { approveMany } from '../draft/store'
 import { readPeaks } from '../schedule/peak'
+import { localToUtc } from '../time/local'
+import { storedZone } from '../time/ownerZone'
 import type { StoredPlan } from './job'
 import type { PlanItem } from './prompt'
+import { readRules, toLocal } from './checkStore'
+import { arrangeSlots, HELD_SAY, type SlotIn } from './scheduler'
 
 export interface PlanSchedule {
   readonly scheduled: number
   readonly skipped: readonly { readonly postId: string; readonly reason: string }[]
 }
 
-/** الموعدُ `YYYY-MM-DDTHH:MM` بـ UTC — في المستقبل دائمًا. */
-export function slotFor(day: string, time: string, peakHour: number | null, now: Date): string {
-  const hhmm = peakHour === null ? time : `${String(peakHour).padStart(2, '0')}:00`
-  const at = new Date(`${day}T${hhmm}:00Z`)
-  while (at.getTime() <= now.getTime()) at.setUTCDate(at.getUTCDate() + 1)
-  return at.toISOString().slice(0, 16)
+/**
+ * الموعدُ `YYYY-MM-DDTHH:MM` بـ UTC — في المستقبل دائمًا (D-383).
+ *
+ * **ساعةُ البند بتوقيت المالك** (`localToUtc` بمنطقته، و`null` الرياض): «09:00» في الرياض تُخزَّن 06:00Z، كما تفعل الحزمة. وأرجحُ
+ * الساعات قيست بـ UTC فتبقى بـ UTC. ويومٌ مضى يُرحَّل يومًا محلّيًّا فيومًا بالساعة نفسِها.
+ */
+export function slotFor(day: string, time: string, peakHour: number | null, now: Date, zone: string | null): string {
+  const [y, mo, d] = day.split('-').map(Number) as [number, number, number]
+  const [h, mi] = time.split(':').map(Number) as [number, number]
+  for (let k = 0; k < 400; k++) {
+    let at: Date | null
+    if (peakHour !== null) at = new Date(Date.UTC(y, mo - 1, d + k, peakHour))
+    else {
+      const c = new Date(Date.UTC(y, mo - 1, d + k))
+      at = localToUtc(c.getUTCFullYear(), c.getUTCMonth() + 1, c.getUTCDate(), h, mi, zone)
+    }
+    if (at !== null && at.getTime() > now.getTime()) return at.toISOString().slice(0, 16)
+  }
+  return new Date(now.getTime() + 86_400_000).toISOString().slice(0, 16)
 }
 
 /**
@@ -91,7 +108,15 @@ function readRefs(raw: string | null): string[] {
   }
 }
 
-export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: Date): Promise<PlanSchedule> {
+/**
+ * **المُجدوِلُ الواحد للخطّة** (D-383 · المرحلة ٦): كلُّ معتمَدٍ من الخطّة إلى موعد بنده بمنطقة المالك، ثمّ `arrangeSlots`
+ * (التباعد والتذبذب وساعات الهدوء)، ثمّ `schedulePost` بحرّاسها. **وموعدٌ مضى يُعرض ولا يُرحَّل** صامتًا.
+ */
+export async function schedulePlan(
+  db: Db, org: string, plan: StoredPlan, now: Date,
+  /** مفاتيحُ بنودٍ منعها الفحص (`blockedKeys`، بصيغة `itemKey` في review.ts): تبقى معتمَدةً بلا موعد ويُقال سببُها. */
+  blocked: ReadonlySet<string> = new Set(),
+): Promise<PlanSchedule> {
   const { results: posts } = await db
     .prepare("SELECT id, platform, source_id, source_refs, idempotency_key FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
     .bind(org, plan.id)
@@ -99,11 +124,13 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   const peaks = new Map<string, number | null>()
   const accounts = new Map<string, string | null>()
   const skipped: { postId: string; reason: string }[] = []
-  let scheduled = 0
+  const slots: SlotIn[] = []
+  const zone = posts.length > 0 ? await storedZone(db) : null
   for (const post of posts) {
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
     const item = plan.plan.items.find((i) => itemOwns(i, post))
     if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
+    if (blocked.size > 0 && blocked.has(`${item.id ?? item.sourceId}|${item.platform}|${item.day}|${item.time}`)) { skipped.push({ postId: post.id, reason: 'منعه الفحص، فأصلحه من شريط التحذيرات' }); continue }
     if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, org, post.platform)).hours[0]?.hour ?? null)
     if (!accounts.has(post.platform)) {
       const acc = await db
@@ -118,9 +145,22 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
     const chosen = (plan.choices?.times?.[item.platform]?.length ?? 0) > 0
     const sameDay = plan.plan.items.filter((i) => i.platform === item.platform && i.day === item.day).length
     const peak = chosen || sameDay > 1 ? null : peaks.get(post.platform) ?? null
-    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peak, now), now)
+    // ‏الموعدُ بلا ترحيل: «الآن» يومَ البند يجعل `slotFor` يردّ موعدَه نفسَه، فما مضى يبقى ماضيًا ويُعرض
+    const at = slotFor(item.day, item.time, peak, new Date(0), zone)
+    slots.push({ id: post.id, account, at, local: localText(at, zone), exact: peak === null })
+  }
+  const arranged = arrangeSlots(slots, await readRules(db, org), now)
+  for (const h of arranged.held) skipped.push({ postId: h.id, reason: HELD_SAY[h.reason] })
+  let scheduled = 0
+  for (const slot of arranged.placed) {
+    const result = await schedulePost(db, slot.id, slot.account, slot.at, now)
     if (result.ok) scheduled += 1
-    else skipped.push({ postId: post.id, reason: result.reason })
+    else skipped.push({ postId: slot.id, reason: result.reason })
   }
   return { scheduled, skipped }
+}
+
+function localText(at: string, zone: string | null): string {
+  const l = toLocal(new Date(at + ':00Z'), zone)
+  return l.day + ' ' + String(Math.floor(l.minutes / 60)).padStart(2, '0') + ':' + String(l.minutes % 60).padStart(2, '0')
 }

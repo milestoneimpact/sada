@@ -24,6 +24,8 @@ import { soloNav } from '../src/routes/ui/rail'
 import { buildCommands, sectionLabel } from '../src/routes/ui/command'
 import { journeyBody } from '../src/routes/ui/journeyView'
 import { spreadScreen } from '../src/routes/ui/spreadView'
+import { importsScreen, monthJourneyCard, monthScreen } from '../src/routes/ui/planMonthView'
+import { approvalLine, monthJourney } from '../src/lib/plan/month'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
 import { PLAN_BUILD_SCRIPT, planBuildScreen } from '../src/routes/ui/planBuildView'
@@ -650,3 +652,36 @@ console.log('رُسمت تسع عشرة في /tmp')
     }), 'n', '', buildCommands({ onPanel: false }), soloNav('results')),
   )
 }
+
+// ‏شاشةُ الشهر (D-383 · المرحلة ٨): رحلةُ الشهرين بتنبيهها، وشريطُ الفحص بأزرار الإصلاح، والتقويمُ بشاراته الثلاث، والفرقُ، وسطرُ الاعتماد
+writeAudited(
+  '/tmp/screen-plan-month.html',
+  soloPage('صدى — شهر 2026-11', { href: '/panel#posts', label: 'المنشورات' },
+    monthJourneyCard([
+      monthJourney({ period: '2026-11', hasPlan: true, reviewed: true, items: 32, approved: 3, queued: 18, published: 7, failed: 1 }, '2026-11-24'),
+      monthJourney({ period: '2026-12', hasPlan: false, reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0 }, '2026-11-24'),
+    ]) + '<div class="mt-3"></div>' + monthScreen({
+      period: '2026-11', planId: 'pl1', dailyCap: 5, prev: '2026-10', next: '2026-12', canApprove: true,
+      perDay: { '2026-11-02': 2, '2026-11-03': 5, '2026-11-04': 1, '2026-11-09': 3, '2026-11-10': 6, '2026-11-16': 2, '2026-11-17': 4, '2026-11-23': 2, '2026-11-24': 5, '2026-11-30': 2 },
+      checks: { planId: 'pl1', canFix: true, findings: [
+        { rule: 'daily_total', severity: 'warn', keys: ['k1', 'k2'], day: '2026-11-10', fix: 'spread', message: '6 منشورات في 2026-11-10، والسقف 5.' },
+        { rule: 'same_slot', severity: 'warn', keys: ['k3', 'k4'], day: '2026-11-03', platform: 'x', fix: 'shift', message: 'بندان على X بينهما 30 دقيقة، والفاصل 90.' },
+        { rule: 'no_media', severity: 'block', keys: ['k5'], day: '2026-11-17', fix: 'upload', message: 'البند 14 يحتاج صورة لم تُرفع.' },
+      ] },
+      diff: [
+        { itemNo: '14', platform: 'linkedin', kind: 'text', awaiting: true, detail: 'ينتظر قرارك' },
+        { itemNo: '21', platform: 'x', kind: 'added', awaiting: false, detail: 'طُبِّق آليًّا' },
+        { itemNo: '09', platform: 'x', kind: 'removed', awaiting: false, detail: 'طُبِّق آليًّا' },
+      ],
+      approval: approvalLine({ total: 32, blocked: 1, reason: 'وسيط ناقص' }),
+    }), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
+)
+
+writeAudited(
+  '/tmp/screen-plan-imports.html',
+  soloPage('صدى — الاستيرادات', { href: '/panel/plan/month', label: 'الشهر' }, importsScreen([
+    { id: 'i3', sourceKind: 'github', sourceRef: '9f2c1ab', contentHash: 'a41f09c2d7e3', period: '2026-12', status: 'applied', createdAt: '2026-11-24 08:00:00', summary: '30 بند' },
+    { id: 'i2', sourceKind: 'github', sourceRef: '71be0d4', contentHash: '5c0e77b1aa90', period: '2026-11', status: 'unchanged', createdAt: '2026-11-20 08:00:00', summary: 'لا تفصيل' },
+    { id: 'i1', sourceKind: 'csv', sourceRef: 'nov.csv', contentHash: '0d93e1f4b2c8', period: '2026-11', status: 'applied', createdAt: '2026-11-01 08:00:00', summary: '3 مضاف، 2 متغيّر' },
+  ], true), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
+)

@@ -63,7 +63,7 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', index: '0', key: keyOf(html, 0), post: 'p1' }), headers: { Cookie: cookie } }, env)
     // ‏«اعتمد» يجدول في موعد بنده (D-327) — ومعه ما كان معتمَدًا بلا موعد، والإصدارُ يُحفظ ويُختم
-    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-01-04 07:00:00' })
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-01-04 04:00:00' })
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p2'").get()).toEqual({ status: 'queued' })
     expect(db.raw.prepare('SELECT version, scheduled FROM plan_versions').all()).toEqual([{ version: 1, scheduled: 2 }])
     expect((db.raw.prepare("SELECT locked_at FROM plans WHERE id = 'pl1'").get() as { locked_at: string | null }).locked_at).not.toBeNull()
@@ -214,7 +214,7 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
     await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '1', key: keyOf(html, 1), post: 'q2' }), headers: { Cookie: cookie } }, env)
     // ‏والوقتُ وقتُ البند (اختاره المالكُ لمنصّته) لا أرجحُ الساعات، فلا يلتقي منشورا اليوم في ساعةٍ واحدة
     expect(db.raw.prepare('SELECT id, status, scheduled_at FROM posts ORDER BY id').all()).toEqual([
-      { id: 'q1', status: 'draft', scheduled_at: null }, { id: 'q2', status: 'queued', scheduled_at: '2099-02-01 15:30:00' }, { id: 'q3', status: 'draft', scheduled_at: null },
+      { id: 'q1', status: 'draft', scheduled_at: null }, { id: 'q2', status: 'queued', scheduled_at: '2099-02-01 12:30:00' }, { id: 'q3', status: 'draft', scheduled_at: null },
     ])
     // ‏و«أزِل» على البند الأوّل يرفض مسوّدتَه هو، لا مسوّدةَ جاره من المصدر نفسِه
     const fresh = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
@@ -265,7 +265,7 @@ describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-32
     expect(moved.headers.get('Location')).toBe('/panel/plan/review?w=1')
     const items = (): { day: string; time: string }[] => (JSON.parse((db.raw.prepare("SELECT plan_json FROM plans WHERE id = 'pl2'").get() as { plan_json: string }).plan_json) as { items: { day: string; time: string }[] }).items
     expect(items()[0]).toMatchObject({ day: '2099-02-03', time: '07:15' })
-    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'q1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-02-03 07:15:00' })
+    expect(db.raw.prepare("SELECT status, scheduled_at FROM posts WHERE id = 'q1'").get()).toEqual({ status: 'queued', scheduled_at: '2099-02-03 04:15:00' })
     // ‏والسحبُ يرسل اليومَ وحدَه: الساعةُ تبقى كما هي بتوقيت المالك
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     await app.request('/panel/plan/review/move', { method: 'POST', body: form({ _csrf: csrf, id: 'pl2', index: '2', key: keyOf(after, 2), day: '2099-02-05' }), headers: { Cookie: cookie } }, env)

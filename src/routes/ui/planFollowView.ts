@@ -13,6 +13,7 @@ import { counted, NOUNS } from '../../lib/format'
 import { pageHead } from './parts'
 import { card } from './components/card'
 import { statusBadge } from './components/badge'
+import { EDITED_MARK } from '../../lib/plan/rights'
 import { html, raw, type Html } from './html'
 
 function row(c: ReviewCard, zone: string | null): Html {
@@ -23,7 +24,9 @@ function row(c: ReviewCard, zone: string | null): Html {
     ${raw(statusBadge(face.tone, face.glyph, face.label))}
     <span class="pf-when" dir="ltr">${when.slice(0, 16)}</span>
     <b>${platformLabel(c.item.platform as never)}</b>
-    <span class="pf-text">${post.text.replace(/\s+/g, ' ').slice(0, 90)}</span></a></li>`
+    <span class="pf-text">${post.text.replace(/\s+/g, ' ').slice(0, 90)}</span></a>
+    ${post.edited === true ? raw(statusBadge('warn', '!', EDITED_MARK)) : ''}
+    <a class="tap" href="/panel/plan/post/${post.id}">${post.status === 'published' ? 'انسخه مسوّدةً' : 'عدّل أو أوقف'}</a></li>`
 }
 
 function group(title: string, cards: readonly ReviewCard[], zone: string | null, empty: string): string {
