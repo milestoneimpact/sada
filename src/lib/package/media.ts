@@ -30,18 +30,21 @@ export async function storeBlob(
   bucket: StreamBucket, org: string, repo: RepoRef, commit: string,
   file: { readonly path: string; readonly blobSha: string; readonly size: number; readonly kind: 'video' | 'image' },
   fetchImpl?: typeof fetch,
+  /** مجلّدُ الحزمة في المستودع: المسارُ المحفوظ تحته، وGitHub يريده كاملًا من جذر المستودع. */
+  root = '',
 ): Promise<{ readonly result: StoreResult; readonly key: string }> {
   const key = packageKey(org, file.blobSha, file.path)
+  const remote = root.replace(/^\/+|\/+$/g, '') === '' ? file.path : root.replace(/^\/+|\/+$/g, '') + '/' + file.path
   if ((await bucket.head(key)) !== null) return { result: 'exists', key }
   if (file.size > 0 && file.size < 1024) {
-    const res = await rawFile(repo, file.path, commit, fetchImpl)
+    const res = await rawFile(repo, remote, commit, fetchImpl)
     const text = await res.text()
     if (isLfsPointer(text)) return { result: 'lfs', key }
     await bucket.put(key, text, { httpMetadata: { contentType: mimeOf(file.path) } })
     return { result: 'stored', key }
   }
   if (!withinLimit(file.kind, file.size)) return { result: 'too_big', key }
-  const res = await rawFile(repo, file.path, commit, fetchImpl)
+  const res = await rawFile(repo, remote, commit, fetchImpl)
   if (res.body === null) return { result: 'too_big', key }
   await bucket.put(key, res.body, { httpMetadata: { contentType: mimeOf(file.path) } })
   return { result: 'stored', key }

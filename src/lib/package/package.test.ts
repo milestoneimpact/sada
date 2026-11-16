@@ -119,6 +119,9 @@ function github(opts: { etag?: string; head?: string; truncated?: boolean } = {}
     }
     if (url.includes('/contents/')) {
       expect(h.get('Accept')).toBe('application/vnd.github.raw')
+      // ‏كما يفعل GitHub: المسارُ من جذر المستودع، وما لا وجود له 404 — مسارٌ تحت المجلّد بلا بادئته يسقط هنا
+      const asked = decodeURIComponent(url.split('/contents/')[1]!.split('?')[0]!)
+      if (!blobs.some((b) => b.path === asked)) return new Response('', { status: 404 })
       return new Response(new Uint8Array(2048), { headers: { 'Content-Length': '2048' } })
     }
     return new Response('', { status: 404 })
