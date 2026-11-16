@@ -39,7 +39,7 @@ describe('اعتمد الخطّة وجدولها', () => {
     const db = seed()
     const plan = await planPackageSchedule(db, 'org_owner', 'Asia/Riyadh', NOW)
     expect(plan.ready.map((s) => s.id)).toEqual(['p1', 'p2'])
-    expect(plan.skipped).toEqual({ text: 1, past: 1, account: 1, video: 1, time: 0 })
+    expect(plan.skipped).toEqual({ text: 1, past: 1, account: 1, video: 1, time: 0, quiet: 0, gap: 0 })
   })
 
   it('يعتمد ويجدول بالطريق نفسِه، والضغطةُ الثانية لا تغيّر شيئًا', async () => {

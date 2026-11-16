@@ -10,21 +10,29 @@
  * - تغييرٌ ينتظرها ثمّ جاءت مراجعةٌ أحدث بالنوع نفسِه للمنشور نفسِه ← يُطوى القديم (`superseded_by`) فلا يكتب فوق الأحدث.
  *
  * والمراجعةُ كلُّها في معاملةٍ واحدة (`atomically`)، والقيدُ الفريدُ على التغيير يمنع تطبيقه مرّتين.
+ *
+ * **والمفتاحُ الطبيعيّ يضمّ الشهر** (D-383 المرحلة ٤): `(org, period, item_no, platform)`، ومفتاحُ منع التكرار
+ * `plan:{org}:{period}:{item}:{platform}` بلا رقم المراجعة (D-004). والمادّةُ التي أُرشفت ثمّ عادت يُضاف لمفتاحها معرّفُ
+ * المؤرشَف، فلا يصطدم بمفتاحه ولا يدخل فيه رقمُ مراجعة.
  */
 import { atomically, type Db, type DbStatement } from '../tokens'
 import { attachStatement } from '../library'
 import { isThread } from '../draft/thread'
-import type { Change, SnapshotEntry } from './diff'
+import { entryPeriod, type Change, type SnapshotEntry } from './diff'
 
 export type Disposition = 'auto_applied' | 'awaiting_owner' | 'kept_old' | 'accepted' | 'frozen_published'
 
 export interface PackagePost {
   readonly id: string
+  /** «YYYY-MM» شهرُ المنشور في الحزمة، والفارغُ لما لا شهر له. */
+  readonly period?: string
   readonly item: string
   readonly platform: string
   readonly status: string
   readonly text: string
   readonly copyOrigin: string | null
+  /** عدّله أحدٌ في صدى (D-383 المرحلة ٧): ما يخالفه في استيرادٍ لاحق ينتظر المالك. */
+  readonly editedInSada?: boolean
 }
 
 export interface Decision {
@@ -50,29 +58,44 @@ export function dispose(change: Change, post: PackagePost | null): Disposition {
   if (FROZEN.has(post.status)) return 'frozen_published'
   if (LIVE.has(post.status)) return 'awaiting_owner'
   if (change.kind === 'text' && ownerEdited(post, change.before)) return 'awaiting_owner'
+  // ‏«عُدِّل في صدى»: الموعدُ والوسيطُ كالنصّ، لا يدهسها استيرادٌ لاحق
+  if (post.editedInSada === true && change.kind !== 'added') return 'awaiting_owner'
   return 'auto_applied'
 }
 
 export function decide(changes: readonly Change[], posts: readonly PackagePost[]): Decision[] {
-  const byKey = new Map(posts.map((p) => [p.item + '|' + p.platform, p]))
+  const byKey = new Map(posts.filter((p) => p.period !== undefined).map((p) => [p.period + '|' + p.item + '|' + p.platform, p]))
+  // ‏منشورٌ لا يُعرف شهرُه (من خارج القاعدة) يُطابَق بمادّته ومنصّته كما كان
+  const loose = new Map(posts.filter((p) => p.period === undefined).map((p) => [p.item + '|' + p.platform, p]))
   return changes.map((change) => {
-    const post = byKey.get(change.item + '|' + change.platform) ?? null
+    const post = byKey.get(changePeriod(change) + '|' + change.item + '|' + change.platform) ?? loose.get(change.item + '|' + change.platform) ?? null
     return { change, post, disposition: dispose(change, post) }
   })
 }
 
-/** منشوراتُ الحزمة الحيّة — أحدثُها لكلّ (مادّة، منصّة). */
+/** شهرُ التغيير: ما حمله، وإلّا فمن تاريخ ما بعده أو ما قبله. */
+export function changePeriod(c: Change): string {
+  return c.period ?? entryPeriod(c.after ?? c.before ?? {})
+}
+
+/** مفتاحُ منع التكرار لمنشور الحزمة (D-004): ثابتٌ للبند في شهره، لا يتبدّل بمراجعة. */
+export function packageKey(org: string, period: string, item: string, platform: string): string {
+  return `plan:${org}:${period}:${item}:${platform}`
+}
+
+/** منشوراتُ الحزمة الحيّة — أحدثُها لكلّ (شهر، مادّة، منصّة). */
 export async function packagePosts(db: Db, org: string): Promise<PackagePost[]> {
   const { results } = await db.prepare(
-    `SELECT id, package_item_no, platform, status, text, copy_origin FROM posts
-      WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC LIMIT 400`,
-  ).bind(org).all<{ id: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null }>()
+    `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin, edited_in_sada FROM posts
+      WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC, rowid ASC LIMIT 800`,
+  ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null; edited_in_sada: number }>()
   const latest = new Map<string, PackagePost>()
   for (const r of results) {
-    const p = { id: r.id, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin }
-    const k = p.item + '|' + p.platform
-    // ‏المؤرشفُ لا يُحدَّث إن جاء بعده حيّ
-    if (latest.get(k) === undefined || p.status !== 'rejected') latest.set(k, p)
+    const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin, editedInSada: r.edited_in_sada === 1 }
+    const k = p.period + '|' + p.item + '|' + p.platform
+    // ‏المؤرشفُ لا يغلب حيًّا قبله، لكنّ الأحدثَ من مؤرشفَين يغلب: منه يُبنى مفتاحُ العائد ثالثةً، فلا يصطدم بمفتاح الثاني
+    const had = latest.get(k)
+    if (had === undefined || p.status !== 'rejected' || had.status === 'rejected') latest.set(k, p)
   }
   return [...latest.values()]
 }
@@ -93,12 +116,16 @@ export function changeStatements(ctx: ApplyContext, change: Change, post: Packag
     if (post !== null && !FROZEN.has(post.status)) return { statements: [], postId: post.id }
     if (a === null || a.text === null) return { statements: [], postId: null }
     const id = crypto.randomUUID()
+    const period = changePeriod(change)
+    const base = packageKey(org, period, a.item, a.platform)
+    // ‏عاد بعد أرشفته: المؤرشَفُ يحمل المفتاحَ الأصل، فيُميَّز الجديدُ بمعرّف المؤرشَف — لا برقم مراجعة
+    const key = post !== null && post.status === 'rejected' ? base + ':after:' + post.id : base
     s.push(db.prepare(
       `INSERT OR IGNORE INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, org_id,
-          package_item_no, source_revision_id, copy_origin, copy_blob_sha, package_due)
-        VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من حزمة المحتوى', ?, ?, ?, 'package', ?, ?)`,
-    ).bind(id, a.platform, isThread(a.platform, a.text) ? 'thread' : 'text', a.text, `pkg:${org}:${a.item}:${a.platform}:${ctx.revisionId}`, org,
-      a.item, ctx.revisionId, ctx.copySha, a.date + ' ' + a.time))
+          package_item_no, source_revision_id, copy_origin, copy_blob_sha, package_due, package_period)
+        VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من حزمة المحتوى', ?, ?, ?, 'package', ?, ?, ?)`,
+    ).bind(id, a.platform, isThread(a.platform, a.text) ? 'thread' : 'text', a.text, key, org,
+      a.item, ctx.revisionId, ctx.copySha, a.date + ' ' + a.time, period === '' ? null : period))
     if (a.media !== null) { const m = attachStatement(db, org, id, a.media); if (m !== null) s.push(m) }
     return { statements: s, postId: id }
   }
@@ -111,8 +138,8 @@ export function changeStatements(ctx: ApplyContext, change: Change, post: Packag
     s.push(db.prepare(`UPDATE posts SET text = ?, type = ?, copy_origin = 'package', copy_blob_sha = ?, source_revision_id = ?
       WHERE id = ? AND org_id = ? AND ${guard}`).bind(a.text, isThread(a.platform, a.text) ? 'thread' : 'text', ctx.copySha, ctx.revisionId, post.id, org))
   } else if (change.kind === 'time' && a !== null) {
-    s.push(db.prepare(`UPDATE posts SET package_due = ?, source_revision_id = ? WHERE id = ? AND org_id = ? AND ${guard}`)
-      .bind(a.date + ' ' + a.time, ctx.revisionId, post.id, org))
+    s.push(db.prepare(`UPDATE posts SET package_due = ?, package_period = coalesce(?, package_period), source_revision_id = ? WHERE id = ? AND org_id = ? AND ${guard}`)
+      .bind(a.date + ' ' + a.time, entryPeriod(a) || null, ctx.revisionId, post.id, org))
   } else if (change.kind === 'media') {
     s.push(db.prepare(`DELETE FROM media WHERE post_id = ? AND org_id = ? AND model = 'package'
       AND EXISTS (SELECT 1 FROM posts WHERE id = ? AND org_id = ? AND ${guard})`).bind(post.id, org, post.id, org))
@@ -142,13 +169,14 @@ export async function applyDecisions(ctx: ApplyContext, decisions: readonly Deci
     } else if (d.disposition === 'awaiting_owner') awaiting += 1
     else frozen += 1
     // ‏ما كان ينتظرها من مراجعةٍ أقدم بالنوع نفسِه طواه هذا الأحدث: لا يُعتمد فيكتب فوقه
+    const period = changePeriod(d.change)
     all.push(db.prepare(`UPDATE package_changes SET disposition = 'kept_old', decided_at = datetime('now'), superseded_by = ?
-      WHERE org_id = ? AND item_no = ? AND platform = ? AND kind = ? AND disposition = 'awaiting_owner' AND revision_id <> ?`)
-      .bind(ctx.revisionId, org, d.change.item, d.change.platform, d.change.kind, ctx.revisionId))
+      WHERE org_id = ? AND period = ? AND item_no = ? AND platform = ? AND kind = ? AND disposition = 'awaiting_owner' AND revision_id <> ?`)
+      .bind(ctx.revisionId, org, period, d.change.item, d.change.platform, d.change.kind, ctx.revisionId))
     all.push(db.prepare(
-      `INSERT OR IGNORE INTO package_changes (id, org_id, revision_id, item_no, platform, kind, before_json, after_json, post_id, disposition, decided_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${d.disposition === 'awaiting_owner' ? 'NULL' : "datetime('now')"})`,
-    ).bind(crypto.randomUUID(), org, ctx.revisionId, d.change.item, d.change.platform, d.change.kind, json(d.change.before), json(d.change.after), postId, d.disposition))
+      `INSERT OR IGNORE INTO package_changes (id, org_id, revision_id, period, item_no, platform, kind, before_json, after_json, post_id, disposition, decided_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ${d.disposition === 'awaiting_owner' ? 'NULL' : "datetime('now')"})`,
+    ).bind(crypto.randomUUID(), org, ctx.revisionId, period, d.change.item, d.change.platform, d.change.kind, json(d.change.before), json(d.change.after), postId, d.disposition))
   }
   all.push(db.prepare("UPDATE package_revisions SET status = 'applied', applied_at = datetime('now') WHERE id = ? AND org_id = ?").bind(ctx.revisionId, org))
   await atomically(db, all)
@@ -157,6 +185,7 @@ export async function applyDecisions(ctx: ApplyContext, decisions: readonly Deci
 
 export interface StoredChange {
   readonly id: string
+  readonly period?: string
   readonly revisionId: string
   readonly item: string
   readonly platform: string
@@ -188,16 +217,16 @@ export async function decideChange(db: Db, org: string, ids: readonly string[], 
   let done = 0
   let superseded = 0
   for (const id of ids.slice(0, 100)) {
-    const r = await db.prepare(`SELECT c.id, c.revision_id, c.item_no, c.platform, c.kind, c.before_json, c.after_json, c.post_id,
+    const r = await db.prepare(`SELECT c.id, c.revision_id, c.period, c.item_no, c.platform, c.kind, c.before_json, c.after_json, c.post_id,
         p.status, p.text, p.copy_origin,
         (SELECT c2.revision_id FROM package_changes c2
            JOIN package_revisions r2 ON r2.id = c2.revision_id AND r2.org_id = c2.org_id
            JOIN package_revisions r1 ON r1.id = c.revision_id AND r1.org_id = c.org_id
-          WHERE c2.org_id = c.org_id AND c2.item_no = c.item_no AND c2.platform = c.platform AND c2.kind = c.kind
+          WHERE c2.org_id = c.org_id AND c2.period = c.period AND c2.item_no = c.item_no AND c2.platform = c.platform AND c2.kind = c.kind
             AND c2.disposition IN ('accepted', 'auto_applied') AND r2.rowid > r1.rowid ORDER BY r2.rowid DESC LIMIT 1) AS newer
         FROM package_changes c LEFT JOIN posts p ON p.id = c.post_id AND p.org_id = c.org_id
        WHERE c.id = ? AND c.org_id = ? AND c.disposition = 'awaiting_owner'`).bind(id, org).first<{
-      id: string; revision_id: string; item_no: string; platform: string; kind: Change['kind']; before_json: string | null; after_json: string | null
+      id: string; revision_id: string; period: string; item_no: string; platform: string; kind: Change['kind']; before_json: string | null; after_json: string | null
       post_id: string | null; status: string | null; text: string | null; copy_origin: string | null; newer: string | null
     }>()
     if (r === null) continue
@@ -212,11 +241,11 @@ export async function decideChange(db: Db, org: string, ids: readonly string[], 
       continue
     }
     const change: Change = {
-      item: r.item_no, platform: r.platform, kind: r.kind,
+      period: r.period, item: r.item_no, platform: r.platform, kind: r.kind,
       before: r.before_json === null ? null : JSON.parse(r.before_json) as SnapshotEntry, after: r.after_json === null ? null : JSON.parse(r.after_json) as SnapshotEntry,
     }
     const post = r.post_id === null || r.status === null ? null
-      : { id: r.post_id, item: r.item_no, platform: r.platform, status: r.status, text: r.text ?? '', copyOrigin: r.copy_origin }
+      : { id: r.post_id, period: r.period, item: r.item_no, platform: r.platform, status: r.status, text: r.text ?? '', copyOrigin: r.copy_origin }
     const stmts: DbStatement[] = []
     if (verdict === 'accept' && post !== null && post.status !== 'published') {
       const rev = await db.prepare('SELECT snapshot_json FROM package_revisions WHERE id = ? AND org_id = ?').bind(r.revision_id, org).first<{ snapshot_json: string }>()
@@ -235,15 +264,15 @@ export async function decideChange(db: Db, org: string, ids: readonly string[], 
 /** تغييراتُ مراجعةٍ واحدة بحال منشوراتها — للشاشة. */
 export async function readChanges(db: Db, org: string, revisionId: string): Promise<(StoredChange & { readonly postStatus: string | null })[]> {
   const { results } = await db.prepare(
-    `SELECT c.id, c.revision_id, c.item_no, c.platform, c.kind, c.before_json, c.after_json, c.post_id, c.disposition, c.decided_at, c.superseded_by, p.status AS post_status
+    `SELECT c.id, c.revision_id, c.period, c.item_no, c.platform, c.kind, c.before_json, c.after_json, c.post_id, c.disposition, c.decided_at, c.superseded_by, p.status AS post_status
        FROM package_changes c LEFT JOIN posts p ON p.id = c.post_id AND p.org_id = c.org_id
-      WHERE c.org_id = ? AND c.revision_id = ? ORDER BY c.item_no, c.platform, c.kind LIMIT 400`,
+      WHERE c.org_id = ? AND c.revision_id = ? ORDER BY c.period, c.item_no, c.platform, c.kind LIMIT 400`,
   ).bind(org, revisionId).all<{
-    id: string; revision_id: string; item_no: string; platform: string; kind: Change['kind']; before_json: string | null; after_json: string | null
+    id: string; revision_id: string; period: string; item_no: string; platform: string; kind: Change['kind']; before_json: string | null; after_json: string | null
     post_id: string | null; disposition: Disposition; decided_at: string | null; superseded_by: string | null; post_status: string | null
   }>()
   return results.map((r) => ({
-    id: r.id, revisionId: r.revision_id, item: r.item_no, platform: r.platform, kind: r.kind,
+    id: r.id, revisionId: r.revision_id, period: r.period, item: r.item_no, platform: r.platform, kind: r.kind,
     before: r.before_json === null ? null : JSON.parse(r.before_json) as SnapshotEntry,
     after: r.after_json === null ? null : JSON.parse(r.after_json) as SnapshotEntry,
     postId: r.post_id, disposition: r.disposition, decidedAt: r.decided_at, supersededBy: r.superseded_by, postStatus: r.post_status,

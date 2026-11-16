@@ -35,7 +35,7 @@ export const EXPORT_FRESH_HOURS = 24
  */
 const OWNED = [
   'publish_attempts', 'metrics', 'media_claims', 'promotion_suggestions', 'media', 'posts',
-  'review_verdicts', 'review_links', 'plan_versions', 'plans', 'content_items', 'analysis_claims', 'sources',
+  'review_verdicts', 'review_links', 'plan_edits', 'plan_items', 'plan_versions', 'import_jobs', 'plans', 'schedule_rules', 'content_items', 'analysis_claims', 'sources',
   'token_alerts', 'tokens', 'accounts', 'uploads', 'asset_marks', 'library_files', 'drive_media', 'drive_media_folder',
   'package_changes', 'package_revisions', 'package_media', 'package_files', 'package_sources',
   'reports', 'settings', 'provider_checks', 'providers', 'task_routes', 'oauth_apps', 'alert_outbox', 'notice_reads', 'web_vitals',
@@ -44,7 +44,7 @@ const OWNED = [
 
 /** ما يُصدَّر — بترتيبٍ يقرؤه إنسان: العميلُ ثمّ عمله ثمّ أثرُه. */
 const EXPORTED = [
-  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_versions', 'review_links', 'review_verdicts', 'posts', 'publish_attempts',
+  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_items', 'plan_versions', 'plan_edits', 'import_jobs', 'schedule_rules', 'review_links', 'review_verdicts', 'posts', 'publish_attempts',
   'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'asset_marks', 'drive_media', 'drive_media_folder', 'package_sources', 'package_files', 'package_media', 'package_revisions', 'package_changes', 'reports', 'token_alerts', 'providers', 'task_routes',
   'cost_ledger', 'audit_log',
 ] as const
@@ -98,13 +98,24 @@ export interface OrgExport {
   readonly not_exported: Readonly<Record<string, string>>
 }
 
+/**
+ * جداولُ النموذج الموحَّد (D-383 · 0061) بأسمائها: الملفُّ يحمل كلَّ أعمدتها، وبنودُ الخطّة وسجلُّ تعديلها بترتيب وقوعها.
+ * ‏ولا قارئَ لها في الشاشات قبل المرحلة ٧، فالملفُّ أوّلُ من يقرؤها كاملةً.
+ */
+const UNIFIED_QUERY: Readonly<Record<string, string>> = {
+  import_jobs: 'SELECT * FROM import_jobs WHERE org_id = ? ORDER BY created_at, id',
+  plan_items: 'SELECT * FROM plan_items WHERE org_id = ? ORDER BY plan_id, due_local, item_key',
+  plan_edits: 'SELECT * FROM plan_edits WHERE org_id = ? ORDER BY at, id',
+  schedule_rules: 'SELECT * FROM schedule_rules WHERE org_id = ?',
+}
+
 /** ملفُّ المنظّمة — أو `null` لمنظّمةٍ لا وجودَ لها. */
 export async function exportOrg(db: Db, org: string, now = new Date()): Promise<OrgExport | null> {
   const head = await db.prepare('SELECT id, name, kind, created_at FROM orgs WHERE id = ?').bind(org).first<Row>()
   if (head === null) return null
   const tables: Record<string, Row[]> = {}
   for (const table of EXPORTED) {
-    const { results } = await db.prepare(`SELECT * FROM ${table} WHERE org_id = ? ORDER BY rowid`).bind(org).all<Row>()
+    const { results } = await db.prepare(UNIFIED_QUERY[table] ?? `SELECT * FROM ${table} WHERE org_id = ? ORDER BY rowid`).bind(org).all<Row>()
     tables[table] = results
       .filter((r) => table !== 'settings' || !SECRET_SETTINGS.has(String(r['key'])))
       .map(clean)

@@ -42,6 +42,8 @@ export interface JourneyCounts {
   readonly perPlatform: Readonly<Record<string, PlatformCounts>>
   /** ما نُشر في السبعة الأيّام الأخيرة — من المحاولات الناجحة. */
   readonly publishedWeek: number
+  /** ما له خطّةٌ من الأشهر المسؤول عنها (D-383 · المرحلة ٨)، في جملة الأسبوع نفسِها فلا يثقل اللوح. */
+  readonly planned?: readonly string[]
 }
 
 export const NO_COUNTS: JourneyCounts = { perPlatform: {}, publishedWeek: 0 }
@@ -57,7 +59,7 @@ const WEEK_MS = 7 * 86_400_000
  * و`approved` يجمع `approved` و`edited`: سؤالٌ واحدٌ عند المالك (D-062).
  * وجدولٌ لم يُرحَّل يُقرأ صفرًا: الرئيسيّةُ تُفتح خاليةً ولا تسقط.
  */
-export async function journeyCounts(db: Db, org: string, now: Date): Promise<JourneyCounts> {
+export async function journeyCounts(db: Db, org: string, now: Date, periods: readonly string[] = []): Promise<JourneyCounts> {
   try {
     const since = new Date(now.getTime() - WEEK_MS).toISOString().slice(0, 19).replace('T', ' ')
     /*
@@ -91,12 +93,16 @@ export async function journeyCounts(db: Db, org: string, now: Date): Promise<Jou
     }
     const week = await db
       .prepare(
-        `SELECT COUNT(DISTINCT pa.post_id) AS n FROM publish_attempts pa JOIN posts p ON p.id = pa.post_id
+        `SELECT COUNT(DISTINCT pa.post_id) AS n,
+                (SELECT group_concat(period) FROM plans WHERE org_id = ? AND status <> 'superseded'
+                   AND period IN (SELECT value FROM json_each(?))) AS planned
+           FROM publish_attempts pa JOIN posts p ON p.id = pa.post_id
           WHERE p.org_id = ? AND pa.status = 'succeeded' AND pa.at >= ?`,
       )
-      .bind(org, since)
-      .first<{ n: number }>()
-    return { perPlatform, publishedWeek: week?.n ?? 0 }
+      .bind(org, JSON.stringify(periods), org, since)
+      .first<{ n: number; planned: string | null }>()
+    const planned = week?.planned === null || week?.planned === undefined ? [] : week.planned.split(',')
+    return { perPlatform, publishedWeek: week?.n ?? 0, planned }
   } catch {
     return NO_COUNTS
   }

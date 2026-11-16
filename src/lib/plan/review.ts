@@ -22,6 +22,8 @@ import { draftFailures, draftRef } from './draftFail'
 import { decide, undoApprove } from '../draft/store'
 import { reschedulePost, unschedule } from '../schedule/job'
 import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
+import { localToUtc } from '../time/local'
+import { storedZone } from '../time/ownerZone'
 import { dayWithin, touchPlan } from './edit'
 import { asSpan, imageFor, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
@@ -31,7 +33,7 @@ export interface ReviewCard {
   readonly index: number
   readonly key: string
   readonly item: PlanItem
-  readonly post: { readonly id: string; readonly text: string; readonly status: string; readonly scheduledAt: string | null } | null
+  readonly post: { readonly id: string; readonly text: string; readonly status: string; readonly scheduledAt: string | null; readonly edited?: boolean } | null
   readonly mediaId: string | null
   /** نوعُ الوسيط — للمعاينة بشكل المنصّة (D-288). */
   readonly mediaMime?: string | null
@@ -59,6 +61,8 @@ export interface PlanVersion {
   readonly lockedBy: string | null
   readonly scheduled: number
   readonly items: number
+  /** الاستيرادُ الذي صنع الإصدار (D-383 · 0061)، وغيابُه إصدارٌ من المعالج أو قبل 0061. */
+  readonly importJobId?: string
 }
 
 export interface ReviewModel {
@@ -81,18 +85,18 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   const [meta, posts, media, versions, failures] = await Promise.all([
     db.prepare('SELECT version, locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org)
       .first<{ version: number; locked_at: string | null }>().catch(() => null),
-    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key FROM posts
+    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key, edited_in_sada FROM posts
                  WHERE org_id = ? AND plan_id = ? AND status <> 'rejected' ORDER BY created_at`)
       .bind(org, plan.id)
-      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
+      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string; edited_in_sada?: number }>()
       .then((r) => r.results).catch(() => []),
     db.prepare(`SELECT m.id, m.post_id, m.mime, m.width, m.height FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
       .bind(org, plan.id)
       .all<{ id: string; post_id: string; mime: string; width: number | null; height: number | null }>().then((r) => r.results).catch(() => []),
-    db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
+    db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at, import_job_id FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
       .bind(org, plan.id)
-      .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
+      .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string; import_job_id?: string | null }>()
       .then((r) => r.results).catch(() => []),
     draftFailures(db, org, plan.id),
   ])
@@ -118,7 +122,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     return {
       index, key: itemKey(item), item, mediaId, mediaMime: mediaId === null ? null : mimeOf.get(mediaId) ?? null, gaps,
       mediaWidth: mediaId === null ? null : dimsOf.get(mediaId)?.width ?? null, mediaHeight: mediaId === null ? null : dimsOf.get(mediaId)?.height ?? null,
-      post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at },
+      post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at, edited: row.edited_in_sada === 1 },
       ...(row === null && failures.has(draftRef(item.id, item.sourceId, item.platform)) ? { failed: failures.get(draftRef(item.id, item.sourceId, item.platform))! } : {}),
     }
   })
@@ -138,7 +142,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     versions: versions.map((v) => {
       let items = 0
       try { items = (JSON.parse(v.plan_json) as { items?: unknown[] }).items?.length ?? 0 } catch { items = 0 }
-      return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items }
+      return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items, ...(v.import_job_id == null ? {} : { importJobId: v.import_job_id }) }
     }),
   }
 }
@@ -203,7 +207,7 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
 }
 
 /**
- * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بـ UTC) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
+ * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بتوقيت المالك، D-383) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
  * يتحرّك موعدُها معه بـ `reschedulePost` وحرّاسِه (لا ماضٍ، ولا ما أُرسل للنشر)؛ **وإن رُدّ تحريكُها لم يتحرّك البندُ**، فلا
  * يقول التقويمُ يومًا والمنشورُ يخرج في غيره. وما نُشر لا يُنقل.
  */
@@ -217,7 +221,12 @@ export async function moveItem(db: Db, org: string, planId: string, index: numbe
   const post = await postOf(db, org, planId, item, "status <> 'rejected'")
   if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُنقل' }
   if (post !== null && post.status === 'queued') {
-    const r = await reschedulePost(db, post.id, `${to.day}T${to.time}`, now, org)
+    // ‏ساعةُ البند بتوقيت المالك، والتخزينُ بـ UTC (D-383) — كما تفعل `slotFor`
+    const [y, mo, d] = to.day.split('-').map(Number) as [number, number, number]
+    const [h, mi] = to.time.split(':').map(Number) as [number, number]
+    const utc = localToUtc(y, mo, d, h, mi, await storedZone(db))
+    if (utc === null) return { ok: false, reason: 'هذه الساعةُ لا وجودَ لها بتوقيتك' }
+    const r = await reschedulePost(db, post.id, utc.toISOString().slice(0, 16), now, org)
     if (!r.ok) return { ok: false, reason: `لم يُنقل: ${r.reason}` }
   }
   at.plan.items[index] = { ...item, day: to.day, time: to.time }

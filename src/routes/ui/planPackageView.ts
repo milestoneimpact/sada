@@ -41,6 +41,8 @@ export interface PlanPackageData {
   /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-382). */
   readonly schedulable?: number
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+  /** شريطُ الفحص (D-383 · المرحلة ٥) مرسومًا: التعارضُ والازدحامُ قبل البناء والاعتماد. */
+  readonly checks?: string
 }
 
 function versions(d: PlanPackageData): string {
@@ -120,6 +122,7 @@ export function planPackageScreen(d: PlanPackageData): string {
     ? html``
     : html`${raw(card({ title: 'هذا ما فهمته', level: 2, body: facts(p).value }))}
       ${p.problems.length === 0 ? html`` : raw(card({ variant: 'alert', tone: 'warn', title: 'ما لم يُفهم', level: 2, body: html`<ul class="plain">${p.problems.map((x) => html`<li>${x}</li>`)}</ul>`.value }))}
+      ${d.checks === undefined ? html`` : raw(d.checks)}
       ${raw(differs(p))}${raw(card({ title: 'الصفوف', level: 2, body: rowsTable(p).value }))}${raw(rulesCard(p))}${act(d, p)}`
   // ‏«اعتمد الخطّة وجدولها» (D-382): رابطٌ إلى تأكيدٍ بلا سكربت، والمدير فأعلى وحده يراه
   const schedule = !d.canBuild || (d.schedulable ?? 0) === 0 ? html`` : raw(card({ title: 'اعتمد وجدوِل', level: 2, body: html`<p class="m-0">${String(d.schedulable)} من مسوّدات الحزمة جاهزة بنصّها وموعدها. تراها قبل أن تؤكّد.</p>

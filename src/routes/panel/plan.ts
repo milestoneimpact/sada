@@ -18,13 +18,20 @@ import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
 import { planFollowScreen } from '../ui/planFollowView'
+import { postEditScreen } from '../ui/postEditView'
+import { copyToDraft, holdPost, postHistory, restoreEdit, revisePost, type ReviseResult } from '../../lib/plan/revise'
+import { stageOf } from '../../lib/plan/rights'
 import { localToUtc } from '../../lib/time/local'
+import { checksStrip, rulesScreen } from '../ui/checksView'
+import { blockedKeys, hhmm, parseRulesForm, planChecks, planFix, RULE_LABEL, type RuleId } from '../../lib/plan/checks'
+import { readRules, reviewCheckInput, writeRules } from '../../lib/plan/checkStore'
+import { itemKey } from '../../lib/plan/review'
 import { localParts } from '../../lib/time/zone'
 import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
 import { currentPicks, readPackageMedia, readSource } from '../../lib/package/sync'
@@ -46,7 +53,13 @@ import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
-import { approvePlan, ideaOf, latestPlan, planSpan, planWindows } from '../../lib/plan/job'
+import { approvePlan, ideaOf, latestPlan, planForId, planForPeriod, planSpan, planWindows } from '../../lib/plan/job'
+import { approvePlanVersion, reopenVersion, unscheduleMonth } from '../../lib/plan/approve'
+import { attachToPost, listLibrary } from '../../lib/library'
+import { rejectMedia } from '../../lib/image/job'
+import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
+import { itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
 import type { PlanDeps } from '../../lib/plan/job'
@@ -54,7 +67,7 @@ import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
-import { ownerZone } from '../../lib/time/ownerZone'
+import { ownerZone, storedZone } from '../../lib/time/ownerZone'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
 import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/clientReview'
@@ -658,7 +671,9 @@ plan.get('/panel/plan/review', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
-  const current = await latestPlan(c.env.DB, org)
+  // ‏`?id=` خطّةٌ بعينها (من شاشة الشهر)، في منظّمتها وما لم تُستبدل؛ وبلا معرّفٍ أحدثُ خطّة
+  const asked = c.req.query('id')
+  const current = asked !== undefined && asked !== '' ? await planForId(c.env.DB, org, asked) ?? await latestPlan(c.env.DB, org) : await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
   const [model, zone, flash, orgRow, accounts, share, verdicts, waiting] = await Promise.all([
     reviewModel(c.env.DB, org, current),
@@ -677,7 +692,10 @@ plan.get('/panel/plan/review', async (c) => {
   for (const a of accounts) if (authors[a.platform] === undefined && a.display_name !== null) authors[a.platform] = a.display_name
   // ‏شارةُ الحزمة (D-372): تحديثٌ يمسّ معتمدًا أو مجدولًا لا يُطبَّق بصمت — يُقال هنا ويُقرَّر هناك
   const pkgBadge = waiting === 0 ? '' : '<p class="m-0"><a href="' + (waitingAt === null ? '/panel/package' : '/panel/package/changes/' + encodeURIComponent(waitingAt)) + '">' + statusBadge('warn', '!', 'في حزمتك تحديث ينتظرك (' + String(waiting) + ')') + '</a></p>'
-  const body = pkgBadge + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
+  // ‏بوّابةُ الفحص (D-383 · المرحلة ٥): التعارضُ والازدحامُ قبل الاعتماد، والإصلاحُ بضغطة لمن يجدول
+  const checked = planChecks(await reviewCheckInput(c.env.DB, org, model, await storedZone(c.env.DB), new Date()), await readRules(c.env.DB, org))
+  const strip = checksStrip({ findings: checked, planId: current.id, w: c.req.query('w') ?? '', canFix: allows(session.record.role ?? 'owner', 'publisher') })
+  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
@@ -846,6 +864,208 @@ plan.post('/panel/plan/review/move', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: 'plan.review.move', target: String(f.get('id') ?? ''), detail: result.ok ? day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
   await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند — ومنشورُه المجدولُ معه.' } : { kind: 'bad', text: result.reason })
   return toCard(f, false)
+})
+
+/**
+ * **الإصلاحُ بضغطة** (D-383 · المرحلة ٥): «أزِح» و«وزّع» و«ادمج» ونقلُ الهدوء والموعدِ الماضي. **الخادمُ يعيد الفحصَ** ويطابق
+ * ما أُرسل (القاعدةُ والبنود) بما وجده الآن، فصفحةٌ قديمة لا تُصلح ما زال. ثمّ تُطبَّق النقلاتُ بـ `moveItem` (فيتحرّك المجدولُ معها)
+ * والدمجُ بـ `removePlanItem` من آخر بندٍ إلى أوّله، فلا يتغيّر موضعُ ما لم يُحذف بعد.
+ */
+plan.post('/panel/plan/check/fix', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const now = new Date()
+  // ‏الخطّةُ بمعرّفها المرسَل (في المنظّمة وما لم تُستبدل)، لا أحدثُ خطّة: شاشةُ الشهر تُصلح أيَّ شهرٍ وخطّةَ الحزمة
+  const current = await planForId(c.env.DB, org, String(f.get('id') ?? ''))
+  let said: PanelFlash = { kind: 'bad', text: 'تغيّرت الخطّة منذ فتحت الصفحة. أعد تحميلها.' }
+  if (current !== null) {
+    const zone = await storedZone(c.env.DB)
+    const [model, rules] = await Promise.all([reviewModel(c.env.DB, org, current), readRules(c.env.DB, org)])
+    const input = await reviewCheckInput(c.env.DB, org, model, zone, now)
+    const keys = String(f.get('keys') ?? '').split('\n').filter((k) => k !== '')
+    const rule = String(f.get('rule') ?? '') as RuleId
+    const finding = planChecks(input, rules).find((x) => x.rule === rule && x.keys.join('\n') === keys.join('\n') && (x.day ?? '') === String(f.get('day') ?? ''))
+    const plan = finding === undefined ? null : planFix(input, rules, finding)
+    const indexOf = new Map(current.plan.items.map((it, i) => [itemKey(it), i]))
+    if (finding === undefined) said = { kind: 'warn', text: 'زال هذا التحذير، أو تغيّر. هذه الصفحة بعد الفحص من جديد.' }
+    else if (plan!.kind === 'none') said = { kind: 'warn', text: plan!.reason + '.' }
+    else if (plan!.kind === 'remove') {
+      let n = 0
+      for (const i of plan!.keys.map((k) => indexOf.get(k)).filter((i): i is number => i !== undefined).sort((a, b) => b - a)) {
+        if ((await removePlanItem(c.env.DB, org, current.id, i)).ok) n += 1
+      }
+      said = n === 0 ? { kind: 'bad', text: 'لم يُحذف المكرَّر. أعد تحميل الصفحة.' } : { kind: 'ok', text: 'دُمج: بقي بندٌ واحد وحُذف ' + String(n) + '.' }
+    } else {
+      let n = 0
+      let why = ''
+      for (const m of plan!.moves) {
+        const i = indexOf.get(m.key)
+        if (i === undefined) continue
+        const r = await moveItem(c.env.DB, org, current.id, i, m.key, { day: m.to.day, time: hhmm(m.to.minutes) }, now)
+        if (r.ok) n += 1
+        else why = r.reason
+      }
+      said = n === 0 ? { kind: 'bad', text: why === '' ? 'لم يُنقل شيء.' : why } : { kind: 'ok', text: 'نُقل ' + String(n) + (n === 1 ? ' بند' : ' بنود') + ' إلى خانةٍ فارغة.' + (why === '' ? '' : ' وتعذّر غيرُه: ' + why) }
+    }
+    await record(c.env.DB, { actor: 'panel', action: 'plan.check.fix', target: current.id, detail: (rule + ':' + (plan?.kind ?? 'gone')).slice(0, 200) }, c.req.raw)
+  }
+  await setFlash(c.env, c.req.raw, said)
+  const back = String(f.get('back') ?? '')
+  if (isPeriod(back)) return c.redirect('/panel/plan/month?p=' + back, 303)
+  return toCard(f, false)
+})
+
+/**
+ * **«اعتمد وجدول» من شاشة الشهر** (D-383 · الاعتماد): يقفل إصدارَ الخطّة ويولّد منشوراتِ بنودها بـ`approvePlanVersion`،
+ * ثمّ يجدول بالمُجدوِل الواحد ما لا يمنعه الفحص. والممنوعُ يبقى معتمَدًا بلا موعد ويُقال عددُه وسببُه.
+ */
+plan.post('/panel/plan/month/approve', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const f = gate.form
+  const period = String(f.get('p') ?? '')
+  const to = isPeriod(period) ? '/panel/plan/month?p=' + period : '/panel/plan/month'
+  const stored = await planForId(c.env.DB, org, String(f.get('id') ?? ''))
+  if (stored === null) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'تغيّرت الخطّة منذ فتحت الصفحة. أعد تحميلها.' })
+    return c.redirect(to, 303)
+  }
+  const now = new Date()
+  const zone = await storedZone(c.env.DB)
+  const [model, rules] = await Promise.all([reviewModel(c.env.DB, org, stored), readRules(c.env.DB, org)])
+  const findings = planChecks(await reviewCheckInput(c.env.DB, org, model, zone, now), rules)
+  const blocked = blockedKeys(findings)
+  const done = await approvePlanVersion(c.env.DB, org, stored.id, gate.session.record.email ?? 'owner', now)
+  if (!done.ok) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.reason })
+    return c.redirect(to, 303)
+  }
+  if (stored.status === 'draft') await approvePlan(c.env.DB, stored.id, org)
+  const fresh = await planForId(c.env.DB, org, stored.id) ?? stored
+  const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
+  await record(c.env.DB, { actor: 'panel', action: 'plan.month.approve', target: stored.id, detail: 'v' + String(done.version) + ':' + String(settled.scheduled) }, c.req.raw)
+  const held = settled.skipped.length
+  await setFlash(c.env, c.req.raw, {
+    kind: held === 0 ? 'ok' : 'warn',
+    text: 'اعتُمد الإصدار ' + String(done.version) + '، وجُدول ' + String(settled.scheduled) +
+      (held === 0 ? '.' : '، وبقي ' + String(held) + ' معتمَدًا بلا موعد: ' + settled.skipped[0]!.reason + '.'),
+  })
+  return c.redirect(to, 303)
+})
+
+/** «ألغِ جدولة الشهر»: كلُّ مجدوَلٍ لم يُرسَل من خطّة الشهر وحزمته يعود معتمَدًا بلا موعد، وما أُرسل يُقال. */
+plan.post('/panel/plan/month/unschedule', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const period = String(gate.form.get('p') ?? '')
+  if (!isPeriod(period)) return c.redirect('/panel/plan/month', 303)
+  const r = await unscheduleMonth(c.env.DB, org, period)
+  await record(c.env.DB, { actor: 'panel', action: 'plan.month.unschedule', target: period, detail: String(r.pulled) + ':' + String(r.kept.length) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, {
+    kind: r.kept.length === 0 ? 'ok' : 'warn',
+    text: (r.pulled === 0 ? 'لا مجدوَلَ يُلغى في ' + period : 'أُلغيت جدولة ' + String(r.pulled) + ' وعادت معتمَدةً بلا موعد') +
+      (r.kept.length === 0 ? '.' : '، وبقي ' + String(r.kept.length) + ': ' + r.kept[0]!.reason + '.'),
+  })
+  return c.redirect('/panel/plan/month?p=' + period, 303)
+})
+
+/** «افتح الإصدار»: إصدارٌ جديد مسوّدة، والمقفلُ يبقى سجلًّا. والمجدوَلُ يُلغى أوّلًا. */
+plan.post('/panel/plan/month/reopen', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const period = String(gate.form.get('p') ?? '')
+  const id = String(gate.form.get('id') ?? '')
+  const r = await reopenVersion(c.env.DB, org, id)
+  if (r.ok) {
+    await c.env.DB.prepare("UPDATE plans SET status = 'draft' WHERE id = ? AND org_id = ? AND status <> 'superseded'").bind(id, org).run()
+    await record(c.env.DB, { actor: 'panel', action: 'plan.month.reopen', target: id, detail: 'v' + String(r.version) }, c.req.raw)
+  }
+  await setFlash(c.env, c.req.raw, r.ok
+    ? { kind: 'ok', text: 'فُتح الإصدار ' + String(r.version) + ' مسوّدةً، ورجع ' + String(r.reverted) + ' إلى المسوّدات.' }
+    : { kind: 'bad', text: r.reason })
+  return c.redirect(isPeriod(period) ? '/panel/plan/month?p=' + period : '/panel/plan/month', 303)
+})
+
+/**
+ * **شاشةُ الشهر** (D-383 · المرحلة ٨): رحلةُ الشهرين، وشريطُ الفحص بأزرار الإصلاح، والتقويمُ بشارات الحمل، والفرقُ، وسطرُ الاعتماد.
+ * للقراءة لكلّ دور، والاعتمادُ والإصلاحُ للناشر فأعلى (`access.ts`).
+ */
+plan.get('/panel/plan/month', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const zone = await storedZone(c.env.DB)
+  const now = new Date()
+  const today = localDay(localParts(now, zone))
+  const current = today.slice(0, 7)
+  const q = c.req.query('p')
+  const period = isPeriod(q) ? q : current
+  const canFix = allows(session.record.role ?? 'owner', 'publisher')
+  const [stored, rules, diff, facts] = await Promise.all([
+    planForPeriod(c.env.DB, org, period), readRules(c.env.DB, org), readDiff(c.env.DB, org, period),
+    Promise.all([monthFacts(c.env.DB, org, current), monthFacts(c.env.DB, org, nextPeriod(current))]),
+  ])
+  let findings: ReturnType<typeof planChecks> = []
+  let total = 0
+  if (stored !== null) {
+    const model = await reviewModel(c.env.DB, org, stored)
+    findings = planChecks(await reviewCheckInput(c.env.DB, org, model, zone, now), rules)
+    total = model.cards.length
+  }
+  const blocked = blockedKeys(findings)
+  const firstBlock = findings.find((f) => f.severity === 'block')
+  const body = monthJourneyCard(facts.map((f) => monthJourney(f, today))) + '<div class="mt-3"></div>' + monthScreen({
+    period, planId: stored?.id ?? null,
+    perDay: stored === null ? {} : await itemsPerDay(c.env.DB, org, stored.id),
+    dailyCap: rules.dailyTotalCap,
+    checks: stored === null ? { findings, canFix } : { findings, planId: stored.id, canFix, back: period },
+    diff,
+    approval: approvalLine({ total, blocked: blocked.size, reason: firstBlock === undefined ? null : RULE_LABEL[firstBlock.rule] }),
+    canApprove: canFix && stored?.status === 'draft',
+    canRollback: canFix && stored !== null,
+    prev: prevPeriod(period), next: nextPeriod(period),
+  })
+  return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel#posts', label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
+})
+
+/** **سجلُّ الاستيرادات** (D-383 · المرحلة ٨): كلُّ `import_job` بحاله وبصمته وشهره وما غيّر، وزرُّ «إعادة الفحص» إلى شهره. */
+plan.get('/panel/plan/imports', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const rows = await readImports(c.env.DB, activeOrg(session.record))
+  const body = importsScreen(rows, allows(session.record.role ?? 'owner', 'publisher'))
+  return page((nonce) => soloPage('صدى — الاستيرادات', { href: '/panel/plan/month', label: 'الشهر' }, body, nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
+})
+
+plan.get('/panel/plan-rules', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const [rules, flash] = await Promise.all([readRules(c.env.DB, activeOrg(session.record)), takeFlash(c.env, c.req.raw)])
+  const body = rulesScreen(rules, allows(session.record.role ?? 'owner', 'admin')) +
+    (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  return page((nonce) => soloPage('صدى — قواعد الجدولة', { href: '/panel/settings#limits', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('settings')))
+})
+
+/**
+ * **قواعد الجدولة** (D-383 · المرحلة ٥): عتباتُ الفحص لهذه المنظّمة في `schedule_rules`. للمدير فأعلى (`access.ts`).
+ */
+plan.post('/panel/plan-rules', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const parsed = parseRulesForm(gate.form)
+  if (parsed.ok) await writeRules(c.env.DB, org, parsed.rules, gate.session.record.email ?? 'panel')
+  await record(c.env.DB, { actor: 'panel', action: 'settings.schedule_rules', target: org, detail: parsed.ok ? JSON.stringify(parsed.rules).slice(0, 200) : 'refused:' + parsed.reason }, c.req.raw)
+  await setFlash(c.env, c.req.raw, parsed.ok ? { kind: 'ok', text: 'حُفظت قواعد الجدولة. يُعاد الفحص بها في كلّ مراجعة.' } : { kind: 'bad', text: parsed.reason + '.' })
+  return c.redirect('/panel/plan-rules', 303)
 })
 
 /**
@@ -1094,11 +1314,16 @@ plan.post('/panel/plan/import/confirm', async (c) => {
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
   // ‏«اكتب من الفكرة» (D-361): نداءٌ مدفوعٌ لكلّ بند، بضغطة المالك وعددُه على الزرّ (D-006 · D-008)
   const write = gate.form.get('write') === '1'
-  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write)
+  // ‏ومصدرُه في `import_jobs` (D-383): الجدولُ ملفٌّ، وما استخرجه النموذجُ نصّ
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write, { kind: table.via === 'model' ? 'text' : 'csv' })
   await record(c.env.DB, {
     actor: 'panel', action: write ? 'plan.import.write' : 'plan.import.seat', target: seated.planId,
     detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
   }, c.req.raw)
+  if (seated.unchanged === true) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'هذه الخطّةُ نفسُها سُكّنت من قبل، فلم يتغيّر شيء. عدّل الملفّ ثمّ ارفعه، أو راجع خطّتك.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
   if (seated.planId === null) {
     return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
   }
@@ -1229,4 +1454,103 @@ plan.get('/panel/plan', async (c) => {
   // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
   if (running(await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
   return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
+})
+
+/**
+ * **تعديلُ المنشور وسجلُّه** (D-383 المرحلة ٧): الشاشةُ تسأل `mayDo` لتخفي ما لا يُتاح، والأبوابُ الأربعة تسأله ثانيةً على
+ * الخادم. والدورُ من الجلسة، فلا يُقبل من النموذج.
+ */
+plan.get('/panel/plan/post/:id', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const id = c.req.param('id')
+  const row = await c.env.DB.prepare('SELECT id, status, text, scheduled_at, dispatched_at, rev, edited_in_sada FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org).first<{ id: string; status: string; text: string; scheduled_at: string | null; dispatched_at: string | null; rev: number; edited_in_sada: number }>()
+  if (row === null) return c.redirect('/panel/plan/follow', 303)
+  const [history, zone, flash, library] = await Promise.all([
+    postHistory(c.env.DB, org, id),
+    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    takeFlash(c.env, c.req.raw),
+    listLibrary(c.env.DB, org, 60).catch(() => []),
+  ])
+  const media = library.filter((a) => a.kind === 'image' && a.origin !== 'drive').slice(0, 30).map((a) => ({ ref: a.ref, name: a.name }))
+  const body = postEditScreen({
+    id: row.id, text: row.text, scheduledAt: row.scheduled_at, rev: row.rev, edited: row.edited_in_sada === 1,
+    stage: stageOf(row, new Date()), role: session.record.role ?? 'owner', history, media,
+  }, zone ?? null) + (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/plan/follow', label: 'المتابعة' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('plan')))
+})
+
+async function editDone(c: Context<{ Bindings: Env }>, id: string, result: ReviseResult | { ok: true; id: string } | { ok: false; reason: string }, to = id): Promise<Response> {
+  if ((c.req.header('Accept') ?? '').includes('application/json')) return c.json(result, result.ok ? 200 : 'conflict' in result && result.conflict === true ? 409 : 400)
+  const text = result.ok ? ('say' in result ? result.say : 'نُسخ مسوّدةً جديدة.') : result.reason
+  await setFlash(c.env, c.req.raw, { kind: result.ok ? 'ok' : 'bad', text })
+  return c.redirect('/panel/plan/post/' + encodeURIComponent(to), 303)
+}
+
+plan.post('/panel/plan/post/revise', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const org = activeOrg(gate.session.record)
+  const text = f.get('text')
+  // ‏الموعدُ بساعة المالك من الحقل، ويُحوَّل إلى UTC بمنطقته؛ وما لم يتغيّر لا يُرسل فلا يُفحص كأنّه جديد
+  const local = String(f.get('scheduled_local') ?? '')
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$/.exec(local)
+  const zone = await storedZone(c.env.DB)
+  const utc = m === null ? null : localToUtc(Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4]), Number(m[5]), zone)
+  if (local !== '' && utc === null) return editDone(c, id, { ok: false, reason: 'الموعد غير مفهوم' })
+  const was = await c.env.DB.prepare('SELECT scheduled_at FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<{ scheduled_at: string | null }>()
+  const at = utc === null ? null : utc.toISOString()
+  const moved = at !== null && (was?.scheduled_at == null || Date.parse(was.scheduled_at.replace(' ', 'T') + (/[Z+]/.test(was.scheduled_at) ? '' : 'Z')) !== utc!.getTime())
+  const mediaRef = String(f.get('media_ref') ?? '')
+  const r = await revisePost(c.env.DB, org, id, {
+    ...(typeof text === 'string' ? { text } : {}),
+    ...(moved ? { scheduledAt: at! } : {}),
+  }, Number(f.get('rev')), gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  // ‏والوسيطُ بعد الحفظ بطريق المكتبة نفسِه: ما رُبط قبله يُرفض ويُطلق حجزُه، والمنشورُ قد رجع من الطابور فيُقبل
+  let out: ReviseResult = r
+  if (r.ok && mediaRef !== '') {
+    const linked = await attachToPost(c.env.DB, org, id, mediaRef, (x) => rejectMedia(c.env.DB, org, x))
+    out = { ...r, say: r.say + (linked.ok ? ' ورُبط الوسيط «' + linked.name + '».' : ' ولم يُربط الوسيط: ' + linked.reason + '.') }
+  }
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.revise', target: id, detail: r.after }, c.req.raw)
+  return editDone(c, id, out)
+})
+
+plan.post('/panel/plan/post/restore', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const r = await restoreEdit(c.env.DB, activeOrg(gate.session.record), String(f.get('edit') ?? ''), Number(f.get('rev')),
+    gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date(), id)
+  // ‏السجلُّ والعودةُ على المنشور الذي استُعيد فعلًا (`target_id` من النسخة)، لا على ما أرسله النموذج
+  const target = r.ok ? r.target : id
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.restore', target, detail: String(f.get('edit') ?? '').slice(0, 64) }, c.req.raw)
+  return editDone(c, target, r)
+})
+
+plan.post('/panel/plan/post/hold', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const f = gate.form
+  const id = String(f.get('id') ?? '')
+  const how = String(f.get('how') ?? '')
+  const r = await holdPost(c.env.DB, activeOrg(gate.session.record), id, how === 'pause' ? { pause: true } : { minutes: Number(how) },
+    gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.hold', target: id, detail: how.slice(0, 16) }, c.req.raw)
+  return editDone(c, id, r)
+})
+
+plan.post('/panel/plan/post/copy', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const id = String(gate.form.get('id') ?? '')
+  const r = await copyToDraft(c.env.DB, activeOrg(gate.session.record), id, gate.session.record.email ?? 'owner', gate.session.record.role ?? 'owner', new Date())
+  if (r.ok) await record(c.env.DB, { actor: 'panel', action: 'plan.post.copy', target: id, detail: r.id }, c.req.raw)
+  return editDone(c, id, r, r.ok ? r.id : id)
 })

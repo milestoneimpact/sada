@@ -18,7 +18,7 @@ const PANEL = ['panel', 'panel-library', 'panel-accounts', 'panel-settings', 'pa
 // ‏و«تفتح قدرة» كذلك (متابعة D-324): مهامُّ القدرة خرجت من «ما عليك» إلى صفحتها
 const SCREENS = ['screen-tasks', 'screen-tasks-later', 'screen-gates', 'screen-wizard', 'screen-report', 'screen-linkedin', 'screen-li-setup', 'screen-x',
   'screen-tiktok', 'screen-link-only', 'screen-yt-setup', 'screen-instagram', 'screen-unbuilt', 'screen-refused',
-  'screen-journey', 'screen-spread', 'screen-notices', 'screen-plan-new', 'screen-plan-build', 'screen-plan-review', 'screen-assets', 'screen-plan-seat', 'screen-plan-doc', 'screen-timeline', 'screen-login', 'screen-2fa', 'screen-enrol', 'screen-stepup', 'screen-resume', 'screen-resume-invite', 'screen-resume-cut', 'screen-404', 'screen-landing',
+  'screen-journey', 'screen-spread', 'screen-notices', 'screen-plan-new', 'screen-plan-build', 'screen-plan-review', 'screen-assets', 'screen-plan-seat', 'screen-plan-doc', 'screen-plan-month', 'screen-plan-imports', 'screen-timeline', 'screen-login', 'screen-2fa', 'screen-enrol', 'screen-stepup', 'screen-resume', 'screen-resume-invite', 'screen-resume-cut', 'screen-404', 'screen-landing',
   'screen-500']
 const BASE = [...PANEL, ...SCREENS, 'privacy']
 

@@ -25,6 +25,9 @@ import { toCsv } from '../../lib/package/plan'
 import { probeAccess } from '../../lib/package/diagnose'
 import { adoptRevision, previewRevision, setFollow } from '../../lib/package/adopt'
 import { planPackageScreen } from '../ui/planPackageView'
+import { checksStrip } from '../ui/checksView'
+import { planChecks } from '../../lib/plan/checks'
+import { packageCheckInput, readRules } from '../../lib/plan/checkStore'
 import { allows } from '../../lib/access'
 import { panelHref } from '../../lib/nav/panes'
 import { ownerZone } from '../../lib/time/ownerZone'
@@ -228,8 +231,11 @@ pkg.get('/panel/plan/package', async (c) => {
   const preview = chosen === null ? null : await previewRevision(c.env.DB, org, chosen.id, currentPicks(media), { x: source.variants.x, linkedin: source.variants.linkedin })
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const schedulable = (await planPackageSchedule(c.env.DB, org, zone, new Date())).ready.length
+  // ‏بوّابةُ الفحص (D-383 · المرحلة ٥) على صفوف النسخة قبل البناء — والإصلاحُ بضغطة في المراجعة بعده، فالملفُّ في GitHub لا يُكتب من هنا
+  const checks = preview === null ? undefined
+    : checksStrip({ findings: planChecks(await packageCheckInput(c.env.DB, org, preview.rows, zone, new Date()), await readRules(c.env.DB, org)), canFix: false })
   const body = planPackageScreen({
-    zone, schedulable,
+    zone, schedulable, ...(checks === undefined ? {} : { checks }),
     repo: source.owner + '/' + source.repo + '@' + source.branch, revisions, preview, follow: source.followUpdates,
     canBuild: allows(session.record.role ?? 'owner', 'admin'),
     flash: flash !== null ? { tone: flash.kind, text: flash.text }

@@ -2,7 +2,10 @@
  * خطّةُ الحزمة من `01-plan/*.xlsx` (D-368) — **تُقرأ أصيلًا بلا كلفة، ثمّ تمرّ من قارئ الخطّة الموجود**.
  *
  * الورقةُ «خطة الشهر» تُحوَّل CSV وتُفرَد بـ `widenPlan` (صفٌّ لكلّ منصّةٍ لها صيغةٌ في يومها)، والورقةُ «الإرشادات» بـ
- * `readGuidelines`. وتاريخُ Excel التسلسليُّ ووقتُه الكسريّ يُحوَّلان قبلها. وإن كان في المجلّد أكثرُ من ملفّ يُختار الأعلى vN.
+ * `readGuidelines`. وتاريخُ Excel التسلسليُّ ووقتُه الكسريّ يُحوَّلان قبلها.
+ *
+ * **كلُّ ملفٍّ في `01-plan/` يُقرأ** (D-383 المرحلة ٤): الشهرُ من تواريخ صفوفه لا من اسمه، و`vN` يحسم بين ملفّات الشهر
+ * نفسِه وحدها. فملفّا نوفمبر وديسمبر يتعايشان، والملفُّ الممتدّ على شهرين يعطي كلَّ شهرٍ صفوفَه.
  */
 import { parseCsvRecords } from '../plan/import'
 import { widenPlan } from '../plan/widen'
@@ -31,11 +34,58 @@ export interface PackagePlan {
 const quote = (v: string): string => (/[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v)
 export const toCsv = (rows: readonly (readonly string[])[]): string => rows.map((r) => r.map(quote).join(',')).join('\n')
 
-/** أعلى نسخةٍ بين ملفّات الخطّة («…-v2.xlsx» قبل «…-v1.xlsx»)، و`null` إن خلا المجلّد. */
-export function choosePlanFile(paths: readonly string[]): string | null {
-  const ver = (p: string): number => Number(/-v(\d+)\.xlsx$/i.exec(p)?.[1] ?? 0)
-  const xs = paths.filter((p) => /^01-plan\/[^/]+\.xlsx$/i.test(p)).sort((a, b) => ver(b) - ver(a) || a.localeCompare(b))
-  return xs[0] ?? null
+/** رقمُ النسخة في الاسم («…-v3.xlsx» ← 3)، و0 لما لا رقم له. */
+export const planVersion = (p: string): number => Number(/-v(\d+)\.xlsx$/i.exec(p)?.[1] ?? 0)
+
+/** كلُّ ملفّات الخطّة في `01-plan/`، الأعلى نسخةً أوّلًا. */
+export function planFiles(paths: readonly string[]): string[] {
+  return paths.filter((p) => /^01-plan\/[^/]+\.xlsx$/i.test(p)).sort((a, b) => planVersion(b) - planVersion(a) || a.localeCompare(b))
+}
+
+/** شهرُ الصفّ «YYYY-MM» من تاريخه، و`null` لصفٍّ بلا تاريخٍ مفهوم. */
+export function periodOf(date: string): string | null {
+  return /^(\d{4}-[01]\d)-[0-3]\d$/.exec(date.trim())?.[1] ?? null
+}
+
+export interface MonthPlans {
+  /** منشوراتُ كلّ الأشهر معًا، ولكلّ شهرٍ صفوفُ أعلى ملفّاته نسخةً. */
+  readonly plan: PackagePlan
+  /** الشهرُ ← الملفُّ الذي غلب فيه. */
+  readonly files: Readonly<Record<string, string>>
+  readonly periods: readonly string[]
+}
+
+/**
+ * يجمع ملفّاتِ الخطّة أشهرًا: لكلّ شهرٍ صفوفُ الملفّ الأعلى `vN` بين ما فيه صفوفٌ لذلك الشهر، ولا يمسّ ملفُّ شهرٍ شهرًا غيرَه.
+ * والصفُّ بلا تاريخٍ يُسقط بتحذير. والإرشاداتُ من الأعلى نسخةً بين ما فيه إرشادات.
+ */
+export function mergeMonthPlans(read: readonly { readonly path: string; readonly plan: PackagePlan }[]): MonthPlans {
+  const ordered = [...read].sort((a, b) => planVersion(b.path) - planVersion(a.path) || a.path.localeCompare(b.path))
+  const owner = new Map<string, string>()
+  const problems: string[] = []
+  for (const r of ordered) {
+    let undated = 0
+    for (const e of r.plan.entries) {
+      const m = periodOf(e.date)
+      if (m === null) { undated += 1; continue }
+      if (!owner.has(m)) owner.set(m, r.path)
+    }
+    if (undated > 0) problems.push(`${r.path.split('/').pop()}: ${undated} صفًّا بلا تاريخٍ مفهوم لم تُقرأ`)
+    for (const p of r.plan.problems) problems.push(read.length > 1 ? `${r.path.split('/').pop()}: ${p}` : p)
+  }
+  const entries: PlanEntry[] = []
+  for (const r of ordered) for (const e of r.plan.entries) { const m = periodOf(e.date); if (m !== null && owner.get(m) === r.path) entries.push(e) }
+  const winners = new Set(owner.values())
+  const used = ordered.filter((r) => winners.has(r.path))
+  const rules = ordered.find((r) => r.plan.rules !== null)?.plan.rules ?? null
+  const periods = [...owner.keys()].sort()
+  return {
+    plan: {
+      entries, rules, days: used.reduce((n, r) => n + r.plan.days, 0),
+      columns: [...new Set(used.flatMap((r) => r.plan.columns))], problems: read.length === 0 ? ['لا ملفّ خطّة في 01-plan'] : problems,
+    },
+    files: Object.fromEntries(owner), periods,
+  }
 }
 
 /** «X» ← x، «LinkedIn» ← linkedin — وما سواهما بحروفه الصغيرة. */

@@ -7,6 +7,7 @@
  */
 import type { Db } from '../tokens'
 import { applyDecisions, decide, packagePosts } from './apply'
+import { landInMonthPlans } from './month'
 import { diffSnapshots, type Change, type Snapshot, type SnapshotEntry } from './diff'
 import { countChanges, lastAppliedSnapshot, readRevision, type RevisionRow } from './revision'
 import type { PackagePick } from './pick'
@@ -111,7 +112,9 @@ export async function adoptRevision(db: Db, source: PackageSource, id: string): 
     JSON.stringify(snap), JSON.stringify(changes), JSON.stringify(countChanges(changes, 0)), id).run()
   // ‏الصفُّ وتطبيقُه معًا: إن انكسر التطبيقُ صار الصفُّ «تعذّر» بسببه — لا يبقى «محسوبًا» بلا تطبيق فيُحسب منه الدفعُ التالي
   try {
-    const out = await applyDecisions({ db, org, revisionId: nid, copySha: snap.copySha }, decide(changes, await packagePosts(db, org)))
+    const decisions = decide(changes, await packagePosts(db, org))
+    const out = await applyDecisions({ db, org, revisionId: nid, copySha: snap.copySha }, decisions)
+    await landInMonthPlans(db, org, { revisionId: nid, commit: revision.commit }, snap, decisions).catch((e: unknown) => { console.error('package month landing failed', e) })
     await db.prepare('UPDATE package_revisions SET summary_counts = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify(countChanges(changes, out.awaiting)), nid, org).run()
     return { kind: 'adopted', id: nid, changes: changes.length, awaiting: out.awaiting }
   } catch {
