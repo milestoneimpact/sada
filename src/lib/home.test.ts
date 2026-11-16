@@ -320,6 +320,11 @@ describe('journeyCounts', () => {
     // ‏ويمضي الأسبوعُ على الحديث فتهدأ الرئيسيّة
     const later = await journeyCounts(db, 'org_owner', new Date('2026-10-12T12:00:00Z'))
     expect(later.perPlatform['x']).toMatchObject({ failed: 3, recentFailed: 0 })
+
+    // ‏وأشهرُ الخطّة في الجملة نفسِها (D-383 · المرحلة ٨): لا خطّةَ لنوفمبر ولا ديسمبر
+    const months = await journeyCounts(db, 'org_owner', now, ['2026-11', '2026-12'])
+    expect(months.planned).toEqual([])
+    expect(months.perPlatform['x']).toMatchObject({ failed: 3 })
     expect(nextAction(facts({ counts: later })).tone).toBe('ok')
   })
 })

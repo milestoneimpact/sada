@@ -69,6 +69,9 @@ import {
 } from './shared'
 import { SCAN_BEAT_SQL, SCAN_MANUAL_SQL, scanTime, stillInFolder } from '../../lib/privacy/trash'
 
+import { localDay, monthJourney, nextPeriod } from '../../lib/plan/month'
+import { localParts } from '../../lib/time/zone'
+
 export const home = new Hono<{ Bindings: Env }>()
 
 const BUILTIN_DOCS: Readonly<Record<string, string>> = {
@@ -592,8 +595,20 @@ function targetsOf(channels: readonly ChannelView[]): Target[] {
  * «نظرة عامّة»: الرحلةُ والبطاقاتُ و«ما ينتظرك» و«الكلفة وما وقع». أحدَ عشرَ انتظارًا مستقلًّا معًا — والأرقامُ
  * من الدفتر كلِّه (ر-10)، و«ما وقع اليوم» ممّا قُرئ أصلًا (D-127).
  */
+/**
+ * تنبيهُ الشهر الحاليّ والقادم بلا خطّة (D-383 · المرحلة ٨)، من `journeyCounts.planned` فلا جملةَ جديدة على اللوح (D-280).
+ * وفشلُ النشر تعرضه الرحلةُ نفسُها بـ`recentFailed`.
+ */
+function twoMonthAlerts(planned: readonly string[] | undefined, today: string): readonly string[] {
+  const cur = today.slice(0, 7)
+  return [cur, nextPeriod(cur)].flatMap((period) => monthJourney({
+    period, hasPlan: (planned ?? []).includes(period), reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0,
+  }, today).alerts)
+}
+
 async function overviewData(load: Load): Promise<OverviewData> {
   const { c, org, now, allowance, drafts, channels, zone } = load
+  const today = localDay(localParts(now, zone))
   const [sources, series, spendMonth, p, media, outbox, loaded, audit, journey, open, factors] = await Promise.all([
     load.sources(),
     dailySpend(c.env.DB, 14),
@@ -604,16 +619,18 @@ async function overviewData(load: Load): Promise<OverviewData> {
     load.pivotFacts(),
     load.audit(),
     // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
-    journeyCounts(c.env.DB, org, now),
+    journeyCounts(c.env.DB, org, now, [today.slice(0, 7), nextPeriod(today.slice(0, 7))]),
     // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
     openSuggestions(c.env.DB, org),
     load.factors(),
   ])
+  const monthAlerts = twoMonthAlerts(journey.planned, today)
   const { slide, mediaReady } = readiness(load, p)
   return {
     sources,
     media,
     journey,
+    monthAlerts,
     openSuggestions: open.length,
     // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
     draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),

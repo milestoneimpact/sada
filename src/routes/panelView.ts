@@ -476,6 +476,8 @@ export interface PanelData {
   readonly openSuggestions: number
   /** عدُّ المنشورات بحالها ومنصّتها من القاعدة كلِّها — لرحلة الرئيسيّة (D-177). */
   readonly journey: JourneyCounts
+  /** تنبيهاتُ رحلة الشهرين (D-383 · المرحلة ٨): نشرٌ فشل، أو شهرٌ يقترب بلا خطّة. والغائبُ لا تنبيه. */
+  readonly monthAlerts?: readonly string[]
   /** مقاطعُ المالك المرفوعة (D-180) — أحدثُها أوّلًا. */
   readonly uploads: readonly UploadRow[]
   /** نصوصٌ كُتبت لمقاطع لم تُنشأ منشوراتُها كلُّها بعد (KV، D-190) — مفتاحُها معرّفُ المقطع. */
@@ -521,7 +523,7 @@ export type ShellData = Pick<PanelData,
 
 /** «نظرة عامّة»: الرحلةُ و«ما ينتظرك» والبطاقاتُ (`TileSource`) و«الكلفة وما وقع». */
 export type OverviewData = Pick<PanelData,
-  'sources' | 'media' | 'journey' | 'openSuggestions' | 'draftBlocker' | 'factors' | 'providers' | 'routing'
+  'sources' | 'media' | 'journey' | 'monthAlerts' | 'openSuggestions' | 'draftBlocker' | 'factors' | 'providers' | 'routing'
   | 'dashboardTiles' | 'series' | 'spendBy' | 'spendMonth' | 'today' | 'autoEnqueue' | 'slide' | 'analysisCap'
   | 'spendCap' | 'usedAnalyses' | 'usedSpend' | 'targets' | 'outbox' | 'alertWebhook' | 'planReady'>
 
@@ -1106,6 +1108,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
       label: 'أعد الربط',
     })
   }
+  // ‏ورحلةُ الشهرين (D-383 · المرحلة ٨): كلُّ تنبيهٍ يذهب إلى شاشة الشهر
+  for (const a of d.monthAlerts ?? []) items.push({ kind: 'warn', text: a, go: '/panel/plan/month', label: 'افتح الشهر' })
   if (d.paused) {
     items.push({ kind: 'warn', text: 'النظام موقوف مؤقّتا — لا مسح ولا تحليل ولا نشر.', go: '#limits', label: 'استأنف' })
   }

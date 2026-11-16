@@ -23,7 +23,7 @@ import { copyToDraft, holdPost, postHistory, restoreEdit, revisePost, type Revis
 import { stageOf } from '../../lib/plan/rights'
 import { localToUtc } from '../../lib/time/local'
 import { checksStrip, rulesScreen } from '../ui/checksView'
-import { hhmm, parseRulesForm, planChecks, planFix, type RuleId } from '../../lib/plan/checks'
+import { blockedKeys, hhmm, parseRulesForm, planChecks, planFix, RULE_LABEL, type RuleId } from '../../lib/plan/checks'
 import { readRules, reviewCheckInput, writeRules } from '../../lib/plan/checkStore'
 import { itemKey } from '../../lib/plan/review'
 import { localParts } from '../../lib/time/zone'
@@ -53,7 +53,10 @@ import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
 import { panelHref } from '../../lib/nav/panes'
-import { approvePlan, ideaOf, latestPlan, planSpan, planWindows } from '../../lib/plan/job'
+import { approvePlan, ideaOf, latestPlan, planForPeriod, planSpan, planWindows } from '../../lib/plan/job'
+import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
+import { itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
 import type { PlanDeps } from '../../lib/plan/job'
@@ -904,6 +907,58 @@ plan.post('/panel/plan/check/fix', async (c) => {
   }
   await setFlash(c.env, c.req.raw, said)
   return toCard(f, false)
+})
+
+/**
+ * **شاشةُ الشهر** (D-383 · المرحلة ٨): رحلةُ الشهرين، وشريطُ الفحص بأزرار الإصلاح، والتقويمُ بشارات الحمل، والفرقُ، وسطرُ الاعتماد.
+ * للقراءة لكلّ دور، والاعتمادُ والإصلاحُ للناشر فأعلى (`access.ts`).
+ */
+plan.get('/panel/plan/month', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const zone = await storedZone(c.env.DB)
+  const now = new Date()
+  const today = localDay(localParts(now, zone))
+  const current = today.slice(0, 7)
+  const q = c.req.query('p')
+  const period = isPeriod(q) ? q : current
+  const canFix = allows(session.record.role ?? 'owner', 'publisher')
+  const [stored, rules, diff, facts] = await Promise.all([
+    planForPeriod(c.env.DB, org, period), readRules(c.env.DB, org), readDiff(c.env.DB, org, period),
+    Promise.all([monthFacts(c.env.DB, org, current), monthFacts(c.env.DB, org, nextPeriod(current))]),
+  ])
+  let findings: ReturnType<typeof planChecks> = []
+  let total = 0
+  if (stored !== null) {
+    const model = await reviewModel(c.env.DB, org, stored)
+    findings = planChecks(await reviewCheckInput(c.env.DB, org, model, zone, now), rules)
+    total = model.cards.length
+  }
+  const blocked = blockedKeys(findings)
+  const firstBlock = findings.find((f) => f.severity === 'block')
+  const body = monthJourneyCard(facts.map((f) => monthJourney(f, today))) + '<div class="mt-3"></div>' + monthScreen({
+    period, planId: stored?.id ?? null,
+    perDay: stored === null ? {} : await itemsPerDay(c.env.DB, org, stored.id),
+    dailyCap: rules.dailyTotalCap,
+    checks: stored === null ? { findings, canFix } : { findings, planId: stored.id, canFix },
+    diff,
+    approval: approvalLine({ total, blocked: blocked.size, reason: firstBlock === undefined ? null : RULE_LABEL[firstBlock.rule] }),
+    canApprove: canFix && stored?.status === 'draft',
+    prev: prevPeriod(period), next: nextPeriod(period),
+  })
+  return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel#posts', label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
+})
+
+/** **سجلُّ الاستيرادات** (D-383 · المرحلة ٨): كلُّ `import_job` بحاله وبصمته وشهره وما غيّر، وزرُّ «إعادة الفحص» إلى شهره. */
+plan.get('/panel/plan/imports', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const rows = await readImports(c.env.DB, activeOrg(session.record))
+  const body = importsScreen(rows, allows(session.record.role ?? 'owner', 'publisher'))
+  return page((nonce) => soloPage('صدى — الاستيرادات', { href: '/panel/plan/month', label: 'الشهر' }, body, nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
 })
 
 plan.get('/panel/plan-rules', async (c) => {
