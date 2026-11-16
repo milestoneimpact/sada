@@ -14,8 +14,10 @@ import { schedulePost } from '../schedule/job'
 import { localToUtc } from '../time/local'
 import { isLinkedInPage, listAccounts } from '../channels'
 import { videoMisfit, type VideoTarget } from '../publish/video'
+import { readRules } from '../plan/checkStore'
+import { arrangeSlots } from '../plan/scheduler'
 
-export type SkipReason = 'text' | 'past' | 'account' | 'video' | 'time'
+export type SkipReason = 'text' | 'past' | 'account' | 'video' | 'time' | 'quiet' | 'gap'
 
 export const SKIP_SAY: Readonly<Record<SkipReason, string>> = {
   text: 'بلا نصّ',
@@ -23,6 +25,8 @@ export const SKIP_SAY: Readonly<Record<SkipReason, string>> = {
   account: 'لا حساب متّصلًا لمنصّته',
   video: 'مقطعُه لا يناسب حدود المنصّة',
   time: 'موعدُه غير مفهوم',
+  quiet: 'موعدُه في ساعات الهدوء',
+  gap: 'لا يتّسع له الفاصلُ الأدنى في يومه',
 }
 
 export interface PackageSlot {
@@ -32,6 +36,8 @@ export interface PackageSlot {
   readonly at: string
   readonly account: string
   readonly draft: boolean
+  /** «YYYY-MM-DD HH:MM» بساعة المالك. */
+  readonly local: string
 }
 
 export interface PackageSchedulePlan {
@@ -51,7 +57,7 @@ const VIDEO_TARGETS: readonly string[] = ['x', 'linkedin']
 
 /** ما سيُجدوَل وما يُتخطّى ولماذا — يقرؤه التأكيدُ قبل الضغطة والتنفيذُ نفسُه. */
 export async function planPackageSchedule(db: Db, org: string, zone: string | null, now: Date): Promise<PackageSchedulePlan> {
-  const skipped: Record<SkipReason, number> = { text: 0, past: 0, account: 0, video: 0, time: 0 }
+  const skipped: Record<SkipReason, number> = { text: 0, past: 0, account: 0, video: 0, time: 0, quiet: 0, gap: 0 }
   const { results } = await db
     .prepare(
       `SELECT id, platform, status, text, package_due FROM posts
@@ -82,9 +88,14 @@ export async function planPackageSchedule(db: Db, org: string, zone: string | nu
         .all<{ bytes: number; duration_ms: number | null }>()
       if (videos.some((v) => videoMisfit(p.platform as VideoTarget, v.bytes, v.duration_ms) !== null)) { skipped.video += 1; continue }
     }
-    ready.push({ id: p.id, platform: p.platform, at, account: account.id, draft: p.status === 'draft' })
+    ready.push({ id: p.id, platform: p.platform, at, account: account.id, draft: p.status === 'draft', local: (p.package_due ?? '').trim().replace('T', ' ') })
   }
-  return { ready, skipped }
+  // ‏**والمُجدوِلُ الواحد** (D-383): التباعدُ والتذبذبُ وساعاتُ الهدوء كما في الخطّة، فالتأكيدُ يعدّ ما سيُجدوَل فعلًا
+  const arranged = arrangeSlots(ready.map((r) => ({ id: r.id, account: r.account, at: r.at, local: r.local, exact: true })), await readRules(db, org), now)
+  for (const h of arranged.held) skipped[h.reason] += 1
+  const byId = new Map(ready.map((r) => [r.id, r]))
+  const placed = arranged.placed.map((s) => ({ ...byId.get(s.id)!, at: s.at }))
+  return { ready: placed, skipped }
 }
 
 export interface PackageScheduleResult extends PackageSchedulePlan {

@@ -15,6 +15,8 @@ import { localToUtc } from '../time/local'
 import { storedZone } from '../time/ownerZone'
 import type { StoredPlan } from './job'
 import type { PlanItem } from './prompt'
+import { readRules, toLocal } from './checkStore'
+import { arrangeSlots, HELD_SAY, type SlotIn } from './scheduler'
 
 export interface PlanSchedule {
   readonly scheduled: number
@@ -106,6 +108,10 @@ function readRefs(raw: string | null): string[] {
   }
 }
 
+/**
+ * **المُجدوِلُ الواحد للخطّة** (D-383 · المرحلة ٦): كلُّ معتمَدٍ من الخطّة إلى موعد بنده بمنطقة المالك، ثمّ `arrangeSlots`
+ * (التباعد والتذبذب وساعات الهدوء)، ثمّ `schedulePost` بحرّاسها. **وموعدٌ مضى يُعرض ولا يُرحَّل** صامتًا.
+ */
 export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: Date): Promise<PlanSchedule> {
   const { results: posts } = await db
     .prepare("SELECT id, platform, source_id, source_refs, idempotency_key FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
@@ -114,7 +120,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   const peaks = new Map<string, number | null>()
   const accounts = new Map<string, string | null>()
   const skipped: { postId: string; reason: string }[] = []
-  let scheduled = 0
+  const slots: SlotIn[] = []
   const zone = posts.length > 0 ? await storedZone(db) : null
   for (const post of posts) {
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
@@ -134,9 +140,22 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
     const chosen = (plan.choices?.times?.[item.platform]?.length ?? 0) > 0
     const sameDay = plan.plan.items.filter((i) => i.platform === item.platform && i.day === item.day).length
     const peak = chosen || sameDay > 1 ? null : peaks.get(post.platform) ?? null
-    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peak, now, zone), now)
+    // ‏الموعدُ بلا ترحيل: «الآن» يومَ البند يجعل `slotFor` يردّ موعدَه نفسَه، فما مضى يبقى ماضيًا ويُعرض
+    const at = slotFor(item.day, item.time, peak, new Date(0), zone)
+    slots.push({ id: post.id, account, at, local: localText(at, zone), exact: peak === null })
+  }
+  const arranged = arrangeSlots(slots, await readRules(db, org), now)
+  for (const h of arranged.held) skipped.push({ postId: h.id, reason: HELD_SAY[h.reason] })
+  let scheduled = 0
+  for (const slot of arranged.placed) {
+    const result = await schedulePost(db, slot.id, slot.account, slot.at, now)
     if (result.ok) scheduled += 1
-    else skipped.push({ postId: post.id, reason: result.reason })
+    else skipped.push({ postId: slot.id, reason: result.reason })
   }
   return { scheduled, skipped }
+}
+
+function localText(at: string, zone: string | null): string {
+  const l = toLocal(new Date(at + ':00Z'), zone)
+  return l.day + ' ' + String(Math.floor(l.minutes / 60)).padStart(2, '0') + ':' + String(l.minutes % 60).padStart(2, '0')
 }

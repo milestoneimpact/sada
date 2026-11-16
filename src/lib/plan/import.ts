@@ -18,6 +18,8 @@ import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
 import { dbNow, schedulePost } from '../schedule/job'
 import { attachStatement } from '../library'
+import { readRules } from './checkStore'
+import { arrangeSlots, HELD_SAY, type SlotIn } from './scheduler'
 import { itemNumber, matchMedia, variantOf, type LibraryMedia, type MediaMatch } from '../drive/media'
 import { packageMediaFor, type PackagePick } from '../package/pick'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
@@ -463,6 +465,8 @@ export async function applyPlan(
   shown?: ReadonlySet<number>,
 ): Promise<ApplyOutcome[]> {
   const out: ApplyOutcome[] = []
+  // ‏ما يُجدوَل يُجمع ثمّ يمرّ من المُجدوِل الواحد (D-383): التباعدُ على الحساب الواحد، وموعدُ الملفّ يُحترم بدقيقته
+  const pending: { readonly at: number; readonly line: number; readonly slot: SlotIn }[] = []
   for (const row of rows) {
     if (shown !== undefined && !shown.has(row.line)) continue
     if (row.problems.length > 0 || row.platform === null || row.whenUtc === null || row.accountId === null) {
@@ -517,10 +521,23 @@ export async function applyPlan(
     // ‏وسيطتُه من مكتبة Drive (D-363) تُربط كما يُختار من المكتبة — ولا تُولَّد له صورة
     const drive = driveMediaRow(db, org, postId, row)
     if (drive !== null) await drive.run()
-    const scheduled = await schedulePost(db, postId, row.accountId, row.whenUtc, now)
-    out.push(scheduled.ok
-      ? { line: row.line, result: 'scheduled' }
-      : { line: row.line, result: 'failed', reason: `اعتُمد ولم يُجدوَل: ${scheduled.reason}` })
+    pending.push({ at: out.length, line: row.line, slot: { id: postId, account: row.accountId, at: row.whenUtc, local: row.local ?? row.whenUtc.replace('T', ' '), exact: true } })
+    out.push({ line: row.line, result: 'failed', reason: '' })
+  }
+  if (pending.length === 0) return out
+  const arranged = arrangeSlots(pending.map((p) => p.slot), await readRules(db, org), now)
+  const held = new Map(arranged.held.map((h) => [h.id, h.reason]))
+  const placed = new Map(arranged.placed.map((s) => [s.id, s]))
+  for (const p of pending) {
+    const slot = placed.get(p.slot.id)
+    if (slot === undefined) {
+      out[p.at] = { line: p.line, result: 'failed', reason: `اعتُمد ولم يُجدوَل: ${HELD_SAY[held.get(p.slot.id) ?? 'past']}` }
+      continue
+    }
+    const scheduled = await schedulePost(db, slot.id, slot.account, slot.at, now)
+    out[p.at] = scheduled.ok
+      ? { line: p.line, result: 'scheduled' }
+      : { line: p.line, result: 'failed', reason: `اعتُمد ولم يُجدوَل: ${scheduled.reason}` }
   }
   return out
 }
