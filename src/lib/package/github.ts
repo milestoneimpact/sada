@@ -31,6 +31,18 @@ export function statusReason(status: number): string {
   return `GitHub ردّ ${status}`
 }
 
+/**
+ * ردٌّ فاشلٌ خطأً بسببه (D-376) — و403 مع `x-ratelimit-remaining: 0` (أو `retry-after`) **حدُّ معدّلٍ عابر**، لا رمزٌ بلا صلاحيّة:
+ * يُحمل على 429 فيُعاد في الدورة التالية.
+ */
+export function failure(res: Response): GitHubError {
+  const limited = (res.status === 403 || res.status === 429) && (res.headers.get('x-ratelimit-remaining') === '0' || res.headers.get('retry-after') !== null)
+  if (limited) return new GitHubError(RATE_LIMITED, 429)
+  return new GitHubError(statusReason(res.status), res.status)
+}
+
+export const RATE_LIMITED = 'GitHub أوقف القراءة مؤقّتًا: بلغ الرمزُ حدَّ الطلبات في الساعة — تُعاد المزامنة وحدها بعد انقضائه'
+
 function headers(token: string, accept = 'application/vnd.github+json'): Record<string, string> {
   return { Authorization: `Bearer ${token}`, Accept: accept, 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'sada-package-sync' }
 }
@@ -49,7 +61,7 @@ export async function branchHead(r: RepoRef, etag: string | null, fetchImpl: typ
   if (etag !== null && etag !== '') h['If-None-Match'] = etag
   const res = await call(`${repoPath(r)}/branches/${seg(r.branch)}`, { headers: h })
   if (res.status === 304) return { kind: 'unchanged' }
-  if (!res.ok) throw new GitHubError(statusReason(res.status), res.status)
+  if (!res.ok) throw failure(res)
   const body = (await res.json()) as { commit?: { sha?: unknown; commit?: { tree?: { sha?: unknown } } } }
   const sha = body.commit?.sha
   const treeSha = body.commit?.commit?.tree?.sha
@@ -71,7 +83,7 @@ interface RawTree {
 
 async function readTree(r: RepoRef, sha: string, recursive: boolean, call: typeof fetch): Promise<RawTree> {
   const res = await call(`${repoPath(r)}/git/trees/${seg(sha)}${recursive ? '?recursive=1' : ''}`, { headers: headers(r.token) })
-  if (!res.ok) throw new GitHubError(statusReason(res.status), res.status)
+  if (!res.ok) throw failure(res)
   return (await res.json()) as RawTree
 }
 
@@ -115,7 +127,7 @@ export async function listTree(r: RepoRef, treeSha: string, root: string, limit:
 export async function rawFile(r: RepoRef, path: string, ref: string, fetchImpl: typeof fetch = withTimeout(fetch, 120_000)): Promise<Response> {
   const p = path.split('/').map(seg).join('/')
   const res = await withTimeout(fetchImpl, 120_000)(`${repoPath(r)}/contents/${p}?ref=${seg(ref)}`, { headers: headers(r.token, 'application/vnd.github.raw') })
-  if (!res.ok) throw new GitHubError(statusReason(res.status), res.status)
+  if (!res.ok) throw failure(res)
   return res
 }
 

@@ -121,6 +121,11 @@ export interface Section {
   readonly bar?: true
   /** صفحةٌ مستقلّة لا لوحٌ في اللوحة — فرابطُها مسارٌ لا مرساة. */
   readonly page?: string
+  /**
+   * تبويبٌ لا يُرسم في الرافدة إلّا لمن يخصّه (`RailInput.shown`) — «حزمة المحتوى» لمنظّمةٍ ربطت حزمةً أو للمالك.
+   * ‏ولوحةُ الأوامر تفهرسه دائمًا: الصفحةُ نفسُها تقول «اربط حزمتك» لمن لم يربط.
+   */
+  readonly optional?: true
 }
 
 /**
@@ -143,6 +148,8 @@ export const SECTIONS: readonly Section[] = [
    * ‏(بلا خطّة «خطّة جديدة»، ومسوّدةٌ «المراجعة»، ومثبَّتةٌ «العرض»). وفي شريط الهاتف مكانَ «المكتبة»، والمكتبةُ في «المزيد».
    */
   { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
+  // ‏«حزمة المحتوى» بعد «الخطّة» (D-366): منها تُبنى الخطّة، وشارتُها ما ينتظر قرارك من تغييراتها
+  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'العمل', alias: 'github مستودع', page: '/panel/package', optional: true },
   { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
   { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
@@ -255,7 +262,7 @@ export function buildCommands(
   })
   // ‏ورحلةُ العميل (D-257): المحطّاتُ السبع والموجز
   out.push({
-    label: 'رحلة العميل', note: 'الموجزُ والقنواتُ والخطّةُ والكلفةُ في شاشة', group: 'الأفعال',
+    label: 'رحلة العميل', note: 'الموجز والقنوات والخطّة والكلفة في شاشة', group: 'الأفعال',
     href: '/panel/client', icon: '', alias: 'client brief onboarding agency عميل موجز وكاله رحله',
   })
   // ‏وأمانُ الحساب للعضو (مراجعة D-317): مفاتيحُ مروره ورمزُ تطبيقه ورموزُ استرداده — لا بابَ آخرَ إليها
@@ -267,7 +274,7 @@ export function buildCommands(
   }
   // ‏والخطُّ الزمنيّ تبويبٌ في «النتائج» بمساره (D-212) — لا لوحٌ يُبلَغ بمرساة
   out.push({
-    label: 'أضف مصدرًا', note: 'ملفٌّ أو رابطٌ يُقرأ ويُحلَّل — في المكتبة', group: 'الأفعال',
+    label: 'أضف مصدرًا', note: 'ملفٌّ أو رابط يُقرأ ويُحلَّل — في المكتبة', group: 'الأفعال',
     href: '/panel/library#add-source', icon: '', alias: 'add source upload link url file اضف مصدر ارفع ملف رابط',
   },
   {

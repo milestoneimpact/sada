@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import type { LinkedAccount } from '../channels'
 import type { UploadRow } from '../media/uploads'
+import type { PackageFile, PackagePick } from '../package/pick'
 import { applyPlan, dateOrder, parseCsv, PLAN_TEMPLATE, readPlan, readWhen, rowKey, type PlanFacts } from './import'
 
 const NOW = new Date('2026-10-03T08:00:00Z')
@@ -263,5 +264,29 @@ describe('سلسلة X من ملفّ (D-324)', () => {
     const single = readPlan('date,time,platform,text\n2026-10-13,09:30,x,تغريدة واحدة بلا فاصل\n', facts({ accounts: [x] }))
     await applyPlan(db, 'org_owner', single.rows, 'panel:passkey', NOW)
     expect(db.raw.prepare('SELECT type FROM posts ORDER BY scheduled_at').all()).toEqual([{ type: 'thread' }, { type: 'text' }])
+  })
+})
+
+describe('وسيطةُ الحزمة في مراجعة الخطّة (D-374)', () => {
+  const file = (over: Partial<PackageFile>): PackageFile => ({
+    path: 'p', blobSha: 'sha-v', size: 600 * 1024 * 1024, role: 'media', itemNo: '06', variant: 'light',
+    version: 2, hasSound: true, r2Key: 'pkg/v', ...over,
+  })
+  const pick: PackagePick = {
+    itemNo: '06', variant: 'light', superseded: [],
+    video: file({}), cover: file({ blobSha: 'sha-c', role: 'cover', size: 200_000, r2Key: 'pkg/c' }),
+  }
+  const csv = 'date,time,platform,text,item\n2026-10-12,09:30,linkedin,نصّ,06\n'
+
+  it('المقطعُ الذي سقط إلى الغلاف يقول لماذا في مشكلات صفّه', () => {
+    const [row] = readPlan(csv, facts({ package: [pick] })).rows
+    expect(row!.packageRef).toBe('g:sha-c')
+    expect(row!.problems.join(' ')).toMatch(/^الوسيطة: المقطع .*LinkedIn.*أُلحق الغلافُ بدلَه/)
+  })
+
+  it('والمقطعُ الموافق لا يضيف مشكلة', () => {
+    const ok = { ...pick, video: file({ size: 2 * 1024 * 1024 }) }
+    const [row] = readPlan(csv, facts({ package: [ok] })).rows
+    expect(row).toMatchObject({ packageRef: 'g:sha-v', problems: [] })
   })
 })

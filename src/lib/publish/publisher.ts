@@ -28,6 +28,7 @@ import {
 } from './platforms'
 import { publishInstagram } from './instagram'
 import { publishXThread } from './xThread'
+import { isVideoTarget, uploadLinkedInVideo, uploadXVideo, videoMisfit } from './video'
 import { tweetsOf } from '../draft/thread'
 import { isLinkedInPage } from '../channels'
 import { mediaUrl, signMediaToken } from '../media/link'
@@ -95,6 +96,8 @@ export interface PublisherDeps {
   readonly now?: () => Date
   /** رقمُ تسليم الطابور لهذه الرسالة (D-270) — يُكتب في الصفّ ليُعرَف أيُّ إعادةٍ هذه */
   readonly queueAttempt?: number
+  /** ‏انتظارُ معالجة المقطع بين سؤالين (D-374) — والاختبارُ يمرّر ما لا ينتظر. */
+  readonly sleep?: (ms: number) => Promise<void>
 }
 
 /**
@@ -257,8 +260,9 @@ export async function publishPost(
        * ‏**ويُعرف صفُّ المقطع بنموذجه لا بإشارته وحدها** (مراجعة D-322): حذفُ المقطع من «فيديوهاتك» يقطع `upload_id`
        * ‏(`SET NULL`) ويُبقي صفَّ المنشور بمفتاحه، فكان يعود الإنفوجرافيكُ الأحدث. و`model = 'upload'` يكتبه `uploadMediaRow` وحدَه.
        */
-      `SELECT id, r2_key, mime, platform_media_id FROM media
-        WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE ?
+      `SELECT id, r2_key, mime, platform_media_id, platform_media_state FROM media
+        WHERE post_id = ? AND org_id = ? AND status = 'ready'
+          AND (mime LIKE ? OR (? = 1 AND model = 'package' AND mime LIKE 'video/%'))
         ORDER BY (upload_id IS NOT NULL OR model = 'upload') DESC, created_at DESC LIMIT 1`,
     )
     .bind(
@@ -267,8 +271,10 @@ export async function publishPost(
       post.platform === 'instagram'
         ? '%/%'
         : CLIP_PLATFORMS.has(post.platform) ? 'video/%' : 'image/%',
+      // ‏‏**ومقطعُ الحزمة لـ X وLinkedIn** (D-374): يُرفع مقطعًا لا صورة. وحدَه: مقطعٌ حُرّك من صورة (D-052) يبقى خارجًا كما كان
+      isVideoTarget(post.platform) ? 1 : 0,
     )
-    .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null }>()
+    .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null; platform_media_state: string | null }>()
     .catch(() => null)
 
   // دلوٌ غير ممرَّرٍ ومنشورٌ بصورة: **لا يُنشر النصُّ وحده**. المالك اعتمد
@@ -457,7 +463,45 @@ export async function publishPost(
      * وسيطُها إلى نهايةٍ لا تخصّها ويُردّ «رفعٌ نجح بلا معرّف وسيط» —
      * وهو ما وقع فعلا في أوّل تشغيل.
      */
-    if (
+    /*
+     * ‏**مقطعُ الحزمة على X وLinkedIn** (D-374): رفعٌ مقطَّعٌ ثمّ انتظارُ المعالجة (`video.ts`). ومعرّفٌ بلغ `processing`
+     * ‏في محاولةٍ سبقت يُسأل عنه ولا يُرفع ثانيةً، و`ready` يُلحَق مباشرة. وكلُّ طلبٍ يُكتب في الدفتر قبل إرساله (D-008)
+     * ‏بصفرٍ موسوم: X يحاسب على الطلب وسعرُ الرفع لم يُؤكَّد بعد.
+     */
+    if (image !== null && isVideoTarget(post.platform) && image.mime.startsWith('video/')) {
+      const target = post.platform
+      if (image.platform_media_state !== 'ready' || mediaId === null) {
+        const clip = await bucketClip(deps.bucket!, image.r2_key, image.mime)
+        if (clip === null) throw new PublishError('media_bytes_missing', 502, false)
+        const misfit = videoMisfit(target, clip.size)
+        if (misfit !== null) throw new PublishError(`video_misfit: ${misfit}`, 400, false)
+        const opts = {
+          resume: image.platform_media_state === 'processing' ? mediaId : null,
+          sleep: deps.sleep,
+          onRequest: (operation: string) => ledger(db, {
+            provider: post.platform, operation: `${operation}:price_unverified`, units: 1, unitCost: 0, refId: post.id, org: post.org_id,
+          }),
+          onStage: async (id: string, state: 'processing') => {
+            await db.prepare('UPDATE media SET platform_media_id = ?, platform_media_state = ?, platform_media_error = NULL WHERE id = ? AND org_id = ?')
+              .bind(id, state, image.id, post.org_id).run()
+          },
+        }
+        try {
+          mediaId = target === 'linkedin'
+            ? await uploadLinkedInVideo(tokens.accessToken, `urn:li:person:${post.external_id}`, clip, fetchImpl, opts)
+            : await uploadXVideo(tokens.accessToken, clip, fetchImpl, opts)
+        } catch (error) {
+          // ‏‏المردودُ نهائيًّا يُكتب سببُه على الوسيط ويُنسى معرّفُه: «أعده» بعد تصحيح المقطع يرفع من أوّله
+          if (error instanceof PublishError && !error.retryable) {
+            await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL WHERE id = ? AND org_id = ?")
+              .bind(error.message.slice(0, 300), image.id, post.org_id).run()
+          }
+          throw error
+        }
+        await db.prepare("UPDATE media SET platform_media_id = ?, platform_media_state = 'ready', platform_media_error = NULL WHERE id = ? AND org_id = ?")
+          .bind(mediaId, image.id, post.org_id).run()
+      }
+    } else if (
       image !== null && mediaId === null
       && !CLIP_PLATFORMS.has(post.platform)
       && post.platform !== 'instagram'

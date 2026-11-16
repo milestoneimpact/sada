@@ -30,7 +30,12 @@ export interface RailInput {
   readonly parent?: boolean
   /** المنظّماتُ والنشطةُ منها: مبدّلٌ تحت العلامة حين تكون أكثرَ من واحدة (`scope.ts`). */
   readonly scope?: Scope
+  /** التبويباتُ الاختياريّة (`Section.optional`) التي تُرسم — «حزمة المحتوى» حين رُبطت حزمةٌ أو للمالك. */
+  readonly shown?: readonly string[]
 }
+
+/** الأقسامُ التي تُرسم لهذا الطلب: الثابتةُ كلُّها، والاختياريّةُ بطلبها. */
+const visible = (input: RailInput) => SECTIONS.filter((s) => s.optional !== true || (input.shown ?? []).includes(s.id))
 
 /**
  * «المزيد» على الهاتف — **قائمةٌ لا بحث** (خطّة التصميم 5.3 · D-208).
@@ -40,7 +45,7 @@ export interface RailInput {
  * فلا يختفي «ينتظرك» تحت زرٍّ لا رقمَ عليه. وعلى الحاسوب لا يُرسم: الرافدةُ تحمل السبعة.
  */
 function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): string {
-  const rest = SECTIONS.filter((s) => s.bar !== true)
+  const rest = visible(input).filter((s) => s.bar !== true)
   const total = rest.reduce((n, s) => n + (counts[s.id] ?? 0), 0)
   const links = rest.map((s) => {
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
@@ -58,7 +63,7 @@ function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): 
 export function railHtml(input: RailInput): string {
   const counts = input.counts ?? {}
   let lastGroup = ''
-  const tabs = SECTIONS.map((s) => {
+  const tabs = visible(input).map((s) => {
     const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
     lastGroup = s.group
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
@@ -95,9 +100,9 @@ export function railHtml(input: RailInput): string {
 }
 
 /** رافدةُ الصفحة المستقلّة — بقسمها معلَّمًا، ومساراتُها إلى اللوحة، ومنصّتُها إن كانت. */
-export function soloNav(active: string, platform?: string): string {
+export function soloNav(active: string, platform?: string, nav?: Pick<RailInput, 'shown' | 'counts'>): string {
   return railHtml({
     // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (خطّة التصميم 5.1 · D-205): سبعةٌ في الرافدة، والمنصّاتُ في لوحها
-    active, inPanel: false, parent: platform !== undefined,
+    active, inPanel: false, parent: platform !== undefined, ...(nav ?? {}),
   })
 }

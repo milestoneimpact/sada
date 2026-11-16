@@ -361,6 +361,8 @@ export interface PanelData {
   readonly paused: boolean
   /** ما لم يُقرأ من الإشعارات (D-294) — جملةٌ واحدة في الهيكل، وغيابُه صفر. */
   readonly unread?: number
+  /** تبويبُ «حزمة المحتوى»: أرُبطت حزمة، وكم تغييرًا ينتظر قرارك (`packageNav`). */
+  readonly packageNav?: { readonly linked: boolean; readonly awaiting: number }
   readonly autoEnqueue: boolean
   /** صورةٌ مع كلّ مسوّدة (D-255) وسقفُها وما وُلّد اليوم. */
   readonly autoImage: boolean
@@ -513,7 +515,7 @@ export interface PanelData {
 
 /** ما يرسمه الهيكلُ لكلّ لوح: الرافدةُ بأعدادها، والترويسةُ وحبّةُ الحال، والإشعارُ وشريطُ المنصّات المنقطعة. */
 export type ShellData = Pick<PanelData,
-  'env' | 'role' | 'paused' | 'pulses' | 'rpId' | 'flash' | 'now' | 'csrf' | 'nonce' | 'orgs' | 'org' | 'drafts' | 'channels' | 'zone' | 'unread'>
+  'env' | 'role' | 'paused' | 'pulses' | 'rpId' | 'flash' | 'now' | 'csrf' | 'nonce' | 'orgs' | 'org' | 'drafts' | 'channels' | 'zone' | 'unread' | 'packageNav'>
 
 /** «نظرة عامّة»: الرحلةُ و«ما ينتظرك» والبطاقاتُ (`TileSource`) و«الكلفة وما وقع». */
 export type OverviewData = Pick<PanelData,
@@ -1752,14 +1754,18 @@ export function panelPage(view: PaneView): string {
   const counts: Readonly<Record<string, number>> = {
     posts: waitingDrafts + d.drafts.filter((x) => x.status === 'failed').length,
     accounts: d.channels.filter((c) => channelHealth(c, d.now).kind === 'broken').length,
+    // ‏وتغييراتُ الحزمة التي تنتظر قرارك — يدُ المالك كالمسوّدات
+    package: d.packageNav?.awaiting ?? 0,
   }
+  // ‏«حزمة المحتوى» لمنظّمةٍ ربطت حزمةً، وللمالك دائمًا: منه تُربط الحزمةُ أوّلَ مرّة
+  const shown = d.packageNav?.linked === true || (d.org ?? OWNER_ORG) === OWNER_ORG ? ['package'] : []
 
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
 ${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
+${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">

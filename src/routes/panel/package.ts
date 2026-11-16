@@ -14,7 +14,7 @@ import { buildCommands } from '../ui/command'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { packageScreen, type PackageScreen } from '../ui/packageView'
 import {
-  checkSource, judgeHook, readPackageMedia, readSource, removeSource, rotateHookSecret, saveSource, syncPackage, tokenFor, tokenReadyFor, hookTooLarge, firstDelivery, MAX_HOOK_BYTES,
+  checkSource, currentPicks, judgeHook, readPackageMedia, readSource, removeSource, rotateHookSecret, saveSource, syncPackage, tokenFor, tokenReadyFor, hookTooLarge, firstDelivery, MAX_HOOK_BYTES,
 } from '../../lib/package/sync'
 import { guardPost, loginResponse, page, setFlash, takeFlash } from './shared'
 import { lastAppliedSnapshot, listRevisions, missingCopy, readRevision, revisePackage, revisionDiff } from '../../lib/package/revision'
@@ -22,6 +22,11 @@ import { counted, NOUNS } from '../../lib/format'
 import { decideChange, readChanges } from '../../lib/package/apply'
 import { changesScreen } from '../ui/packageChangesView'
 import { toCsv } from '../../lib/package/plan'
+import { probeAccess } from '../../lib/package/diagnose'
+import { adoptRevision, previewRevision, setFollow } from '../../lib/package/adopt'
+import { planPackageScreen } from '../ui/planPackageView'
+import { allows } from '../../lib/access'
+import { panelHref } from '../../lib/nav/panes'
 
 export const pkg = new Hono<{ Bindings: Env }>()
 
@@ -45,7 +50,7 @@ export interface PackageSyncMessage {
 
 function render(env: Env, csrf: string, m: PackageScreen): Response {
   return page((nonce) => soloPage('صدى — حزمة المحتوى', { href: '/panel/library', label: 'المكتبة', at: '/panel/package' },
-    injectCsrf(packageScreen(m), csrf), nonce, '', buildCommands({ onPanel: false }), soloNav('library')))
+    injectCsrf(packageScreen(m), csrf), nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
 }
 
 pkg.get('/panel/package', async (c) => {
@@ -96,6 +101,20 @@ pkg.post('/panel/package', async (c) => {
     return render(c.env, gate.session.record.csrf, {
       source: { ...source, hasHook: true }, media: await readPackageMedia(c.env.DB, org), tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN), revisions: [], missing: [],
       hook: { url: base + '/hooks/github/' + source.id, secret },
+    })
+  }
+  if (act === 'test') {
+    // ‏قراءتان لا ثالثة (D-376): المستودعُ ثمّ الفرع — والنتيجةُ في الصفحة نفسِها، والرمزُ لا يدخلها
+    const token = await tokenFor(source, c.env.TOKEN_ENC_KEY, c.env.GITHUB_CONTENT_TOKEN)
+    if (token === null) {
+      await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'ينقص رمز القراءة — خطواتُه في «ما عليك».' })
+      return back()
+    }
+    const probe = await probeAccess({ owner: source.owner, repo: source.repo, branch: source.branch, token })
+    await record(c.env.DB, { actor: 'panel', action: 'package.test', target: source.id, detail: probe.verdict }, c.req.raw)
+    const [media, revisions] = await Promise.all([readPackageMedia(c.env.DB, org), listRevisions(c.env.DB, org, 10)])
+    return render(c.env, gate.session.record.csrf, {
+      source, media, revisions, missing: [], tokenReady: true, probe,
     })
   }
   if (act === 'settings') {
@@ -154,6 +173,74 @@ pkg.post('/panel/package', async (c) => {
   return back()
 })
 
+/**
+ * «من حزمتك في GitHub» (D-377): نسخُ الحزمة، وأيُّ نسخةٍ تصوّرًا كاملًا من لقطتها المحفوظة — بلا نداءٍ إلى GitHub ولا كلفة.
+ * والافتراضُ أحدثُ نسخةٍ قُرئت.
+ */
+pkg.get('/panel/plan/package', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const org = activeOrg(session.record)
+  const source = await readSource(c.env.DB, org)
+  if (source === null) return c.redirect('/panel/plan/new?way=build', 303)
+  const [revisions, media, flash] = await Promise.all([listRevisions(c.env.DB, org, 30), readPackageMedia(c.env.DB, org), takeFlash(c.env, c.req.raw)])
+  const asked = c.req.query('rev') ?? ''
+  const readable = revisions.filter((r) => r.status === 'applied' || r.status === 'analysed')
+  // ‏أيُّ نسخةٍ للمنظّمة بمعرّفها، لا آخرُ ثلاثين وحدها — والرابطُ إلى نسخةٍ قديمة يفتحها
+  const listed = revisions.find((r) => r.id === asked)
+  const older = asked !== '' && listed === undefined && /^rev_[a-z0-9]{1,40}$/.test(asked) ? await readRevision(c.env.DB, org, asked) : null
+  const notFound = asked !== '' && listed === undefined && older === null
+  const chosen = listed ?? older ?? readable[0] ?? null
+  const preview = chosen === null ? null : await previewRevision(c.env.DB, org, chosen.id, currentPicks(media), { x: source.variants.x, linkedin: source.variants.linkedin })
+  const body = planPackageScreen({
+    repo: source.owner + '/' + source.repo + '@' + source.branch, revisions, preview, follow: source.followUpdates,
+    canBuild: allows(session.record.role ?? 'owner', 'admin'),
+    flash: flash !== null ? { tone: flash.kind, text: flash.text }
+      : notFound ? { tone: 'warn', text: 'لم نجد النسخةَ المطلوبة في حزمتك' + (chosen === null ? '.' : '، فهذه أحدثُ نسخةٍ مقروءة.') }
+      : chosen !== null && preview === null ? { tone: 'warn', text: 'تعذّرت قراءةُ هذه النسخة: ' + (chosen.error ?? 'لم تُحسب بعد') + '. اختر غيرها.' } : null,
+  })
+  return page((nonce) => soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('plan', undefined, { shown: ['package'] })))
+})
+
+pkg.post('/panel/plan/package', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const source = await readSource(c.env.DB, org)
+  if (source === null) return c.redirect('/panel/plan/new?way=build', 303)
+  const rev = String(gate.form.get('rev') ?? '')
+  const back = (): Response => c.redirect('/panel/plan/package' + (/^rev_[a-f0-9]{1,40}$/.test(rev) ? '?rev=' + rev : ''), 303)
+  if (!allows(gate.session.record.role ?? 'owner', 'admin')) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'بناءُ الخطّة للمدير فأعلى.' })
+    return back()
+  }
+  // ‏«تابع التحديث تلقائيًّا» نموذجٌ وحده (D-377): يُحفظ ولا يبني شيئًا، والدفعُ التالي يقرؤه
+  if (gate.form.get('do') === 'follow') {
+    const follow = gate.form.get('follow') === '1'
+    if (follow !== source.followUpdates) await setFollow(c.env.DB, org, source.id, follow)
+    await record(c.env.DB, { actor: 'panel', action: 'package.follow', target: source.id, detail: follow ? 'follow' : 'hold' }, c.req.raw)
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: follow ? 'حُفظ: كلُّ دفعٍ جديد يحدّث المسوّدات وحده.' : 'حُفظ: كلُّ تغييرٍ على منشورٍ قائم ينتظر قرارك.' })
+    return back()
+  }
+  const out = await adoptRevision(c.env.DB, source, rev)
+  await record(c.env.DB, { actor: 'panel', action: 'package.adopt', target: rev, detail: out.kind + (source.followUpdates ? ' · follow' : ' · hold') }, c.req.raw)
+  if (out.kind === 'failed') {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'تعذّر بناءُ الخطّة من هذه النسخة، ولم يُطبَّق شيءٌ منها. حاول ثانيةً.' })
+    return back()
+  }
+  if (out.kind === 'missing') {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم نجد هذه النسخةَ مقروءةً في حزمتك. اختر غيرها.' })
+    return c.redirect('/panel/plan/package', 303)
+  }
+  if (out.kind === 'same') {
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'خطّتك مبنيّةٌ من هذه النسخة: لا تغيير.' })
+    return back()
+  }
+  await setFlash(c.env, c.req.raw, { kind: out.awaiting > 0 ? 'warn' : 'ok', text: 'بُنيت الخطّة: ' + counted(out.changes, NOUNS.change) + (out.awaiting === 0 ? '.' : '، وينتظر قرارك ' + counted(out.awaiting, NOUNS.update) + '.') })
+  return c.redirect('/panel/package/changes/' + out.id, 303)
+})
+
 /** ويب هوك GitHub — عامّ، والتوقيعُ هو الإذن. لا يُقرأ الحِمل في سجلّ. */
 pkg.post('/hooks/github/:sourceId', async (c) => {
   if (hookTooLarge(c.req.header('Content-Length') ?? null)) return c.body(null, 413)
@@ -194,7 +281,7 @@ pkg.get('/panel/package/changes/:rev', async (c) => {
     : (await revisionDiff(c.env.DB, org, revision.id)).map((x, i) => ({ ...x, id: 'diff:' + String(i), revisionId: revision.id, postId: null, disposition: 'frozen_published' as const, postStatus: null }))
   return page((nonce) => soloPage('صدى — ما تغيّر في حزمتك', { href: '/panel/package', label: 'حزمة المحتوى', at: '/panel/package' },
     injectCsrf(changesScreen({ revision, changes, history, flash: flash === null ? null : { tone: flash.kind, text: flash.text } }), session.record.csrf),
-    nonce, '', buildCommands({ onPanel: false }), soloNav('library')))
+    nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
 })
 
 pkg.post('/panel/package/changes/:rev/decide', async (c) => {

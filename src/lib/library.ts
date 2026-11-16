@@ -216,11 +216,11 @@ export function attachStatement(db: Db, org: string, postId: string, ref: string
       ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'upload', 0, 'ready', ?3, width, height, org_id, brand_id
            FROM uploads WHERE id = ?4 AND org_id = ?5 AND status = 'ready'`
       : p.tag === 'g'
-        // ‏وسيطةُ الحزمة (D-366): الغلافُ لأيّ منشور، والمقطعُ لمنصّات المقاطع وحدها — فالناشرُ لا يرفع مقطعًا إلى نهاية صور
+        // ‏وسيطةُ الحزمة (D-366): الغلافُ لأيّ منشور، والمقطعُ لمنصّات المقاطع ولـ X وLinkedIn (D-374) — وللاثنين رفعُ مقاطعَ في الناشر
         ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'package', 0, 'ready', ?3, 1080, 1080, org_id,
                coalesce((SELECT brand_id FROM posts WHERE id = ?2), 'brand_owner')
              FROM package_media WHERE blob_sha = ?4 AND org_id = ?5 AND r2_key IS NOT NULL
-              AND (kind = 'image' OR (SELECT platform FROM posts WHERE id = ?2 AND org_id = ?5) IN ('youtube', 'tiktok', 'instagram'))`
+              AND (kind = 'image' OR (SELECT platform FROM posts WHERE id = ?2 AND org_id = ?5) IN ('youtube', 'tiktok', 'instagram', 'x', 'linkedin'))`
       : p.tag === 'd'
         // ‏وسيطةُ Drive (D-363): صورةٌ نُزّلت إلى R2 وحاضرةٌ في المجلّد — والمقطعُ يُنشر من «فيديوهاتك» لا من هنا
         ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'drive', 0, 'ready', ?3, NULL, NULL, org_id,

@@ -1,7 +1,7 @@
 /**
- * «ما تغيّر في حزمتك» (D-372) — رأسٌ بثلاثة أرقام، ثمّ بطاقةٌ لكلّ مادّة فيها قبلُ وبعدُ متجاوران، وزرّان لكلّ ما ينتظر:
- * «اعتمد التحديث» و«أبقِ القديم»، وزرٌّ جماعيٌّ لكلّ نوع. نماذجُ POST بلا سكربت بالعُدّة نفسِها.
- * والنصوصُ هنا للمالكة: بلا أرقام قرارات.
+ * «ما تغيّر في حزمتك» (D-372) — رأس بثلاثة أرقام، ثمّ بطاقة لكلّ مادّة فيها قبل وبعد متجاوران، وزرّان لكلّ ما ينتظر:
+ * «اعتمد التحديث» و«أبقِ القديم»، وزرٌّ جماعيٌّ لكلّ نوع. نماذج POST بلا سكربت بالعُدّة نفسِها.
+ * والنصوص هنا للمالكة: بلا أرقام قرارات.
  */
 import type { StoredChange } from '../../lib/package/apply'
 import type { SnapshotEntry } from '../../lib/package/diff'
@@ -39,8 +39,8 @@ function disposition(c: ChangeView): string {
   switch (c.disposition) {
     case 'auto_applied': return statusBadge('ok', '✓', c.kind === 'added' && c.postId === null && c.after?.text === null ? 'ينتظر الكتابة' : 'حُدّث وحده')
     case 'awaiting_owner': return statusBadge('warn', '!', 'ينتظر قرارك')
-    case 'accepted': return statusBadge('ok', '✓', 'اعتمدتِ التحديث')
-    case 'kept_old': return c.supersededBy == null ? statusBadge('', '○', 'أبقيتِ القديم') : statusBadge('', '○', 'سبقه تحديثٌ أحدث')
+    case 'accepted': return statusBadge('ok', '✓', 'اعتمدت التحديث')
+    case 'kept_old': return c.supersededBy == null ? statusBadge('', '○', 'أبقيت القديم') : statusBadge('', '○', 'سبقه تحديث أحدث')
     case 'frozen_published': return statusBadge('', '■', 'نُشر — لا يتغيّر')
   }
 }
@@ -72,14 +72,14 @@ function changeBlock(rev: string, c: ChangeView): Html {
       <div class="pk-side pk-new"><h4>بعد</h4>${side(c.after, c.kind)}</div>
     </div>
     ${problems.length === 0 ? html`` : html`<p class="m-0">${raw(statusBadge('warn', '!', problems.join('، ')))}</p>`}
-    ${c.disposition === 'awaiting_owner' && c.kind === 'time' ? html`<p class="hint m-0">اعتمادُ الموعد يحدّث موعدَه في الحزمة، وجدولتُه تبقى من بطاقته.</p>` : html``}
-    ${c.supersededBy == null ? html`` : html`<p class="hint m-0">دفعةٌ أحدث غيّرت هذا المنشور بالنوع نفسِه بعد هذا التغيير، فلم يُكتب فوقها. <a href="/panel/package/changes/${c.supersededBy}">افتح الدفعة الأحدث</a>.</p>`}
+    ${c.disposition === 'awaiting_owner' && c.kind === 'time' ? html`<p class="hint m-0">اعتماد الموعد يحدّث موعدَه في الحزمة، وجدولتُه تبقى من بطاقته.</p>` : html``}
+    ${c.supersededBy == null ? html`` : html`<p class="hint m-0">دفعة أحدث غيّرت هذا المنشور بالنوع نفسِه بعد هذا التغيير، فلم يُكتب فوقها. <a href="/panel/package/changes/${c.supersededBy}">افتح الدفعة الأحدث</a>.</p>`}
     ${c.decidedAt == null || c.disposition === 'awaiting_owner' ? html`` : html`<p class="hint m-0">حُسم <bdi dir="ltr">${c.decidedAt.slice(0, 16)}</bdi></p>`}
     ${decideForm(rev, c)}
   </section>`
 }
 
-/** الأرقامُ الثلاثة في رأس الشاشة. */
+/** الأرقام الثلاثة في رأس الشاشة. */
 export function summary(r: RevisionRow): string {
   return html`<dl class="pk-sum">
     <div><dt>أُضيف</dt><dd>${String(r.counts.added)}</dd></div>
@@ -93,7 +93,7 @@ const STATUS: Readonly<Record<RevisionRow['status'], readonly ['ok' | 'warn' | '
 }
 export const revisionBadge = (r: RevisionRow): string => statusBadge(...STATUS[r.status])
 
-/** سجلُّ الدفعات — قائمةٌ منسدلة بلا سكربت. */
+/** سجلُّ الدفعات — قائمة منسدلة بلا سكربت. */
 export function historyMenu(history: readonly RevisionRow[]): string {
   if (history.length === 0) return ''
   return menu({ label: 'الدفعات السابقة', size: 'sm', items: history.map((r) => menuItem({
@@ -110,7 +110,7 @@ export function changesScreen(m: ChangesScreen): string {
     historyMenu(m.history.filter((h) => h.id !== r.id)))
   const flash = m.flash == null ? html`` : html`<p class="m-0">${raw(statusBadge(m.flash.tone, m.flash.tone === 'ok' ? '✓' : '!', m.flash.text))}</p>`
   const kinds = [...new Set(awaiting.map((c) => c.kind))]
-  const bulk = kinds.length === 0 ? html`` : raw(card({ title: 'قرارٌ واحد لنوعٍ كامل', level: 2, body: html`<p class="hint m-0">المسوّدات حُدّثت وحدها. وهذا ما اعتمدتِه أو جُدول: لا يتغيّر إلا بقرارك.</p>
+  const bulk = kinds.length === 0 ? html`` : raw(card({ title: 'قرار واحد لنوع كامل', level: 2, body: html`<p class="hint m-0">المسوّدات حُدّثت وحدها. وهذا ما اعتمدتِه أو جُدول: لا يتغيّر إلا بقرارك.</p>
     ${kinds.map((k) => html`<form method="post" action="/panel/package/changes/${r.id}/decide" class="pk-acts">
       <input type="hidden" name="kind" value="${k}"><span>${BULK[k]} (${String(awaiting.filter((c) => c.kind === k).length)})</span>
       ${raw(button({ label: 'اعتمدها كلّها', variant: 'secondary', type: 'submit', name: 'verdict', value: 'accept', size: 'sm' }))}

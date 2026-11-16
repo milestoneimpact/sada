@@ -1,6 +1,6 @@
 /**
- * شاشةُ «حزمة المحتوى» (D-366) — الربطُ، وحالُ آخر دفعة، و«زامن الآن»، وبطاقةٌ لكلّ مادّة بمقطعها المعتمد وغلافها والنسخِ المستبدَلة
- * مطويّةً. نماذجُ بلا سكربت بالعُدّة نفسِها.
+ * شاشة «حزمة المحتوى» (D-366) — الربط، وحال آخر دفعة، و«زامن الآن»، وبطاقة لكلّ مادّة بمقطعها المعتمد وغلافها والنسخ المستبدَلة
+ * مطويّة. نماذج بلا سكربت بالعُدّة نفسِها.
  */
 import type { PackageMediaRow, PackageSource } from '../../lib/package/sync'
 import { pageHead } from './parts'
@@ -12,19 +12,22 @@ import { html, raw, type Html } from './html'
 import { escapeHtml } from './escape'
 import { counted, NOUNS } from '../../lib/format'
 import type { RevisionRow } from '../../lib/package/revision'
+import { fixFor, type AccessProbe } from '../../lib/package/diagnose'
 import { historyMenu, revisionBadge, short as shortSha } from './packageChangesView'
 
 export interface PackageScreen {
   readonly source: PackageSource | null
   readonly media: readonly PackageMediaRow[]
   readonly tokenReady: boolean
-  /** آخرُ الدفعات — الأحدثُ أوّلًا. */
+  /** آخر الدفعات — الأحدث أوّلًا. */
   readonly revisions?: readonly RevisionRow[]
-  /** منشوراتٌ في الخطّة بلا نصٍّ جاهز («01 · x»). */
+  /** منشورات في الخطّة بلا نصٍّ جاهز («01 · x»). */
   readonly missing?: readonly string[]
-  /** عنوانُ الويب هوك وسرُّه — مرّةً واحدة بعد التوليد، ولا يُحفظ في صفحةٍ غيرها. */
+  /** عنوان الويب هوك وسرُّه — مرّة واحدة بعد التوليد، ولا يُحفظ في صفحة غيرها. */
   readonly hook?: { readonly url: string; readonly secret: string }
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+  /** نتيجة «اختبر الرمز» (D-376) — تُعرض مرّة بعد الضغط ولا تُحفظ. */
+  readonly probe?: AccessProbe
 }
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
@@ -35,7 +38,23 @@ function statusLine(s: PackageSource): Html {
     : s.status === 'partial' ? statusBadge('warn', '…', 'يُكمل النقل')
       : s.status === 'failed' ? statusBadge('bad', '!', 'تعذّرت المزامنة') : statusBadge('', '○', 'لم يُزامَن بعد')
   return html`<p class="m-0">${raw(face)} · آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi dir="ltr">${s.lastCheckedAt}</bdi>`}</p>
-    ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>`}`
+    ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>${fixList(fixFor(s.error))}`}`
+}
+
+/** خطوات الإصلاح مرقّمة — لا تُرسم إن لم نعرف السبب. */
+function fixList(fix: readonly string[]): Html {
+  return fix.length === 0 ? html`` : html`<ol class="stack m-0">${fix.map((f) => html`<li>${f}</li>`)}</ol>`
+}
+
+const STEP = { repo: 'المستودع', branch: 'الفرع' } as const
+
+/** نتيجة «اختبر الرمز»: أيُّ الخطوتين نجحت، والسبب الدقيق، وخطوات إصلاحه. */
+function probeCard(p: AccessProbe): string {
+  const ok = p.verdict === 'ok'
+  const steps = (['repo', 'branch'] as const).map((k) => html`<li>${p.passed.includes(k) ? raw(statusBadge('ok', '✓', STEP[k] + ': نجح'))
+    : raw(statusBadge(p.passed.length === 0 && k === 'branch' ? '' : 'bad', p.passed.length === 0 && k === 'branch' ? '○' : '!', STEP[k] + (p.passed.length === 0 && k === 'branch' ? ': لم يُجرَّب' : ': لم ينجح')))}</li>`)
+  return card({ variant: 'alert', tone: ok ? 'ok' : 'warn', title: ok ? 'الرمز يعمل' : 'اختبار الرمز: ما يلزم إصلاحه', level: 2,
+    body: html`<ul class="plain">${steps}</ul><p class="m-0">${p.reason}</p>${p.identity === undefined ? html`` : html`<p class="hint m-0">${p.identity}</p>`}${fixList(p.fix)}`.value })
 }
 
 function input(id: string, label: string, name: string, value: string, required: boolean): string {
@@ -70,7 +89,7 @@ function itemCards(media: readonly PackageMediaRow[]): Html {
     })
     const old = own.filter((m) => !m.isCurrent)
     return raw(card({ title: 'المادّة ' + item, level: 3, body: html`<ul class="plain">${lines}</ul>
-      <p class="hint m-0">لـ X ولـ LinkedIn الغلافُ باللون المختار في الإعدادات — والمقطعُ جاهزٌ ولم تُفتح المنصّتان له بعد.</p>
+      <p class="hint m-0">لـ X ولـ LinkedIn الغلاف باللون المختار في الإعدادات — والمقطع جاهز ولم تُفتح المنصّتان له بعد.</p>
       ${old.length === 0 ? html`` : html`<details><summary>${String(old.length)} نسخة مستبدَلة</summary><ul class="plain">${old.map((m) =>
         html`<li><bdi dir="ltr">${m.path.split('/').pop() ?? ''}</bdi></li>`)}</ul></details>`}
       ${item === '15' ? html`<p class="hint m-0">${raw(statusBadge('warn', '!', 'قبل النشر'))} يُضاف رابط التسجيل إلى نصّ هذه المادّة.</p>` : html``}`.value }))
@@ -82,7 +101,7 @@ function choice(name: string, label: string, value: 'dark' | 'light'): string {
   return field({ id: 'pkg-' + name, label, control: '<select name="' + name + '">' + opt('dark', 'داكن') + opt('light', 'فاتح') + '</select>' })
 }
 
-/** بطاقةُ الإعدادات: لونُ كلّ منصّة، وما تفعله صدى عند كلّ دفع — بلغة المالك. */
+/** بطاقة الإعدادات: لون كلّ منصّة، وما تفعله صدى عند كلّ دفع — بلغة المالك. */
 function settingsCard(s: PackageSource): string {
   return card({ title: 'إعدادات الحزمة', level: 2, body: html`<form method="post" action="/panel/package" class="stack">
     <input type="hidden" name="do" value="settings">
@@ -101,10 +120,10 @@ function settingsCard(s: PackageSource): string {
 function revisionsCard(revs: readonly RevisionRow[], missing: readonly string[]): string {
   const last = revs[0]
   const waiting = revs.reduce((n, r) => n + r.counts.awaiting, 0)
-  // ‏الزرُّ إلى الدفعة التي فيها القرار — قد تكون أقدمَ من الأخيرة
+  // ‏الزرُّ إلى الدفعة التي فيها القرار — قد تكون أقدم من الأخيرة
   const target = revs.find((r) => r.counts.awaiting > 0) ?? last
   const body = last === undefined
-    ? html`<p class="m-0">لم تُقرأ دفعةٌ بعد. اضغط «زامن الآن» فتُبنى الخطّة من الحزمة: النصُّ الجاهز كما هو، والفيديو أو الغلاف لكلّ منشور.</p>`
+    ? html`<p class="m-0">لم تُقرأ دفعة بعد. اضغط «زامن الآن» فتُبنى الخطّة من الحزمة: النصُّ الجاهز كما هو، والفيديو أو الغلاف لكلّ منشور.</p>`
     : html`<p class="m-0">آخر دفعة <bdi dir="ltr">${shortSha(last.commit)}</bdi> ${raw(revisionBadge(last))}${last.message === '' ? '' : ' · ' + last.message}</p>
       ${waiting === 0 ? html`` : html`<p class="m-0">${raw(statusBadge('warn', '!', 'ينتظر قرارك ' + counted(waiting, NOUNS.update)))}</p>`}
       <div class="pk-acts">${raw(button({ label: 'ما تغيّر في حزمتك', variant: waiting > 0 ? 'primary' : 'secondary', href: '/panel/package/changes/' + (target ?? last).id }))}${raw(historyMenu(revs.slice(1)))}</div>`
@@ -124,14 +143,18 @@ export function packageScreen(m: PackageScreen): string {
   const flash = m.flash === undefined || m.flash === null ? html`` : html`<p class="m-0">${raw(statusBadge(m.flash.tone, m.flash.tone === 'ok' ? '✓' : '!', m.flash.text))}</p>`
   const token = m.tokenReady ? html`` : raw(card({ variant: 'alert', tone: 'warn', title: 'ينقص رمز القراءة', level: 2,
     body: html`<p class="m-0">صدى لا تقرأ المستودع الخاصّ بلا رمز قراءة. خطواتُه في «ما عليك».</p>`.value }))
-  const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانيةً', level: 2,
+  const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانية', level: 2,
     body: html`<p class="m-0">Payload URL: <code dir="ltr">${m.hook.url}</code></p><p class="m-0">Secret: <code dir="ltr">${m.hook.secret}</code></p>`.value }))
   const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s)}
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="sync">${raw(button({ label: 'زامن الآن', variant: 'primary', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
+      <input type="hidden" name="do" value="test">${raw(button({ label: 'اختبر الرمز', type: 'submit' }))}
+      <span class="hint">قراءتان مجّانيّتان: المستودع ثمّ الفرع.</span></form>
+    <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="hook">${raw(button({ label: s.hasHook ? 'أعد توليد سرّ التحديث الفوري' : 'اربط التحديث الفوري', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'quiet', type: 'submit' }))}</form>`.value }))
-  return html`${raw(head)}<div class="stack">${flash}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? []))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
+  const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
+  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? []))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

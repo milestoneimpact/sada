@@ -10,6 +10,7 @@ import { MAX_MEDIA_FILES, SYNC_BYTE_CAP } from '../drive/media'
 import { openScoped, sealScoped, LEGACY_RAW, toBase64 } from '../crypto'
 import { OWNER_ORG } from '../tenancy'
 import { branchHead, GitHubError, listTree, type RepoRef } from './github'
+import { probeAccess } from './diagnose'
 import { classifyPath, mimeOf, type FileRole, type PackageVariant } from './classify'
 import { pickMedia, type PackageFile, type PackagePick } from './pick'
 import { storeBlob, type StreamBucket } from './media'
@@ -35,6 +36,8 @@ export interface PackageSource {
   readonly sealedToken: { readonly ciphertext: string; readonly iv: string } | null
   /** لونُ كلّ منصّة (D-368) — تعدّله المالك من بطاقة الإعدادات. */
   readonly variants: { readonly x: PackageVariant; readonly linkedin: PackageVariant }
+  /** «تابع التحديث تلقائيًّا» (D-377) — الافتراضُ نعم. */
+  readonly followUpdates: boolean
 }
 
 interface SourceRow {
@@ -42,11 +45,11 @@ interface SourceRow {
   token_enc: string | null; token_iv: string | null; webhook_secret_enc: string | null
   last_commit_sha: string | null; last_tree_sha: string | null; last_etag: string | null; last_checked_at: string | null
   status: PackageSource['status']; error_reason: string | null
-  x_variant?: PackageVariant; linkedin_variant?: PackageVariant
+  x_variant?: PackageVariant; linkedin_variant?: PackageVariant; follow_updates?: number
 }
 
 const SOURCE_COLUMNS = `id, org_id, owner, repo, branch, root_path, token_enc, token_iv, webhook_secret_enc, last_commit_sha, last_tree_sha,
-  last_etag, last_checked_at, status, error_reason, x_variant, linkedin_variant`
+  last_etag, last_checked_at, status, error_reason, x_variant, linkedin_variant, follow_updates`
 
 function toSource(r: SourceRow): PackageSource {
   return {
@@ -55,6 +58,7 @@ function toSource(r: SourceRow): PackageSource {
     status: r.status, error: r.error_reason, hasHook: r.webhook_secret_enc !== null,
     sealedToken: r.token_enc !== null && r.token_iv !== null ? { ciphertext: r.token_enc, iv: r.token_iv } : null,
     variants: { x: r.x_variant ?? 'dark', linkedin: r.linkedin_variant ?? 'light' },
+    followUpdates: (r.follow_updates ?? 1) !== 0,
   }
 }
 
@@ -199,7 +203,9 @@ export async function firstDelivery(kv: DeliveryStore, sourceId: string, deliver
 export async function tokenFor(s: PackageSource, encKey: string, workerToken: string | undefined): Promise<string | null> {
   if (s.sealedToken !== null) return openScoped(encKey, SCOPE, s.sealedToken, tokenContext(s.id), LEGACY_RAW).catch(() => null)
   // ‏سرُّ Worker للمنظّمة المالك وحدها — منظّمةٌ أخرى لا تقرأ بمفتاح غيرها
-  return s.org === OWNER_ORG && workerToken !== undefined && workerToken !== '' ? workerToken : null
+  const clean = (workerToken ?? '').trim().replace(/^["'«]+|["'»]+$/g, '').trim()
+  // ‏المفتاحُ يُنظَّف من مسافةٍ أو تنصيصٍ لصقهما المالك مع القيمة، فلا يُرسَل إلى GitHub مشوَّهًا
+  return s.org === OWNER_ORG && clean !== '' ? clean : null
 }
 
 /** هل لهذه المنظّمة رمزُ قراءة؟ المختومُ في صفّها، أو سرُّ Worker إن كانت المالك. */
@@ -278,7 +284,12 @@ export async function syncPackage(deps: SyncDeps, source: PackageSource, opts: {
     ).bind(head.sha, head.treeSha, head.etag, now, status, reason, source.id, source.org).run()
     return { kind: 'synced', commit: head.sha, seen: tree.length, changed, stored: transfer.stored, deferred: transfer.deferred, current, problems: transfer.problems }
   } catch (error) {
-    const reason = error instanceof GitHubError ? error.message : 'تعذّرت المزامنة'
+    let reason = error instanceof GitHubError ? error.message : 'تعذّرت المزامنة'
+    // ‏404 وحده لا يقول أيَّهما (D-376): المستودعُ أوّلًا ثمّ الفرع، فيُكتب السببُ الدقيق
+    if (error instanceof GitHubError && error.status === 404) {
+      const probe = await probeAccess(repo, deps.fetchImpl).catch(() => null)
+      if (probe !== null && probe.verdict !== 'ok' && probe.verdict !== 'network') reason = probe.reason
+    }
     await db.prepare("UPDATE package_sources SET status = 'failed', error_reason = ?, last_checked_at = ? WHERE id = ? AND org_id = ?")
       .bind(reason, now, source.id, source.org).run().catch(() => undefined)
     return { kind: 'failed', reason }

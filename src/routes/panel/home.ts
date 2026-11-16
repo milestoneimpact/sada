@@ -4,6 +4,7 @@
  * جزءٌ من `panel.ts` قُسم على أقسامه (D-278) بلا تغييرٍ في سلوك. **وكلُّ لوحٍ يُحمَّل له ما يقرأ وحدَه** (D-280):
  * الهيكلُ لكلّ لوح، ثمّ محمِّلٌ للوح المطلوب — انظر `panelRoute`.
  */
+import { packageNav } from '../../lib/package/revision'
 import { waitingImages } from '../../lib/image/job'
 import { NEURON_USD } from '../../lib/ai/imagePricing'
 import { Hono, type Context } from 'hono'
@@ -242,7 +243,7 @@ async function shellData(
   c: PanelContext, session: Session, org: string, now: Date, q: URLSearchParams,
 ): Promise<{ shell: ShellLoad; load: Load }> {
   const env = c.env as unknown as Record<string, string | undefined>
-  const [allowance, drafts, apps, accounts, beats, orgs, flash, zone] = await Promise.all([
+  const [allowance, drafts, apps, accounts, beats, orgs, flash, zone, pkgNav] = await Promise.all([
     checkAllowance(c.env.DB, 'image', org),
     listDrafts(c.env.DB, org, BOARD),
     appStatuses(c.env.DB, env),
@@ -252,6 +253,8 @@ async function shellData(
     takeFlash(c.env, c.req.raw),
     // ‏«هذا الشهر» وساعةُ انفتاح السقف بتوقيت المالك من كعكة متصفّحه (D-173) — لا من إعدادٍ يُخزَّن
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+    // ‏تبويبُ «حزمة المحتوى» وشارتُه: جملةٌ واحدة (packageNav)
+    packageNav(c.env.DB, org),
   ])
 
   /**
@@ -282,6 +285,7 @@ async function shellData(
     paused: allowance.settings.paused,
     pulses: beatsNow,
     unread,
+    packageNav: pkgNav,
     rpId: relyingParty(c.env.PUBLIC_BASE_URL).id,
     flash,
     now,

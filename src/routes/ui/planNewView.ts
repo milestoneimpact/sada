@@ -25,6 +25,7 @@
  */
 import { html, raw, type Html } from './html'
 import { pageHead } from './parts'
+import { planWays } from './planPackageView'
 import { LOGOS } from './logos'
 import { AR_LATN, money, num } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -48,8 +49,8 @@ export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
 const SPANS = [
   { id: 'week', label: 'أسبوع', weeks: 1, note: 'للبدء أو لحملةٍ قصيرة' },
   { id: '2weeks', label: 'أسبوعان', weeks: 2, note: 'إيقاعٌ ثابتٌ بلا التزامٍ طويل' },
-  { id: 'month', label: 'شهر', weeks: 4, note: 'الأنسبُ لخطّةٍ تُراجَع أسبوعًا أسبوعًا' },
-  { id: '2months', label: 'شهران', weeks: 8, note: 'رؤيةٌ أبعد — تُبنى شهرًا شهرًا' },
+  { id: 'month', label: 'شهر', weeks: 4, note: 'الأنسب لخطّة تُراجَع أسبوعًا أسبوعًا' },
+  { id: '2months', label: 'شهران', weeks: 8, note: 'رؤية أبعد — تُبنى شهرًا شهرًا' },
 ] as const
 
 /**
@@ -106,6 +107,8 @@ export interface PlanNewData {
   readonly picked?: string | null
   /** أيملك الدورُ إضافةَ مصدر؟ (المديرُ فأعلى — كالتحليل) */
   readonly canAdd?: boolean
+  /** حزمةُ محتوى مربوطة؟ فيظهر طريقُ «من حزمتك في GitHub» (D-377). */
+  readonly hasPackage?: boolean
 }
 
 const AR = num
@@ -129,7 +132,7 @@ function spanStep(start: string, perWeek: number, channels: number): Html {
       <span class="wz-sub">نحو ${AR(Math.max(1, channels) * perWeek * s.weeks)} منشورًا</span>
       <span class="ago">${s.note}</span></label>`)
   return html`<section class="wz-step" data-step="1" aria-labelledby="wz-t1">
-    ${stepHead(1, 'كم مدّةً تغطّي الخطّة؟', 'تُكتب المنشوراتُ كلُّها مرّةً واحدة، ثمّ تراجعها قبل أن يُجدوَل شيء.')}
+    ${stepHead(1, 'كم مدّة تغطّي الخطّة؟', 'تُكتب المنشورات كلُّها مرّة واحدة، ثمّ تراجعها قبل أن يُجدوَل شيء.')}
     <div class="wz-opts" role="radiogroup" aria-labelledby="wz-t1">${cards}</div>
     <details class="fold mt-3"><summary><span>تبدأ ${startLabel(start)} — غيّر</span></summary>
       <div class="field"><label for="plan-start">يوم البداية</label>
@@ -155,7 +158,7 @@ function channelCard(p: PlanPlatform, perWeek: number): Html {
     <div class="wz-pf-more">
       ${raw(field({
         id: 'wz-time-' + p, label: 'أوقات نشر ' + name + ' بتوقيتك',
-        hint: 'وقتٌ لكلّ منشورٍ في اليوم، والفارغُ يُترك. بلا وقتٍ يختار صدى أرجحَ الساعات.',
+        hint: 'وقت لكلّ منشور في اليوم، والفارغ يُترك. بلا وقت يختار صدى أرجح الساعات.',
         control: html`<div class="row gap-2 wz-times"><input type="time" id="wz-time-${p}" name="time_${p}" value="${first}" dir="ltr"><input type="time" name="time_${p}" value="" dir="ltr" aria-label="${name}: وقتٌ ثانٍ في اليوم"><input type="time" name="time_${p}" value="" dir="ltr" aria-label="${name}: وقتٌ ثالث في اليوم"></div>`.value,
       }))}
       ${raw(field({ id: 'wz-image-' + p, label: 'صورةُ منشورات ' + name, control: html`<select id="wz-image-${p}" name="image_${p}">${images}</select>`.value }))}
@@ -171,7 +174,7 @@ function channelStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
         ? ''
         : html`<p class="hint m-0">${missing.map((p) => platformLabel(p)).join(' و')} غير مربوطة — <a href="${panelHref('channels')}">اربطها</a> لتظهر هنا.</p>`}`
   return html`<section class="wz-step" data-step="2" aria-labelledby="wz-t2">
-    ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوطُ وحدَه يظهر. ولكلّ منصّةٍ إيقاعُها وأوقاتُها وصورتُها — فيصحّ رسمٌ فنّيٌّ هنا وإنفوجرافيك هناك، ووقتان في اليوم نفسِه.')}
+    ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوط وحدَه يظهر، ولكلّ منصّة إيقاعُها وأوقاتُها وصورتُها.')}
     <div class="stack">${body}</div>
   </section>`
 }
@@ -189,7 +192,7 @@ function contentStep(d: PlanNewData): Html {
     { v: 'none', title: 'بلا صورة', notes: ['نصٌّ وحده'], cost: 0 },
     { v: 'infographic', title: 'إنفوجرافيك', notes: [
       info === null ? 'كتابةُ محتواه: تُقاس بعد أوّل صورة' : 'كتابةُ محتواه: نحو ' + money(info),
-      'رسمُه مجّانيّ، والعربيّةُ فيه صحيحة',
+      'رسمُه مجّانيّ، والعربيّة فيه صحيحة',
     ], cost: info ?? 0 },
     { v: 'illustration', title: 'رسمٌ فنّيّ', notes: [
       left(free.draft, 'المسوّدة (FLUX schnell)'),
@@ -206,11 +209,11 @@ function contentStep(d: PlanNewData): Html {
     : html`<div class="wz-add card card-inset">
       <label class="wz-drop card" id="pn-drop"><input type="file" name="file" form="pn-up" accept="${UPLOAD_EXTENSIONS.map((e) => '.' + e).join(',')}" id="pn-file" multiple>
         <span class="wz-big">ارفع ملفًّا أو أكثر</span>
-        <span class="ago">اسحبها إلى هنا أو اخترها — PDF وWord وExcel وPowerPoint ونصّ وملفُّ ترجمة مقطع (srt · vtt)، حتّى 10MB للملفّ. تُحفظ في مكتبتك وتُحلَّل الآن.</span>
+        <span class="ago">اسحبها إلى هنا أو اخترها: PDF وWord وExcel وPowerPoint ونصّ وترجمة مقطع، حتّى 10MB للملفّ.</span>
         <span class="wz-prog" id="pn-prog" hidden><span></span></span></label>
       <noscript><button class="btn btn-secondary btn-sm" type="submit" form="pn-up">ارفع ما اخترت</button></noscript>
       <div class="field m-0"><label for="pn-url">أو أضف رابطًا أو أكثر</label>
-        <p class="field-hint m-0" id="pn-url-hint">سطرٌ لكلّ رابط، حتّى ستّة: موقعٌ (يُقرأ مع صفحاته التعريفيّة) أو مقالٌ أو PDF أو مقطع YouTube (يُقرأ وصفُه وما قيل فيه). يُستخرج المحتوى ويُحلَّل كأيّ مصدر.</p>
+        <p class="field-hint m-0" id="pn-url-hint">سطر لكلّ رابط، حتّى ستّة: موقع (يُقرأ مع صفحاته التعريفيّة) أو مقال أو PDF أو مقطع YouTube.</p>
         <div class="row gap-2"><textarea id="pn-url" name="url" form="pn-link" rows="2" placeholder="https://…" dir="ltr" inputmode="url" autocomplete="off" aria-describedby="pn-url-hint"></textarea>
           <button class="btn btn-secondary" type="submit" form="pn-link" id="pn-link-go">اقرأ الروابط</button></div></div>
       <p class="m-0 wz-say" id="pn-add-say" role="status" aria-live="polite"></p>
@@ -273,9 +276,7 @@ export function planNewScreen(d: PlanNewData): string {
   const count = shown.length * preset * 4
   const canBuild = blocker(d, shown) === null
   const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
-  const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
-      <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
-      <a class="btn btn-secondary btn-sm" href="/panel/plan/import">عندي خطّة</a></nav>`
+  const ways = planWays('build', d.hasPackage === true)
   const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${String(i + 1)}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>
@@ -296,13 +297,13 @@ export function planNewScreen(d: PlanNewData): string {
   /*
    * ‏**المعاينةُ الحيّة** (D-331، بقرار D-328): تقويمُ المدى بجانب الخطوات، يتبدّل مع كلّ اختيار — المدّةُ تمدّه، والمنصّةُ تظهر في
    * ‏أيّامها، والإيقاعُ يملؤها. يرسمه السكربتُ من اختيارات النموذج نفسِها (فهو مخفيٌّ بدونه)، وشعاراتُ المنصّات من قوالبَ رسمها
-   * ‏الخادم. **وهو توزيعٌ تقريبيّ** يُقال: الأيّامُ الفعليّةُ يختارها المخطِّطُ من المصادر.
+   * ‏الخادم. **وهو توزيع تقريبيّ** يُقال: الأيّام الفعليّة يختارها المخطِّط من المصادر.
    */
   const preview = html`<div class="wz-pv" id="pn-pv" hidden>${raw(card({
     title: 'المعاينة', titleId: 'pn-pv-t', attrs: 'role="complementary" aria-labelledby="pn-pv-t"',
     body: html`<div class="wz-pv-grid" id="pn-pv-grid" role="img" aria-label="توزيعٌ تقريبيٌّ للمنشورات على أيّام المدى"></div>
       <p class="m-0 mt-3" id="pn-pv-sum" role="status"></p>
-      <p class="hint m-0 mt-2">توزيعٌ تقريبيّ — الأيّامُ الفعليّةُ يختارها صدى من مصادرك، وتنقلها بعدها بالسحب.</p>
+      <p class="hint m-0 mt-2">توزيع تقريبيّ — الأيّام الفعليّة يختارها صدى من مصادرك، وتنقلها بعدها بالسحب.</p>
       ${shown.map((p) => html`<template id="pn-logo-${p}"><span class="pf-logo rv-pf rv-dot" data-pf="${p}">${raw(LOGOS[p] ?? '')}</span></template>`)}`.value,
   }))}</div>`
   return html`${raw(head)}${ways}<div class="wz-grid">${form}${preview}</div>${helpers}`.value

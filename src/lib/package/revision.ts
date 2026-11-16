@@ -12,7 +12,7 @@ import { classifyPath } from './classify'
 import { choosePlanFile, readPackagePlan, type PackagePlan } from './plan'
 import { copyVersion, mergeCopies } from './copy'
 import { diffSnapshots, snapshot, type Change, type Snapshot, type SnapshotEntry } from './diff'
-import { applyDecisions, decide, packagePosts } from './apply'
+import { applyDecisions, decide, packagePosts, type Decision } from './apply'
 import { currentPicks, readPackageMedia, type PackageSource } from './sync'
 
 export interface RevisionRow {
@@ -140,7 +140,7 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
       const again = await db.prepare('SELECT id FROM package_revisions WHERE org_id = ? AND commit_sha = ?').bind(org, commit).first<{ id: string }>()
       return { kind: 'exists', id: again?.id ?? id }
     }
-    const decisions = decide(changes, await packagePosts(db, org))
+    const decisions = followOrHold(decide(changes, await packagePosts(db, org)), source.followUpdates)
     const out = await applyDecisions({ db, org, revisionId: id, copySha }, decisions)
     await db.prepare('UPDATE package_revisions SET summary_counts = ? WHERE id = ? AND org_id = ?')
       .bind(JSON.stringify(countChanges(changes, out.awaiting)), id, org).run()
@@ -158,6 +158,15 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
     ).bind(id, org, source.id, commit, reason, JSON.stringify(ZERO), attempts + 1, retryable, createdAt).run().catch(() => undefined)
     return { kind: 'failed', reason }
   }
+}
+
+/**
+ * «تابع التحديث تلقائيًّا» مطفأ (D-377): ما كان سيُكتب وحده على منشورٍ قائم ينتظر قرارَ المالك.
+ * والمادّةُ الجديدة تبقى مسوّدةً تُكتب — لا منشورَ قائمًا يُمسّ.
+ */
+export function followOrHold(decisions: readonly Decision[], follow: boolean): Decision[] {
+  if (follow) return [...decisions]
+  return decisions.map((d) => (d.disposition === 'auto_applied' && d.post !== null && d.change.kind !== 'added' ? { ...d, disposition: 'awaiting_owner' } : d))
 }
 
 /** مراجعةٌ واحدة بمعرّفها — أيُّ مراجعةٍ للمنظّمة، لا آخرُ عشرين وحدها. */
@@ -209,6 +218,18 @@ export async function listRevisions(db: Db, org: string, limit = 20): Promise<Re
   } catch {
     return []
   }
+}
+
+/**
+ * تبويبُ «حزمة المحتوى» في الرافدة: أرُبطت حزمةٌ، وكم تغييرًا ينتظر قرارَ المالك — **جملةٌ واحدة** لكلّ لوح (سقفُ `panelLoad`).
+ * وعطلُ القراءة لا يكسر اللوحة: التبويبُ يغيب بلا شارة.
+ */
+export async function packageNav(db: Db, org: string): Promise<{ readonly linked: boolean; readonly awaiting: number }> {
+  const r = await db.prepare(
+    `SELECT (SELECT count(*) FROM package_sources WHERE org_id = ?) AS linked,
+            (SELECT count(*) FROM package_changes WHERE org_id = ? AND disposition = 'awaiting_owner') AS n`,
+  ).bind(org, org).first<{ linked: number; n: number }>().catch(() => null)
+  return { linked: (r?.linked ?? 0) > 0, awaiting: r?.n ?? 0 }
 }
 
 /** كم تغييرًا ينتظر قرار المالك — للشارة في الخطّة. */
