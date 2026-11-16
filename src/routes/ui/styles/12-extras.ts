@@ -301,7 +301,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   border:var(--bd); background:var(--surface-2); cursor:pointer; color:var(--ink-2);
   font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400;
   transition:border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-  border-radius:var(--r-pill); padding:0 var(--s-4)}
+  border-radius:var(--r-control); padding:0 var(--s-3); min-inline-size:14rem}
+/* بشكل حقل بحث (المواصفات v1 §4.1): الاختصارُ في آخر الحقل */
+.cmdk-open .kbd{margin-inline-start:auto}
 @media(hover:hover){
   .cmdk-open:hover{border-color:var(--field); color:var(--ink-2)}
 }
@@ -310,6 +312,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 @media${below('sm')}{
   .cmdk-veil{padding:var(--s-4) var(--s-3)}
   .cmdk-open span{display:none}
+  .cmdk-open{min-inline-size:0}
 }
 
 /* ── الخطّةُ لوحةً أو قائمة (D-259) ─────────────────────────────────────
