@@ -9,10 +9,11 @@ import { escapeHtml } from '../escape'
 import { kb, money, relativeTime } from '../../../lib/format'
 import { platformLabel } from '../../../lib/oauth/providers'
 import {
-  CAPTION_LIMIT, PRIVATE_ONLY, PRIVATE_REACH, privateReach, STALE_UPLOAD_HOURS, VIDEO_PLATFORMS, videoChecks,
-  YOUTUBE_DESCRIPTION_BYTES, type Reach, type UploadPost, type UploadRow, type VideoCheck, type VideoPlatform,
+  CAPTION_LIMIT, captionProblem, PRIVATE_ONLY, PRIVATE_REACH, privateReach, STALE_UPLOAD_HOURS, UPLOAD_PLATFORMS, VIDEO_PLATFORMS, videoChecks,
+  YOUTUBE_DESCRIPTION_BYTES, type Reach, type UploadPost, type UploadRow, type VideoCheck, type UploadPlatform, type VideoPlatform,
 } from '../../../lib/media/uploads'
 import { errorSummary } from '../components/errorSummary'
+import { html, raw } from '../html'
 import { ABOUT_MAX, captionIssues, type VideoCaptions } from '../../../lib/media/captions'
 import type { LinkState } from '../../../lib/channels'
 import { YT_TITLE_MAX } from '../../../lib/publish/youtube'
@@ -79,7 +80,7 @@ export interface VideoContext {
 }
 
 /** مربّعُ المنصّة: اسمُها، ثمّ أمتّصلةٌ ومَن يرى، ثمّ ما يقوله شكلُ المقطع عندها. */
-function chip(p: VideoPlatform, c: VideoCheck, ctx: VideoContext): string {
+function chip(p: UploadPlatform, c: VideoCheck, ctx: VideoContext): string {
   const link = ctx.links?.[p]
   const reach = ctx.reach ?? PRIVATE_ONLY
   const blocked = c.level === 'block'
@@ -161,8 +162,8 @@ function counter(limit: number, unit: 'chars' | 'bytes'): { attrs: string; out: 
 }
 
 /** حقولُ كلّ منصّةٍ مملوءةً بما كُتب (D-190) — لما بقي مفتوحًا منها وحدَه، وخطأُ كلٍّ تحته. */
-function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: VideoPlatform) => boolean, tiktokInbox: boolean): string {
-  const issues = captionIssues(cap)
+function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: UploadPlatform) => boolean, tiktokInbox: boolean): string {
+  const issues: Partial<Record<string, string>> = { ...captionIssues(cap) }
   const parts: string[] = []
   if (open('youtube')) {
     parts.push(field({
@@ -200,9 +201,26 @@ function perPlatformFields(u: UploadRow, cap: VideoCaptions, open: (p: VideoPlat
       ...(issues[p] === undefined ? {} : { error: issues[p] }),
     }))
   }
+  /*
+   * ‏‏X وLinkedIn (D-379): لا يكتب لهما نموذجُ النصوص حقلًا، فيبدأ كلٌّ بنصّ Instagram ليراجعه المالكُ ويقصّره —
+   * ‏والعدّادُ بحدّ المنصّة (‏280 لـ X و‏3000 لـ LinkedIn)، والخطأُ تحته بفحص الإنشاء نفسِه (`captionProblem`).
+   */
+  for (const p of ['x', 'linkedin'] as const) {
+    if (!open(p)) continue
+    const chars = counter(CAPTION_LIMIT[p], 'chars')
+    const why = captionProblem(p, cap.instagram)
+    if (why !== null) issues[p] = why
+    parts.push(field({
+      id: 'v' + p + '-' + u.id,
+      label: 'نصّ ' + platformLabel(p),
+      hint: html`حتّى ${CAPTION_LIMIT[p]} محرف — بدأ بنصّ Instagram، فراجعه.`.value,
+      control: html`<textarea name="caption_${p}" rows="3"${raw(chars.attrs)}>${cap.instagram}</textarea>${raw(chars.out)}`.value,
+      ...(why === null ? {} : { error: why }),
+    }))
+  }
   // ‏وخلاصةُ الأخطاء فوق الحقول (D-302): سطرٌ لكلّ حقلٍ معروضٍ فيه ما يُصلَح، رابطُه إلى حقله
-  const anchors: Readonly<Record<string, string>> = { title: '#vyt-' + u.id, youtube: '#vyd-' + u.id, tiktok: '#vtt-' + u.id, instagram: '#vig-' + u.id }
-  const shown = new Set<string>([...(open('youtube') ? ['title', 'youtube'] : []), ...(open('tiktok') ? ['tiktok'] : []), ...(open('instagram') ? ['instagram'] : [])])
+  const anchors: Readonly<Record<string, string>> = { title: '#vyt-' + u.id, youtube: '#vyd-' + u.id, tiktok: '#vtt-' + u.id, instagram: '#vig-' + u.id, x: '#vx-' + u.id, linkedin: '#vlinkedin-' + u.id }
+  const shown = new Set<string>([...(open('youtube') ? ['title', 'youtube'] : []), ...(open('tiktok') ? ['tiktok'] : []), ...(open('instagram') ? ['instagram'] : []), ...(open('x') ? ['x'] : []), ...(open('linkedin') ? ['linkedin'] : [])])
   const summary = errorSummary(Object.entries(issues).filter(([k]) => shown.has(k)).map(([k, text]) => ({ href: anchors[k] ?? '#', text: text ?? '' })))
   // ‏ومَن كتبها يُرسَل معها (D-190): إن انتهى يومُها في KV قبل «أنشئ» لا تصير نصوصَ المالك
   return `<div class="vcaps">${summary}<input type="hidden" name="per_platform" value="1">
@@ -235,7 +253,7 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
   }
   // ‏منشورُ كلّ منصّةٍ من هذا المقطع — الأحدثُ إن تعدّد (من «فيديوهاتك» ومن خطّةٍ مستورَدة)
   const postOf = (p: string): UploadPost | undefined => u.posts.find((x) => x.platform === p)
-  const boxes = VIDEO_PLATFORMS.map((p) => {
+  const boxes = UPLOAD_PLATFORMS.map((p) => {
     const c = checks.find((x) => x.platform === p)!
     const post = postOf(p)
     if (post !== undefined) {
@@ -248,17 +266,22 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
       const note = post.status === 'published' && typeof post.note === 'string' && post.note !== ''
         ? statusBadge('warn', '!', escapeHtml(post.note))
         : ''
+      // ‏‏وحالُ المقطع عند X وLinkedIn (D-379) ما دام لم يُنشر — والمعرّفُ لا يُرسم
+      const video = post.status !== 'published' && typeof post.video === 'string' && post.video !== ''
+        ? statusBadge(post.video.startsWith('لم يُقبل') ? 'bad' : post.video === 'جاهز' ? 'ok' : 'pending', post.video.startsWith('لم يُقبل') ? '▲' : post.video === 'جاهز' ? '●' : '○', escapeHtml('الفيديو: ' + post.video))
+        : ''
       return `<div class="vpf">
         <span class="vpf-b"><b>${escapeHtml(platformLabel(p))}</b>
           ${statusBadge(st.cls, st.g, escapeHtml(st.text))}
           ${note}
+          ${video}
           ${link}</span>
       </div>`
     }
     return chip(p, c, ctx)
   }).join('')
-  const isOpen = (p: VideoPlatform): boolean => postOf(p) === undefined && checks.find((x) => x.platform === p)!.level !== 'block'
-  const open = VIDEO_PLATFORMS.some(isOpen)
+  const isOpen = (p: UploadPlatform): boolean => postOf(p) === undefined && checks.find((x) => x.platform === p)!.level !== 'block'
+  const open = UPLOAD_PLATFORMS.some(isOpen)
   const id = escapeHtml(u.id)
   const cap = ctx.captions?.[u.id]
   // ‏عنوانُ YouTube سطرُه الأوّل: يُقال فوق الحقل ويُعَدّ تحته ما دام YouTube مفتوحًا (ر-4)
@@ -280,10 +303,14 @@ function row(u: UploadRow, now: Date, cards: ReadonlySet<string> | null, ctx: Vi
    * ‏ونصُّ النموذج لا يُعتمَد بالافتراض (D-009 · D-190): «كتبتُه أنا» صادقةٌ بالبناء فتُؤشَّر،
    * ‏و«راجعتُ النصوص» شهادةٌ يؤشّرها المالكُ بيده — وإلّا تُنشأ مسوّداتٍ تنتظر قراره.
    */
-  const made = VIDEO_PLATFORMS.filter((p) => postOf(p) !== undefined)
-  const hint = made.length === VIDEO_PLATFORMS.length
+  const made = UPLOAD_PLATFORMS.filter((p) => postOf(p) !== undefined)
+  // ‏‏وما بقي بلا منشورٍ لأنّ حدودَ منصّته تردّه يُسمّى باسمه (D-379): LinkedIn لا يقبل دون ‏75KB، وX فوق ‏140 ثانية
+  const barred = UPLOAD_PLATFORMS.filter((p) => postOf(p) === undefined && checks.find((x) => x.platform === p)?.level === 'block')
+  const hint = made.length === UPLOAD_PLATFORMS.length
     ? 'أُنشئت كلُّها — وكلّ في بطاقته تحت «المنشورات».'
-    : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدود منصّته.'
+    : made.length + barred.length === UPLOAD_PLATFORMS.length && made.length > 0
+      ? 'أُنشئ على كلّ ما يوافقه — و' + barred.map(platformLabel).join(' و') + ' لا يوافق حدوده، والسبب تحته.'
+      : 'أُنشئ على كلّ ما يوافقه — وما بقي لا يوافق حدود منصّته.'
   return `<div class="card card-inset vrow" id="v-${id}">
     <div class="vmeta"><b>${fileName(u.name)}</b><span class="ago">${meta}</span></div>
     ${/*

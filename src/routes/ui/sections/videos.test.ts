@@ -11,6 +11,8 @@ const UP: UploadRow = {
     { id: 'p-yt', platform: 'youtube', status: 'approved' },
     { id: 'p-tt', platform: 'tiktok', status: 'queued' },
     { id: 'p-ig', platform: 'instagram', status: 'draft' },
+    { id: 'p-x', platform: 'x', status: 'queued', video: 'تعالجه المنصّة' },
+    { id: 'p-li', platform: 'linkedin', status: 'failed', video: 'لم يُقبل: linkedin: رفض LinkedIn المقطع بعد المعالجة (…)' },
   ],
 }
 
@@ -25,6 +27,9 @@ describe('صفّ المقطع بعد الإنشاء', () => {
     expect(html).toContain('جدوِل منشور YouTube بتوقيتك:')
     expect(html).toContain('<input type="hidden" name="post" value="p-yt">')
     expect(html).not.toContain('value="p-tt"')
+    // ‏‏وحالُ المقطع عند X وLinkedIn (D-379) بلسان المالك
+    expect(html).toContain('الفيديو: تعالجه المنصّة')
+    expect(html).toContain('الفيديو: لم يُقبل')
   })
 
   it('وأوّل زيارة «بتوقيت الرياض» والمنطقة تُرسَل مع الأزرار (D-202)', () => {

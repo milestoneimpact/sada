@@ -76,7 +76,11 @@ describe('الرفع', () => {
 describe('حدود المنصّات', () => {
   it('رأسيّ ‏42 ثانية: يوافق الثلاث، وأفقيّ طويل فيديو عاديّ على YouTube ويُمنع على TikTok', () => {
     // ‏يوافق الثلاث — ومَن يرى المقطع ليس من الحدود (D-190): يُقال من إعداد المالك بجانبها
-    expect(videoChecks(META).map((c) => c.level)).toEqual(['ok', 'ok', 'ok'])
+    // ‏‏وX وLinkedIn بحدود الناشر نفسِها (D-379)
+    expect(videoChecks(META).map((c) => c.level)).toEqual(['ok', 'ok', 'ok', 'ok', 'ok'])
+    expect(videoChecks({ ...META, durationMs: 150_000 }).find((c) => c.platform === 'x')).toMatchObject({ level: 'block', note: expect.stringContaining('140 ثانية') })
+    expect(videoChecks({ ...META, durationMs: 150_000 }).find((c) => c.platform === 'linkedin')!.level).toBe('ok')
+    expect(videoChecks({ ...META, mime: 'video/webm' }).find((c) => c.platform === 'linkedin')!.level).toBe('block')
     const long = videoChecks({ ...META, width: 1920, height: 1080, durationMs: 700_000 })
     expect(long.find((c) => c.platform === 'youtube')).toMatchObject({ level: 'ok', note: 'فيديو عاديّ لأنّه أطول من ثلاث دقائق' })
     expect(long.find((c) => c.platform === 'tiktok')!.level).toBe('block')
@@ -114,7 +118,7 @@ describe('منشورات من مقطع', () => {
     expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'none', platforms: ['youtube'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
     await ready()
     expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['youtube'], caption: '  ', approve: true, by: 'o' })).toMatchObject({ ok: false })
-    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['x'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
+    expect(await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['facebook'], caption: 'نصّ', approve: true, by: 'o' })).toMatchObject({ ok: false })
     await postsFromUpload(db, { org: 'org_owner', uploadId: 'u1', platforms: ['tiktok'], caption: 'نصّ', approve: false, by: 'o' })
     const row = db.raw.prepare("SELECT status, approved_at FROM posts WHERE platform = 'tiktok'").get() as { status: string; approved_at: string | null }
     expect(row).toEqual({ status: 'draft', approved_at: null })
@@ -433,5 +437,21 @@ describe('مكتبة فوق المئة (مراجعة ر-5)', () => {
     expect(all.map((u) => u.id)).toContain('u1')
     expect(all).toHaveLength(4)
     expect(all.every((u) => u.posts.length === 0)).toBe(true)
+  })
+})
+
+describe('D-379: مقطعُ المالك إلى X وLinkedIn', () => {
+  it('يُنشأ لهما منشورٌ بمقطعه من «فيديوهاتك»، وحدُّ نصّ X ‏280', async () => {
+    db.raw.prepare(`INSERT INTO uploads (id, r2_key, name, mime, bytes, width, height, duration_ms, status, org_id)
+      VALUES ('u9', 'upload/u9.mp4', 'a.mp4', 'video/mp4', 2000000, 1080, 1920, 42000, 'ready', 'org_owner')`).run()
+    const long = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u9', platforms: ['x'], caption: 'ن'.repeat(281), approve: true, by: 'o' })
+    expect(long).toMatchObject({ ok: false, reason: expect.stringContaining('280') })
+    const out = await postsFromUpload(db, { org: 'org_owner', uploadId: 'u9', platforms: ['x', 'linkedin'], caption: 'نصّ قصير', approve: true, by: 'o' })
+    expect(out).toMatchObject({ ok: true, created: ['x', 'linkedin'] })
+    const rows = db.raw.prepare(`SELECT p.platform, m.model, m.mime, m.duration_ms AS d FROM posts p JOIN media m ON m.post_id = p.id WHERE m.upload_id = 'u9' ORDER BY p.platform`).all()
+    expect(rows).toEqual([
+      { platform: 'linkedin', model: 'upload', mime: 'video/mp4', d: 42000 },
+      { platform: 'x', model: 'upload', mime: 'video/mp4', d: 42000 },
+    ])
   })
 })
