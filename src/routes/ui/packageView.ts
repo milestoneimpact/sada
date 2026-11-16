@@ -12,6 +12,7 @@ import { html, raw, type Html } from './html'
 import { escapeHtml } from './escape'
 import { counted, NOUNS } from '../../lib/format'
 import type { RevisionRow } from '../../lib/package/revision'
+import { fixFor, type AccessProbe } from '../../lib/package/diagnose'
 import { historyMenu, revisionBadge, short as shortSha } from './packageChangesView'
 
 export interface PackageScreen {
@@ -25,6 +26,8 @@ export interface PackageScreen {
   /** عنوانُ الويب هوك وسرُّه — مرّةً واحدة بعد التوليد، ولا يُحفظ في صفحةٍ غيرها. */
   readonly hook?: { readonly url: string; readonly secret: string }
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
+  /** نتيجةُ «اختبر الرمز» (D-376) — تُعرض مرّةً بعد الضغط ولا تُحفظ. */
+  readonly probe?: AccessProbe
 }
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
@@ -35,7 +38,23 @@ function statusLine(s: PackageSource): Html {
     : s.status === 'partial' ? statusBadge('warn', '…', 'يُكمل النقل')
       : s.status === 'failed' ? statusBadge('bad', '!', 'تعذّرت المزامنة') : statusBadge('', '○', 'لم يُزامَن بعد')
   return html`<p class="m-0">${raw(face)} · آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi dir="ltr">${s.lastCheckedAt}</bdi>`}</p>
-    ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>`}`
+    ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>${fixList(fixFor(s.error))}`}`
+}
+
+/** خطواتُ الإصلاح مرقّمةً — لا تُرسم إن لم نعرف السبب. */
+function fixList(fix: readonly string[]): Html {
+  return fix.length === 0 ? html`` : html`<ol class="stack m-0">${fix.map((f) => html`<li>${f}</li>`)}</ol>`
+}
+
+const STEP = { repo: 'المستودع', branch: 'الفرع' } as const
+
+/** نتيجةُ «اختبر الرمز»: أيُّ الخطوتين نجحت، والسببُ الدقيق، وخطواتُ إصلاحه. */
+function probeCard(p: AccessProbe): string {
+  const ok = p.verdict === 'ok'
+  const steps = (['repo', 'branch'] as const).map((k) => html`<li>${p.passed.includes(k) ? raw(statusBadge('ok', '✓', STEP[k] + ': نجح'))
+    : raw(statusBadge(p.passed.length === 0 && k === 'branch' ? '' : 'bad', p.passed.length === 0 && k === 'branch' ? '○' : '!', STEP[k] + (p.passed.length === 0 && k === 'branch' ? ': لم يُجرَّب' : ': لم ينجح')))}</li>`)
+  return card({ variant: 'alert', tone: ok ? 'ok' : 'warn', title: ok ? 'الرمزُ يعمل' : 'اختبارُ الرمز: ما يلزم إصلاحه', level: 2,
+    body: html`<ul class="plain">${steps}</ul><p class="m-0">${p.reason}</p>${fixList(p.fix)}`.value })
 }
 
 function input(id: string, label: string, name: string, value: string, required: boolean): string {
@@ -130,8 +149,12 @@ export function packageScreen(m: PackageScreen): string {
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="sync">${raw(button({ label: 'زامن الآن', variant: 'primary', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
+      <input type="hidden" name="do" value="test">${raw(button({ label: 'اختبر الرمز', type: 'submit' }))}
+      <span class="hint">قراءتان مجّانيّتان: المستودعُ ثمّ الفرع.</span></form>
+    <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="hook">${raw(button({ label: s.hasHook ? 'أعد توليد سرّ التحديث الفوري' : 'اربط التحديث الفوري', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'quiet', type: 'submit' }))}</form>`.value }))
-  return html`${raw(head)}<div class="stack">${flash}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? []))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
+  const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
+  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? []))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

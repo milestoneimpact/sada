@@ -90,7 +90,7 @@
     "inputs": 1
   },
   "routes/ui/planNewView.ts": {
-    "buttons": 9,
+    "buttons": 7,
     "cards": 6,
     "inputs": 10
   },
@@ -100,7 +100,7 @@
     "inputs": 1
   },
   "routes/ui/planSeatView.ts": {
-    "buttons": 4,
+    "buttons": 2,
     "cards": 3,
     "inputs": 2
   },

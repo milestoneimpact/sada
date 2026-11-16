@@ -27,7 +27,7 @@ import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neu
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
-import { currentPicks, readPackageMedia } from '../../lib/package/sync'
+import { currentPicks, readPackageMedia, readSource } from '../../lib/package/sync'
 import {
   applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
@@ -220,6 +220,10 @@ plan.get('/panel/plan/new', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
+  // ‏حزمةٌ مربوطة: «من حزمتك في GitHub» هو الطريقُ الافتراضيّ (D-377)، و«ابنِ لي خطّة» بطلبه صراحةً
+  const pkgSource = await readSource(c.env.DB, org).catch(() => null)
+  // ‏والتحويلُ لـ«خطّة جديدة» العاريةِ وحدها: رابطٌ بمعاملات («ابنِ خطّةً منه» من المصادر، أو فكرةٌ، أو `?way=build`) يفتح كما كان
+  if (pkgSource !== null && new URL(c.req.url).search === '') return c.redirect('/panel/plan/package', 302)
   const [accounts, brief, analyzed, units, settings, current, ready] = await Promise.all([
     listAccounts(c.env.DB, org),
     readBrief(c.env.DB, org),
@@ -255,6 +259,7 @@ plan.get('/panel/plan/new', async (c) => {
     picked: analyzed.results.some((s) => s.id === c.req.query('picked')) ? c.req.query('picked') ?? null : null,
     // ‏إضافةُ مصدرٍ تحليلٌ مدفوع: للمدير فأعلى كزرّ «حلّل» (D-272)
     canAdd: allows(session.record.role ?? 'owner', 'admin'),
+    hasPackage: pkgSource !== null,
   })
   return page((nonce) =>
     soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
@@ -994,7 +999,8 @@ plan.post('/panel/plan/pin', async (c) => {
 plan.get('/panel/plan/import', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin') })
+  const hasPackage = (await readSource(c.env.DB, activeOrg(session.record)).catch(() => null)) !== null
+  const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin'), hasPackage })
   return page((nonce) =>
     soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
       PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),

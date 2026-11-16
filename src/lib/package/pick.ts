@@ -5,6 +5,7 @@
  * المقطع (المادّة 06: المقطعُ v2 بالصوت والغلافُ v1). وما سوى المعتمد يبقى «مستبدَلًا» يُعرض مطويًّا ولا يُختار.
  */
 import { isVideoPlatform } from '../media/uploads'
+import { isVideoTarget, videoMisfit } from '../publish/video'
 import type { PackageVariant } from './classify'
 
 export interface PackageFile {
@@ -55,14 +56,28 @@ export function defaultVariant(platform: string): PackageVariant {
 }
 
 /**
- * مرجعُ المكتبة (`g:<sha>`) لصفٍّ في الخطّة: **المقطعُ حيث تنشر صدى المقطعَ اليوم** (`isVideoPlatform`)، والغلافُ في غيرها —
- * فـ X وLinkedIn يأخذان الغلاف حتى يُفتح لهما مسارُ مقطعٍ مثبَت. وما لم يُنقل إلى R2 بعد لا يُربط، واللونُ من التلميح إن سمّى واحدًا.
+ * مرجعُ المكتبة (`g:<sha>`) لصفٍّ في الخطّة ولماذا اختير: **المقطعُ حيث تنشر صدى المقطع** — منصّاتُ المقاطع (`isVideoPlatform`)
+ * ‏وX وLinkedIn منذ D-374 — **والغلافُ بديلٌ** حين لا يوافق المقطعُ حدودَ المنصّة (`videoMisfit`)، وسببُه في `note` يُعرض.
+ * وما لم يُنقل إلى R2 بعد لا يُربط، واللونُ من التلميح إن سمّى واحدًا.
  */
-export function packageRefFor(picks: readonly PackagePick[], itemNo: string, platform: string, variant: PackageVariant | null): string | null {
+export function packageMediaFor(
+  picks: readonly PackagePick[], itemNo: string, platform: string, variant: PackageVariant | null,
+): { readonly ref: string | null; readonly note: string | null } {
   const want = variant ?? defaultVariant(platform)
   const own = picks.filter((p) => p.itemNo === itemNo)
   const pick = own.find((p) => p.variant === want) ?? own[0]
-  if (pick === undefined) return null
-  const file = isVideoPlatform(platform) ? pick.video : pick.cover
-  return file === null || file.r2Key === null ? null : 'g:' + file.blobSha
+  if (pick === undefined) return { ref: null, note: null }
+  const ref = (f: PackageFile | null): string | null => (f === null || f.r2Key === null ? null : 'g:' + f.blobSha)
+  if (isVideoPlatform(platform)) return { ref: ref(pick.video), note: null }
+  if (isVideoTarget(platform) && pick.video !== null && pick.video.r2Key !== null) {
+    const misfit = videoMisfit(platform, pick.video.size)
+    if (misfit === null) return { ref: ref(pick.video), note: null }
+    const cover = ref(pick.cover)
+    return { ref: cover, note: `${misfit} — ${cover === null ? 'ولا غلاف بديل' : 'أُلحق الغلافُ بدلَه'}` }
+  }
+  return { ref: ref(pick.cover), note: null }
+}
+
+export function packageRefFor(picks: readonly PackagePick[], itemNo: string, platform: string, variant: PackageVariant | null): string | null {
+  return packageMediaFor(picks, itemNo, platform, variant).ref
 }

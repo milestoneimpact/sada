@@ -6,14 +6,13 @@
  */
 import { html, raw } from './html'
 import { pageHead } from './parts'
+import { planWays } from './planPackageView'
 import { panelHref } from '../../lib/nav/panes'
 import { SEAT_EXTENSIONS } from '../../lib/plan/seat'
 
-export function planSeatScreen(d: { readonly canRead: boolean }): string {
+export function planSeatScreen(d: { readonly canRead: boolean; readonly hasPackage?: boolean }): string {
   const head = pageHead('المنشورات', 'عندي خطّة', 'ارفع خطّتك كما هي أو الصقها — يقرؤها صدى ويضعها في المراجعة، ولا يُجدوَل شيءٌ قبل أن تثبّتها.')
-  const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
-      <a class="btn btn-secondary btn-sm" href="/panel/plan/new">ابنِ لي خطّة</a>
-      <a class="btn btn-primary btn-sm" href="/panel/plan/import" aria-current="page">عندي خطّة</a></nav>`
+  const ways = planWays('import', d.hasPackage === true)
   const styles = [
     { v: 'none', title: 'بلا صورة', note: 'خطّتُك كما هي' },
     { v: 'infographic', title: 'إنفوجرافيك', note: 'يُرسم من نصّ كلّ منشور' },

@@ -227,10 +227,22 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
   })
 
-  /** والرافدةُ ثمانية (D-289): «الخطّة» بعد الرئيسيّة — محورُ المنصّة وجهةٌ — ثمّ ما كان. */
-  it('**وثمانية في الرافدة** بترتيب الخطّة', () => {
+  /** والرافدةُ ثمانية (D-289): «الخطّة» بعد الرئيسيّة — محورُ المنصّة وجهةٌ — ثمّ ما كان. و«حزمة المحتوى» بعد «الخطّة» لمن يخصّه. */
+  it('**وثمانية في الرافدة** بترتيب الخطّة، و«حزمة المحتوى» تاسعةٌ اختياريّة بعد «الخطّة»', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'الخطّة', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
+      ['الرئيسيّة', 'الخطّة', 'حزمة المحتوى', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
+    expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(8)
+    expect(SECTIONS.find((s) => s.id === 'package')).toMatchObject({ group: 'العمل', page: '/panel/package', optional: true })
+  })
+
+  it('«حزمة المحتوى» لا تُرسم إلّا بطلبها، وبشارةِ ما ينتظر قرارك تحت «العمل» بعد «الخطّة»', () => {
+    expect(railHtml({ inPanel: true })).not.toContain('href="/panel/package"')
+    const rail = railHtml({ inPanel: true, shown: ['package'], counts: { package: 3 } })
+    const at = rail.indexOf('href="/panel/package"')
+    expect(at).toBeGreaterThan(rail.indexOf('href="/panel/plan"'))
+    expect(at).toBeLessThan(rail.indexOf('href="#posts"'))
+    expect(rail.slice(at, rail.indexOf('</a>', at))).toContain('حزمة المحتوى')
+    expect(rail.slice(at, rail.indexOf('</a>', at))).toMatch(/>3</)
   })
 
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */

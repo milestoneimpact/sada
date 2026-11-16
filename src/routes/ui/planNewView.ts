@@ -25,6 +25,7 @@
  */
 import { html, raw, type Html } from './html'
 import { pageHead } from './parts'
+import { planWays } from './planPackageView'
 import { LOGOS } from './logos'
 import { AR_LATN, money, num } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -106,6 +107,8 @@ export interface PlanNewData {
   readonly picked?: string | null
   /** أيملك الدورُ إضافةَ مصدر؟ (المديرُ فأعلى — كالتحليل) */
   readonly canAdd?: boolean
+  /** حزمةُ محتوى مربوطة؟ فيظهر طريقُ «من حزمتك في GitHub» (D-377). */
+  readonly hasPackage?: boolean
 }
 
 const AR = num
@@ -273,9 +276,7 @@ export function planNewScreen(d: PlanNewData): string {
   const count = shown.length * preset * 4
   const canBuild = blocker(d, shown) === null
   const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
-  const ways = html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
-      <a class="btn btn-primary btn-sm" href="/panel/plan/new" aria-current="page">ابنِ لي خطّة</a>
-      <a class="btn btn-secondary btn-sm" href="/panel/plan/import">عندي خطّة</a></nav>`
+  const ways = planWays('build', d.hasPackage === true)
   const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${String(i + 1)}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">
       <button class="btn btn-secondary" type="button" id="wz-prev" hidden>السابق</button>

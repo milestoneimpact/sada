@@ -5,7 +5,7 @@
  */
 import type { PackagePlan } from './plan'
 import type { CopyRead } from './copy'
-import { packageRefFor, type PackagePick } from './pick'
+import { packageMediaFor, type PackagePick } from './pick'
 import type { PackageVariant } from './classify'
 
 export interface SnapshotEntry {
@@ -60,11 +60,12 @@ export function snapshot(i: SnapshotInput): Snapshot {
     const c = i.copy.items.get(e.item)
     const piece = e.platform === 'x' ? c?.x ?? null : e.platform === 'linkedin' ? c?.linkedin ?? null : null
     const hint = /داكن|dark/i.test(e.mediaHint) && !/فاتح|light/i.test(e.mediaHint) ? 'dark' : /فاتح|light/i.test(e.mediaHint) && !/داكن|dark/i.test(e.mediaHint) ? 'light' : null
-    const media = packageRefFor(i.picks, e.item, e.platform, hint ?? i.variants[e.platform] ?? null)
+    const { ref: media, note } = packageMediaFor(i.picks, e.item, e.platform, hint ?? i.variants[e.platform] ?? null)
     entries.push({
       item: e.item, platform: e.platform, date: e.date, time: e.time, format: e.format, idea: e.idea,
       text: piece === null || piece.text === '' ? null : piece.text, media, mediaName: media === null ? null : nameOf.get(media) ?? null,
-      problems: piece?.problems ?? [],
+      // ‏‏وسببُ الغلاف البديل يُعرض مع مشكلات الصفّ (D-374)
+      problems: [...(piece?.problems ?? []), ...(note === null ? [] : [`الوسيطة: ${note}`])],
     })
   }
   entries.sort((a, b) => a.item.localeCompare(b.item) || a.platform.localeCompare(b.platform))

@@ -6,7 +6,7 @@ import { PACKAGE_PATHS } from '../../test/packageTree'
 import { fakeDb, fakeKv } from '../../test/fakes'
 import { toBase64 } from '../crypto'
 import { classifyPath, underRoot } from './classify'
-import { packageRefFor, pickMedia, type PackageFile } from './pick'
+import { packageMediaFor, packageRefFor, pickMedia, type PackageFile } from './pick'
 import { branchHead, listTree } from './github'
 import { checkSource, currentPicks, firstDelivery, hookTooLarge, judgeHook, readPackageMedia, readSource, rotateHookSecret, saveSource, syncPackage, tokenFor, tokenReadyFor } from './sync'
 import type { StreamBucket } from './media'
@@ -23,7 +23,7 @@ function files(): PackageFile[] {
     const rel = underRoot(p, ROOT)!
     const c = classifyPath(rel)
     if (c.role !== 'media' && c.role !== 'cover') return []
-    return [{ path: rel, blobSha: sha(p), size: 1, role: c.role, itemNo: c.itemNo, variant: c.variant, version: c.version ?? 0, hasSound: c.hasSound, r2Key: 'k' }]
+    return [{ path: rel, blobSha: sha(p), size: c.role === 'media' ? 1_048_576 : 1, role: c.role, itemNo: c.itemNo, variant: c.variant, version: c.version ?? 0, hasSound: c.hasSound, r2Key: 'k' }]
   })
 }
 
@@ -66,14 +66,27 @@ describe('الاختيار: الأحدثُ بالصوت', () => {
     expect(picks.find((p) => p.itemNo === '01' && p.variant === 'dark')!.cover!.version).toBe(3)
   })
 
-  it('المقطعُ لمنصّات المقاطع، والغلافُ لـ X وLinkedIn بلونهما الافتراضيّ', () => {
+  it('المقطعُ لمنصّات المقاطع ولـ X وLinkedIn بلونهما الافتراضيّ (D-374)', () => {
     const picks = pickMedia(files())
     const d = picks.find((p) => p.itemNo === '06' && p.variant === 'dark')!
     const l = picks.find((p) => p.itemNo === '06' && p.variant === 'light')!
-    expect(packageRefFor(picks, '06', 'x', null)).toBe('g:' + d.cover!.blobSha)
-    expect(packageRefFor(picks, '06', 'linkedin', null)).toBe('g:' + l.cover!.blobSha)
+    expect(packageRefFor(picks, '06', 'x', null)).toBe('g:' + d.video!.blobSha)
+    expect(packageRefFor(picks, '06', 'linkedin', null)).toBe('g:' + l.video!.blobSha)
     expect(packageRefFor(picks, '06', 'instagram', null)).toBe('g:' + d.video!.blobSha)
     expect(packageRefFor(picks, '99', 'x', null)).toBeNull()
+  })
+
+  it('**والغلافُ بديلٌ بسببه** حين يخالف المقطعُ حدودَ المنصّة (D-374)', () => {
+    const big = pickMedia(files()).map((p) => (p.itemNo === '06' && p.video !== null ? { ...p, video: { ...p.video, size: 600 * 1024 * 1024 } } : p))
+    const d = big.find((p) => p.itemNo === '06' && p.variant === 'dark')!
+    const out = packageMediaFor(big, '06', 'x', null)
+    expect(out.ref).toBe('g:' + d.cover!.blobSha)
+    expect(out.note).toContain('لا يقبل فوق 512MB')
+    expect(out.note).toContain('أُلحق الغلافُ بدلَه')
+    // ‏وLinkedIn لا يقبل دون ‏75KB
+    const tiny = pickMedia(files()).map((p) => (p.video !== null ? { ...p, video: { ...p.video, size: 1000 } } : p))
+    expect(packageMediaFor(tiny, '06', 'linkedin', null).note).toContain('LinkedIn لا يقبل دون')
+    expect(packageMediaFor(pickMedia(files()), '06', 'x', null).note).toBeNull()
   })
 })
 

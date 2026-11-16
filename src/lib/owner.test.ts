@@ -288,3 +288,22 @@ describe('M-30 رصيد AI Gateway', () => {
     expect(m30.evidence!({ ...empty, gatewayCredit: 'short' })).toContain('نفاد الرصيد')
   })
 })
+
+describe('M-58 مقطعُ الحزمة على LinkedIn: الحسابُ الشخصيّ', () => {
+  const section = DOC.slice(DOC.indexOf('<a name="m-58">'), DOC.indexOf('<a name="m-59">'))
+  const publisher = readFileSync(new URL('./publish/publisher.ts', import.meta.url), 'utf8')
+
+  it('تطلب الحسابَ الشخصيّ وتسمّي فشلَ حساب الصفحة بنصّه كما يكتبه الناشر', () => {
+    expect(section).toContain('حسابك الشخصيّ')
+    expect(section).toContain('/panel/accounts')
+    const failure = 'حساب صفحة — والنشر باسم الصفحة لم يُبن بعد (M-03)'
+    expect(publisher).toContain(failure)
+    expect(section).toContain(failure)
+  })
+
+  it('وM-59 مهمّةٌ مستقلّة بمرساها', () => {
+    expect(OWNER_TASKS.filter((t) => t.code === 'M-58')).toHaveLength(1)
+    expect(OWNER_TASKS.some((t) => t.code === 'M-59')).toBe(true)
+    expect(DOC).toContain('## M-59 · اختبرِ الرمز')
+  })
+})
