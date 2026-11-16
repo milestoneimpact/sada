@@ -527,7 +527,9 @@ const R4: Journey = {
     const after = posts.map((p) => `${p.platform}:${status(stack, p.id)?.status ?? '—'}`)
     const queued = posts.filter((p) => status(stack, p.id)?.status === 'queued').length
     if (queued < posts.length) m.note(`الإشعار: ${await m.readFlash()}`)
-    return { success: posts.length === 3 && queued === 3, verified: `${posts.length} منشورات · مجدولة ${queued} (${after.join(' · ')})` }
+    // ‏X وLinkedIn مُعلَّمان افتراضًا منذ D-379: الرحلةُ تنجح إن جُدولت الثلاثُ وكلُّ ما أُنشئ معها
+    const three = ['instagram', 'tiktok', 'youtube'].every((p) => posts.some((x) => x.platform === p))
+    return { success: three && posts.length >= 3 && queued === posts.length, verified: `${posts.length} منشورات · مجدولة ${queued} (${after.join(' · ')})` }
   },
 }
 
