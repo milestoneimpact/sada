@@ -1922,10 +1922,11 @@ describe('مراجعة المرحلة ٢ب (D-189)', () => {
  * ولحظةُ العلامة في القالب T6 وحده.
  */
 describe('الهويّة من لوحتها (D-196)', () => {
-  it('القمع حبر واحد، والمحطّة المميَّزة وحدَها بلون حالها — لا أرض تحذير على سطح رمليّ (D-194 · D-196)', () => {
-    expect(css.rule('.fn-bar > span').background).toBe('var(--ink-2)')
-    expect(css.rule('.funnel li[data-focus][data-state=now] .fn-bar > span').background).toBe('var(--warn)')
-    expect(css.rule('.funnel li[data-state=now] a')).toEqual({})
+  it('رحلةُ المنشور خطُّ مراحل: المميَّزةُ وحدَها مغسولةٌ بلون حالها، والباقي بلا أرض (D-381 بدل أشرطة D-194)', () => {
+    expect(css.rule('.jsteps li[data-focus][data-state=now] a').background).toBe('var(--warn-wash)')
+    expect(css.rule('.jsteps li[data-focus][data-state=failed] a').background).toBe('var(--bad-wash)')
+    expect(css.rule('.jsteps li[data-state=now] a')).toEqual({})
+    expect(css.rule('.fn-bar > span')).toEqual({})
   })
 
   it('رمز القسم الحاليّ وخطّ عنوان الصفحة بحبر الرابط — لا ذهب رابعًا', () => {

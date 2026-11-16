@@ -1,6 +1,6 @@
 /** القمعُ وشريطُ الأسبوع في الرسم (D-194). */
 import { describe, expect, it } from 'vitest'
-import { activityCard, homeTop } from './home'
+import { activityCard, homeTop, planCard } from './home'
 import { setupHref, viewChannels } from '../../../lib/channels'
 import type { HomeFacts } from '../../../lib/home'
 
@@ -12,10 +12,20 @@ const facts = (over: Partial<HomeFacts> = {}): HomeFacts => ({
 })
 
 describe('لوحة القيادة (D-194)', () => {
-  it('القمع سبع محطّات بأشرطة نسبتُها إلى أكبرها', () => {
+  it('رحلةُ المنشور سبعُ مراحلَ على خطٍّ عموديّ، لكلٍّ دائرةُ حالٍ واسمٌ وعدد — بلا أشرطة (D-381 · SPEC-v1 §6.1)', () => {
     const html = homeTop(facts({ sources: { total: 4, analyzed: 4 } }), NOW)
-    expect(html.match(/class="fn-bar"/g)).toHaveLength(7)
-    expect(html).toContain('style="--w:100%"')
+    const ol = html.slice(html.indexOf('<ol class="jsteps">'), html.indexOf('</ol>', html.indexOf('<ol class="jsteps">')))
+    expect(ol.match(/class="js-dot"/g)).toHaveLength(7)
+    expect(ol.match(/class="js-n num"/g)).toHaveLength(7)
+    expect(html).not.toContain('fn-bar')
+    expect(html).not.toContain('--w:')
+    // ‏ومرحلةٌ «تامّة» لم يمرّ بها شيء لا تلبس «تامّة»
+    for (const li of ol.split('<li').slice(1)) {
+      if (/class="js-n num">0</.test(li)) expect(li).not.toContain('data-state="done"')
+    }
+    // ‏والرحلةُ في العمود الأضيق بعد الأسبوع
+    expect(html.indexOf('class="home-main"')).toBeLessThan(html.indexOf('<ol class="jsteps">'))
+    expect(html.indexOf('<ol class="wk">')).toBeLessThan(html.indexOf('<ol class="jsteps">'))
   })
   it('شريط الأسبوع سبعة أيّام أوّلُها «اليوم»، ونقطة لكلّ منشور في يومه بتوقيت المالك', () => {
     const html = homeTop(facts({
@@ -26,14 +36,19 @@ describe('لوحة القيادة (D-194)', () => {
         { platform: 'x', at: '2026-09-30 10:00:00' }, // ‏مضى: لا يُعدّ
       ],
     }), NOW)
-    const wk = html.slice(html.indexOf('<ol class="wk">'), html.indexOf('</ol>', html.indexOf('<ol class="wk">')))
-    expect(wk.match(/<li/g)).toHaveLength(7)
+    const wk = html.slice(html.indexOf('<ol class="wk">'), html.indexOf('class="wk-today"'))
+    const days = wk.split(/<li(?=[ >])(?! class)/).slice(1).filter((x) => !x.startsWith('><bdi'))
+    expect(days).toHaveLength(7)
     expect(wk).toContain('<li data-today><span class="wk-d">اليوم</span>')
-    const days = wk.split('<li').slice(1)
     expect(days[0]).toContain('data-pf="linkedin"')
     expect(days[0]).not.toContain('data-pf="x"')
     expect(days[1]).toContain('data-pf="x"')
     expect(html).toContain('مجدول 2')
+    // ‏ويومٌ فيه منشوراتٌ غيرُ اليوم يُفتح بقائمته (D-381)، واليومُ بقائمته تحت الشريط
+    expect(days[1]).toContain('<details class="wk-day" name="wk"><summary>')
+    expect(days[0]).not.toContain('<details')
+    const today = html.slice(html.indexOf('class="wk-today"'))
+    expect(today).toContain('LinkedIn')
   })
   it('وأسبوع فارغ يقول ما يفعله المالك', () => {
     expect(homeTop(facts(), NOW)).toContain('لا شيء مجدول في الأيّام السبعة')
@@ -95,8 +110,9 @@ describe('قائمةُ البدء في الرئيسيّة (D-326 · خطّة ا�
   it('والمؤشّراتُ مخفيّةٌ حتّى تتوفّر بيانات: لا أرقامَ أربعة ولا قمعَ ولا أسبوعَ فارغًا', () => {
     const html = homeTop(zero(), NOW)
     expect(html).not.toContain('class="hstats"')
-    expect(html).not.toContain('class="funnel"')
+    expect(html).not.toContain('class="jsteps"')
     expect(html).not.toContain('هذا الأسبوع')
+    expect(html).not.toContain('hello-status')
   })
   it('منصّةٌ ضُبط تطبيقُها تُربط من القائمة مباشرةً', () => {
     expect(homeTop(zero({ channels: viewChannels([], (n) => n.startsWith('TIKTOK')) }), NOW)).toContain('href="/oauth/tiktok/start"')
@@ -136,7 +152,50 @@ describe('بابُ الكتابة في سطر التحيّة (D-326 · «أنش�
   it('وكذلك حين تكون التحيّةُ سطرًا وحدَها (الشريطُ يقول المنصّةَ المنقطعة)', () => {
     const html = homeTop(facts({ channels: viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'needs_reauth',
       createdAt: '2026-09-01 00:00:00', expiresAt: null }], () => true) }), NOW, '', '', '<details data-home-new></details>')
-    expect(html).toContain('home-hello')
+    // ‏والتنبيهُ أعلى الصفحة يقولها بزرّه (§4.4)، فلا صفَّ «خطوتُك التالية» لها في «ما ينتظرك»
+    expect(html).not.toContain('class="todo-next"')
+    expect(html).not.toContain('href="/oauth/linkedin/start"')
     expect(html).toContain('data-home-new')
+  })
+  it('سطرُ حالٍ واحد تحت التحيّة، ثمّ «ما ينتظرك» أوّلَ البطاقات، وخطوتُك التالية أوّلُ صفوفها بزرٍّ أوّليٍّ واحد (D-381)', () => {
+    const html = homeTop(facts({ counts: { perPlatform: { x: { draft: 2, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW,
+      '', '', '', { rows: '<li>بند</li>', tools: '<a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a>' })
+    expect(html).toMatch(/<p class="hello-status m-0"><b class="num">2<\/b> بانتظار قرارك · <b class="num">0<\/b> مجدولة هذا الأسبوع<\/p>/)
+    const box = html.slice(html.indexOf('id="hw-t"'), html.indexOf('class="hstats"'))
+    expect(box.indexOf('class="todo-next"')).toBeLessThan(box.indexOf('<li>بند</li>'))
+    expect(box.match(/btn-primary/g)).toHaveLength(1)
+    expect(box).toContain('مراجعة المصادر')
+    expect(html.indexOf('id="hw-t"')).toBeLessThan(html.indexOf('class="hstats"'))
+  })
+  it('ولا شيء ينتظر: حالٌ فارغةٌ إيجابيّة لا قائمةٌ خالية', () => {
+    const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
+      createdAt: '2026-09-01 00:00:00', expiresAt: '2026-12-01 00:00:00' }], () => true)
+    const html = homeTop(facts({ channels: linked, counts: { perPlatform: { x: { draft: 0, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW)
+    expect(html).toContain('لا شيء ينتظرك الآن')
+    expect(html).not.toContain('class="todo')
+  })
+  it('والصفرُ في صفّ الأرقام بسطرٍ يقول ما يعنيه', () => {
+    const html = homeTop(facts({ counts: { perPlatform: { x: { draft: 0, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW)
+    expect(html.match(/class="hs-z"/g)).toHaveLength(3)
+    expect(html).toContain('لا فشل هذا الأسبوع')
+  })
+})
+
+describe('«خطّةُ أسبوع» انقضى أسبوعُها (D-381 · SPEC-v1 §6.1)', () => {
+  const plan = (week: string) => ({ week, span: 'week', version: 1, lockedAt: null,
+    plan: { items: [{ day: week, time: '09:00', platform: 'x', angle: 'زاوية' }] } }) as never
+  it('وسمُ «خطّة منتهية» وزرٌّ أوّليٌّ واحد إلى بناء خطّة الأسبوع الحاليّ، بلا «تابع الكتابة» ولا أقربِ منشوراتٍ مضت', () => {
+    const html = planCard(plan('2026-09-20'), { written: 0, ready: 0, pending: 0 }, NOW, null)
+    expect(html).toContain('<span class="st warn">خطّة منتهية</span>')
+    expect(html).toContain('<a class="btn btn-primary" href="/panel/plan/new">أنشئ خطّة الأسبوع الحاليّ</a>')
+    expect(html).not.toContain('تابع الكتابة')
+    expect(html).not.toContain('class="hp-next"')
+    expect(html.match(/btn-primary/g)).toHaveLength(1)
+    expect(html).toContain('<b>0</b> من 1 معتمَدة')
+  })
+  it('وخطّةُ الأسبوع الجاري بلا وسم، وزرُّها يتبع حالَها', () => {
+    const html = planCard(plan('2026-10-04'), { written: 0, ready: 0, pending: 0 }, NOW, null)
+    expect(html).not.toContain('خطّة منتهية')
+    expect(html).toContain('تابع الكتابة')
   })
 })

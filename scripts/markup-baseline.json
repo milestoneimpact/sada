@@ -11,7 +11,7 @@
   },
   "routes/panelView.ts": {
     "buttons": 11,
-    "cards": 31,
+    "cards": 30,
     "inputs": 7
   },
   "routes/pwa.ts": {
@@ -136,7 +136,7 @@
   },
   "routes/ui/sections/home.ts": {
     "buttons": 7,
-    "cards": 7,
+    "cards": 6,
     "inputs": 0
   },
   "routes/ui/sections/pivot.ts": {

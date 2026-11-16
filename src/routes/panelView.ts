@@ -13,7 +13,7 @@
 import { html, raw } from './ui/html'
 import { agoTag } from './ui/time'
 import { filterBar } from './ui/components/filterbar'
-import { stamp } from '../lib/time/zone'
+import { stamp, zoneNote } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
@@ -999,7 +999,7 @@ function topNew(): string {
  * ‏فلا زرّان بالاسم نفسِه في شاشة. والعائمُ يبقى في «المكتبة» ويخرج من الرئيسيّة لهذا.
  */
 function homeNew(): string {
-  return menu({ label: 'منشور جديد', variant: 'secondary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
+  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
 }
 
 /**
@@ -1136,7 +1136,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
 
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
-      ${i.go === undefined ? '' : button({ label: i.label ?? 'اذهب', size: 'sm', href: i.go })}</li>`)
+      ${i.go === undefined ? '' : `<span class="todo-go">${button({ label: i.label ?? 'اذهب', size: 'sm', variant: 'secondary', href: i.go })}</span>`}</li>`)
     .join('')
 
   return `<section data-pane="overview" hidden>
@@ -1159,17 +1159,11 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
-  ${/* ‏**«ما ينتظرك» أوّلًا بعرض اللوح** (SPEC-v1 §6.1): ما يوجب يدَ المالك قبل الخطّة والرحلة. */''}
-  <div class="mt-3">
-      <div class="card"><h2>ما ينتظرك</h2>
-        <p class="hint">مولَّد من حال النظام الآن — لا قائمة ثابتة</p>
-        ${todo === ''
-          ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
-          : `<ul class="todo">${todo}</ul>`}
-        <div class="row mt-3">${SCAN_BTN}
-          ${button({ label: 'مراجعة المصادر', size: 'sm', href: '#sources' })}</div></div>
-  </div>
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew())}
+  ${/* ‏**«ما ينتظرك» بعد التحيّة بعرض اللوح** (SPEC-v1 §6.1 · D-381): يرسمها `homeTop`، وصفوفُها من هنا وأدواتُها ثانويّة */''}
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
+    rows: todo,
+    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
+  })}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
@@ -1190,8 +1184,18 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
-  <details class="card home-ops mt-3" id="ops">
-    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">اليوم بالأرقام، والإنفاق 14 يومًا، وأين يذهب المال، وسجلّ اليوم</span></summary>
+  ${/*
+   * ‏**«الكلفة وما وقع» بطاقةً مضغوطة برقمين** (SPEC-v1 §6.1 · D-381، بدل الطيّ الكامل في D-216): إنفاقُ اليوم وإنفاقُ 14 يومًا
+   * ‏يُقرآن بلا فتح، وما عداهما خلف «التفاصيل» — طيٌّ أصيلٌ يعمل بلا سكربت. والرقمان من السلسلة نفسِها التي يرسمها الرسمُ تحته.
+   */''}
+  <div class="card home-cost mt-3" role="region" aria-labelledby="hc-t">
+    <div class="card-head"><h2 id="hc-t">الكلفة وما وقع</h2></div>
+    <dl class="hc-nums">
+      <div><dt>إنفاق اليوم</dt><dd class="num">${escapeHtml(money(d.series[d.series.length - 1]?.total ?? 0))}</dd></div>
+      <div><dt>إنفاق 14 يومًا</dt><dd class="num">${escapeHtml(money(d.series.reduce((n, x) => n + x.total, 0)))}</dd></div>
+    </dl>
+  <details class="home-ops" id="ops">
+    <summary>التفاصيل<span class="ago">اليوم بالأرقام، وأين يذهب المال، وسجلّ اليوم</span></summary>
   <h2 class="home-sub mt-3">اليوم بالأرقام</h2>${tileRow(d)}
   <div class="mt-3">${todayList(d)}</div>
   <div class="mt-3">${activityCard(facts, d.now)}</div>
@@ -1214,6 +1218,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     </div>
   </div>
   </details>
+  </div>
 </section>`
 }
 
@@ -1806,8 +1811,7 @@ ${panesOf(view)}
 
 ${fabNew()}
 ${/* ‏والذيل اسم وساعة (D-215): «كلّ زرّ هنا يحرسه قيد مُختبَر في الخادم» جملة للمطوّر لا للمالك */''}
-<footer><span>صدى</span>
-  <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
+<footer class="page-foot">صدى · <bdi class="num" dir="ltr">${escapeHtml(stamp(d.now, d.zone ?? null).replace(/ بتوقيت.*$/, ''))}</bdi>${escapeHtml(zoneNote(d.zone ?? null))}</footer>
 </main>
 </div>
 </div>`

@@ -577,7 +577,8 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('class="card home-plan"')
     expect(html).toContain('مسوّدة · الإصدار 1')
-    expect(html).toContain('<b>1</b> معتمَدةً من 3')
+    expect(html).toContain('<b>1</b> من 3 معتمَدة')
+    expect(html).not.toContain('خطّة منتهية')
     expect(html).toContain('href="/panel/plan/review">تابع الكتابة</a>')
     expect(html).toContain('class="hp-next"')
     // ‏و«اليوم بالأرقام» في المطويّ لا أعلى الرئيسيّة
@@ -591,9 +592,10 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     db.raw.exec("UPDATE accounts SET status = 'needs_reauth'")
     const { cookie } = await session()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    // ‏‏D-355: سطرُ التحيّة صار رأسَ الرئيسيّة (`home-head`)، والقاعدةُ نفسُها: زرٌّ صغيرٌ فيه
-    expect(html).toContain('class="home-head home-hello"')
-    expect(html).toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
+    // ‏‏D-381 (§4.4): التنبيهُ الواحدُ أعلى الصفحة يحمل الزرّ، فلا يُعاد بجانب التحيّة ولا صفًّا في «ما ينتظرك»
+    expect(html).not.toContain('class="todo-next" data-tone="bad"')
+    expect(html.match(/class="sys-banner /g)).toHaveLength(1)
+    expect(html).not.toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
     expect(html).not.toContain('card-alert next is-slim" data-tone="bad"')
   })
 })

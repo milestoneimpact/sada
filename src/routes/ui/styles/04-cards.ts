@@ -88,40 +88,69 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    ثمّ العدد. **والمميَّزة وحدَها بلون حالها** فلا تُقرأ سبع محطّات برتقاليّة ضجيجًا. */
 /* ‏وتحت العريض عمودٌ واحد — وبعد قاعدتها في الورقة، فلا يغلبها الترتيب */
 /* ‏**عمودان** (D-355): الرئيسيُّ للقرار والجانبيُّ للسياق، والجانبيُّ ثابتُ العرض كي لا يتمدّد في الشاشات العريضة */
+/* ‏**الرئيسيّة بترتيب SPEC-v1 §6.1** (D-381): التحيّةُ وسطرُ حالها، ثمّ «ما ينتظرك» بعرض اللوح، ثمّ الأرقامُ صفًّا، ثمّ عمودان
+   الأسبوعُ فيهما ثلثان والرحلةُ ثلث. وتحت «tab» عمودٌ واحد: الأسبوعُ ثمّ الرحلة */
 .home-head{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-3); margin-bottom:var(--s-5)}
-.home-grid{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,1fr) 24rem; margin-top:var(--gap-card)}
+.hello-t{display:flex; flex-direction:column; gap:var(--s-1); min-width:0}
+.hello-status{font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
+.hello-status b{color:var(--ink); font-weight:600}
+.home-waiting{margin-bottom:var(--gap-card)}
+.home-waiting .card-head{margin-bottom:var(--s-2)}
+.todo-next .next-k{font-weight:600; color:var(--ink-2); margin-inline-end:var(--s-1)}
+.empty-ok{padding:var(--s-5); text-align:start}
+.empty-ok .empty-t{display:flex; align-items:center; gap:var(--s-2); font-weight:600; font-size:var(--t-ui); line-height:var(--lh-ui)}
+.empty-ok .dot{width:var(--dot); height:var(--dot); border-radius:50%; flex:none; background:var(--ok)}
+.home-grid{display:grid; align-items:start; gap:var(--gap-card); grid-template-columns:minmax(0,2fr) minmax(0,1fr); margin-top:var(--gap-card)}
 .home-main, .home-aside{display:grid; grid-template-columns:minmax(0,1fr); gap:var(--gap-card); min-width:0}
 .home-main > .card, .home-aside > .card{margin-bottom:0}
-@media${below('lg')}{.home-grid{grid-template-columns:minmax(0,1fr)}}
-/* ‏«خطوتك التالية» سطرٌ مضغوط (D-355): كان كتلةً بعنوانٍ كبير تملأ أوّلَ الشاشة */
-.card-alert.next.is-slim{padding:var(--s-3) var(--s-5); border-radius:var(--r-card)}
-.next.is-slim .next-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
-.next.is-slim .next-k{display:inline; margin-inline-end:var(--s-2)}
-.next.is-slim .next-body{display:flex; flex-wrap:wrap; align-items:baseline; gap:var(--s-1)}
-.funnel{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-1)}
-.funnel a{display:grid; grid-template-columns:9rem minmax(0,1fr) 2.5rem; grid-template-areas:"t bar n" "t note note";
-  column-gap:var(--s-3); row-gap:var(--s-0); align-items:center; padding:var(--s-1) var(--s-2); border-radius:var(--r-control);
-  color:inherit; text-decoration:none; min-height:var(--tap)}
-@media(hover:hover){.funnel a:hover{background:var(--hover)}}
-.funnel li[data-focus] a{background:var(--surface-2)}
-.fn-t{grid-area:t; display:flex; flex-direction:column; align-items:flex-start; gap:var(--s-0)}
-.fn-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
-.fn-bar{grid-area:bar; display:flex; justify-content:flex-start; height:var(--s-3); border-radius:var(--r-control); background:var(--surface-3); overflow:hidden}
-.fn-bar > span{display:block; flex:none; height:100%; width:var(--w); border-radius:var(--r-control); background:var(--ink-2)}
-.funnel li[data-focus][data-state=now] .fn-bar > span{background:var(--warn)}
-.funnel li[data-focus][data-state=failed] .fn-bar > span,.funnel li[data-state=failed] .fn-bar > span{background:var(--bad)}
-.fn-n{grid-area:n; text-align:end; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
-.fn-note{grid-area:note; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.wk{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
+@media${below('tab')}{.home-grid{grid-template-columns:minmax(0,1fr)}}
+/* ‏**رحلةُ المنشور خطُّ مراحلَ عموديّ** (D-381، بدل أشرطة D-194): دائرةُ حالٍ على خطٍّ يصل المراحل، والمميَّزةُ وحدَها مغسولة */
+.jsteps{list-style:none; margin:0; padding:0; display:grid}
+.jsteps li{position:relative}
+.jsteps li:not(:last-child)::after{content:''; position:absolute; inset-inline-start:calc(var(--s-2) + var(--icon-sm) / 2 - var(--ul) / 2);
+  top:calc(var(--s-2) + var(--icon-sm)); bottom:calc(-1 * var(--s-2) + var(--s-2)); width:var(--ul); background:var(--line)}
+.jsteps a{display:grid; grid-template-columns:var(--icon-sm) minmax(0,1fr) auto; grid-template-areas:"d t n" ". note note";
+  column-gap:var(--s-3); row-gap:var(--s-0); align-items:center; padding:var(--s-2); border-radius:var(--r-control);
+  color:inherit; text-decoration:none; min-height:var(--tap); transition:background-color var(--dur-2) var(--ease)}
+@media(hover:hover){.jsteps a:hover{background:var(--hover)}}
+.jsteps li[data-focus][data-state=now] a{background:var(--warn-wash)}
+.jsteps li[data-focus][data-state=failed] a{background:var(--bad-wash)}
+.js-dot{grid-area:d; position:relative; z-index:1; display:grid; place-items:center; width:var(--icon-sm); height:var(--icon-sm);
+  border-radius:50%; background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--line); color:var(--ink-3); font-size:var(--t-caption); line-height:1}
+.js-dot[data-tone=ok]{color:var(--ok); box-shadow:inset 0 0 0 var(--stroke) var(--ok)}
+.js-dot[data-tone=warn]{color:var(--warn); box-shadow:inset 0 0 0 var(--stroke) var(--warn)}
+.js-dot[data-tone=bad]{color:var(--bad); box-shadow:inset 0 0 0 var(--stroke) var(--bad)}
+.js-t{grid-area:t; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); min-width:0}
+.js-t b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
+.js-n{grid-area:n; text-align:end; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+.js-note{grid-area:note; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+/* ‏«الكلفة وما وقع» رقمان وطيّ (D-381) */
+.hc-nums{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:var(--s-4); margin:0}
+.hc-nums dt{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+.hc-nums dd{margin:0; font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
+.home-cost > .home-ops{margin-top:var(--s-4); border-top:var(--bd-soft); padding-top:var(--s-2)}
+/* ‏والذيلُ اسمٌ ووقتٌ بخطّ الشرح (D-381 · §6.1): ‏13px بحبرٍ ثالث */
+footer.page-foot{display:block; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-3)}
+.wk{position:relative; list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-1)}
 .wk li{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-2) 0;
   border-radius:var(--r-control); background:var(--surface-2); min-height:8.5rem}
 .wk li[data-today]{background:var(--surface); box-shadow:inset 0 0 0 var(--stroke) var(--accent)}
+/* ‏واليومُ الذي فيه منشوراتٌ يُفتح (D-381): الملخّصُ هو الخانةُ نفسُها، والقائمةُ منبثقةٌ تحت الشريط بعرضه */
+.wk-day{display:contents}
+.wk-day > summary{display:flex; flex-direction:column; align-items:center; gap:var(--s-1); width:100%; flex:1; cursor:pointer; list-style:none;
+  border-radius:var(--r-control)}
+.wk-day > summary::-webkit-details-marker{display:none}
+@media(hover:hover){.wk-day > summary:hover{background:var(--hover)}}
+.wk-day[open] > summary{box-shadow:inset 0 0 0 var(--stroke) var(--line)}
+.wk-pop{position:absolute; z-index:2; inset-inline:0; top:calc(100% + var(--s-1)); padding:var(--s-3) var(--s-4);
+  background:var(--surface); border:var(--bd); border-radius:var(--r-control); box-shadow:var(--sh-2)}
+.wk-today{display:flex; align-items:center; gap:var(--s-2); margin:var(--s-4) 0 var(--s-2); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
 .wk-d{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 /* ‏والاسمُ بقدر عموده (D-325): الكاملُ فوق «sm»، وبلا «ال» تحتها بحجم الشارة، وحرفُه الأوّلُ تحت «xs» («ح ن ث ر خ ج س» كما في
    تقويم الهاتف) — «الخميس» ‏42px و«خميس» ‏36px في عمودٍ ‏33px عند ‏320. والاسمُ الكاملُ لقارئ الشاشة دائمًا («.vh») */
 .wk-short,.wk-min{display:none}
 /* ‏في العمود الجانبيّ (D-355) الخانةُ أضيقُ من اسم اليوم كاملًا، فالمختصرُ على كلّ عرض */
-@media${atLeast('lg')}{.home-aside .wk-long{display:none} .home-aside .wk-short{display:inline}}
+@media${atLeast('lg')}{.home-main .wk-long{display:none} .home-main .wk-short{display:inline}}
 .wk-n{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .wk-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0); flex:1; align-content:flex-start; padding:0 var(--s-1)}
 /* ‏ومربّعُ شعارٍ لا نقطةُ لون (D-325): الرمزُ الأبيضُ يحمل المنصّة، واللونُ يُعين؛ وحلقةُ الليل تحدّ مربّعَ X على الأرض الداكنة */
@@ -286,7 +315,7 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 /* ‏**شريطٌ واحد لا أربعُ بطاقات** (D-355): الأرقامُ مقياسٌ واحد يُقرأ معًا، فتفصلها خيوطٌ لا حوافٌّ ملوّنة. والحالُ نقطةٌ قبل اسم الرقم */
 @media${below('md')}{.hstats{grid-template-columns:repeat(2,minmax(0,1fr))} .hstats li:nth-child(n+3){border-top:var(--bd)} .hstats li:nth-child(3){border-inline-start:0}}
 .hstats li + li{border-inline-start:var(--bd)}
-.hstats a{display:flex; flex-direction:column; gap:var(--s-1); min-height:var(--tap); padding:var(--s-4) var(--s-5); color:var(--ink); text-decoration:none;
+.hstats a{display:flex; flex-direction:column; gap:var(--s-0); min-height:var(--tap); padding:var(--s-3) var(--s-4); color:var(--ink); text-decoration:none;
   transition:background-color var(--dur-2) var(--ease)}
 @media(hover:hover){.hstats a:hover{background:var(--hover)} .db-bar:hover rect{opacity:.8}}
 .hs-k::before{content:''; display:inline-block; width:var(--s-2); height:var(--s-2); margin-inline-end:var(--s-2); border-radius:var(--r-pill); background:var(--line); vertical-align:middle}
@@ -295,7 +324,9 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .hstats [data-tone=ok] .hs-k::before{background:var(--ok)}
 .hstats [data-tone=bad] .hs-k::before{background:var(--bad)}
 .hs-k{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.hs-n{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
+.hs-n{font-size:var(--t-h2); line-height:var(--lh-h2); font-weight:600}
+/* ‏والصفرُ بسطرٍ يقول ما يعنيه (D-381 · §5.4): لا رقمَ صفريٌّ بلا سياق */
+.hs-z{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .daybars{margin:0}
 /* ‏والرقمُ فوق عموده (مراجعة D-323): صفٌّ بعرض الرسم وارتفاعه فوقه، عمودٌ لكلّ يوم بعرض عموده، والرقمُ في عموده على
    ارتفاعٍ يكتبه الخادمُ نسبةً من ارتفاع الرسم — فيعلو رأسَ العمود أيًّا كان عرضُ الشاشة */

@@ -177,6 +177,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
 .todo .dot.warn{background:var(--warn)} .todo .dot.bad{background:var(--bad)}
 .todo .dot.ok{background:var(--ok)}
 .todo a,.todo form{margin-inline-start:auto}
+
 /* أزرارُ الصفوف عمودٌ واحدٌ لا حافّةٌ مسنّنة (D-136): عرضٌ أدنى واحد،
    والأطول يتجاوزه بحقّه. */
 .todo>li>a.btn,.todo>li>form .btn{flex:none; background:transparent; border-color:transparent;
@@ -185,6 +186,10 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
   /* ‏زرٌّ هادئ: حبرُ الرابط وخطٌّ تحته بلونه (D-149 ثمّ D-187) — كان الخطُّ نحاسيًّا، فيُعدّ
      كلّ زرّ في «ما ينتظرك» موضعًا (أحد عشر في الرئيسيّة) */
   text-decoration:underline; text-underline-offset:var(--ul-off); text-decoration-thickness:var(--ul)}
+/* ‏وفي «ما ينتظرك» بالرئيسيّة أزرارٌ حقًّا لا روابطُ نصّيّة (SPEC-v1 §2.3 · D-381): ثانويّةٌ، والخطوةُ التالية وحدَها أوّليّة */
+.todo-act>li{padding-block:var(--s-2)}
+/* ‏والزرُّ في غلافه، فلا يلبس قاعدةَ الزرّ الهادئ أعلاه («.todo>li>a.btn») — ويبقى ثانويًّا أو أوّليًّا كما رُسم */
+.todo-go{flex:none; margin-inline-start:auto; display:inline-flex}
 
 /* ── صفٌّ عاجلٌ في «ما عليك» (D-123) ────────────────────────────────
    مهمّة توقف بوّابة مرحلة ولم تتمّ. **وكان الصنف يُكتب في الوسم ولا
