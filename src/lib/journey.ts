@@ -25,6 +25,7 @@
 import { deciderText } from './decider'
 import type { Db } from './tokens'
 import { kb } from './format'
+import { videoStateLabel } from './publish/video'
 
 /** محطّةٌ في الرحلة — **ولا تُنشأ إلّا من صفّ**. */
 export interface Station {
@@ -195,27 +196,30 @@ export async function readJourney(db: Db, org: string, postId: string): Promise<
   // ── ٤ · الصور ──────────────────────────────────────────────────────
   const { results: media } = await db
     .prepare(
-      `SELECT mime, bytes, cost_usd, status, model, note, headline, created_at FROM media
+      `SELECT mime, bytes, cost_usd, status, model, note, headline, created_at, platform_media_state, platform_media_error FROM media
         WHERE post_id = ? AND org_id = ? ORDER BY rowid`,
     )
     .bind(postId, org)
     .all<{
       mime: string; bytes: number; cost_usd: number; status: string; model: string | null
       note: string | null; headline: string | null; created_at: string
+      platform_media_state: string | null; platform_media_error: string | null
     }>()
     .catch(() => ({ results: [] as never[] }))
 
   for (const m of media) {
     const clip = m.mime.startsWith('video/')
+    // ‏‏حالُ المقطع عند المنصّة (D-379): يُرفع، تعالجه، جاهز، أو سببُ الردّ — **والمعرّفُ لا يُقال**
+    const at = clip ? videoStateLabel(m.platform_media_state, m.platform_media_error) : null
     stations.push({
       kind: 'image',
       title: clip ? 'وُلّد مقطع' : 'وُلّدت صورة',
       at: m.created_at,
       detail: m.status === 'rejected'
         ? 'رفضتَها — وتبقى بكلفتها'
-        : `${kb(m.bytes)}${slideSaid(m.note, m.headline)}`,
+        : `${kb(m.bytes)}${slideSaid(m.note, m.headline)}${at === null ? '' : ` · على المنصّة: ${at}`}`,
       cost: m.cost_usd, model: m.model,
-      state: m.status === 'rejected' ? 'failed' : 'done',
+      state: m.status === 'rejected' || m.platform_media_state === 'failed' ? 'failed' : 'done',
     })
   }
 

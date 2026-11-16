@@ -14,7 +14,9 @@ import { atomically, type Db, type DbStatement } from '../tokens'
 import { isLinkedInPage, type LinkedAccount } from '../channels'
 import { schedulePost } from '../schedule/job'
 import { YT_TITLE_MAX, youtubeDescription, youtubeTitle } from '../publish/youtube'
+import { videoMisfit, videoStateLabel } from '../publish/video'
 import { canUploadMedia } from '../oauth/scopes'
+import { platformLabel } from '../oauth/providers'
 import { objectKey } from '../tenancy'
 
 /** الأنواعُ التي تقبلها المنصّاتُ الثلاث أو بعضُها — وما سواها يُردّ قبل أن يُرفَع بايت. */
@@ -66,6 +68,8 @@ export interface UploadPost {
    * أو مستوًى أضيقُ من العامّ. و`null` لما سواه.
    */
   readonly note?: string | null
+  /** ‏حالُ المقطع عند X وLinkedIn بلسان المالك (D-379): «يُرفع الفيديو»، «تعالجه المنصّة»، «جاهز» أو سببُ الردّ — بلا معرّفه. */
+  readonly video?: string | null
 }
 
 export interface UploadMeta {
@@ -262,13 +266,13 @@ export async function listUploads(db: Db, org: string, limit = 20): Promise<Uplo
    * ‏مقطعًا قيل له «لا مقطعَ مرفوعًا» والمقاطعُ موجودة. **وتعثُّرُ هذا النداء وحدَه لا يُفرغها**:
    * ‏المقاطعُ تُعرَض بلا روابط منشوراتها، والخطّةُ تجدها بأسمائها.
    */
-  let made: { upload_id: string; id: string; platform: string; status: string; note: string | null }[] = []
+  let made: { upload_id: string; id: string; platform: string; status: string; note: string | null; vstate: string | null; verror: string | null }[] = []
   if (results.length > 0) {
     try {
       made = (await db
         .prepare(
           // ‏وملاحظةُ الناشر على نشرٍ نجح (D-190): للمنشور وحدَه، ولا استعلامَ لما لم يُنشر
-          `SELECT m.upload_id, p.id, p.platform, p.status,
+          `SELECT m.upload_id, p.id, p.platform, p.status, m.platform_media_state AS vstate, m.platform_media_error AS verror,
                   CASE WHEN p.status = 'published' THEN
                     (SELECT json_extract(pa.response_json, '$.note') FROM publish_attempts pa
                       WHERE pa.post_id = p.id AND pa.org_id = p.org_id AND pa.status = 'succeeded'
@@ -278,7 +282,7 @@ export async function listUploads(db: Db, org: string, limit = 20): Promise<Uplo
             ORDER BY p.created_at DESC, p.id`,
         )
         .bind(org, org, limit)
-        .all<{ upload_id: string; id: string; platform: string; status: string; note: string | null }>()).results
+        .all<{ upload_id: string; id: string; platform: string; status: string; note: string | null; vstate: string | null; verror: string | null }>()).results
     } catch (error) {
       console.error({ job: 'uploads.list', posts_failed: String(error).slice(0, 200) })
     }
@@ -288,6 +292,7 @@ export async function listUploads(db: Db, org: string, limit = 20): Promise<Uplo
     durationMs: r.duration_ms, status: r.status, createdAt: r.created_at,
     posts: made.filter((m) => m.upload_id === r.id).map((m) => ({
       id: m.id, platform: m.platform, status: m.status, note: typeof m.note === 'string' && m.note !== '' ? m.note : null,
+      video: m.platform === 'x' || m.platform === 'linkedin' ? videoStateLabel(m.vstate ?? null, m.verror ?? null) : null,
     })),
   }))
 }
@@ -295,8 +300,16 @@ export async function listUploads(db: Db, org: string, limit = 20): Promise<Uplo
 export type VideoPlatform = 'youtube' | 'tiktok' | 'instagram'
 export const VIDEO_PLATFORMS: readonly VideoPlatform[] = ['youtube', 'tiktok', 'instagram']
 
+/**
+ * ‏**ومقطعُ المالك إلى X وLinkedIn أيضًا** (D-379): بمسار `publish/video.ts` نفسِه وحدودِه (`VIDEO_LIMITS`). قائمةٌ أوسعُ
+ * ‏بجانب `VIDEO_PLATFORMS` لا مكانَها: تلك «منصّاتُ المقاطع» التي لا نصَّ وحده عندها، ويقرؤها اختيارُ الحزمة وحدُّ نصّ المسوّدة
+ * ‏(`isVideoPlatform`)، وإدخالُ X وLinkedIn فيها يقيس تغريدةً مكتوبةً بحدّ وصف مقطع. فهذه لـ«فيديوهاتك» وحدَها.
+ */
+export type UploadPlatform = VideoPlatform | 'x' | 'linkedin'
+export const UPLOAD_PLATFORMS: readonly UploadPlatform[] = [...VIDEO_PLATFORMS, 'x', 'linkedin']
+
 export interface VideoCheck {
-  readonly platform: VideoPlatform
+  readonly platform: UploadPlatform
   /** `block` يمنع إنشاءَ المنشور، و`warn` يُقال ولا يمنع. */
   readonly level: 'ok' | 'warn' | 'block'
   readonly note: string
@@ -441,11 +454,17 @@ export function videoChecks(u: Pick<UploadRow, 'mime' | 'bytes' | 'width' | 'hei
               ? { platform: 'instagram', level: 'warn', note: 'Reel — وليس 9:16 فيُقصّ في الخلاصة' }
               : { platform: 'instagram', level: 'ok', note: 'Reel' }
 
-  return [youtube, tiktok, instagram]
+  // ‏X وLinkedIn بحدود الناشر نفسِها (D-379): ما يُردّ هنا يُردّ هناك، والمدّةُ المجهولة يقرؤها الناشرُ من رأس الملفّ
+  const toPlatform = (platform: 'x' | 'linkedin'): VideoCheck => {
+    const why = videoMisfit(platform, u.bytes, u.durationMs, u.mime)
+    return why === null ? { platform, level: 'ok', note: 'فيديو' } : { platform, level: 'block', note: why }
+  }
+
+  return [youtube, tiktok, instagram, toPlatform('x'), toPlatform('linkedin')]
 }
 
 /** حدُّ نصّ المقطع: TikTok وInstagram بالمحرف، وYouTube بالبايت على وصفه (ما بعد سطر العنوان). */
-export const CAPTION_LIMIT: Readonly<Record<'tiktok' | 'instagram', number>> = { tiktok: 2200, instagram: 2200 }
+export const CAPTION_LIMIT: Readonly<Record<'tiktok' | 'instagram' | 'x' | 'linkedin', number>> = { tiktok: 2200, instagram: 2200, x: 280, linkedin: 3000 }
 export const YOUTUBE_DESCRIPTION_BYTES = 5000
 
 /**
@@ -454,7 +473,7 @@ export const YOUTUBE_DESCRIPTION_BYTES = 5000
  * سليمٌ («ثلاثُ طبقاتٍ للحوكمة»). ووصفُ YouTube يُردّ بعد رفع المقطع إن زاد على ‏5000 بايت
  * أو حمل «<» و«>»، فتضيع حصّةُ يومه — فيُقال قبل الاعتماد.
  */
-export function captionProblem(platform: VideoPlatform, text: string): string | null {
+export function captionProblem(platform: UploadPlatform, text: string): string | null {
   if (text.trim() === '') return 'النصّ فارغ'
   // ‏وYouTube يُقاس على ما يُرفع وصفًا (`youtubeDescription`): العنوانُ له حدُّه في `titleProblem`
   const t = platform === 'youtube' ? youtubeDescription(text) : text.trim()
@@ -465,7 +484,7 @@ export function captionProblem(platform: VideoPlatform, text: string): string | 
     return null
   }
   const limit = CAPTION_LIMIT[platform]
-  return t.length > limit ? `النصّ ${t.length} محرفًا و${platform === 'tiktok' ? 'TikTok' : 'Instagram'} تقبل ${limit}` : null
+  return t.length > limit ? `النصّ ${t.length} محرفًا و${platformLabel(platform)} تقبل ${limit}` : null
 }
 
 /**
@@ -517,7 +536,7 @@ export function uploadMediaRow(db: Db, postId: string, uploadId: string, u: Uplo
 }
 
 export type PostsResult =
-  | { readonly ok: true; readonly created: readonly VideoPlatform[]; readonly skipped: readonly VideoPlatform[] }
+  | { readonly ok: true; readonly created: readonly UploadPlatform[]; readonly skipped: readonly UploadPlatform[] }
   | { readonly ok: false; readonly reason: string }
 
 /**
@@ -539,7 +558,7 @@ export async function postsFromUpload(
     readonly uploadId: string
     readonly platforms: readonly string[]
     readonly caption?: string
-    readonly captions?: Partial<Readonly<Record<VideoPlatform, string>>>
+    readonly captions?: Partial<Readonly<Record<UploadPlatform, string>>>
     readonly title?: string
     readonly approve: boolean
     readonly by: string
@@ -557,7 +576,7 @@ export async function postsFromUpload(
   const perPlatform = input.captions !== undefined
   const caption = clean(input.caption ?? '')
   if (!perPlatform && caption === '') return { ok: false, reason: 'اكتب نصّ المنشور — يُنشر وصفًا مع المقطع' }
-  const textOf = (p: VideoPlatform): string => !perPlatform
+  const textOf = (p: UploadPlatform): string => !perPlatform
     ? caption
     : p === 'youtube'
       ? youtubeText(input.title ?? '', input.captions?.youtube ?? '')
@@ -569,13 +588,13 @@ export async function postsFromUpload(
   if (row === null || row.status !== 'ready') return { ok: false, reason: 'المقطع لم يكتمل رفعُه' }
 
   const checks = videoChecks({ mime: row.mime, bytes: row.bytes, width: row.width, height: row.height, durationMs: row.duration_ms })
-  const wanted = VIDEO_PLATFORMS.filter((p) => input.platforms.includes(p))
+  const wanted = UPLOAD_PLATFORMS.filter((p) => input.platforms.includes(p))
   if (wanted.length === 0) return { ok: false, reason: 'اختر منصّةً واحدةً على الأقلّ' }
   const allowed = wanted.filter((p) => checks.find((c) => c.platform === p)?.level !== 'block')
   if (allowed.length === 0) return { ok: false, reason: 'المقطع لا يوافق حدود ما اخترت — والسبب تحت كلّ منصّة' }
 
   // ‏ولكلّ منصّةٍ سببُها باسمها حين تختلف نصوصُها — «النصُّ فارغ» وحدَها لا تقول أيَّها
-  const label = (p: VideoPlatform): string => (p === 'youtube' ? 'YouTube' : p === 'tiktok' ? 'TikTok' : 'Instagram')
+  const label = (p: UploadPlatform): string => platformLabel(p)
   const tooLong = allowed
     .map((p) => {
       if (!perPlatform) return { p, why: captionProblem(p, caption) }
@@ -584,12 +603,12 @@ export async function postsFromUpload(
       const why = textOf(p) === '' ? 'النصّ فارغ' : captionProblem(p, textOf(p))
       return { p, why: why === null ? null : `${label(p)}: ${why}` }
     })
-    .filter((x): x is { p: VideoPlatform; why: string } => x.why !== null)
+    .filter((x): x is { p: UploadPlatform; why: string } => x.why !== null)
   if (tooLong.length > 0) return { ok: false, reason: tooLong.map((x) => x.why).join('؛ ') }
 
   const media = { r2_key: row.r2_key, mime: row.mime, bytes: row.bytes, width: row.width, height: row.height, duration_ms: row.duration_ms }
-  const created: VideoPlatform[] = []
-  const skipped: VideoPlatform[] = []
+  const created: UploadPlatform[] = []
+  const skipped: UploadPlatform[] = []
   for (const platform of allowed) {
     const key = `upload:${row.id}:${platform}`
     const exists = await db
@@ -678,7 +697,7 @@ export async function scheduleFromUpload(
   const scheduled: string[] = []
   const failed: { platform: string; reason: string }[] = []
   // ‏بترتيب المنصّات الثابت لا بترتيب الكتابة: الإشعارُ يقول «YouTube وInstagram» كلَّ مرّة
-  const rank = (p: string): number => (VIDEO_PLATFORMS as readonly string[]).indexOf(p)
+  const rank = (p: string): number => (UPLOAD_PLATFORMS as readonly string[]).indexOf(p)
   const wanted = results.filter((p) => input.shown.includes(p.id)).sort((a, b) => rank(a.platform) - rank(b.platform))
   for (const post of wanted) {
     // ‏وصفحةُ LinkedIn وحدَها تُستبعَد: قناةُ YouTube محفوظةٌ `org` وهي وجهةٌ صالحة

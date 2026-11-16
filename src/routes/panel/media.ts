@@ -660,6 +660,9 @@ media.post('/panel/uploads/:id/posts', async (c) => {
     youtubeDescription: pick('caption_youtube', cached?.youtubeDescription ?? ''),
     tiktok: pick('caption_tiktok', cached?.tiktok ?? ''),
     instagram: pick('caption_instagram', cached?.instagram ?? ''),
+    // ‏X وLinkedIn (D-379): حقلاهما يبدآن بنصّ Instagram، وما لم يُرسَل منهما يبقى به
+    x: pick('caption_x', cached?.instagram ?? ''),
+    linkedin: pick('caption_linkedin', cached?.instagram ?? ''),
   }
   const result = await postsFromUpload(c.env.DB, {
     org: activeOrg(gate.session.record),
@@ -667,7 +670,7 @@ media.post('/panel/uploads/:id/posts', async (c) => {
     platforms: form.getAll('platform').map(String),
     ...(perPlatform
       ? {
-          captions: { youtube: texts.youtubeDescription, tiktok: texts.tiktok, instagram: texts.instagram },
+          captions: { youtube: texts.youtubeDescription, tiktok: texts.tiktok, instagram: texts.instagram, x: texts.x, linkedin: texts.linkedin },
           title: texts.youtubeTitle,
         }
       : { caption: String(form.get('caption') ?? '') }),

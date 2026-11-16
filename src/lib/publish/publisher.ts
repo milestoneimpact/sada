@@ -28,7 +28,7 @@ import {
 } from './platforms'
 import { publishInstagram } from './instagram'
 import { publishXThread } from './xThread'
-import { isVideoTarget, uploadLinkedInVideo, uploadXVideo, videoMisfit } from './video'
+import { clipShape, isMediaIdRejection, isVideoTarget, uploadLinkedInVideo, uploadXVideo, videoMisfit } from './video'
 import { tweetsOf } from '../draft/thread'
 import { isLinkedInPage } from '../channels'
 import { mediaUrl, signMediaToken } from '../media/link'
@@ -240,7 +240,7 @@ export async function publishPost(
    * واحدةٌ لا أكثر: المنصّتان تقبلان عدّة، وصدى تولّد واحدة. ومعالجةُ ما
    * لا يقع تُكتب ولا تُختبَر، فتنكسر يومَ يقع.
    */
-  const image = await db
+  let image = await db
     .prepare(
       /*
        * **والنوعُ يُشترَط لا يُترَك للأحدثيّة** (D-092).
@@ -260,9 +260,10 @@ export async function publishPost(
        * ‏**ويُعرف صفُّ المقطع بنموذجه لا بإشارته وحدها** (مراجعة D-322): حذفُ المقطع من «فيديوهاتك» يقطع `upload_id`
        * ‏(`SET NULL`) ويُبقي صفَّ المنشور بمفتاحه، فكان يعود الإنفوجرافيكُ الأحدث. و`model = 'upload'` يكتبه `uploadMediaRow` وحدَه.
        */
-      `SELECT id, r2_key, mime, platform_media_id, platform_media_state FROM media
+      `SELECT id, r2_key, mime, platform_media_id, platform_media_state, platform_media_expires_at, platform_media_resets, duration_ms
+         FROM media
         WHERE post_id = ? AND org_id = ? AND status = 'ready'
-          AND (mime LIKE ? OR (? = 1 AND model = 'package' AND mime LIKE 'video/%'))
+          AND (mime LIKE ? OR (? = 1 AND model IN ('package', 'upload') AND mime LIKE 'video/%'))
         ORDER BY (upload_id IS NOT NULL OR model = 'upload') DESC, created_at DESC LIMIT 1`,
     )
     .bind(
@@ -274,7 +275,7 @@ export async function publishPost(
       // ‏‏**ومقطعُ الحزمة لـ X وLinkedIn** (D-374): يُرفع مقطعًا لا صورة. وحدَه: مقطعٌ حُرّك من صورة (D-052) يبقى خارجًا كما كان
       isVideoTarget(post.platform) ? 1 : 0,
     )
-    .first<{ id: string; r2_key: string; mime: string; platform_media_id: string | null; platform_media_state: string | null }>()
+    .first<MediaRow>()
     .catch(() => null)
 
   // دلوٌ غير ممرَّرٍ ومنشورٌ بصورة: **لا يُنشر النصُّ وحده**. المالك اعتمد
@@ -468,41 +469,90 @@ export async function publishPost(
      * ‏في محاولةٍ سبقت يُسأل عنه ولا يُرفع ثانيةً، و`ready` يُلحَق مباشرة. وكلُّ طلبٍ يُكتب في الدفتر قبل إرساله (D-008)
      * ‏بصفرٍ موسوم: X يحاسب على الطلب وسعرُ الرفع لم يُؤكَّد بعد.
      */
+    let videoPath = false
+    let videoResets = image?.platform_media_resets ?? 0
     if (image !== null && isVideoTarget(post.platform) && image.mime.startsWith('video/')) {
       const target = post.platform
-      if (image.platform_media_state !== 'ready' || mediaId === null) {
-        const clip = await bucketClip(deps.bucket!, image.r2_key, image.mime)
-        if (clip === null) throw new PublishError('media_bytes_missing', 502, false)
-        const misfit = videoMisfit(target, clip.size)
-        if (misfit !== null) throw new PublishError(`video_misfit: ${misfit}`, 400, false)
-        const opts = {
-          resume: image.platform_media_state === 'processing' ? mediaId : null,
-          sleep: deps.sleep,
-          onRequest: (operation: string) => ledger(db, {
-            provider: post.platform, operation: `${operation}:price_unverified`, units: 1, unitCost: 0, refId: post.id, org: post.org_id,
-          }),
-          onStage: async (id: string, state: 'processing') => {
-            await db.prepare('UPDATE media SET platform_media_id = ?, platform_media_state = ?, platform_media_error = NULL WHERE id = ? AND org_id = ?')
-              .bind(id, state, image.id, post.org_id).run()
-          },
+      const video = image
+      /*
+       * ‏**معرّفُ X ينتهي** (D-379): قرابة يوم (`expires_after_secs`). إعادةٌ بعده تلحق معرّفًا منتهيًا فتُردّ التغريدة،
+       * ‏فيُرفع من جديد — **مرّةً واحدة** (`platform_media_resets`)، وما بعدها ردٌّ نهائيٌّ بسببه فلا دوران ولا دفعٌ بلا حدّ.
+       */
+      const expired = mediaId !== null && video.platform_media_expires_at !== null
+        && Date.parse(video.platform_media_expires_at) <= now().getTime() + 60_000
+      let reupload: string | null = null
+      if (expired) {
+        if (video.platform_media_resets >= 1) {
+          throw new PublishError('x: media_expired: انتهى معرّف المقطع عند X بعد أن أُعيد رفعُه مرّة — أعده بيدك بعد أن تتحقّق', 400, false)
         }
-        try {
-          mediaId = target === 'linkedin'
-            ? await uploadLinkedInVideo(tokens.accessToken, `urn:li:person:${post.external_id}`, clip, fetchImpl, opts)
-            : await uploadXVideo(tokens.accessToken, clip, fetchImpl, opts)
-        } catch (error) {
-          // ‏‏المردودُ نهائيًّا يُكتب سببُه على الوسيط ويُنسى معرّفُه: «أعده» بعد تصحيح المقطع يرفع من أوّله
-          if (error instanceof PublishError && !error.retryable) {
-            await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL WHERE id = ? AND org_id = ?")
-              .bind(error.message.slice(0, 300), image.id, post.org_id).run()
-          }
-          throw error
-        }
-        await db.prepare("UPDATE media SET platform_media_id = ?, platform_media_state = 'ready', platform_media_error = NULL WHERE id = ? AND org_id = ?")
-          .bind(mediaId, image.id, post.org_id).run()
+        reupload = 'انتهت صلاحيّة معرّف المقطع عند X قبل النشر — رُفع من جديد'
+        await resetVideo(db, video.id, post.org_id, reupload)
+        videoResets += 1
+        mediaId = null
       }
-    } else if (
-      image !== null && mediaId === null
+      if (video.platform_media_state !== 'ready' || mediaId === null) {
+        const clip = await bucketClip(deps.bucket!, video.r2_key, video.mime)
+        if (clip === null) throw new PublishError('media_bytes_missing', 502, false)
+        /*
+         * ‏**المدّةُ والصيغةُ قبل الرفع** (D-379): من صفّ «فيديوهاتك» إن قرأها المتصفّح، وإلّا من `moov/mvhd` برأس الملفّ أو
+         * ‏ذيله من R2 بمداه — بلا فكّ ترميز. وما خالف حدودَ المنصّة يسقط إلى الغلاف إن كان للمنشور غلاف، وسببُه على المقطع.
+         */
+        const shape = video.duration_ms !== null ? { isoBmff: true, durationMs: video.duration_ms } : await clipShape(clip)
+        const misfit = !shape.isoBmff
+          ? 'المقطع ليس MP4 ولا MOV في رأسه (لا ftyp)'
+          : videoMisfit(target, clip.size, shape.durationMs, video.mime)
+        if (misfit !== null) {
+          const cover = await coverOf(db, post.id, post.org_id)
+          await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL WHERE id = ? AND org_id = ?")
+            .bind(`video_misfit: ${misfit}`.slice(0, 300), video.id, post.org_id).run()
+          if (cover === null) throw new PublishError(`video_misfit: ${misfit}`, 400, false)
+          note = `نُشر الغلاف بدل المقطع: ${misfit}`
+          image = cover
+          mediaId = cover.platform_media_id
+        } else {
+          videoPath = true
+          const opts = {
+            resume: video.platform_media_state === 'processing' ? mediaId : null,
+            sleep: deps.sleep,
+            onRequest: (operation: string) => ledger(db, {
+              provider: post.platform, operation: `${operation}:price_unverified`, units: 1, unitCost: 0, refId: post.id, org: post.org_id,
+            }),
+            onStart: async () => {
+              await db.prepare("UPDATE media SET platform_media_state = 'uploading', platform_media_id = NULL, platform_media_expires_at = NULL WHERE id = ? AND org_id = ?")
+                .bind(video.id, post.org_id).run()
+            },
+            onStage: async (id: string, state: 'processing') => {
+              await db.prepare('UPDATE media SET platform_media_id = ?, platform_media_state = ?, platform_media_error = NULL WHERE id = ? AND org_id = ?')
+                .bind(id, state, video.id, post.org_id).run()
+            },
+            onExpiry: async (secs: number) => {
+              await db.prepare('UPDATE media SET platform_media_expires_at = ? WHERE id = ? AND org_id = ?')
+                .bind(new Date(now().getTime() + secs * 1000).toISOString(), video.id, post.org_id).run()
+            },
+          }
+          try {
+            mediaId = target === 'linkedin'
+              ? await uploadLinkedInVideo(tokens.accessToken, `urn:li:person:${post.external_id}`, clip, fetchImpl, opts)
+              : await uploadXVideo(tokens.accessToken, clip, fetchImpl, opts)
+          } catch (error) {
+            // ‏‏المردودُ نهائيًّا يُكتب سببُه على الوسيط ويُنسى معرّفُه: «أعده» بعد تصحيح المقطع يرفع من أوّله
+            if (error instanceof PublishError && !error.retryable) {
+              await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL WHERE id = ? AND org_id = ?")
+                .bind(error.message.slice(0, 300), video.id, post.org_id).run()
+            }
+            throw error
+          }
+          await db.prepare("UPDATE media SET platform_media_id = ?, platform_media_state = 'ready', platform_media_error = NULL WHERE id = ? AND org_id = ?")
+            .bind(mediaId, video.id, post.org_id).run()
+          if (reupload !== null) note = reupload
+        }
+      } else {
+        videoPath = true
+      }
+    }
+    if (
+      !videoPath && image !== null && mediaId === null
+      && !image.mime.startsWith('video/')
       && !CLIP_PLATFORMS.has(post.platform)
       && post.platform !== 'instagram'
     ) {
@@ -621,6 +671,7 @@ export async function publishPost(
         .run()
       result = out
     } else {
+      try {
       result =
         post.platform === 'linkedin'
           ? await publishLinkedIn(
@@ -633,6 +684,23 @@ export async function publishPost(
           : thread
             ? await publishXThread(db, post, { id: attemptId, request: attemptRequest }, tweets, tokens.accessToken, fetchImpl, mediaId)
             : await publishX(tokens.accessToken, tweets[0]!, fetchImpl, mediaId)
+      } catch (error) {
+        /*
+         * ‏**X ردّ معرّفَ المقطع** (D-379): منتهٍ أو غيرُ صالح. لم يُنشر شيء (‏4xx)، فيُنسى المعرّفُ ويُعاد من الطابور قابلًا
+         * ‏للإعادة فيُرفع المقطعُ من جديد — **مرّةً**: ردٌّ ثانٍ بعد إعادة الرفع نهائيٌّ بسببه. وكلُّ طلب رفعٍ في الدفتر كما كان.
+         */
+        if (videoPath && post.platform === 'x' && image !== null && isMediaIdRejection(error)) {
+          const why = error instanceof Error ? error.message : String(error)
+          if (videoResets >= 1) {
+            await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL WHERE id = ? AND org_id = ?")
+              .bind(`media_rejected: ردّ X المقطع ثانيةً بعد إعادة رفعه (${why})`.slice(0, 300), image.id, post.org_id).run()
+            throw new PublishError(`x: media_rejected: ردّ X معرّف المقطع ثانيةً بعد إعادة رفعه — لا يُعاد وحده (${why})`.slice(0, 300), 400, false)
+          }
+          await resetVideo(db, image.id, post.org_id, `ردّ X معرّف المقطع (${why}) — يُرفع من جديد مرّة`)
+          throw new PublishError(`x: media_expired: ردّ X معرّف المقطع منتهيًا أو غيرَ صالح — يُرفع من جديد مرّةً في الإعادة (${why})`.slice(0, 300), 400, true)
+        }
+        throw error
+      }
     }
   } catch (error) {
     /*
@@ -684,6 +752,28 @@ export async function publishPost(
   await markPublished(db, post.id, post.org_id, result.platformPostId)
 
   return { kind: 'published', platformPostId: result.platformPostId }
+}
+
+interface MediaRow {
+  id: string; r2_key: string; mime: string; platform_media_id: string | null; platform_media_state: string | null
+  platform_media_expires_at: string | null; platform_media_resets: number; duration_ms: number | null
+}
+
+/** ‏يُنسى معرّفُ المقطع ويُعدّ رفعٌ جديد (D-379): الحالُ فارغةٌ والسببُ يُقرأ، و`platform_media_resets` يمنع الدوران. */
+async function resetVideo(db: Db, id: string, org: string, reason: string): Promise<void> {
+  await db.prepare(`UPDATE media SET platform_media_id = NULL, platform_media_state = NULL, platform_media_expires_at = NULL,
+                           platform_media_error = ?, platform_media_resets = platform_media_resets + 1 WHERE id = ? AND org_id = ?`)
+    .bind(reason.slice(0, 300), id, org).run()
+}
+
+/** ‏غلافُ المنشور حين يخالف المقطعُ حدودَ المنصّة (D-379) — أحدثُ صورةٍ جاهزة له، أو `null`. */
+async function coverOf(db: Db, postId: string, org: string): Promise<MediaRow | null> {
+  return db
+    .prepare(`SELECT id, r2_key, mime, platform_media_id, platform_media_state, platform_media_expires_at, platform_media_resets, duration_ms
+                FROM media WHERE post_id = ? AND org_id = ? AND status = 'ready' AND mime LIKE 'image/%' ORDER BY created_at DESC LIMIT 1`)
+    .bind(postId, org)
+    .first<MediaRow>()
+    .catch(() => null)
 }
 
 /**

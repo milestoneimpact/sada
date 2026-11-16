@@ -4427,7 +4427,7 @@ describe('فيديوهاتك: من الملفّ إلى منشورات على ا�
     return started.id
   }
 
-  async function create(cookie: string, id: string, caption: string, platforms = ['youtube', 'tiktok', 'instagram']): Promise<void> {
+  async function create(cookie: string, id: string, caption: string, platforms = ['youtube', 'tiktok', 'instagram', 'x', 'linkedin']): Promise<void> {
     const f = new FormData()
     f.set('caption', caption)
     f.set('approve', 'on')
@@ -4470,7 +4470,8 @@ describe('فيديوهاتك: من الملفّ إلى منشورات على ا�
     const row = page.slice(page.indexOf(`id="v-${id}"`), page.indexOf('</form>', page.indexOf(`/panel/uploads/${id}/schedule`)))
     for (const p of posts) expect(row).toContain(`href="#d-${p.id}"`)
     expect(row).toContain('معتمَد بلا موعد')
-    expect(row).toContain('أُنشئت كلُّها')
+    // ‏‏والمقطعُ هنا ‏12 بايتًا فـLinkedIn يردّه (دون ‏75KB) ويُسمّى باسمه (D-379)
+    expect(row).toContain('أُنشئ على كلّ ما يوافقه — وLinkedIn لا يوافق حدوده')
     expect(row).not.toContain('وما بقي لا يوافق')
     // ‏بلا كعكةٍ ولا منطقةٍ محفوظة: الأزرارُ بتوقيت الرياض وتقوله (D-202)
     expect(row).toContain('جدوِل منشورات YouTube وTikTok وInstagram معًا بتوقيت الرياض:')
@@ -4487,14 +4488,14 @@ describe('فيديوهاتك: من الملفّ إلى منشورات على ا�
     const after = db.raw.prepare(`SELECT platform, status, account_id, scheduled_at FROM posts ORDER BY platform`).all() as
       { platform: string; status: string; account_id: string | null; scheduled_at: string | null }[]
     expect(after.map((r) => [r.platform, r.status, r.account_id])).toEqual([
-      ['instagram', 'queued', 'acc-ig'], ['tiktok', 'approved', null], ['youtube', 'queued', 'acc-yt'],
+      ['instagram', 'queued', 'acc-ig'], ['tiktok', 'approved', null], ['x', 'approved', null], ['youtube', 'queued', 'acc-yt'],
     ])
     // ‏التاسعةُ صباحًا بالرياض السادسةُ بـ UTC — أيًّا كانت ساعةُ الاختبار
     expect(after[0]!.scheduled_at).toMatch(/ 06:00:00$/)
-    expect(after[0]!.scheduled_at).toBe(after[2]!.scheduled_at)
+    expect(after[0]!.scheduled_at).toBe(after[3]!.scheduled_at)
     const flash = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     expect(flash).toMatch(/جُدول على YouTube وInstagram [^<]* 9:00 ص\./)
-    expect(flash).toContain('وتعذّر TikTok: لا حساب متّصلًا — اربطه أوّلًا.')
+    expect(flash).toContain('وتعذّر TikTok: لا حساب متّصلًا — اربطه أوّلًا؛ X: لا حساب متّصلًا — اربطه أوّلًا.')
     expect(flash).toContain('YouTube لا يُنشر للعامّة')
     expect(flash).not.toContain('UTC.')
   })
