@@ -22,6 +22,8 @@ import { draftFailures, draftRef } from './draftFail'
 import { decide, undoApprove } from '../draft/store'
 import { reschedulePost, unschedule } from '../schedule/job'
 import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
+import { localToUtc } from '../time/local'
+import { storedZone } from '../time/ownerZone'
 import { dayWithin, touchPlan } from './edit'
 import { asSpan, imageFor, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
@@ -203,7 +205,7 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
 }
 
 /**
- * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بـ UTC) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
+ * **انقل** (D-330): البندُ إلى يومٍ وساعةٍ (بتوقيت المالك، D-383) داخل مدى الخطّة — بالسحب في اللوحة أو من لوح البطاقة. ومسوّدتُه المجدولةُ
  * يتحرّك موعدُها معه بـ `reschedulePost` وحرّاسِه (لا ماضٍ، ولا ما أُرسل للنشر)؛ **وإن رُدّ تحريكُها لم يتحرّك البندُ**، فلا
  * يقول التقويمُ يومًا والمنشورُ يخرج في غيره. وما نُشر لا يُنقل.
  */
@@ -217,7 +219,12 @@ export async function moveItem(db: Db, org: string, planId: string, index: numbe
   const post = await postOf(db, org, planId, item, "status <> 'rejected'")
   if (post !== null && post.status === 'published') return { ok: false, reason: 'نُشر منشورُه — لا يُنقل' }
   if (post !== null && post.status === 'queued') {
-    const r = await reschedulePost(db, post.id, `${to.day}T${to.time}`, now, org)
+    // ‏ساعةُ البند بتوقيت المالك، والتخزينُ بـ UTC (D-383) — كما تفعل `slotFor`
+    const [y, mo, d] = to.day.split('-').map(Number) as [number, number, number]
+    const [h, mi] = to.time.split(':').map(Number) as [number, number]
+    const utc = localToUtc(y, mo, d, h, mi, await storedZone(db))
+    if (utc === null) return { ok: false, reason: 'هذه الساعةُ لا وجودَ لها بتوقيتك' }
+    const r = await reschedulePost(db, post.id, utc.toISOString().slice(0, 16), now, org)
     if (!r.ok) return { ok: false, reason: `لم يُنقل: ${r.reason}` }
   }
   at.plan.items[index] = { ...item, day: to.day, time: to.time }

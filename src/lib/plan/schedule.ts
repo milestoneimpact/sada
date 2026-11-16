@@ -11,6 +11,8 @@ import type { Db } from '../tokens'
 import { schedulePost } from '../schedule/job'
 import { approveMany } from '../draft/store'
 import { readPeaks } from '../schedule/peak'
+import { localToUtc } from '../time/local'
+import { storedZone } from '../time/ownerZone'
 import type { StoredPlan } from './job'
 import type { PlanItem } from './prompt'
 
@@ -19,12 +21,25 @@ export interface PlanSchedule {
   readonly skipped: readonly { readonly postId: string; readonly reason: string }[]
 }
 
-/** الموعدُ `YYYY-MM-DDTHH:MM` بـ UTC — في المستقبل دائمًا. */
-export function slotFor(day: string, time: string, peakHour: number | null, now: Date): string {
-  const hhmm = peakHour === null ? time : `${String(peakHour).padStart(2, '0')}:00`
-  const at = new Date(`${day}T${hhmm}:00Z`)
-  while (at.getTime() <= now.getTime()) at.setUTCDate(at.getUTCDate() + 1)
-  return at.toISOString().slice(0, 16)
+/**
+ * الموعدُ `YYYY-MM-DDTHH:MM` بـ UTC — في المستقبل دائمًا (D-383).
+ *
+ * **ساعةُ البند بتوقيت المالك** (`localToUtc` بمنطقته، و`null` الرياض): «09:00» في الرياض تُخزَّن 06:00Z، كما تفعل الحزمة. وأرجحُ
+ * الساعات قيست بـ UTC فتبقى بـ UTC. ويومٌ مضى يُرحَّل يومًا محلّيًّا فيومًا بالساعة نفسِها.
+ */
+export function slotFor(day: string, time: string, peakHour: number | null, now: Date, zone: string | null): string {
+  const [y, mo, d] = day.split('-').map(Number) as [number, number, number]
+  const [h, mi] = time.split(':').map(Number) as [number, number]
+  for (let k = 0; k < 400; k++) {
+    let at: Date | null
+    if (peakHour !== null) at = new Date(Date.UTC(y, mo - 1, d + k, peakHour))
+    else {
+      const c = new Date(Date.UTC(y, mo - 1, d + k))
+      at = localToUtc(c.getUTCFullYear(), c.getUTCMonth() + 1, c.getUTCDate(), h, mi, zone)
+    }
+    if (at !== null && at.getTime() > now.getTime()) return at.toISOString().slice(0, 16)
+  }
+  return new Date(now.getTime() + 86_400_000).toISOString().slice(0, 16)
 }
 
 /**
@@ -100,6 +115,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
   const accounts = new Map<string, string | null>()
   const skipped: { postId: string; reason: string }[] = []
   let scheduled = 0
+  const zone = posts.length > 0 ? await storedZone(db) : null
   for (const post of posts) {
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
     const item = plan.plan.items.find((i) => itemOwns(i, post))
@@ -118,7 +134,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
     const chosen = (plan.choices?.times?.[item.platform]?.length ?? 0) > 0
     const sameDay = plan.plan.items.filter((i) => i.platform === item.platform && i.day === item.day).length
     const peak = chosen || sameDay > 1 ? null : peaks.get(post.platform) ?? null
-    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peak, now), now)
+    const result = await schedulePost(db, post.id, account, slotFor(item.day, item.time, peak, now, zone), now)
     if (result.ok) scheduled += 1
     else skipped.push({ postId: post.id, reason: result.reason })
   }
