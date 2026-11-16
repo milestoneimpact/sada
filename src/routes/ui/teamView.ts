@@ -5,6 +5,7 @@
  * **والبريدُ يصل بعد التحقّق منه عند Cloudflare** (M-33): الصفحةُ تقول ذلك عند الدعوة، ولا تدّعي إرسالًا لم يقع.
  */
 import { escapeHtml } from './escape'
+import { localWhen } from '../../lib/time/zone'
 import { pageHead } from './parts'
 import { notice, toastRegion } from './components/toast'
 import { MEMBER_ROLES, ROLE_LABEL, type Member } from '../../lib/team'
@@ -14,6 +15,7 @@ import { OWNER_EMAIL } from '../../lib/ownerEmail'
 export interface TeamData {
   readonly members: readonly Member[]
   readonly orgs: readonly OrgRow[]
+  readonly zone?: string | null
   readonly flash: { readonly kind: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -30,7 +32,7 @@ export function teamScreen(d: TeamData): string {
     ...d.members.map((m) => `<tr><td data-label="البريد"><bdi dir="ltr">${escapeHtml(m.email)}</bdi></td>
       <td data-label="الدور"><b>${ROLE_LABEL[m.role].name}</b><div class="note">${ROLE_LABEL[m.role].can}</div></td>
       <td data-label="الشركات">${orgNames(m, d.orgs)}</td>
-      <td data-label="آخرُ دخول">${m.lastSeenAt === null ? '<span class="ago">لم يدخل بعد</span>' : `<bdi dir="ltr">${escapeHtml(m.lastSeenAt.slice(0, 16))}</bdi>`}</td>
+      <td data-label="آخرُ دخول">${m.lastSeenAt === null ? '<span class="ago">لم يدخل بعد</span>' : `<bdi>${escapeHtml(localWhen(m.lastSeenAt, d.zone ?? null))}</bdi>`}</td>
       <td><form class="inline" method="POST" action="/panel/team/revoke" data-confirm="${escapeHtml(`ألغِ دخول ${m.email}؟ تسقط جلستُه في طلبه التالي.`)}">
         <input type="hidden" name="email" value="${escapeHtml(m.email)}">
         <button class="btn btn-danger btn-sm" type="submit">ألغِ</button></form></td></tr>`),

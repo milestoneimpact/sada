@@ -27,6 +27,7 @@ import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
 import { connectedBody, elsewhereBody, otherBrowserBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
 import { setFlash } from './panel'
+import { ownerZone } from '../lib/time/ownerZone'
 
 /**
  * صفحةٌ لا سطرُ JSON.
@@ -300,6 +301,8 @@ oauth.get('/oauth/:platform/callback', async (c) => {
         grantedScopes: parseGranted(tokens.scopes),
         hasRefresh: tokens.refreshToken !== null,
         expiresAt: tokens.expiresAt,
+        // ‏الكعكةُ على /panel وحدها، فالمحفوظةُ هنا (D-378)
+        zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
       }),
       200,
     ), platform)

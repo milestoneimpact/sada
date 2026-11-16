@@ -11,7 +11,7 @@ import { platformLabel, PLATFORM_IDS } from '../../lib/oauth/providers'
 import { PERIODS, totals, type PortfolioFilter, type PortfolioRow } from '../../lib/portfolio'
 import type { OrgRow } from '../../lib/tenancy'
 import { html, raw } from './html'
-import { stamp } from '../../lib/time/zone'
+import { stamp, todayKey, zoneName } from '../../lib/time/zone'
 import { postStatus } from '../../lib/status'
 import { CAL_DAYS, type CalPost } from '../../lib/portfolioCalendar'
 import { dayLabel, shift } from './planReviewView'
@@ -25,7 +25,7 @@ const WEEKDAY = new Intl.DateTimeFormat('ar', { weekday: 'long', timeZone: 'UTC'
  */
 export function clientsCalendar(posts: readonly CalPost[], orgs: readonly OrgRow[], now: Date, zone: string | null): string {
   const names = new Map(orgs.map((o) => [o.id, o.name]))
-  const today = now.toISOString().slice(0, 10)
+  const today = todayKey(now, zone)
   const days = Array.from({ length: CAL_DAYS }, (_, i) => shift(today, i))
   const byDay = new Map<string, CalPost[]>()
   for (const p of posts) {
@@ -35,7 +35,7 @@ export function clientsCalendar(posts: readonly CalPost[], orgs: readonly OrgRow
   }
   const busiest = Math.max(0, ...days.map((d) => byDay.get(d)?.length ?? 0))
   return html`<section class="pc-cal" aria-labelledby="pc-cal-t">
-    <div class="pc-head"><h2 id="pc-cal-t">تقويمُ العملاء</h2><span class="hint">أسبوعان من اليوم · ${String(posts.length)} منشورًا${busiest > 0 ? ' · أزحمُ يومٍ ' + String(busiest) : ''}</span></div>
+    <div class="pc-head"><h2 id="pc-cal-t">تقويمُ العملاء</h2><span class="hint">أسبوعان من اليوم بتوقيت ${zoneName(zone)} · ${String(posts.length)} منشورًا${busiest > 0 ? ' · أزحمُ يومٍ ' + String(busiest) : ''}</span></div>
     ${posts.length === 0 ? html`<p class="hint">لا منشورَ مجدولًا في الأسبوعين القادمين لأيّ شركة.</p>` : html`<ol class="pc-grid">${days.map((d) => {
       const list = byDay.get(d) ?? []
       return html`<li class="pc-day"${list.length === 0 ? raw(' data-empty') : ''}${d === today ? raw(' aria-current="date"') : ''}>

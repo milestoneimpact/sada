@@ -188,3 +188,32 @@ export function stamp(value: string | Date, zone: string | null): string {
   const two = (n: number): string => String(n).padStart(2, '0')
   return `${p.year}-${two(p.month)}-${two(p.day)} ${two(p.hour)}:${two(p.minute)}${zoneNote(zone)}`
 }
+
+/** أسماءُ المدن الشائعة بالعربيّة، وما سواها يُقرأ من اسم المنطقة نفسه («America/Chicago» يصير «Chicago»). */
+const CITY: Readonly<Record<string, string>> = {
+  'Asia/Riyadh': 'الرياض', 'Asia/Dubai': 'دبي', 'Asia/Kuwait': 'الكويت', 'Asia/Qatar': 'الدوحة',
+  'Asia/Bahrain': 'البحرين', 'Asia/Muscat': 'مسقط', 'Asia/Amman': 'عمان', 'Asia/Beirut': 'بيروت',
+  'Asia/Baghdad': 'بغداد', 'Africa/Cairo': 'القاهرة', 'Europe/London': 'لندن', 'Europe/Paris': 'باريس',
+  'Europe/Istanbul': 'إسطنبول', 'America/New_York': 'نيويورك', 'UTC': 'غرينتش', 'Etc/UTC': 'غرينتش',
+}
+
+/** «الرياض» أو «لندن»: اسمُ منطقة العرض، و`null` يعني الرياض (D-201، D-378). */
+export function zoneName(zone: string | null): string {
+  const z = zone ?? FALLBACK_ZONE
+  return CITY[z] ?? (z.split('/').pop() ?? z).replace(/_/g, ' ')
+}
+
+/**
+ * الوقتُ المطلق المعروض للمالك بصيغةٍ واحدة (D-378): «2026-10-13 10:06 م بتوقيت الرياض»،
+ * بمنطقة متصفّحه وأرقامٍ لاتينيّة واسمِ المنطقة بجواره. وما لم يُقرأ وقتًا يُعاد كما هو.
+ */
+export function localWhen(value: string | Date, zone: string | null): string {
+  const date = typeof value === 'string' ? parseSqliteUtc(value.replace('T', ' ').replace(/Z$/, '').slice(0, 19)) : value
+  if (date === null) return typeof value === 'string' ? value : ''
+  return `${dayKey(date, zone)} ${clock(date, zone)} بتوقيت ${zoneName(zone)}`
+}
+
+/** يومُ `now` المحلّيّ `YYYY-MM-DD`، بدلَ `toISOString().slice(0, 10)` الذي يعطي يومَ غرينتش. */
+export function todayKey(now: Date, zone: string | null): string {
+  return dayKey(now, zone)
+}

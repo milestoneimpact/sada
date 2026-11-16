@@ -13,6 +13,7 @@ import { button } from './components/button'
 import { menu, menuItem } from './components/menu'
 import { html, raw, type Html } from './html'
 import { escapeHtml } from './escape'
+import { localWhen } from '../../lib/time/zone'
 import { PLATFORM_LABEL } from '../../lib/oauth/providers'
 
 export interface ChangeView extends StoredChange { readonly postStatus: string | null }
@@ -21,6 +22,7 @@ export interface ChangesScreen {
   readonly revision: RevisionRow
   readonly changes: readonly ChangeView[]
   readonly history: readonly RevisionRow[]
+  readonly zone?: string | null
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -63,7 +65,7 @@ function decideForm(rev: string, c: ChangeView): Html {
   </form>`
 }
 
-function changeBlock(rev: string, c: ChangeView): Html {
+function changeBlock(rev: string, c: ChangeView, zone: string | null): Html {
   const problems = c.after?.problems ?? []
   return html`<section class="stack" aria-label="${(PLATFORM[c.platform] ?? c.platform) + ' — ' + KIND_LABEL[c.kind]}">
     <p class="m-0"><b>${PLATFORM[c.platform] ?? c.platform}</b> · ${KIND_LABEL[c.kind]} ${raw(disposition(c))}</p>
@@ -74,7 +76,7 @@ function changeBlock(rev: string, c: ChangeView): Html {
     ${problems.length === 0 ? html`` : html`<p class="m-0">${raw(statusBadge('warn', '!', problems.join('، ')))}</p>`}
     ${c.disposition === 'awaiting_owner' && c.kind === 'time' ? html`<p class="hint m-0">اعتماد الموعد يحدّث موعدَه في الحزمة، وجدولتُه تبقى من بطاقته.</p>` : html``}
     ${c.supersededBy == null ? html`` : html`<p class="hint m-0">دفعة أحدث غيّرت هذا المنشور بالنوع نفسِه بعد هذا التغيير، فلم يُكتب فوقها. <a href="/panel/package/changes/${c.supersededBy}">افتح الدفعة الأحدث</a>.</p>`}
-    ${c.decidedAt == null || c.disposition === 'awaiting_owner' ? html`` : html`<p class="hint m-0">حُسم <bdi dir="ltr">${c.decidedAt.slice(0, 16)}</bdi></p>`}
+    ${c.decidedAt == null || c.disposition === 'awaiting_owner' ? html`` : html`<p class="hint m-0">حُسم <bdi>${localWhen(c.decidedAt, zone)}</bdi></p>`}
     ${decideForm(rev, c)}
   </section>`
 }
@@ -94,11 +96,11 @@ const STATUS: Readonly<Record<RevisionRow['status'], readonly ['ok' | 'warn' | '
 export const revisionBadge = (r: RevisionRow): string => statusBadge(...STATUS[r.status])
 
 /** سجلُّ الدفعات — قائمة منسدلة بلا سكربت. */
-export function historyMenu(history: readonly RevisionRow[]): string {
+export function historyMenu(history: readonly RevisionRow[], zone: string | null): string {
   if (history.length === 0) return ''
   return menu({ label: 'الدفعات السابقة', size: 'sm', items: history.map((r) => menuItem({
     label: short(r.commit) + ' · ' + STATUS[r.status][2], href: '/panel/package/changes/' + r.id,
-    note: (r.message === '' ? 'بلا رسالة' : r.message.slice(0, 60)) + ' · ' + r.createdAt.slice(0, 16),
+    note: (r.message === '' ? 'بلا رسالة' : r.message.slice(0, 60)) + ' · ' + localWhen(r.createdAt, zone),
   })) })
 }
 
@@ -106,8 +108,8 @@ export function changesScreen(m: ChangesScreen): string {
   const r = m.revision
   const awaiting = m.changes.filter((c) => c.disposition === 'awaiting_owner')
   const head = pageHead('حزمة المحتوى', 'ما تغيّر في حزمتك',
-    'الدفعة <bdi dir="ltr">' + escapeHtml(short(r.commit)) + '</bdi>' + (r.appliedAt === null ? '' : ' · طُبّقت <bdi dir="ltr">' + escapeHtml(r.appliedAt.slice(0, 16)) + '</bdi>') + (r.message === '' ? '' : ' · ' + escapeHtml(r.message)) + ' · ' + revisionBadge(r),
-    historyMenu(m.history.filter((h) => h.id !== r.id)))
+    'الدفعة <bdi dir="ltr">' + escapeHtml(short(r.commit)) + '</bdi>' + (r.appliedAt === null ? '' : ' · طُبّقت <bdi>' + escapeHtml(localWhen(r.appliedAt, m.zone ?? null)) + '</bdi>') + (r.message === '' ? '' : ' · ' + escapeHtml(r.message)) + ' · ' + revisionBadge(r),
+    historyMenu(m.history.filter((h) => h.id !== r.id), m.zone ?? null))
   const flash = m.flash == null ? html`` : html`<p class="m-0">${raw(statusBadge(m.flash.tone, m.flash.tone === 'ok' ? '✓' : '!', m.flash.text))}</p>`
   const kinds = [...new Set(awaiting.map((c) => c.kind))]
   const bulk = kinds.length === 0 ? html`` : raw(card({ title: 'قرار واحد لنوع كامل', level: 2, body: html`<p class="hint m-0">المسوّدات حُدّثت وحدها. وهذا ما اعتمدتِه أو جُدول: لا يتغيّر إلا بقرارك.</p>
@@ -120,7 +122,7 @@ export function changesScreen(m: ChangesScreen): string {
   const cards = items.map((item) => {
     const own = m.changes.filter((c) => c.item === item)
     const title = own.find((c) => c.after !== null)?.after?.idea ?? own[0]?.before?.idea ?? ''
-    return raw(card({ title: 'المادّة ' + item + (title === '' ? '' : ' — ' + title), level: 2, body: html`${own.map((c) => changeBlock(r.id, c))}`.value }))
+    return raw(card({ title: 'المادّة ' + item + (title === '' ? '' : ' — ' + title), level: 2, body: html`${own.map((c) => changeBlock(r.id, c, m.zone ?? null))}`.value }))
   })
   const empty = m.changes.length === 0
     ? raw(card({ title: r.status === 'failed' ? 'تعذّرت قراءة هذه الدفعة' : 'لا تغيير في هذه الدفعة', level: 2,

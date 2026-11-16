@@ -10,6 +10,7 @@ import { button } from './components/button'
 import { field } from './components/field'
 import { html, raw, type Html } from './html'
 import { escapeHtml } from './escape'
+import { localWhen } from '../../lib/time/zone'
 import { counted, NOUNS } from '../../lib/format'
 import type { RevisionRow } from '../../lib/package/revision'
 import { fixFor, type AccessProbe } from '../../lib/package/diagnose'
@@ -30,6 +31,8 @@ export interface PackageScreen {
   readonly probe?: AccessProbe
   /** المقاطعُ والأغلفةُ المنقولة إلى صدى من كلّ ما في الحزمة — مؤشّرُ التقدّم. */
   readonly transfer?: { readonly total: number; readonly done: number }
+  /** منطقةُ المتصفّح (D-378)، و`null` يعني الرياض. */
+  readonly zone?: string | null
 }
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
@@ -45,11 +48,12 @@ function progressLine(s: PackageSource, t: { readonly total: number; readonly do
       ${live ? raw('<meta http-equiv="refresh" content="6">') : ''}</div>`
 }
 
-function statusLine(s: PackageSource): Html {
+
+function statusLine(s: PackageSource, zone: string | null): Html {
   const face = s.status === 'ok' ? statusBadge('ok', '●', 'متصل')
     : s.status === 'partial' ? statusBadge('warn', '…', 'يُكمل النقل')
       : s.status === 'failed' ? statusBadge('bad', '!', 'تعذّرت المزامنة') : statusBadge('', '○', 'لم يُزامَن بعد')
-  return html`<p class="m-0">${raw(face)} · آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi dir="ltr">${s.lastCheckedAt}</bdi>`}</p>
+  return html`<p class="m-0">${raw(face)} · آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi>${localWhen(s.lastCheckedAt, zone)}</bdi>`}</p>
     ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>${fixList(fixFor(s.error))}`}`
 }
 
@@ -129,7 +133,7 @@ function settingsCard(s: PackageSource): string {
   </form>`.value })
 }
 
-function revisionsCard(revs: readonly RevisionRow[], missing: readonly string[]): string {
+function revisionsCard(revs: readonly RevisionRow[], missing: readonly string[], zone: string | null): string {
   const last = revs[0]
   const waiting = revs.reduce((n, r) => n + r.counts.awaiting, 0)
   // ‏الزرُّ إلى الدفعة التي فيها القرار — قد تكون أقدم من الأخيرة
@@ -138,7 +142,7 @@ function revisionsCard(revs: readonly RevisionRow[], missing: readonly string[])
     ? html`<p class="m-0">لم تُقرأ دفعة بعد. اضغط «زامن الآن» فتُبنى الخطّة من الحزمة: النصُّ الجاهز كما هو، والفيديو أو الغلاف لكلّ منشور.</p>`
     : html`<p class="m-0">آخر دفعة <bdi dir="ltr">${shortSha(last.commit)}</bdi> ${raw(revisionBadge(last))}${last.message === '' ? '' : ' · ' + last.message}</p>
       ${waiting === 0 ? html`` : html`<p class="m-0">${raw(statusBadge('warn', '!', 'ينتظر قرارك ' + counted(waiting, NOUNS.update)))}</p>`}
-      <div class="pk-acts">${raw(button({ label: 'ما تغيّر في حزمتك', variant: waiting > 0 ? 'primary' : 'secondary', href: '/panel/package/changes/' + (target ?? last).id }))}${raw(historyMenu(revs.slice(1)))}</div>`
+      <div class="pk-acts">${raw(button({ label: 'ما تغيّر في حزمتك', variant: waiting > 0 ? 'primary' : 'secondary', href: '/panel/package/changes/' + (target ?? last).id }))}${raw(historyMenu(revs.slice(1), zone))}</div>`
   const write = missing.length === 0 ? html`` : html`<form method="post" action="/panel/package" class="stack">
     <input type="hidden" name="do" value="write">
     <p class="m-0">${counted(missing.length, NOUNS.post)} بلا نصٍّ جاهز (<bdi dir="ltr">${missing.join('، ')}</bdi>) — يُكتب من فكرته وفق الإرشادات، وترى العدد قبل الكتابة.</p>
@@ -157,7 +161,7 @@ export function packageScreen(m: PackageScreen): string {
     body: html`<p class="m-0">صدى لا تقرأ المستودع الخاصّ بلا رمز قراءة. خطواتُه في «ما عليك».</p>`.value }))
   const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانية', level: 2,
     body: html`<p class="m-0">Payload URL: <code dir="ltr">${m.hook.url}</code></p><p class="m-0">Secret: <code dir="ltr">${m.hook.secret}</code></p>`.value }))
-  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s)}${progressLine(s, m.transfer)}
+  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s, m.zone ?? null)}${progressLine(s, m.transfer)}
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="sync">${raw(button({ label: 'زامن الآن', variant: 'primary', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
@@ -168,5 +172,5 @@ export function packageScreen(m: PackageScreen): string {
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'quiet', type: 'submit' }))}</form>`.value }))
   const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
-  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? []))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
+  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? [], m.zone ?? null))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

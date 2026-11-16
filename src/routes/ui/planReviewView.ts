@@ -25,7 +25,7 @@ import { menu, menuAction, menuItem } from './components/menu'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
-import { localParts, stamp } from '../../lib/time/zone'
+import { localParts, stamp, todayKey } from '../../lib/time/zone'
 import { field } from './components/field'
 import { AR_LATN, num } from '../../lib/format'
 import { SPAN_LABEL, imageFor, spanDays } from '../../lib/plan/prompt'
@@ -75,14 +75,14 @@ const waits = (c: ReviewCard): boolean => c.post !== null && (c.post.status === 
  * الأسبوعُ المعروض: ما طُلب إن صحّ، ثمّ أسبوعُ اليوم إن كان في المدى، ثمّ أوّلُ أسبوعٍ فيه ما ينتظر، ثمّ الأوّل.
  * و`0` الخطّةُ كلُّها («all»).
  */
-export function shownWeek(m: ReviewModel, asked: string | null | undefined, now: Date | undefined): number {
+export function shownWeek(m: ReviewModel, asked: string | null | undefined, now: Date | undefined, zone: string | null = null): number {
   const weeks = Math.ceil(spanDays(m.plan.span ?? 'week') / 7)
   if (asked === 'all') return 0
   const n = Number(asked)
   if (asked !== null && asked !== undefined && Number.isInteger(n) && n >= 1 && n <= weeks) return n
   if (weeks === 1) return 1
   if (now !== undefined) {
-    const today = weekOfDay(m.plan.week, now.toISOString().slice(0, 10))
+    const today = weekOfDay(m.plan.week, todayKey(now, zone))
     if (today >= 1 && today <= weeks && m.cards.some((c) => weekOfDay(m.plan.week, c.item.day) === today)) return today
   }
   const first = m.cards.filter((c) => c.post === null || waits(c)).map((c) => weekOfDay(m.plan.week, c.item.day)).sort((a, b) => a - b)[0]
@@ -290,7 +290,7 @@ function planActions(m: ReviewModel): Html {
 export function planReviewScreen(m: ReviewModel, zone: string | null, view: ReviewView = {}): string {
   const span = SPAN_LABEL[m.plan.span ?? 'week']
   const end = shift(m.plan.week, spanDays(m.plan.span ?? 'week') - 1)
-  const shown = shownWeek(m, view.week, view.now)
+  const shown = shownWeek(m, view.week, view.now, zone)
   const w = shown === 0 ? 'all' : String(shown)
   const state = m.lockedAt !== null
     ? html`<span class="st ok">مثبَّتة · الإصدار ${AR(m.version)}</span>`
@@ -355,7 +355,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const channels = [...new Set([...m.plan.choices.channels, ...m.cards.map((c) => c.item.platform)])]
   const firstDay = shown === 0 ? m.plan.week : shift(m.plan.week, (shown - 1) * 7)
   const lastDay = shown === 0 ? end : [shift(firstDay, 6), end].sort()[0]!
-  const today = (view.now ?? new Date()).toISOString().slice(0, 10)
+  const today = todayKey(view.now ?? new Date(), zone)
   const addDay = today >= firstDay && today <= lastDay ? today : firstDay
   const add = channels.length === 0 ? html`` : html`<details class="fold rv-add"><summary><span>أضف منشورًا إلى ${scope}</span></summary>
       <form method="POST" action="/panel/plan/review/add" class="rv-add-f" data-busy="يُضاف…">

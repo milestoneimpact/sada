@@ -15,6 +15,7 @@ import { button } from './components/button'
 import { statusBadge } from './components/badge'
 import { field } from './components/field'
 import { html, raw, type Html } from './html'
+import { localWhen } from '../../lib/time/zone'
 import { KIND_LABEL, revisionBadge, short } from './packageChangesView'
 
 /** أزرار «طريقة الخطّة» الثلاثة — الشاشات الثلاث أخوات. */
@@ -36,6 +37,7 @@ export interface PlanPackageData {
   readonly preview: RevisionPreview | null
   readonly follow: boolean
   readonly canBuild: boolean
+  readonly zone?: string | null
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -45,7 +47,7 @@ function versions(d: PlanPackageData): string {
     ? html`<p class="m-0">لم تُقرأ نسخة بعد. افتح <a href="/panel/package">حزمة المحتوى</a> واضغط «زامن الآن».</p>`
     : html`<ul class="plain stack">${d.revisions.map((r) => html`<li>
         <a href="/panel/plan/package?rev=${r.id}"${r.id === at ? raw(' aria-current="true"') : ''}><bdi dir="ltr">${short(r.commit)}</bdi> · ${r.message === '' ? 'بلا رسالة' : r.message.slice(0, 80)}</a>
-        <span class="hint"> · <bdi dir="ltr">${r.createdAt.slice(0, 16)}</bdi></span> ${raw(revisionBadge(r))}</li>`)}</ul>`
+        <span class="hint"> · <bdi>${localWhen(r.createdAt, d.zone ?? null)}</bdi></span> ${raw(revisionBadge(r))}</li>`)}</ul>`
   return card({ title: 'نسخ الحزمة', level: 2, body: html`<p class="hint m-0">من <bdi dir="ltr">${d.repo}</bdi> — الأحدث أوّلًا. اختر أيَّ نسخة لتراها كاملة.</p>${body}`.value })
 }
 

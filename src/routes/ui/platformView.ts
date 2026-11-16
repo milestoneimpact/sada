@@ -984,7 +984,7 @@ export function platformScreen(d: PlatformScreenData): string {
     </div>`
   }
 
-  const r = readiness({ view: d.view, app: d.app, health: d.health, tally: d.tally, posts: d.posts, now: d.now })
+  const r = readiness({ view: d.view, app: d.app, health: d.health, tally: d.tally, posts: d.posts, now: d.now, zone: d.zone })
   const head = accountHeader(d, r)
   // ‏وما ينتظر يُقال في زرّ الرأس وعددِ التبويب، لا في شريطٍ ثالثٍ يدفع المنشوراتِ إلى الأسفل
   const zoneNote = d.zone === null && (d.tab === 'posts' || d.tab === 'waiting')

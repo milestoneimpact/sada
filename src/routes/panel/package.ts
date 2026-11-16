@@ -27,6 +27,7 @@ import { adoptRevision, previewRevision, setFollow } from '../../lib/package/ado
 import { planPackageScreen } from '../ui/planPackageView'
 import { allows } from '../../lib/access'
 import { panelHref } from '../../lib/nav/panes'
+import { ownerZone } from '../../lib/time/ownerZone'
 
 export const pkg = new Hono<{ Bindings: Env }>()
 
@@ -48,7 +49,10 @@ export interface PackageSyncMessage {
   readonly packageSync: { readonly sourceId: string; readonly after?: string; readonly force?: boolean }
 }
 
-function render(env: Env, csrf: string, m: PackageScreen): Response {
+async function render(env: Env, csrf: string, m: PackageScreen, req: Request): Promise<Response> {
+  // ‏وقتُ الفحص بمنطقة المتصفّح (D-378)
+  const zone = await ownerZone(env.DB, req.headers.get('Cookie'))
+  m = { ...m, zone }
   return page((nonce) => soloPage('صدى — حزمة المحتوى', { href: '/panel/library', label: 'المكتبة', at: '/panel/package' },
     injectCsrf(packageScreen(m), csrf), nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
 }
@@ -66,7 +70,7 @@ pkg.get('/panel/package', async (c) => {
   return render(c.env, session.record.csrf, {
     source, media, revisions, missing: missing.map((e) => e.item + ' · ' + e.platform), transfer: moved ?? { total: 0, done: 0 }, tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN),
     flash: flash === null ? null : { tone: flash.kind, text: flash.text },
-  })
+  }, c.req.raw)
 })
 
 pkg.post('/panel/package', async (c) => {
@@ -103,7 +107,7 @@ pkg.post('/panel/package', async (c) => {
     return render(c.env, gate.session.record.csrf, {
       source: { ...source, hasHook: true }, media: await readPackageMedia(c.env.DB, org), tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN), revisions: [], missing: [],
       hook: { url: base + '/hooks/github/' + source.id, secret },
-    })
+    }, c.req.raw)
   }
   if (act === 'test') {
     // ‏قراءتان لا ثالثة (D-376): المستودعُ ثمّ الفرع — والنتيجةُ في الصفحة نفسِها، والرمزُ لا يدخلها
@@ -117,7 +121,7 @@ pkg.post('/panel/package', async (c) => {
     const [media, revisions] = await Promise.all([readPackageMedia(c.env.DB, org), listRevisions(c.env.DB, org, 10)])
     return render(c.env, gate.session.record.csrf, {
       source, media, revisions, missing: [], tokenReady: true, probe,
-    })
+    }, c.req.raw)
   }
   if (act === 'settings') {
     const pick = (k: string, d: 'dark' | 'light'): 'dark' | 'light' => { const v = String(gate.form.get(k) ?? d); return v === 'light' ? 'light' : v === 'dark' ? 'dark' : d }
@@ -195,7 +199,9 @@ pkg.get('/panel/plan/package', async (c) => {
   const notFound = asked !== '' && listed === undefined && older === null
   const chosen = listed ?? older ?? readable[0] ?? null
   const preview = chosen === null ? null : await previewRevision(c.env.DB, org, chosen.id, currentPicks(media), { x: source.variants.x, linkedin: source.variants.linkedin })
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const body = planPackageScreen({
+    zone,
     repo: source.owner + '/' + source.repo + '@' + source.branch, revisions, preview, follow: source.followUpdates,
     canBuild: allows(session.record.role ?? 'owner', 'admin'),
     flash: flash !== null ? { tone: flash.kind, text: flash.text }
@@ -282,8 +288,9 @@ pkg.get('/panel/package/changes/:rev', async (c) => {
   // ‏مراجعةٌ حُسبت ولم تُطبَّق: فرقُها يُعرض كما هو، بلا أزرار
   const changes = stored.length > 0 || revision.status === 'applied' ? stored
     : (await revisionDiff(c.env.DB, org, revision.id)).map((x, i) => ({ ...x, id: 'diff:' + String(i), revisionId: revision.id, postId: null, disposition: 'frozen_published' as const, postStatus: null }))
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   return page((nonce) => soloPage('صدى — ما تغيّر في حزمتك', { href: '/panel/package', label: 'حزمة المحتوى', at: '/panel/package' },
-    injectCsrf(changesScreen({ revision, changes, history, flash: flash === null ? null : { tone: flash.kind, text: flash.text } }), session.record.csrf),
+    injectCsrf(changesScreen({ revision, changes, history, zone, flash: flash === null ? null : { tone: flash.kind, text: flash.text } }), session.record.csrf),
     nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
 })
 

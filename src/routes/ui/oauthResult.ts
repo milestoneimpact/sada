@@ -25,7 +25,7 @@
  * تُعرض بعد أن يُخزَّن الرمزُ مشفّرا، ولا تحمل منه شيئا: اسمُ الحساب
  * وحالُ النطاقات لا أكثر (D-005).
  */
-import { stamp } from '../../lib/time/zone'
+import { localWhen } from '../../lib/time/zone'
 import { panelHref } from '../../lib/nav/panes'
 import { SCOPES, scopeSet, type ScopeSpec } from '../../lib/oauth/scopes'
 import { blamedScopes } from '../../lib/oauth/refusal'
@@ -85,6 +85,7 @@ export interface ConnectedData {
   readonly grantedScopes: readonly string[]
   readonly hasRefresh: boolean
   readonly expiresAt: string
+  readonly zone?: string | null
 }
 
 /** رُبط الحساب — وما يستطيعه يُقال هنا لا يُترك ليُكتشَف عند أوّل نشر. */
@@ -127,7 +128,7 @@ export function connectedBody(d: ConnectedData): string {
     <div class="card-head"><h2>ما مُنح لهذا الحساب</h2>
       <div class="grow"></div>${refresh}</div>
     <p class="hint">وقت انتهاء الإذن: <span class="mono">${escapeHtml(
-      stamp(d.expiresAt.slice(0, 16).replace('T', ' '), null),
+      localWhen(d.expiresAt, d.zone ?? null),
     )}</span>.
       ${d.hasRefresh
         ? 'ويُجدَّد قبل انتهائه بلا تدخّل.'
