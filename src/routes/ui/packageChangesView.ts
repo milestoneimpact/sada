@@ -23,7 +23,7 @@ export interface ChangesScreen {
   readonly changes: readonly ChangeView[]
   readonly history: readonly RevisionRow[]
   readonly zone?: string | null
-  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-381). */
+  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-382). */
   readonly schedulable?: number
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }

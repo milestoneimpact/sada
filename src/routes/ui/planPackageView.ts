@@ -38,7 +38,7 @@ export interface PlanPackageData {
   readonly follow: boolean
   readonly canBuild: boolean
   readonly zone?: string | null
-  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-381). */
+  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-382). */
   readonly schedulable?: number
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
@@ -121,7 +121,7 @@ export function planPackageScreen(d: PlanPackageData): string {
     : html`${raw(card({ title: 'هذا ما فهمته', level: 2, body: facts(p).value }))}
       ${p.problems.length === 0 ? html`` : raw(card({ variant: 'alert', tone: 'warn', title: 'ما لم يُفهم', level: 2, body: html`<ul class="plain">${p.problems.map((x) => html`<li>${x}</li>`)}</ul>`.value }))}
       ${raw(differs(p))}${raw(card({ title: 'الصفوف', level: 2, body: rowsTable(p).value }))}${raw(rulesCard(p))}${act(d, p)}`
-  // ‏«اعتمد الخطّة وجدولها» (D-381): رابطٌ إلى تأكيدٍ بلا سكربت، والمدير فأعلى وحده يراه
+  // ‏«اعتمد الخطّة وجدولها» (D-382): رابطٌ إلى تأكيدٍ بلا سكربت، والمدير فأعلى وحده يراه
   const schedule = !d.canBuild || (d.schedulable ?? 0) === 0 ? html`` : raw(card({ title: 'اعتمد وجدوِل', level: 2, body: html`<p class="m-0">${String(d.schedulable)} من مسوّدات الحزمة جاهزة بنصّها وموعدها. تراها قبل أن تؤكّد.</p>
     <div class="row">${raw(button({ label: 'اعتمد الخطّة وجدولها', variant: 'secondary', href: '/panel/plan/package/schedule' }))}</div>`.value }))
   return html`${raw(head)}${planWays('package', true)}<div class="stack">${flash}${schedule}${raw(versions(d))}${view}</div>`.value
@@ -139,7 +139,7 @@ export interface ScheduleConfirm {
   readonly back: string
 }
 
-/** تأكيدُ «اعتمد الخطّة وجدولها» (D-381) — صفحةٌ بلا سكربت تقول ما سيقع قبل أن يقع. */
+/** تأكيدُ «اعتمد الخطّة وجدولها» (D-382) — صفحةٌ بلا سكربت تقول ما سيقع قبل أن يقع. */
 export function scheduleConfirmScreen(m: ScheduleConfirm): string {
   const head = pageHead('المنشورات', 'اعتمد الخطّة وجدولها', 'كلُّ مسوّدةٍ من الحزمة بنصّها تُعتمد وتُجدوَل في موعدها بتوقيتك. لا يُدفع شيءٌ الآن، والنشرُ في موعده.')
   const skipped = m.skipped.length === 0 && m.waiting === 0 ? html``
