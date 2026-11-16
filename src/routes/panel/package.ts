@@ -161,7 +161,7 @@ pkg.post('/panel/package', async (c) => {
     const commit = out.kind === 'synced' ? out.commit : source.lastCommit
     if (commit !== null && (out.kind === 'unchanged' || (out.kind === 'synced' && out.deferred === 0))) {
       const fresh = (await readSource(c.env.DB, org)) ?? source
-      const rev = await revisePackage({ db: c.env.DB, token }, fresh, commit)
+      const rev = await revisePackage({ db: c.env.DB, token, retryFailed: true }, fresh, commit)
       if (rev.kind === 'applied') {
         await setFlash(c.env, c.req.raw, { kind: rev.awaiting > 0 ? 'warn' : 'ok', text: syncedSay(commit, rev.changes, rev.awaiting) })
         return c.redirect('/panel/package/changes/' + rev.id, 303)
