@@ -5,6 +5,7 @@
  * `package_files`، ثمّ ما لم يُنقل من المقاطع والأغلفة يُبثّ إلى R2 بسقف الدفعة، والباقي في رسالة طابورٍ تالية. ثمّ يُعاد حسابُ
  * المعتمد لكلّ مادّةٍ ولون في `package_media`. **ولا نداءَ مدفوعًا**: GitHub مجّانيّ بحدّ الرمز، والنقلُ بلا كلفة.
  */
+import { counted, NOUNS } from '../format'
 import { inBatches, type Db, type DbStatement } from '../tokens'
 import { MAX_MEDIA_FILES, SYNC_BYTE_CAP } from '../drive/media'
 import { openScoped, sealScoped, LEGACY_RAW, toBase64 } from '../crypto'
@@ -277,14 +278,16 @@ export async function syncPackage(deps: SyncDeps, source: PackageSource, opts: {
     const transfer = await transferMedia(deps, source, repo, head.sha)
     const current = await refreshMedia(db, source.org)
     const status = transfer.deferred > 0 || transfer.problems > 0 ? 'partial' : 'ok'
-    const reason = transfer.problems > 0 ? `${transfer.problems} ملفًّا لم يُنقل: أكبر من الحدّ أو مؤشّر Git LFS` : null
+    const reason = transfer.problems === 0 ? null
+      : counted(transfer.problems, NOUNS.file) + ' لم يُنقل' + (transfer.failed === null ? ': أكبر من الحدّ أو مؤشّر Git LFS' : '، أوّلها ' + transfer.failed)
     await db.prepare(
       `UPDATE package_sources SET last_commit_sha = ?, last_tree_sha = ?, last_etag = ?, last_checked_at = ?, status = ?, error_reason = ?
         WHERE id = ? AND org_id = ?`,
     ).bind(head.sha, head.treeSha, head.etag, now, status, reason, source.id, source.org).run()
     return { kind: 'synced', commit: head.sha, seen: tree.length, changed, stored: transfer.stored, deferred: transfer.deferred, current, problems: transfer.problems }
   } catch (error) {
-    let reason = error instanceof GitHubError ? error.message : 'تعذّرت المزامنة'
+    // ‏السببُ يُسمّى ولو لم يكن من GitHub — اسمُ العطل لا تفاصيلُه، فلا يخرج رمزٌ ولا عنوان
+    let reason = error instanceof GitHubError ? error.message : 'تعذّرت المزامنة (' + (error instanceof Error ? error.name : 'عطل') + ')'
     // ‏404 وحده لا يقول أيَّهما (D-376): المستودعُ أوّلًا ثمّ الفرع، فيُكتب السببُ الدقيق
     if (error instanceof GitHubError && error.status === 404) {
       const probe = await probeAccess(repo, deps.fetchImpl).catch(() => null)
@@ -297,7 +300,7 @@ export async function syncPackage(deps: SyncDeps, source: PackageSource, opts: {
 }
 
 /** ينقل المقاطعَ والأغلفةَ التي لم تُنقل — أصغرَها أوّلًا وبسقف الدفعة. */
-async function transferMedia(deps: SyncDeps, source: PackageSource, repo: RepoRef, commit: string): Promise<{ stored: number; deferred: number; problems: number }> {
+async function transferMedia(deps: SyncDeps, source: PackageSource, repo: RepoRef, commit: string): Promise<{ stored: number; deferred: number; problems: number; failed: string | null }> {
   const { db } = deps
   const cap = deps.cap ?? SYNC_BYTE_CAP
   const { results } = await db.prepare(
@@ -307,15 +310,24 @@ async function transferMedia(deps: SyncDeps, source: PackageSource, repo: RepoRe
   let stored = 0
   let deferred = 0
   let problems = 0
+  let failed: string | null = null
   for (const f of results) {
     if (used + f.size > cap) { deferred += 1; continue }
     const kind = mimeOf(f.path).startsWith('video/') ? 'video' : 'image'
-    const out = await storeBlob(deps.bucket, source.org, repo, commit, { path: f.path, blobSha: f.blob_sha, size: f.size, kind }, deps.fetchImpl, source.root)
+    // ‏ملفٌّ يتعثّر لا يُسقط الدفعة: يُعدّ ويُسمّى أوّلُه، والباقي يُنقل
+    let out: Awaited<ReturnType<typeof storeBlob>>
+    try {
+      out = await storeBlob(deps.bucket, source.org, repo, commit, { path: f.path, blobSha: f.blob_sha, size: f.size, kind }, deps.fetchImpl, source.root)
+    } catch (error) {
+      problems += 1
+      failed ??= f.path.split('/').pop() + ': ' + (error instanceof GitHubError ? error.message : 'لم يُحفظ في التخزين')
+      continue
+    }
     if (out.result === 'too_big' || out.result === 'lfs') { problems += 1; continue }
     if (out.result === 'stored') { used += f.size; stored += 1 }
     await db.prepare('UPDATE package_files SET r2_key = ? WHERE org_id = ? AND path = ? AND blob_sha = ?').bind(out.key, source.org, f.path, f.blob_sha).run()
   }
-  return { stored, deferred, problems }
+  return { stored, deferred, problems, failed }
 }
 
 /** يعيد حسابَ المعتمد من الفهرس — والقديمُ يبقى صفًّا بما حلّ محلّه. */

@@ -861,4 +861,6 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pk-new{border-color:var(--accent)}
 .pk-text{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit}
 .pk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center}
+.pk-prog{gap:var(--s-2)}
+.pk-prog progress{inline-size:100%; block-size:var(--s-2); accent-color:var(--link)}
 `
