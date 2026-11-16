@@ -1711,7 +1711,7 @@ export function panelPage(view: PaneView): string {
     // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
     html: `${needy.slice(0, 3)
       .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
-      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. <a class="tap" href="#channels">افتح الحسابات</a>` })
+      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. ${button({ label: 'افتح الحسابات', size: 'sm', href: '#channels' })}` })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(

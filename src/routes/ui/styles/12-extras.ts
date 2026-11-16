@@ -509,6 +509,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-drop{position:relative; display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-6) var(--s-4);
   text-align:center; border:var(--stroke) dashed var(--line); cursor:pointer;
   transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
+/* ‏ومنطقةُ الرفع في حقلٍ من العُدّة بلا صنف البطاقة (مواصفات v1 §5.6): الحقلُ الأصليّ شفّافٌ فوقها، فتعمل بلا سكربت */
+.wz-drop:not(.card){border-radius:var(--r-card)}
 .wz-drop input[type=file]{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer}
 .wz-drop.is-over{border-color:var(--accent); background:var(--selected)}
 @media(hover:hover){.wz-drop:hover{border-color:var(--accent); background:var(--selected)}}

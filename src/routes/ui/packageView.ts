@@ -170,7 +170,7 @@ export function packageScreen(m: PackageScreen): string {
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="hook">${raw(button({ label: s.hasHook ? 'أعد توليد سرّ التحديث الفوري' : 'اربط التحديث الفوري', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">
-      <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'quiet', type: 'submit' }))}</form>`.value }))
+      <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'danger', type: 'submit' }))}</form>`.value }))
   const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
   return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? [], m.zone ?? null))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

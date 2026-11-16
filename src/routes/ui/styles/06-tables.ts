@@ -126,7 +126,8 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 
 /* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
 .st{display:inline-flex; align-items:center; gap:var(--s-1); padding:var(--s-0) var(--s-2); border-radius:var(--r-pill);
-  font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; border:var(--bd-clear); white-space:nowrap}
+  font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; border:var(--bd-clear); white-space:nowrap;
+  min-height:var(--s-6); box-sizing:border-box}
 /* الرمزُ مرسومٌ لا حرفٌ من خطّ النظام (D-154). **واسمُه له وحدَه** (D-183): كان
    «.g» — وهو صنف الزرّ الشبحيّ نفسُه، فلبس الرمز أرض الزرّ البيضاء وحبرَه
    داخل كلّ حبّة ملوّنة (‏٩٦ شارةً في الرئيسيّة). والرمز بلا أرض ولا حدّ:

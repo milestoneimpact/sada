@@ -19,7 +19,7 @@ export function addSourceCard(): string {
       <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" class="stack" data-busy="يُرفع ويُحلَّل…">
         <input type="hidden" name="return" value="library">
         ${raw(field({ id: 'add-src-file', label: 'ملفٌّ أو أكثر', hint: 'PDF وWord وExcel وPowerPoint ونصّ وملفُّ ترجمة مقطع، حتّى 10MB للملفّ.',
-          control: html`<input type="file" id="add-src-file" name="file" accept="${accept}" multiple required>`.value }))}
+          control: html`<div class="wz-drop"><input type="file" id="add-src-file" name="file" accept="${accept}" multiple required><span class="wz-big">اسحبها إلى هنا أو اخترها</span></div>`.value }))}
         <div class="row">${raw(button({ label: 'ارفع وحلّل', type: 'submit' }))}</div>
       </form>
       <form method="POST" action="/panel/sources/link" class="stack" data-busy="يُقرأ الرابط…">

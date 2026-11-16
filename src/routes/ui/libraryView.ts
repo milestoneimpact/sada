@@ -138,7 +138,7 @@ export function libraryScreen(d: LibraryData): string {
   const upload = '<form class="card card-inset" id="upload" method="POST" action="/panel/assets/upload" enctype="multipart/form-data">'
     + hidden(d)
     + field({ id: 'lib-up', label: 'ارفع صورة', hint: 'PNG أو JPEG أو WebP حتّى 5MB. والمقاطعُ تُرفع من «فيديوهاتك» وتظهر هنا بعدها.',
-      control: '<input type="file" id="lib-up" name="file" accept="' + escapeHtml(accept) + '" required>' })
+      control: '<div class="wz-drop"><input type="file" id="lib-up" name="file" accept="' + escapeHtml(accept) + '" required><span class="wz-big">اسحبها إلى هنا أو اخترها</span></div>' })
     + '<div class="row gap-2 mt-3">'
     + button({ label: 'ارفع' + (d.pickPost !== undefined && d.pickPost !== null ? ' واربطها بالمنشور' : d.pick === null ? '' : ' واربطه بالبند'), variant: 'primary', size: 'sm', type: 'submit' })
     + button({ label: 'فيديوهاتك', size: 'sm', href: '/panel/library#videos' })

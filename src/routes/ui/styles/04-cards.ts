@@ -192,6 +192,9 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
    «card-alert»: الحافّة الملوّنة الوحيدة (‏٤px بلون الحال) بدل خمس — والإشعار صيغتُها. */
 .card-interactive{display:block; color:inherit; text-decoration:none}
 @media(hover:hover){.card-interactive:hover{box-shadow:var(--sh-2); border-color:var(--field)}}
+/* ‏ويرتفع بكسلًا كالأوّليّ (مواصفات v1 §5.3) — ومع تقليل الحركة يبقى الظلُّ وحدَه */
+@media(hover:hover) and (prefers-reduced-motion:no-preference){.card-interactive{transition:transform var(--dur-1) var(--ease), box-shadow var(--dur-2) var(--ease)}
+  :root:not([data-motion=reduced]) .card-interactive:hover{transform:translateY(calc(-1 * var(--ul)))}}
 .card-inset{background:var(--surface-2); border-color:transparent; box-shadow:none}
 .card-alert{border-inline-start:var(--s-1) solid var(--ok)}
 .card-alert[data-tone=warn]{border-inline-start-color:var(--warn)}

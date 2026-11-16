@@ -11,6 +11,7 @@
  *   btn-danger     ثانويٌّ بحبر «--bad» — «احذف» و«ارفض»
  *   btn-icon       مربّعُ ‏٤٤ بلا نصٍّ ظاهر، واسمُه في «aria-label» — الإغلاق والقائمة
  *   btn-sm         حشوٌ أضيق بقامة الهدف نفسِها (‏٤٤ على كلّ عرض)
+ *   btn-lg         قامةُ ‏٤٨ وحشوٌ أوسع — للفعل الواحد في شاشةٍ فارغة (مواصفات v1 §5.1)
  *
  * **والحالان من السِّمات لا من الأصناف**: المشغولُ `aria-busy="true"` بدوّارة ‏١٦px والعرضُ
  * ثابت، والمعطّلُ `aria-disabled="true"` بسببٍ مكتوبٍ تحته مربوطٍ بـ`aria-describedby` —
@@ -19,11 +20,11 @@
 import { escapeHtml } from '../escape'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'icon'
-export type ButtonSize = 'md' | 'sm'
+export type ButtonSize = 'md' | 'sm' | 'lg'
 
 /** صنفُ الزرّ بدرجته ومقاسه — **لمن يكتب الوسمَ بيده** في صفٍّ لا يسعه الكائن. */
 export function btnClass(variant: ButtonVariant, size: ButtonSize = 'md'): string {
-  return `btn btn-${variant}${size === 'sm' ? ' btn-sm' : ''}`
+  return `btn btn-${variant}${size === 'md' ? '' : ' btn-' + size}`
 }
 
 export interface ButtonInput {
