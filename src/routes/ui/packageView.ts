@@ -124,7 +124,7 @@ export function packageScreen(m: PackageScreen): string {
   const flash = m.flash === undefined || m.flash === null ? html`` : html`<p class="m-0">${raw(statusBadge(m.flash.tone, m.flash.tone === 'ok' ? '✓' : '!', m.flash.text))}</p>`
   const token = m.tokenReady ? html`` : raw(card({ variant: 'alert', tone: 'warn', title: 'ينقص رمز القراءة', level: 2,
     body: html`<p class="m-0">صدى لا تقرأ المستودع الخاصّ بلا رمز قراءة. خطواتُه في «ما عليك».</p>`.value }))
-  const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخي هذين الآن — لا يُعرضان ثانيةً', level: 2,
+  const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانيةً', level: 2,
     body: html`<p class="m-0">Payload URL: <code dir="ltr">${m.hook.url}</code></p><p class="m-0">Secret: <code dir="ltr">${m.hook.secret}</code></p>`.value }))
   const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s)}
     <form method="post" action="/panel/package" class="row">

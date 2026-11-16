@@ -73,7 +73,7 @@ function changeBlock(rev: string, c: ChangeView): Html {
     </div>
     ${problems.length === 0 ? html`` : html`<p class="m-0">${raw(statusBadge('warn', '!', problems.join('، ')))}</p>`}
     ${c.disposition === 'awaiting_owner' && c.kind === 'time' ? html`<p class="hint m-0">اعتمادُ الموعد يحدّث موعدَه في الحزمة، وجدولتُه تبقى من بطاقته.</p>` : html``}
-    ${c.supersededBy == null ? html`` : html`<p class="hint m-0">دفعةٌ أحدث غيّرت هذا المنشور بالنوع نفسِه بعد هذا التغيير، فلم يُكتب فوقها. <a href="/panel/package/changes/${c.supersededBy}">افتحي الدفعة الأحدث</a>.</p>`}
+    ${c.supersededBy == null ? html`` : html`<p class="hint m-0">دفعةٌ أحدث غيّرت هذا المنشور بالنوع نفسِه بعد هذا التغيير، فلم يُكتب فوقها. <a href="/panel/package/changes/${c.supersededBy}">افتح الدفعة الأحدث</a>.</p>`}
     ${c.decidedAt == null || c.disposition === 'awaiting_owner' ? html`` : html`<p class="hint m-0">حُسم <bdi dir="ltr">${c.decidedAt.slice(0, 16)}</bdi></p>`}
     ${decideForm(rev, c)}
   </section>`
