@@ -89,7 +89,7 @@ describe('شاشة حزمة المحتوى', () => {
     const res = await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)
     expect(res.headers.get('Location')).toBe('/panel/plan/package')
     const page = await (await app.request('/panel/plan/package', { headers: { Cookie: cookie } }, env)).text()
-    expect(page).toContain('نسخُ الحزمة')
+    expect(page).toContain('نسخ الحزمة')
     expect(page).toContain('/panel/plan/new?way=build')
     expect((await app.request('/panel/plan/new?way=build', { headers: { Cookie: cookie } }, env)).status).toBe(200)
   })

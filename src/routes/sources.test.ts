@@ -126,7 +126,7 @@ describe('مجموعةُ مصادر في طلبٍ واحد (D-327)', () => {
     const html = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toMatch(/<input type="file" name="file" form="pn-up"[^>]* multiple>/)
     expect(html).toMatch(/<textarea id="pn-url" name="url" form="pn-link"/)
-    for (const s of ['.srt', 'مقطع YouTube', 'موقعٌ (يُقرأ مع صفحاته التعريفيّة)']) expect(html).toContain(s)
+    for (const s of ['.srt', 'مقطع YouTube', 'موقع (يُقرأ مع صفحاته التعريفيّة)']) expect(html).toContain(s)
   })
 
   it('المعاينةُ الحيّة بجانب المعالج (D-331): مخفيّةٌ بلا سكربت، وقوالبُ شعاراتها من الخادم، ونموذجا الإضافة خارج شبكتها', async () => {
