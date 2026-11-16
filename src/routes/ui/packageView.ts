@@ -28,10 +28,22 @@ export interface PackageScreen {
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
   /** نتيجة «اختبر الرمز» (D-376) — تُعرض مرّة بعد الضغط ولا تُحفظ. */
   readonly probe?: AccessProbe
+  /** المقاطعُ والأغلفةُ المنقولة إلى صدى من كلّ ما في الحزمة — مؤشّرُ التقدّم. */
+  readonly transfer?: { readonly total: number; readonly done: number }
 }
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
 const label = { dark: 'داكن', light: 'فاتح' } as const
+
+/** مؤشّرُ النقل: «نُقل 12 من 63» بشريطٍ، والصفحةُ تتحدّث وحدها كلَّ ستّ ثوانٍ ما دام النقلُ جاريًا — بلا سكربت. */
+function progressLine(s: PackageSource, t: { readonly total: number; readonly done: number } | undefined): Html {
+  if (t === undefined || t.total === 0 || (t.done >= t.total && s.status !== 'partial')) return html``
+  const live = s.status === 'partial' || (t.done < t.total && s.status !== 'failed')
+  return html`<div class="stack pk-prog">
+      <p class="m-0">نُقل <b>${String(t.done)}</b> من <b>${String(t.total)}</b> مقطعًا وغلافًا إلى صدى${live ? ' · يُكمل في الخلفيّة' : ''}</p>
+      <progress max="${String(t.total)}" value="${String(Math.min(t.done, t.total))}" aria-label="ما نُقل من وسائط الحزمة"></progress>
+      ${live ? raw('<meta http-equiv="refresh" content="6">') : ''}</div>`
+}
 
 function statusLine(s: PackageSource): Html {
   const face = s.status === 'ok' ? statusBadge('ok', '●', 'متصل')
@@ -145,7 +157,7 @@ export function packageScreen(m: PackageScreen): string {
     body: html`<p class="m-0">صدى لا تقرأ المستودع الخاصّ بلا رمز قراءة. خطواتُه في «ما عليك».</p>`.value }))
   const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانية', level: 2,
     body: html`<p class="m-0">Payload URL: <code dir="ltr">${m.hook.url}</code></p><p class="m-0">Secret: <code dir="ltr">${m.hook.secret}</code></p>`.value }))
-  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s)}
+  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s)}${progressLine(s, m.transfer)}
     <form method="post" action="/panel/package" class="row">
       <input type="hidden" name="do" value="sync">${raw(button({ label: 'زامن الآن', variant: 'primary', type: 'submit' }))}</form>
     <form method="post" action="/panel/package" class="row">

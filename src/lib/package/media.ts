@@ -46,6 +46,12 @@ export async function storeBlob(
   if (!withinLimit(file.kind, file.size)) return { result: 'too_big', key }
   const res = await rawFile(repo, remote, commit, fetchImpl)
   if (res.body === null) return { result: 'too_big', key }
-  await bucket.put(key, res.body, { httpMetadata: { contentType: mimeOf(file.path) } })
+  // ‏R2 لا يقبل جسمًا بلا طولٍ معلوم، وGitHub يبثّ الملفَّ الخامّ مقطَّعًا بلا Content-Length: فيُعلَن الطولُ من الشجرة
+  // ‏(FixedLengthStream في Workers)، وإن غاب يُقرأ الملفُّ كلُّه — والمقاطعُ ميغابايتٌ أو اثنان
+  const declared = Number(res.headers.get('Content-Length') ?? '')
+  const Fixed = (globalThis as { FixedLengthStream?: new (n: number) => TransformStream<Uint8Array, Uint8Array> }).FixedLengthStream
+  const body: ReadableStream | ArrayBuffer = Number.isFinite(declared) && declared > 0 ? res.body
+    : Fixed !== undefined && file.size > 0 ? res.body.pipeThrough(new Fixed(file.size)) : await res.arrayBuffer()
+  await bucket.put(key, body, { httpMetadata: { contentType: mimeOf(file.path) } })
   return { result: 'stored', key }
 }

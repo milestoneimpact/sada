@@ -57,12 +57,14 @@ pkg.get('/panel/package', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
-  const [source, media, flash, revisions, snap] = await Promise.all([readSource(c.env.DB, org), readPackageMedia(c.env.DB, org), takeFlash(c.env, c.req.raw),
-    listRevisions(c.env.DB, org, 10), lastAppliedSnapshot(c.env.DB, org).catch(() => null)])
+  const [source, media, flash, revisions, snap, moved] = await Promise.all([readSource(c.env.DB, org), readPackageMedia(c.env.DB, org), takeFlash(c.env, c.req.raw),
+    listRevisions(c.env.DB, org, 10), lastAppliedSnapshot(c.env.DB, org).catch(() => null),
+    c.env.DB.prepare("SELECT count(*) AS total, coalesce(sum(r2_key IS NOT NULL), 0) AS done FROM package_files WHERE org_id = ? AND role IN ('media', 'cover')")
+      .bind(org).first<{ total: number; done: number }>().catch(() => null)])
   // ‏الناقصُ ما لا نصَّ له **ولا مسوّدةَ كُتبت له** — فلا يُعرض الزرُّ نفسُه بعد الكتابة
   const missing = await missingCopy(c.env.DB, org, snap)
   return render(c.env, session.record.csrf, {
-    source, media, revisions, missing: missing.map((e) => e.item + ' · ' + e.platform), tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN),
+    source, media, revisions, missing: missing.map((e) => e.item + ' · ' + e.platform), transfer: moved ?? { total: 0, done: 0 }, tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN),
     flash: flash === null ? null : { tone: flash.kind, text: flash.text },
   })
 })
@@ -146,7 +148,8 @@ pkg.post('/panel/package', async (c) => {
       await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'ينقص رمز القراءة — خطواتُه في «ما عليك».' })
       return back()
     }
-    const out = await syncPackage({ db: c.env.DB, bucket: c.env.MEDIA, token }, source, { force: true })
+    // ‏الطلبُ يقرأ الشجرةَ وينقل دفعةً صغيرة ثمّ يعود فورًا، والطابورُ يكمل الباقي والشاشةُ تعدّه
+    const out = await syncPackage({ db: c.env.DB, bucket: c.env.MEDIA, token, cap: 6 * 1024 * 1024 }, source, { force: true })
     if (out.kind === 'synced' && out.deferred > 0) {
       await c.env.GENERATE_QUEUE.send({ packageSync: { sourceId: source.id, force: true } } satisfies PackageSyncMessage).catch(() => undefined)
     }

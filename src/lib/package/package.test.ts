@@ -122,7 +122,8 @@ function github(opts: { etag?: string; head?: string; truncated?: boolean } = {}
       // ‏كما يفعل GitHub: المسارُ من جذر المستودع، وما لا وجود له 404 — مسارٌ تحت المجلّد بلا بادئته يسقط هنا
       const asked = decodeURIComponent(url.split('/contents/')[1]!.split('?')[0]!)
       if (!blobs.some((b) => b.path === asked)) return new Response('', { status: 404 })
-      return new Response(new Uint8Array(2048), { headers: { 'Content-Length': '2048' } })
+      // ‏كما يبثّ GitHub الملفَّ الخامّ: مقطَّعًا بلا Content-Length (R2 يرفض جسمًا بلا طولٍ معلوم)
+      return new Response(new ReadableStream({ start(c) { c.enqueue(new Uint8Array(2048)); c.close() } }))
     }
     return new Response('', { status: 404 })
   }
@@ -135,6 +136,7 @@ function bucket(): StreamBucket & { keys: Map<string, number> } {
     keys,
     async head(key) { return keys.has(key) ? {} : null },
     async put(key, value) {
+      if (value instanceof ReadableStream && !('__fixed' in value)) throw new TypeError('Provided readable stream must have a known length')
       const n = typeof value === 'string' ? value.length : (await new Response(value as ReadableStream).arrayBuffer()).byteLength
       keys.set(key, n)
     },
