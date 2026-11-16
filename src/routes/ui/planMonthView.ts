@@ -29,7 +29,7 @@ export function importsScreen(rows: readonly ImportRow[], canRecheck: boolean): 
     return head + card({ title: 'لا استيراد بعد', body: html`<p class="hint">ادفع ملفّ الشهر إلى 01-plan أو ألصق جدولًا في «خطّة جديدة».</p>`.value })
   }
   const body = html`<div class="scroll"><table>
-    <thead><tr><th>المصدر</th><th>الشهر</th><th>الحال</th><th>البصمة</th><th>ما تغيّر</th><th></th></tr></thead>
+    <thead><tr><th>المصدر</th><th>الشهر</th><th>الحال</th><th>البصمة</th><th>ما تغيّر</th><th>الإجراء</th></tr></thead>
     <tbody>${rows.map((r) => html`<tr>
       <td><span class="chip">${SOURCE_SAY[r.sourceKind] ?? r.sourceKind}</span>${r.sourceRef === null ? '' : html` <span class="mono">${r.sourceRef}</span>`}</td>
       <td class="mono">${r.period ?? '—'}</td>
