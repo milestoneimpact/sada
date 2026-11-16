@@ -203,7 +203,9 @@ export async function firstDelivery(kv: DeliveryStore, sourceId: string, deliver
 export async function tokenFor(s: PackageSource, encKey: string, workerToken: string | undefined): Promise<string | null> {
   if (s.sealedToken !== null) return openScoped(encKey, SCOPE, s.sealedToken, tokenContext(s.id), LEGACY_RAW).catch(() => null)
   // ‏سرُّ Worker للمنظّمة المالك وحدها — منظّمةٌ أخرى لا تقرأ بمفتاح غيرها
-  return s.org === OWNER_ORG && workerToken !== undefined && workerToken !== '' ? workerToken : null
+  const clean = (workerToken ?? '').trim().replace(/^["'«]+|["'»]+$/g, '').trim()
+  // ‏المفتاحُ يُنظَّف من مسافةٍ أو تنصيصٍ لصقهما المالك مع القيمة، فلا يُرسَل إلى GitHub مشوَّهًا
+  return s.org === OWNER_ORG && clean !== '' ? clean : null
 }
 
 /** هل لهذه المنظّمة رمزُ قراءة؟ المختومُ في صفّها، أو سرُّ Worker إن كانت المالك. */

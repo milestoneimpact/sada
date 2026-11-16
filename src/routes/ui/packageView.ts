@@ -54,7 +54,7 @@ function probeCard(p: AccessProbe): string {
   const steps = (['repo', 'branch'] as const).map((k) => html`<li>${p.passed.includes(k) ? raw(statusBadge('ok', '✓', STEP[k] + ': نجح'))
     : raw(statusBadge(p.passed.length === 0 && k === 'branch' ? '' : 'bad', p.passed.length === 0 && k === 'branch' ? '○' : '!', STEP[k] + (p.passed.length === 0 && k === 'branch' ? ': لم يُجرَّب' : ': لم ينجح')))}</li>`)
   return card({ variant: 'alert', tone: ok ? 'ok' : 'warn', title: ok ? 'الرمز يعمل' : 'اختبار الرمز: ما يلزم إصلاحه', level: 2,
-    body: html`<ul class="plain">${steps}</ul><p class="m-0">${p.reason}</p>${fixList(p.fix)}`.value })
+    body: html`<ul class="plain">${steps}</ul><p class="m-0">${p.reason}</p>${p.identity === undefined ? html`` : html`<p class="hint m-0">${p.identity}</p>`}${fixList(p.fix)}`.value })
 }
 
 function input(id: string, label: string, name: string, value: string, required: boolean): string {

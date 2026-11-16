@@ -18,6 +18,15 @@ export interface AccessProbe {
   readonly passed: readonly ('repo' | 'branch')[]
   readonly reason: string
   readonly fix: readonly string[]
+  /** لمن المفتاح وما شكلُه — اسمُ الحساب من `GET /user`، وبادئةُ المفتاح وطولُه، لا حرفَ منه بعد البادئة. */
+  readonly identity?: string
+}
+
+/** شكلُ المفتاح بلا كشفه: بادئتُه المعروفة وطولُه وما يشوبه من مسافةٍ أو علامة تنصيص. */
+export function tokenShape(token: string): string {
+  const prefix = (/^(github_pat_|ghp_|gho_|ghs_|ghu_)/.exec(token.trim())?.[1]) ?? 'بادئةٌ غير معروفة'
+  const flaws = [token !== token.trim() ? 'مسافةٌ قبله أو بعده' : '', /["'«»]/.test(token) ? 'علامةُ تنصيص' : '', /\s/.test(token.trim()) ? 'مسافةٌ في وسطه' : ''].filter((x) => x !== '')
+  return 'يبدأ بـ ' + prefix + ' وطوله ' + String(token.length) + (flaws.length === 0 ? '' : ' · فيه ' + flaws.join(' و'))
 }
 
 /** الأسبابُ بنصوصها — البطاقةُ تعرف منها خطواتِ الإصلاح لصفٍّ مكتوبٍ قبل الآن. */
@@ -77,18 +86,27 @@ export async function probeAccess(r: RepoRef, fetchImpl: typeof fetch = withTime
   const h = { Authorization: `Bearer ${r.token}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'sada-package-sync' }
   const base = `https://api.github.com/repos/${encodeURIComponent(r.owner)}/${encodeURIComponent(r.repo)}`
   const passed: ('repo' | 'branch')[] = []
+  // ‏لمن المفتاح: قراءةٌ مجّانيّةٌ ثالثة تحسم «المفتاحُ سليمٌ من جهازي و404 من صدى»
+  let who = 'لم يُعرف الحساب'
+  try {
+    const u = await call('https://api.github.com/user', { headers: h })
+    if (u.ok) { const j = (await u.json()) as { login?: unknown }; if (typeof j.login === 'string') who = 'لحساب ' + j.login.slice(0, 40) }
+    else who = 'GitHub ردّ ' + String(u.status) + ' على «من أنا»'
+  } catch { /* المهلةُ تُقال في الخطوتين */ }
+  const identity = 'المفتاحُ ' + who + ' · ' + tokenShape(r.token)
+  const withId = (a: AccessProbe): AccessProbe => ({ ...a, identity })
   for (const [step, url] of [['repo', base], ['branch', `${base}/branches/${encodeURIComponent(r.branch)}`]] as const) {
     let res: Response
     try {
       res = await call(url, { headers: h })
     } catch {
-      return result('network', passed)
+      return withId(result('network', passed))
     }
     if (!res.ok) {
       const e = failure(res)
-      return result(verdictOf(e, step), passed, e.status === 429 ? RATE_LIMITED : statusReason(res.status))
+      return withId(result(verdictOf(e, step), passed, e.status === 429 ? RATE_LIMITED : statusReason(res.status)))
     }
     passed.push(step)
   }
-  return result('ok', passed)
+  return withId(result('ok', passed))
 }

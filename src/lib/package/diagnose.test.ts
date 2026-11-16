@@ -29,7 +29,7 @@ describe('اختبر الرمز', () => {
     const f = gh(404, 200)
     const p = await probeAccess(REPO, f.fetch)
     expect(p).toMatchObject({ verdict: 'repo', passed: [], reason: REASONS.repo })
-    expect(f.calls).toHaveLength(1)
+    expect(f.calls.filter((u) => !u.endsWith('/user'))).toHaveLength(1)
     expect(p.fix.join(' ')).toContain('Repository access')
     expect(p.fix.join(' ')).toContain('Resource owner')
   })
@@ -62,5 +62,15 @@ describe('اختبر الرمز', () => {
     const out = await syncPackage({ db, bucket, token: 't', fetchImpl: gh(200, 404).fetch }, (await readSource(db, 'org_owner'))!)
     expect(out).toEqual({ kind: 'failed', reason: REASONS.branch })
     expect(fixFor((await readSource(db, 'org_owner'))!.error).length).toBeGreaterThan(0)
+  })
+})
+
+describe('شكلُ المفتاح بلا كشفه', async () => {
+  const { tokenShape } = await import('./diagnose')
+  it('البادئةُ والطولُ، والعيبُ يُسمّى، ولا حرفَ بعد البادئة', () => {
+    const t = 'github_pat_' + 'A'.repeat(82)
+    expect(tokenShape(t)).toBe('يبدأ بـ github_pat_ وطوله 93')
+    expect(tokenShape(' "' + t + '" ')).toContain('مسافةٌ قبله أو بعده')
+    expect(tokenShape(t)).not.toContain('AAAA')
   })
 })
