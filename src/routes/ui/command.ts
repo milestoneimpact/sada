@@ -149,7 +149,7 @@ export const SECTIONS: readonly Section[] = [
    */
   { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
   // ‏«حزمة المحتوى» بعد «الخطّة» (D-366): منها تُبنى الخطّة، وشارتُها ما ينتظر قرارك من تغييراتها
-  { id: 'package', label: 'حزمة المحتوى', note: 'حزمتُك في GitHub: الوسائطُ والخطّةُ والنصوص، وما تغيّر فيها', icon: ICON.package, group: 'العمل', alias: 'package github repo حزمه مستودع جيتهب تغييرات', page: '/panel/package', optional: true },
+  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'العمل', alias: 'github مستودع', page: '/panel/package', optional: true },
   { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
   { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },

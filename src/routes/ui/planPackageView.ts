@@ -23,7 +23,7 @@ export function planWays(at: 'build' | 'import' | 'package', hasPackage: boolean
     raw(button({ label, href, size: 'sm', variant: key === at ? 'primary' : 'secondary', ...(key === at ? { attrs: 'aria-current="page"' } : {}) }))
   return html`<nav class="row gap-2 mb-4" aria-label="طريقة الخطّة">
       ${hasPackage ? one('package', '/panel/plan/package', 'من حزمتك في GitHub') : html``}
-      ${one('build', hasPackage ? '/panel/plan/new?way=build' : '/panel/plan/new', 'ابن لي خطّة')}
+      ${one('build', hasPackage ? '/panel/plan/new?way=build' : '/panel/plan/new', 'ابنِ لي خطّة')}
       ${one('import', '/panel/plan/import', 'عندي خطّة')}</nav>`
 }
 

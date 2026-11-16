@@ -174,7 +174,7 @@ function channelStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
         ? ''
         : html`<p class="hint m-0">${missing.map((p) => platformLabel(p)).join(' و')} غير مربوطة — <a href="${panelHref('channels')}">اربطها</a> لتظهر هنا.</p>`}`
   return html`<section class="wz-step" data-step="2" aria-labelledby="wz-t2">
-    ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوط وحدَه يظهر. ولكلّ منصّة إيقاعُها وأوقاتُها وصورتُها — فيصحّ رسم فنّيٌّ هنا وإنفوجرافيك هناك، ووقتان في اليوم نفسِه.')}
+    ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوط وحدَه يظهر، ولكلّ منصّة إيقاعُها وأوقاتُها وصورتُها.')}
     <div class="stack">${body}</div>
   </section>`
 }
@@ -209,11 +209,11 @@ function contentStep(d: PlanNewData): Html {
     : html`<div class="wz-add card card-inset">
       <label class="wz-drop card" id="pn-drop"><input type="file" name="file" form="pn-up" accept="${UPLOAD_EXTENSIONS.map((e) => '.' + e).join(',')}" id="pn-file" multiple>
         <span class="wz-big">ارفع ملفًّا أو أكثر</span>
-        <span class="ago">اسحبها إلى هنا أو اخترها — PDF وWord وExcel وPowerPoint ونصّ وملفُّ ترجمة مقطع (srt · vtt)، حتّى 10MB للملفّ. تُحفظ في مكتبتك وتُحلَّل الآن.</span>
+        <span class="ago">اسحبها إلى هنا أو اخترها: PDF وWord وExcel وPowerPoint ونصّ وترجمة مقطع، حتّى 10MB للملفّ.</span>
         <span class="wz-prog" id="pn-prog" hidden><span></span></span></label>
       <noscript><button class="btn btn-secondary btn-sm" type="submit" form="pn-up">ارفع ما اخترت</button></noscript>
       <div class="field m-0"><label for="pn-url">أو أضف رابطًا أو أكثر</label>
-        <p class="field-hint m-0" id="pn-url-hint">سطر لكلّ رابط، حتّى ستّة: موقع (يُقرأ مع صفحاته التعريفيّة) أو مقال أو PDF أو مقطع YouTube (يُقرأ وصفُه وما قيل فيه). يُستخرج المحتوى ويُحلَّل كأيّ مصدر.</p>
+        <p class="field-hint m-0" id="pn-url-hint">سطر لكلّ رابط، حتّى ستّة: موقع (يُقرأ مع صفحاته التعريفيّة) أو مقال أو PDF أو مقطع YouTube.</p>
         <div class="row gap-2"><textarea id="pn-url" name="url" form="pn-link" rows="2" placeholder="https://…" dir="ltr" inputmode="url" autocomplete="off" aria-describedby="pn-url-hint"></textarea>
           <button class="btn btn-secondary" type="submit" form="pn-link" id="pn-link-go">اقرأ الروابط</button></div></div>
       <p class="m-0 wz-say" id="pn-add-say" role="status" aria-live="polite"></p>
