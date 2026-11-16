@@ -38,6 +38,8 @@ export interface PlanPackageData {
   readonly follow: boolean
   readonly canBuild: boolean
   readonly zone?: string | null
+  /** ما يُعتمَد ويُجدوَل بـ«اعتمد الخطّة وجدولها» (D-382). */
+  readonly schedulable?: number
   readonly flash?: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -119,5 +121,39 @@ export function planPackageScreen(d: PlanPackageData): string {
     : html`${raw(card({ title: 'هذا ما فهمته', level: 2, body: facts(p).value }))}
       ${p.problems.length === 0 ? html`` : raw(card({ variant: 'alert', tone: 'warn', title: 'ما لم يُفهم', level: 2, body: html`<ul class="plain">${p.problems.map((x) => html`<li>${x}</li>`)}</ul>`.value }))}
       ${raw(differs(p))}${raw(card({ title: 'الصفوف', level: 2, body: rowsTable(p).value }))}${raw(rulesCard(p))}${act(d, p)}`
-  return html`${raw(head)}${planWays('package', true)}<div class="stack">${flash}${raw(versions(d))}${view}</div>`.value
+  // ‏«اعتمد الخطّة وجدولها» (D-382): رابطٌ إلى تأكيدٍ بلا سكربت، والمدير فأعلى وحده يراه
+  const schedule = !d.canBuild || (d.schedulable ?? 0) === 0 ? html`` : raw(card({ title: 'اعتمد وجدوِل', level: 2, body: html`<p class="m-0">${String(d.schedulable)} من مسوّدات الحزمة جاهزة بنصّها وموعدها. تراها قبل أن تؤكّد.</p>
+    <div class="row">${raw(button({ label: 'اعتمد الخطّة وجدولها', variant: 'secondary', href: '/panel/plan/package/schedule' }))}</div>`.value }))
+  return html`${raw(head)}${planWays('package', true)}<div class="stack">${flash}${schedule}${raw(versions(d))}${view}</div>`.value
+}
+
+export interface ScheduleConfirm {
+  readonly count: number
+  readonly perPlatform: Readonly<Record<string, number>>
+  readonly first: string | null
+  readonly last: string | null
+  readonly skipped: readonly string[]
+  /** ما ينتظر الكتابة من الحزمة ولا مسوّدةَ له بعد. */
+  readonly waiting: number
+  readonly canBuild: boolean
+  readonly back: string
+}
+
+/** تأكيدُ «اعتمد الخطّة وجدولها» (D-382) — صفحةٌ بلا سكربت تقول ما سيقع قبل أن يقع. */
+export function scheduleConfirmScreen(m: ScheduleConfirm): string {
+  const head = pageHead('المنشورات', 'اعتمد الخطّة وجدولها', 'كلُّ مسوّدةٍ من الحزمة بنصّها تُعتمد وتُجدوَل في موعدها بتوقيتك. لا يُدفع شيءٌ الآن، والنشرُ في موعده.')
+  const skipped = m.skipped.length === 0 && m.waiting === 0 ? html``
+    : html`<p class="m-0">${raw(statusBadge('warn', '!', 'يُتخطّى'))}</p><ul class="plain">${m.skipped.map((s) => html`<li>${s}</li>`)}${m.waiting === 0 ? html``
+      : html`<li>ينتظر الكتابة: ${String(m.waiting)} · <a href="/panel/package">اكتب الناقص من أفكارها</a></li>`}</ul>`
+  const go = !m.canBuild ? html`<p class="m-0">اعتمادُ الخطّة وجدولتُها للمدير فأعلى.</p>`
+    : m.count === 0 ? html`<p class="m-0">لا مسوّدة جاهزة للجدولة الآن.</p>`
+      : html`<form method="POST" action="/panel/plan/package/schedule" class="row">
+        ${raw(button({ label: 'نعم، اعتمد ' + String(m.count) + ' وجدولها', type: 'submit', variant: 'primary' }))}</form>`
+  const facts = m.count === 0 ? html`` : html`<dl class="pv-facts">
+    <div><dt>يُجدوَل</dt><dd>${counted(m.count, NOUNS.post)}</dd></div>
+    <div><dt>لكلّ منصّة</dt><dd>${Object.entries(m.perPlatform).map(([k, n]) => (PLATFORM[k] ?? k) + ' ' + String(n)).join(' · ')}</dd></div>
+    <div><dt>أوّلُها</dt><dd>${m.first ?? '—'}</dd></div>
+    <div><dt>آخرُها</dt><dd>${m.last ?? '—'}</dd></div></dl>`
+  return html`${raw(head)}<div class="stack">${raw(card({ title: 'هذا ما سيقع', level: 2, body: html`${facts}${skipped}${go}
+    <p class="m-0">${raw(button({ label: 'عودة', variant: 'quiet', href: m.back }))}</p>`.value }))}</div>`.value
 }
