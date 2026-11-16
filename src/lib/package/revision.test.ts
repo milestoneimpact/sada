@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../../test/fakes'
-import { choosePlanFile, clock, readPackagePlan } from './plan'
+import { clock, planFiles, readPackagePlan } from './plan'
 import { excelDate, excelTime } from './xlsx'
 import { mergeCopies, parseCopy } from './copy'
 import { diffSnapshots, snapshot, type Snapshot, type SnapshotEntry } from './diff'
@@ -40,7 +40,7 @@ describe('الخطّة من xlsx أصيلًا', () => {
     expect(excelDate('46348')).toBe('2026-11-22')
     expect(excelTime('0.395833')).toBe('09:30')
     expect(clock('8:00 م')).toBe('20:00')
-    expect(choosePlanFile(['01-plan/a-v1.xlsx', '01-plan/a-v2.xlsx', '02-copy/x.md'])).toBe('01-plan/a-v2.xlsx')
+    expect(planFiles(['01-plan/a-v1.xlsx', '01-plan/a-v2.xlsx', '02-copy/x.md'])[0]).toBe('01-plan/a-v2.xlsx')
   })
 })
 
@@ -104,7 +104,9 @@ describe('السياسة', () => {
     expect(dispose(text, post('draft', { copyOrigin: 'manual' }))).toBe('awaiting_owner')
     // ‏عدّلته بيدها ولم تعلّمه: نصُّه غيرُ ما كتبته الحزمة
     expect(dispose(text, post('draft', { text: 'كتبتُه أنا' }))).toBe('awaiting_owner')
-    const removed = diffSnapshots(snap([entry()]), snap([]))[0]!
+    // ‏«حُذف» داخل شهره: الدفعةُ الجديدة فيها نوفمبر بغير المادّة 03 (D-383 المرحلة ٤)
+    const removed = diffSnapshots(snap([entry(), entry({ item: '04' })]), snap([entry({ item: '04' })]))[0]!
+    expect(removed).toMatchObject({ kind: 'removed', item: '03', period: '2026-11' })
     expect(decide([removed], [post('draft')])[0]!.disposition).toBe('auto_applied')
     expect(decide([removed], [post('queued')])[0]!.disposition).toBe('awaiting_owner')
   })

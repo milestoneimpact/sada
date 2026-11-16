@@ -314,7 +314,8 @@ export async function seatPlan(
     }
     statements.push(
       db.prepare('UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ?').bind(org, planId),
-      db.prepare('DELETE FROM plan_items WHERE org_id = ? AND plan_id = ?').bind(org, planId),
+      // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)
+      db.prepare("DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github'").bind(org, planId),
       db.prepare(`UPDATE plans SET plan_json = ?, model = 'import', status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL,
                          created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)
         .bind(planJson, JSON.stringify(choices), planPeriod, JSON.stringify([kind]), planId, org),

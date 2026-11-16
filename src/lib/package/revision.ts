@@ -1,17 +1,18 @@
 /**
  * المراجعة (D-370) — **كلُّ دفعٍ مراجعةٌ برقم التزامه، والدفعةُ نفسُها مرّتين مراجعةٌ واحدة**.
  *
- * بعد مزامنةٍ اكتمل نقلُها: تُقرأ الخطّةُ (الأعلى vN في 01-plan) والنصوصُ (02-copy) خامًا بنداءين مجّانيّين، وتُبنى اللقطة بالمعتمد من
+ * بعد مزامنةٍ اكتمل نقلُها: تُقرأ الخطّةُ (كلُّ ملفّات 01-plan، والأعلى vN لكلّ شهرٍ بين ملفّاته — D-383 المرحلة ٤) والنصوصُ (02-copy) خامًا بنداءين مجّانيّين، وتُبنى اللقطة بالمعتمد من
  * الوسائط ولونِ كلّ منصّة، ثمّ يُحسب الفرقُ عن آخر مراجعةٍ طُبّقت، ثمّ `INSERT OR IGNORE` بمفتاح (org_id, commit_sha): ما رآه
- * الويب هوك لا يعيده الفحصُ الساعيّ. ثمّ تُطبَّق الأحكامُ في معاملةٍ واحدة.
+ * الويب هوك لا يعيده الفحصُ الساعيّ. ثمّ تُطبَّق الأحكامُ في معاملةٍ واحدة، ثمّ تُكتب البنودُ في خطّة كلّ شهر (`landInMonthPlans`).
  */
 import { atomically, type Db } from '../tokens'
 import { isTimeout } from '../net/timeout'
 import { commitInfo, GitHubError, listTree, rawFile, type RepoRef } from './github'
 import { classifyPath } from './classify'
-import { choosePlanFile, readPackagePlan, type PackagePlan } from './plan'
+import { mergeMonthPlans, planFiles, readPackagePlan, type PackagePlan } from './plan'
+import { landInMonthPlans } from './month'
 import { copyVersion, mergeCopies } from './copy'
-import { diffSnapshots, snapshot, type Change, type Snapshot, type SnapshotEntry } from './diff'
+import { diffSnapshots, entryKey, snapshot, type Change, type Snapshot, type SnapshotEntry } from './diff'
 import { applyDecisions, decide, packagePosts, type Decision } from './apply'
 import { currentPicks, readPackageMedia, type PackageSource } from './sync'
 
@@ -118,9 +119,14 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
   const full = (p: string): string => (source.root === '' ? p : source.root + '/' + p)
   try {
     const files = await reviewedFiles(repo, commit, source.root, deps.fetchImpl)
-    const planPath = choosePlanFile(files.map((f) => f.path))
-    let plan: PackagePlan = { entries: [], rules: null, days: 0, columns: [], problems: ['لا ملفّ خطّة في 01-plan'] }
-    if (planPath !== null) plan = await readPackagePlan(new Uint8Array(await (await rawFile(repo, full(planPath), commit, deps.fetchImpl)).arrayBuffer()))
+    // ‏كلُّ ملفٍّ في 01-plan يُقرأ، والشهرُ من تواريخه، و`vN` يحسم داخل الشهر وحده
+    const read: { path: string; plan: PackagePlan }[] = []
+    for (const path of planFiles(files.map((f) => f.path))) {
+      read.push({ path, plan: await readPackagePlan(new Uint8Array(await (await rawFile(repo, full(path), commit, deps.fetchImpl)).arrayBuffer())) })
+    }
+    const months = mergeMonthPlans(read)
+    const plan = months.plan
+    const planPath = read[0]?.path ?? null
     // ‏ترتيبُ `mergeCopies` نفسُه: الأعلى نسخةً آخرًا، فبصمةُ النصّ لملفّه الغالب
     const copyFiles = files.filter((f) => /^02-copy\/[^/]+\.md$/i.test(f.path))
       .sort((a, b) => copyVersion(a.path) - copyVersion(b.path) || a.path.localeCompare(b.path))
@@ -134,7 +140,7 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
     const changes = diffSnapshots(prev, next)
     const info = await commitInfo(repo, commit, deps.fetchImpl)
     // ‏الإرشاداتُ في اللقطة: «اكتب الناقص» يكتب بها
-    const stored = { ...next, rules: plan.rules, rulesFound: plan.rules !== null, planProblems: plan.problems, unparsed: copy.unparsed }
+    const stored = { ...next, planFiles: months.files, rules: plan.rules, rulesFound: plan.rules !== null, planProblems: plan.problems, unparsed: copy.unparsed }
     const ins = await db.prepare(
       `INSERT OR IGNORE INTO package_revisions (id, org_id, source_id, commit_sha, parent_commit_sha, commit_message, status, snapshot_json, diff_json, summary_counts, attempts, created_at, claimed_at)
         VALUES (?, ?, ?, ?, ?, ?, 'analysed', ?, ?, ?, ?, COALESCE(?, datetime('now')), datetime('now'))`,
@@ -146,6 +152,8 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
     }
     const decisions = followOrHold(decide(changes, await packagePosts(db, org)), source.followUpdates)
     const out = await applyDecisions({ db, org, revisionId: id, copySha }, decisions)
+    // ‏ما تغيّر يهبط في خطّة شهره — وعطلُه لا يُبطل مراجعةً طُبّقت، ويُعاد في الدفعة التالية
+    await landInMonthPlans(db, org, { revisionId: id, commit }, next, decisions).catch((e: unknown) => { console.error('package month landing failed', e) })
     await db.prepare('UPDATE package_revisions SET summary_counts = ? WHERE id = ? AND org_id = ?')
       .bind(JSON.stringify(countChanges(changes, out.awaiting)), id, org).run()
     return { kind: 'applied', id, changes: changes.length, awaiting: out.awaiting }
@@ -198,10 +206,13 @@ export async function missingCopy(db: Db, org: string, snap: Snapshot | null): P
   const without = (snap?.entries ?? []).filter((e) => e.text === null)
   if (without.length === 0) return []
   const { results } = await db.prepare(
-    `SELECT package_item_no, platform FROM posts WHERE org_id = ? AND package_item_no IS NOT NULL AND status <> 'rejected' LIMIT 400`,
-  ).bind(org).all<{ package_item_no: string; platform: string }>().catch(() => ({ results: [] as { package_item_no: string; platform: string }[] }))
-  const have = new Set(results.map((r) => r.package_item_no + '|' + r.platform))
-  return without.filter((e) => !have.has(e.item + '|' + e.platform))
+    `SELECT coalesce(package_period, substr(package_due, 1, 7)) AS period, package_item_no, platform FROM posts
+      WHERE org_id = ? AND package_item_no IS NOT NULL AND status <> 'rejected' LIMIT 800`,
+  ).bind(org).all<{ period: string | null; package_item_no: string; platform: string }>().catch(() => ({ results: [] as { period: string | null; package_item_no: string; platform: string }[] }))
+  // ‏بالشهر (D-383 المرحلة ٤): مسوّدةُ «01» نوفمبر لا تُخفي أنّ «01» ديسمبر بلا نصّ. وما لا شهرَ له يُطابَق بمادّته ومنصّته كما كان
+  const have = new Set(results.map((r) => (r.period ?? '') + '|' + r.package_item_no + '|' + r.platform))
+  const loose = new Set(results.filter((r) => r.period === null).map((r) => r.package_item_no + '|' + r.platform))
+  return without.filter((e) => !have.has(entryKey(e)) && !loose.has(e.item + '|' + e.platform))
 }
 
 interface RevRow { id: string; commit_sha: string; parent_commit_sha: string | null; commit_message: string; status: RevisionRow['status']; summary_counts: string; error_reason: string | null; created_at: string; applied_at: string | null }
