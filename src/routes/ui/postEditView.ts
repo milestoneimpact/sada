@@ -11,6 +11,7 @@ import { stamp } from '../../lib/time/zone'
 import { pageHead } from './parts'
 import { button } from './components/button'
 import { card } from './components/card'
+import { field } from './components/field'
 import { statusBadge } from './components/badge'
 import { html, join, raw, type Html } from './html'
 
@@ -23,20 +24,39 @@ export interface PostEditModel {
   readonly stage: EditStage
   readonly role: Role
   readonly history: readonly EditEntry[]
+  /** صورُ المكتبة التي تُربط به: «الوسيط» في جدول التعديل. */
+  readonly media?: readonly { readonly ref: string; readonly name: string }[]
+}
+
+/** قيمةُ حقل `datetime-local` بساعة المالك من موعدٍ بتوقيت UTC. */
+function localValue(at: string | null, zone: string | null): string {
+  if (at === null) return ''
+  const s = stamp(at, zone)
+  return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}/.test(s) ? s.slice(0, 10) + 'T' + s.slice(11, 16) : ''
 }
 
 const hidden = (m: PostEditModel): Html =>
   html`<input type="hidden" name="id" value="${m.id}"><input type="hidden" name="rev" value="${String(m.rev)}">`
 
-function editCard(m: PostEditModel): string {
+function editCard(m: PostEditModel, zone: string | null): string {
   const can = mayDo(m.role, 'edit', m.stage)
+  const media = m.media ?? []
   const body = can.ok
     ? html`<form class="stack" method="POST" action="/panel/plan/post/revise" data-busy="يُحفظ…">${hidden(m)}
         <label for="pe-text">النصّ</label>
         <textarea id="pe-text" name="text" rows="8" required>${m.text}</textarea>
+        ${raw(field({
+          id: 'pe-at', label: 'الموعد بساعتك', optional: true,
+          ...(m.stage === 'scheduled' ? { hint: 'المجدوَل يُعدَّل موعدُه حتّى قبل النشر بـ 15 دقيقة.' } : {}),
+          control: html`<input name="scheduled_local" type="datetime-local" dir="ltr" value="${localValue(m.scheduledAt, zone)}">`.value,
+        }))}
+        ${raw(field({
+          id: 'pe-media', label: 'الوسيط', optional: true,
+          control: html`<select name="media_ref"><option value="">يبقى كما هو</option>${media.map((x) => html`<option value="${x.ref}">${x.name}</option>`)}</select>`.value,
+        }))}
         <div class="row">${raw(button({ label: 'احفظ التعديل', variant: 'primary', type: 'submit' }))}</div></form>`
     : html`<p class="m-0">${m.text}</p><p class="hint m-0">${can.reason}</p>`
-  return card({ id: 'post-edit', title: 'النصّ', level: 2, body: body.value })
+  return card({ id: 'post-edit', title: 'النصّ والموعد والوسيط', level: 2, body: body.value })
 }
 
 function actionsCard(m: PostEditModel): string {
@@ -70,5 +90,5 @@ export function postEditScreen(m: PostEditModel, zone: string | null): string {
   const when = m.scheduledAt === null ? 'بلا موعد' : stamp(m.scheduledAt, zone).slice(0, 16)
   const head = pageHead('الخطّة', 'تعديل المنشور', STAGE_LABEL[m.stage] + ' · ' + when)
   const mark = m.edited ? html`<p class="m-0">${raw(statusBadge('warn', '!', EDITED_MARK))}</p>` : html``
-  return html`${raw(head)}<div class="stack">${mark}${raw(editCard(m))}${raw(actionsCard(m))}${raw(historyCard(m, zone))}</div>`.value
+  return html`${raw(head)}<div class="stack">${mark}${raw(editCard(m, zone))}${raw(actionsCard(m))}${raw(historyCard(m, zone))}</div>`.value
 }

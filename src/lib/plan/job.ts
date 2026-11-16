@@ -445,6 +445,18 @@ export async function planForPeriod(db: Db, org: string, period: string): Promis
   }
 }
 
+/** خطّةٌ بمعرّفها في منظّمتها، ما لم تُستبدَل — لما يُرسل معرّفَه (شاشةُ الشهر، والإصلاح، والمراجعة). */
+export async function planForId(db: Db, org: string, id: string): Promise<StoredPlan | null> {
+  try {
+    const row = await db.prepare(`SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+                                    WHERE org_id = ? AND id = ? AND status <> 'superseded'`)
+      .bind(org, id).first<Record<string, string>>()
+    return row === null ? null : storedOf(row)
+  } catch {
+    return null
+  }
+}
+
 /** أحدثُ خطّةٍ لأقرب مدًى. */
 export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan | null> {
   try {

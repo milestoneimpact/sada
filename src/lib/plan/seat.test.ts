@@ -85,6 +85,20 @@ describe('سلسلة X تُسكَّن بنوعها (D-324)', () => {
 describe('التسكينُ بمهمّة استيرادٍ وإصدار (D-383)', () => {
   const CSV = ['التاريخ,الوقت,المنصة,النص', '2099-01-04,09:00,LinkedIn,الأولى', '2099-01-06,13:00,X,الثانية'].join('\n')
 
+  it('شهرٌ تحمله خطّةُ الحزمة: صفوفُ الملفّ تنزل فيها ولا تُنشأ خطّةٌ بلا شهر', async () => {
+    db.raw.exec(`INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, period, source_kinds)
+      VALUES ('plan_pkg_org_owner_2099-01', '2099-01', '{"items":[]}', 'package', 'draft', 'org_owner', 'month', '2099-01', '["github"]')`)
+    db.raw.exec(`INSERT INTO plan_items (id, org_id, plan_id, item_key, platform, due_local, source_kind, package_item_no)
+      VALUES ('pi_g', 'org_owner', 'plan_pkg_org_owner_2099-01', 'pkg:01', 'x', '2099-01-10 20:00', 'github', '01')`)
+    const csv = ['التاريخ,الوقت,المنصة,النص', '2099-01-04,09:00,LinkedIn,الأولى', '2099-01-20,13:00,X,الثانية'].join('\n')
+    const out = await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(out.planId).toBe('plan_pkg_org_owner_2099-01')
+    expect(db.raw.prepare('SELECT count(*) AS n FROM plans').get()).toEqual({ n: 1 })
+    expect(db.raw.prepare("SELECT model, period, source_kinds FROM plans").get()).toEqual({ model: 'package', period: '2099-01', source_kinds: '["github","csv"]' })
+    expect(db.raw.prepare("SELECT source_kind FROM plan_items ORDER BY due_local").all()).toEqual([{ source_kind: 'csv' }, { source_kind: 'github' }, { source_kind: 'csv' }])
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE plan_id = 'plan_pkg_org_owner_2099-01'").get()).toEqual({ n: 2 })
+  })
+
   it('الملفُّ نفسُه مرّتين: مهمّةٌ واحدة وخطّةٌ واحدة، والثانيةُ «لا تغيير»', async () => {
     const first = await seatPlan(db, 'org_owner', CSV, facts(), new Map(), null)
     expect(first.seated).toBe(2)

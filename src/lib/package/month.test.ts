@@ -110,6 +110,15 @@ describe('الحزمةُ في خطّة الشهر', () => {
     expect(await jobs()).toEqual({ n: 2 })
   })
 
+  it('خطّةٌ مُستبدَلةٌ تحمل الشهر لا تأخذ بنودَ الحزمة: يُفكّ شهرُها وتُنشأ خطّةُ الحزمة', async () => {
+    const { db, source } = await seeded()
+    await db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, period) VALUES ('old', '2026-11-01', '{\"items\":[]}', 'm', 'superseded', 'org_owner', 'month', '2026-11')").run()
+    const out = await push(db, source.id, 'rev_s', null, snap([entry('01', '2026-11-22')]))
+    expect(out.plans['2026-11']).not.toBe('old')
+    expect(await db.prepare("SELECT period FROM plans WHERE id = 'old'").first()).toEqual({ period: null })
+    expect(await db.prepare("SELECT count(*) AS n FROM plan_items WHERE plan_id = ?").bind(out.plans['2026-11']).first()).toEqual({ n: 1 })
+  })
+
   it('«حُذف» في ديسمبر يؤرشف مسوّدةَ ديسمبر وبندَها وحدهما، ونوفمبر برقمه نفسِه باقٍ', async () => {
     const { db, source } = await seeded()
     const both = snap([entry('01', '2026-11-22'), entry('01', '2026-12-01'), entry('02', '2026-12-02')])

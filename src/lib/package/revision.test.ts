@@ -267,6 +267,25 @@ describe('ما أصلحته المراجعة', () => {
     expect(rev).not.toBe('rev_back')
   })
 
+  it('أُرشفت مرّتين ثمّ عادت ثالثةً: يُكتب لها منشورٌ جديد بمفتاحٍ لا يصطدم', async () => {
+    const { db, source } = await seeded()
+    await revisePackage({ db, token: 't', fetchImpl: github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY }) }, source, 'a'.repeat(40))
+    const back = (text: string) => ({ item: '03', platform: 'x', kind: 'added' as const, before: null, after: entry({ text, media: null, mediaName: null }) })
+    await db.prepare("INSERT INTO package_revisions (id, org_id, source_id, commit_sha, status) VALUES ('rev_b2', 'org_owner', ?, 'z2', 'analysed'), ('rev_b3', 'org_owner', ?, 'z3', 'analysed')").bind(source.id, source.id).run()
+    const rows = () => db.prepare("SELECT id, status, text FROM posts WHERE package_item_no = '03' AND platform = 'x' ORDER BY created_at, rowid").all<{ id: string; status: string; text: string }>().then((r) => r.results)
+    // ‏الأولى تُؤرشف، وتعود ثانيةً
+    await db.prepare("UPDATE posts SET status = 'rejected' WHERE package_item_no = '03' AND platform = 'x'").run()
+    await applyDecisions({ db, org: 'org_owner', revisionId: 'rev_b2', copySha: 'c' }, decide([back('ثانية')], await packagePosts(db, 'org_owner')))
+    // ‏والثانيةُ تُؤرشف، وتعود ثالثةً
+    await db.prepare("UPDATE posts SET status = 'rejected' WHERE package_item_no = '03' AND platform = 'x'").run()
+    const third = decide([back('ثالثة')], await packagePosts(db, 'org_owner'))
+    expect(third[0]!.post!.id).toBe((await rows())[1]!.id)
+    await applyDecisions({ db, org: 'org_owner', revisionId: 'rev_b3', copySha: 'c' }, third)
+    const all = await rows()
+    expect(all.map((r) => r.status)).toEqual(['rejected', 'rejected', 'draft'])
+    expect(all[2]!.text).toBe('ثالثة')
+  })
+
   it('تغييرٌ قديمٌ ينتظر ثمّ جاء أحدثُ منه للمنشور نفسِه: يُطوى القديم ولا يكتب فوق الأحدث، والشارةُ إلى الأحدث', async () => {
     const { db, source } = await seeded()
     await revisePackage({ db, token: 't', fetchImpl: github({ [PLAN_PATH]: PLAN, [COPY_PATH]: COPY }) }, source, 'a'.repeat(40))

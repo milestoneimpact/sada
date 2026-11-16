@@ -19,6 +19,8 @@ export interface ChecksView {
   readonly w?: string
   /** من يجدول (الناشرُ فأعلى) يرى أزرار الإصلاح. */
   readonly canFix: boolean
+  /** شهرٌ «YYYY-MM» يعود إليه الإصلاح: من شاشة الشهر إليها، لا إلى المراجعة. */
+  readonly back?: string
   /** وجهةُ ما يُصلَح بيد المالك. */
   readonly links?: Partial<Record<'edit' | 'upload' | 'connect' | 'format' | 'adopt', string>>
 }
@@ -31,7 +33,7 @@ function fixOf(f: Finding, v: ChecksView): Html {
     return html`<form class="inline" method="POST" action="/panel/plan/check/fix" data-busy="يُصلَح…">
       <input type="hidden" name="id" value="${v.planId}"><input type="hidden" name="w" value="${v.w ?? ''}">
       <input type="hidden" name="rule" value="${f.rule}"><input type="hidden" name="keys" value="${f.keys.join('\n')}">
-      <input type="hidden" name="day" value="${f.day ?? ''}"><input type="hidden" name="platform" value="${f.platform ?? ''}">
+      <input type="hidden" name="day" value="${f.day ?? ''}"><input type="hidden" name="platform" value="${f.platform ?? ''}">${v.back === undefined ? html`` : html`<input type="hidden" name="back" value="${v.back}">`}
       ${raw(button({ label: FIX_LABEL[f.fix], size: 'sm', type: 'submit' }))}</form>`
   }
   const href = v.links?.[f.fix as keyof typeof LINKS] ?? LINKS[f.fix as keyof typeof LINKS]

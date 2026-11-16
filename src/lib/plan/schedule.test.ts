@@ -3,6 +3,7 @@ import { fakeDb } from '../../test/fakes'
 import { planProgress, schedulePlan, slotFor } from './schedule'
 import type { StoredPlan } from './job'
 import { dropItem, itemKey, moveItem, reviewModel } from './review'
+import { revisePost } from './revise'
 
 const NOW = new Date('2026-10-24T12:00:00Z')
 
@@ -118,5 +119,26 @@ describe('السلسلةُ والتغريدةُ من مصدرٍ واحد (مرا
       { id: 'p-text', status: 'draft' },
       { id: 'p-thread', status: 'rejected' },
     ])
+  })
+
+  it('ما منعه الفحص يبقى معتمَدًا بلا موعد ويُقال سببُه', async () => {
+    const { db, plan } = seed()
+    const done = await schedulePlan(db, 'org_owner', plan, NOW, new Set([itemKey(plan.plan.items[0]! as never)]))
+    expect(done.scheduled).toBe(0)
+    expect(done.skipped[0]).toEqual({ postId: 'p1', reason: 'منعه الفحص، فأصلحه من شريط التحذيرات' })
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'approved' })
+  })
+
+  it('مجدوَلٌ يعدّله المحرّر لا تجدوله «جدوِل» التالية باسم من اعتمد قبله', async () => {
+    const { db, plan } = seed()
+    await schedulePlan(db, 'org_owner', plan, NOW)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'queued' })
+    const r = await revisePost(db, 'org_owner', 'p1', { text: 'نصٌّ لم يُعتمد' }, 1, 'e@x', 'editor', NOW)
+    expect(r).toMatchObject({ ok: true, after: 'await' })
+    expect(db.raw.prepare("SELECT status, approved_by, account_id FROM posts WHERE id = 'p1'").get())
+      .toEqual({ status: 'draft', approved_by: null, account_id: null })
+    const again = await schedulePlan(db, 'org_owner', plan, NOW)
+    expect(again.scheduled).toBe(0)
+    expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'draft' })
   })
 })

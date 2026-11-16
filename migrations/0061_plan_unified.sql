@@ -103,13 +103,14 @@ CREATE TABLE plan_edits (
 );
 CREATE INDEX idx_plan_edits_target ON plan_edits (org_id, target_kind, target_id, at DESC);
 
--- ١) شهرُ الخطّة الشهريّة: الأحدثُ لكلّ (منظّمة، شهر) وحده، فلا يصطدم القيدُ الفريد
+-- ١) شهرُ الخطّة الشهريّة: الأحدثُ لكلّ (منظّمة، شهر) وحده، فلا يصطدم القيدُ الفريد.
+-- ‏والمُستبدَلةُ (`superseded`) لا تأخذ شهرًا: شاشةُ الشهر لا تراها، فبنودٌ تُكتب فيها تضيع عنه
 UPDATE plans SET period = substr(week_start, 1, 7)
- WHERE span = 'month'
+ WHERE span = 'month' AND status <> 'superseded'
    AND id = (SELECT p2.id FROM plans p2
-              WHERE p2.org_id = plans.org_id AND p2.span = 'month'
+              WHERE p2.org_id = plans.org_id AND p2.span = 'month' AND p2.status <> 'superseded'
                 AND substr(p2.week_start, 1, 7) = substr(plans.week_start, 1, 7)
-              ORDER BY (p2.status = 'superseded'), p2.created_at DESC, p2.id DESC LIMIT 1);
+              ORDER BY p2.created_at DESC, p2.id DESC LIMIT 1);
 
 UPDATE plans SET source_kinds = CASE WHEN model = 'import' THEN '["csv"]' ELSE '["wizard"]' END;
 
@@ -164,5 +165,7 @@ UPDATE posts SET plan_item_id = (
 UPDATE posts SET plan_item_id = (
   SELECT i.id FROM plan_items i
    WHERE i.plan_id = posts.plan_id AND i.platform = posts.platform AND i.item_key NOT LIKE '#%'
-     AND posts.source_refs LIKE '%"item:' || i.item_key || '"%' LIMIT 1)
+     AND EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(posts.source_refs) THEN posts.source_refs ELSE '[]' END)
+                  WHERE value = 'item:' || i.item_key)
+   ORDER BY i.id LIMIT 1)
  WHERE plan_id IS NOT NULL AND plan_item_id IS NULL;

@@ -13,6 +13,12 @@ import { atomically, type Db } from '../tokens'
 import { changedRows } from '../dbResult'
 import type { Role } from '../ownerEmail'
 import { unschedule, reschedulePost } from '../schedule/job'
+import { storedZone } from '../time/ownerZone'
+import { localParts } from '../time/zone'
+import { planChecks } from './checks'
+import { readRules, reviewCheckInput } from './checkStore'
+import { reviewModel } from './review'
+import { planForId } from './job'
 import { AFTER_SAY, CONFLICT_SAY, afterSave, mayDo, stageOf, type AfterSave, type EditStage } from './rights'
 
 export interface PostChange {
@@ -23,7 +29,7 @@ export interface PostChange {
 }
 
 export type ReviseResult =
-  | { readonly ok: true; readonly rev: number; readonly after: AfterSave; readonly say: string }
+  | { readonly ok: true; readonly rev: number; readonly after: AfterSave; readonly say: string; readonly findings?: readonly string[] }
   | { readonly ok: false; readonly reason: string; readonly conflict?: boolean }
 
 interface PostRow {
@@ -50,6 +56,38 @@ async function readPost(db: Db, org: string, id: string): Promise<PostRow | null
 
 export const TEXT_MAX = 25_000
 
+const two = (n: number): string => String(n).padStart(2, '0')
+
+/** موعدُ البند بساعة المالك (`YYYY-MM-DD HH:MM`) من موعدٍ بتوقيت UTC. */
+async function dueOf(db: Db, utc: string): Promise<string> {
+  const l = localParts(new Date(utc), await storedZone(db))
+  return `${String(l.year)}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}`
+}
+
+/**
+ * **يُعاد الفحصُ فورًا** (DESIGN «التعديل والصلاحيات»): قواعدُ الخطّة على يوم المنشور المعدَّل، وما يخصّه يُقال على شاشة التعديل.
+ * ومنشورٌ بلا خطّة لا فحصَ له، وعطلُ القراءة لا يُفشل حفظًا تمّ.
+ */
+async function recheck(db: Db, org: string, postId: string, now: Date): Promise<string[]> {
+  try {
+    const p = await db.prepare('SELECT plan_id FROM posts WHERE id = ? AND org_id = ?').bind(postId, org).first<{ plan_id: string | null }>()
+    if (p?.plan_id == null) return []
+    const plan = await planForId(db, org, p.plan_id)
+    if (plan === null) return []
+    const model = await reviewModel(db, org, plan)
+    const mine = model.cards.find((c) => c.post?.id === postId)
+    if (mine === undefined) return []
+    const [input, rules] = await Promise.all([reviewCheckInput(db, org, model, await storedZone(db), now), readRules(db, org)])
+    return planChecks(input, rules).filter((f) => f.keys.includes(mine.key)).map((f) => f.message)
+  } catch {
+    return []
+  }
+}
+
+function sayFindings(f: readonly string[]): string {
+  return f.length === 0 ? ' ولا تحذير على يومه.' : ' وفي الفحص: ' + f.slice(0, 3).join('، ') + '.'
+}
+
 /** يعدّل منشورًا بشرط رقم نسخته، ويسجّل التعديل، ويطبّق ما يقع بعد الحفظ. */
 export async function revisePost(
   db: Db, org: string, postId: string, change: PostChange, ifRev: number, actor: string, role: Role, now: Date, reason: string | null = null,
@@ -70,26 +108,29 @@ export async function revisePost(
     try { if (!Array.isArray(JSON.parse(change.mediaJson))) throw new Error() } catch { return { ok: false, reason: 'الوسيط غير مفهوم' } }
   }
   const after = afterSave(role, stage)
-  // ‏المجدوَلُ يُسحب أوّلًا: نصٌّ لم يُعتمد لا يبقى في الطابور لحظةً
-  if (stage === 'scheduled') {
-    const pulled = await unschedule(db, postId, org)
-    if (!pulled.ok) return pulled
-  }
   const next = {
     text: change.text ?? row.text,
     media_json: change.mediaJson ?? row.media_json,
     scheduled_at: change.scheduledAt ?? row.scheduled_at,
   }
-  const status = after === 'recheck' ? row.status : after === 'await' ? 'edited' : 'approved'
+  // ‏`await` مسوّدةٌ بلا اعتماد: «edited» حالٌ معتمَدةٌ يجدولها `schedulePlan`، فلا يخرج نصٌّ لم يعتمده ناشر باسم من اعتمد قبله
+  const status = after === 'recheck' ? row.status : after === 'await' ? 'draft' : 'approved'
   const reapprove = after === 'pull_reapprove'
+  const clearApproval = after === 'await'
+  const pull = stage === 'scheduled'
+  // ‏**السحبُ والتعديلُ في جملةٍ واحدة بشرط النسخة** (لا `unschedule` قبلها): تعديلٌ خسر السباق لا يُخرج المنشور من الطابور ولا يُضيّع خانته
   const done = await db.prepare(
     `UPDATE posts SET text = ?, media_json = ?, scheduled_at = ?, status = ?, rev = rev + 1, edited_in_sada = 1,
+            account_id = CASE WHEN ? THEN NULL ELSE account_id END,
+            enqueued_for = CASE WHEN ? THEN NULL ELSE enqueued_for END,
             copy_origin = CASE WHEN copy_origin IS NOT NULL AND ? THEN 'manual' ELSE copy_origin END,
-            approved_by = CASE WHEN ? THEN ? ELSE approved_by END,
-            approved_at = CASE WHEN ? THEN ? ELSE approved_at END
-      WHERE id = ? AND org_id = ? AND rev = ? AND status <> 'published'`,
-  ).bind(next.text, next.media_json, next.scheduled_at, status, change.text !== undefined ? 1 : 0,
-    reapprove ? 1 : 0, actor, reapprove ? 1 : 0, now.toISOString(), postId, org, ifRev).run()
+            approved_by = CASE WHEN ? THEN ? WHEN ? THEN NULL ELSE approved_by END,
+            approved_at = CASE WHEN ? THEN ? WHEN ? THEN NULL ELSE approved_at END
+      WHERE id = ? AND org_id = ? AND rev = ? AND status = ? AND status <> 'published'
+        AND (? = 0 OR (status = 'queued' AND dispatched_at IS NULL))`,
+  ).bind(next.text, next.media_json, next.scheduled_at, status, pull ? 1 : 0, pull ? 1 : 0, change.text !== undefined ? 1 : 0,
+    reapprove ? 1 : 0, actor, clearApproval ? 1 : 0, reapprove ? 1 : 0, now.toISOString(), clearApproval ? 1 : 0,
+    postId, org, ifRev, row.status, pull ? 1 : 0).run()
   if (!changedRows(done)) return { ok: false, reason: CONFLICT_SAY, conflict: true }
   const stmts = [
     db.prepare(`INSERT INTO plan_edits (id, org_id, target_kind, target_id, rev, actor, at, before_json, after_json, reason)
@@ -97,11 +138,14 @@ export async function revisePost(
       .bind(crypto.randomUUID(), org, postId, row.rev, actor, now.toISOString(), snapshot(row), snapshot(next), reason),
   ]
   if (row.plan_item_id !== null) {
-    stmts.push(db.prepare(`UPDATE plan_items SET copy = ?, rev = rev + 1, edited_in_sada = 1, updated_at = datetime('now') WHERE id = ? AND org_id = ?`)
-      .bind(next.text, row.plan_item_id, org))
+    // ‏والبندُ يتبع منشورَه: نصُّه وموعدُه بساعة المالك، فلا يفترقان
+    const due = change.scheduledAt === undefined ? null : await dueOf(db, change.scheduledAt)
+    stmts.push(db.prepare(`UPDATE plan_items SET copy = ?, due_local = coalesce(?, due_local), rev = rev + 1, edited_in_sada = 1, updated_at = datetime('now') WHERE id = ? AND org_id = ?`)
+      .bind(next.text, due, row.plan_item_id, org))
   }
   await atomically(db, stmts)
-  return { ok: true, rev: row.rev + 1, after, say: AFTER_SAY[after] }
+  const findings = await recheck(db, org, postId, now)
+  return { ok: true, rev: row.rev + 1, after, say: AFTER_SAY[after] + sayFindings(findings), findings }
 }
 
 export interface EditEntry {
@@ -134,14 +178,20 @@ export async function postHistory(db: Db, org: string, postId: string): Promise<
 }
 
 /** «استعد هذه النسخة»: يعيد ما كان قبل تعديلٍ مسجَّل، تعديلًا جديدًا بشرط النسخة الحاليّة. */
-export async function restoreEdit(db: Db, org: string, editId: string, ifRev: number, actor: string, role: Role, now: Date): Promise<ReviseResult> {
+export async function restoreEdit(
+  db: Db, org: string, editId: string, ifRev: number, actor: string, role: Role, now: Date,
+  /** المنشورُ الذي في النموذج: نسخةٌ لمنشورٍ غيرِه تُردّ، فلا يُستعاد منشورٌ ويُسجَّل غيرُه. */
+  expect: string | null = null,
+): Promise<ReviseResult & ({ readonly ok: false } | { readonly target: string })> {
   const verdict = mayDo(role, 'restore')
   if (!verdict.ok) return verdict
   const e = await db.prepare("SELECT target_id, rev, before_json FROM plan_edits WHERE id = ? AND org_id = ? AND target_kind = 'post'")
     .bind(editId, org).first<{ target_id: string; rev: number; before_json: string }>()
   if (e === null) return { ok: false, reason: 'لا نسخة بهذا المعرّف' }
+  if (expect !== null && expect !== e.target_id) return { ok: false, reason: 'هذه النسخة لمنشورٍ آخر. افتح سجلّ منشورها.' }
   const before = parse(e.before_json)!
-  return revisePost(db, org, e.target_id, before, ifRev, actor, role, now, `استعادة النسخة ${e.rev}`)
+  const r = await revisePost(db, org, e.target_id, before, ifRev, actor, role, now, `استعادة النسخة ${e.rev}`)
+  return r.ok ? { ...r, target: e.target_id } : r
 }
 
 /** في آخر ربع ساعة: «أوقف» يسحبه من الطابور، و«أجّل» يؤخّر موعده بالدقائق. ولا يُمسّ النصّ. */

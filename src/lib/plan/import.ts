@@ -260,6 +260,13 @@ export interface PlanFacts {
 const norm = (s: string): string => s.trim().replace(/\s+/g, ' ').toLowerCase()
 
 /** «2026-10-12 06:30:00» بـ UTC إلى «2026-10-12 09:30» بمنطقة المالك. */
+/** ساعةُ المالك من موعدٍ بتوقيت UTC (`YYYY-MM-DDTHH:MM`)، كما يحسبها `dueLocalOf`: ساعاتُ الهدوء واليومُ تُقاس بها. */
+function ownerLocal(whenUtc: string, zone: string): string {
+  const l = localParts(new Date(whenUtc + ':00Z'), zone === '' ? null : zone)
+  const two = (n: number): string => String(n).padStart(2, '0')
+  return `${String(l.year)}-${two(l.month)}-${two(l.day)} ${two(l.hour)}:${two(l.minute)}`
+}
+
 function localStamp(dbAt: string, zone: string): string {
   const p = localParts(new Date(`${dbAt.replace(' ', 'T')}Z`), zone)
   const two = (n: number): string => String(n).padStart(2, '0')
@@ -521,7 +528,7 @@ export async function applyPlan(
     // ‏وسيطتُه من مكتبة Drive (D-363) تُربط كما يُختار من المكتبة — ولا تُولَّد له صورة
     const drive = driveMediaRow(db, org, postId, row)
     if (drive !== null) await drive.run()
-    pending.push({ at: out.length, line: row.line, slot: { id: postId, account: row.accountId, at: row.whenUtc, local: row.local ?? row.whenUtc.replace('T', ' '), exact: true } })
+    pending.push({ at: out.length, line: row.line, slot: { id: postId, account: row.accountId, at: row.whenUtc, local: row.local ?? ownerLocal(row.whenUtc, row.zone), exact: true } })
     out.push({ line: row.line, result: 'failed', reason: '' })
   }
   if (pending.length === 0) return out

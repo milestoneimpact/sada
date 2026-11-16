@@ -87,14 +87,15 @@ export function packageKey(org: string, period: string, item: string, platform: 
 export async function packagePosts(db: Db, org: string): Promise<PackagePost[]> {
   const { results } = await db.prepare(
     `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin, edited_in_sada FROM posts
-      WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC LIMIT 800`,
+      WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC, rowid ASC LIMIT 800`,
   ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null; edited_in_sada: number }>()
   const latest = new Map<string, PackagePost>()
   for (const r of results) {
     const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin, editedInSada: r.edited_in_sada === 1 }
     const k = p.period + '|' + p.item + '|' + p.platform
-    // ‏المؤرشفُ لا يُحدَّث إن جاء بعده حيّ
-    if (latest.get(k) === undefined || p.status !== 'rejected') latest.set(k, p)
+    // ‏المؤرشفُ لا يغلب حيًّا قبله، لكنّ الأحدثَ من مؤرشفَين يغلب: منه يُبنى مفتاحُ العائد ثالثةً، فلا يصطدم بمفتاح الثاني
+    const had = latest.get(k)
+    if (had === undefined || p.status !== 'rejected' || had.status === 'rejected') latest.set(k, p)
   }
   return [...latest.values()]
 }

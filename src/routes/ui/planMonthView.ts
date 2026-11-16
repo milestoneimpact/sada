@@ -70,6 +70,8 @@ export interface MonthScreenData {
   readonly diff: readonly DiffRow[]
   readonly approval: string
   readonly canApprove: boolean
+  /** «ألغِ جدولة الشهر» و«افتح الإصدار» للناشر فأعلى بعد الاعتماد. */
+  readonly canRollback?: boolean
   readonly prev: string
   readonly next: string
 }
@@ -97,10 +99,16 @@ export function monthScreen(d: MonthScreenData): string {
     return head + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ادفع ملفّ ${d.period} إلى 01-plan، أو ابدأ خطّة جديدة.</p>
       <div class="row">${raw(button({ label: 'خطّة جديدة', href: '/panel/plan/new' }))}</div>`.value })
   }
+  const ids = html`<input type="hidden" name="id" value="${d.planId}"><input type="hidden" name="p" value="${d.period}">`
+  const rollback = d.canRollback === true && !d.canApprove
+    ? html`<div class="row mt-2"><form class="inline" method="POST" action="/panel/plan/month/unschedule" data-busy="تُلغى الجدولة…">${ids}${raw(button({ label: 'ألغِ جدولة الشهر', size: 'sm', type: 'submit', variant: 'secondary' }))}</form>
+        <form class="inline" method="POST" action="/panel/plan/month/reopen" data-busy="يُفتح…">${ids}${raw(button({ label: 'افتح الإصدار', size: 'sm', type: 'submit', variant: 'quiet' }))}</form></div>
+        <p class="hint m-0">«افتح الإصدار» يعيد المعتمَد مسوّدةً بإصدارٍ جديد، والمجدوَل يُلغى أوّلًا.</p>`
+    : html``
   const approve = html`<p class="m-0" role="status"><b>${d.approval}</b></p>${d.canApprove
-    ? html`<form method="POST" action="/panel/plan/approve" data-busy="يُعتمد…"><input type="hidden" name="id" value="${d.planId}"><div class="row">${raw(button({ label: 'اعتمد وجدول', type: 'submit' }))}
+    ? html`<form method="POST" action="/panel/plan/month/approve" data-busy="يُعتمد…">${ids}<div class="row">${raw(button({ label: 'اعتمد وجدول', type: 'submit' }))}
         ${raw(button({ label: 'راجع البنود', href: '/panel/plan/review?id=' + d.planId, variant: 'secondary' }))}</div></form>`
-    : html`<p class="hint">الاعتماد للناشر فأعلى.</p>`}`
+    : d.canRollback === true ? html`` : html`<p class="hint">الاعتماد للناشر فأعلى.</p>`}${rollback}`
   return head + nav + checksStrip(d.checks) + '<div class="mt-3">' + card({ title: 'التقويم', body: monthCalendar(d) }) + '</div>' +
     (d.diff.length === 0 ? '' : '<div class="mt-3">' + diffCard(d.diff) + '</div>') +
     '<div class="mt-3">' + card({ title: 'الاعتماد', body: approve.value }) + '</div>'

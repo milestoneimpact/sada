@@ -11,7 +11,8 @@ const NOW = new Date('2099-01-01T08:00:00Z')
 describe('المرحلة من حال المنشور وموعده', () => {
   it('آخر 15 دقيقة تجميد، وما قبلها مجدوَل، والمرسَل مجمَّد', () => {
     expect(stageOf({ status: 'draft' }, NOW)).toBe('draft')
-    expect(stageOf({ status: 'edited' }, NOW)).toBe('draft')
+    // ‏«edited» حالٌ معتمَدةٌ يجدولها `schedulePlan`، فمرحلتُها «معتمَد»
+    expect(stageOf({ status: 'edited' }, NOW)).toBe('approved')
     expect(stageOf({ status: 'approved' }, NOW)).toBe('approved')
     expect(stageOf({ status: 'queued', scheduled_at: '2099-01-01T08:16:00Z' }, NOW)).toBe('scheduled')
     expect(stageOf({ status: 'queued', scheduled_at: '2099-01-01T08:15:00Z' }, NOW)).toBe('frozen')
@@ -62,8 +63,8 @@ const seed = (status: string, at: string | null = null): void => {
     VALUES ('p1', 'x', 'text', 'النصّ الأوّل', '${status}', 'k1', 'o', ${at === null ? 'NULL' : `'${at}'`}, 'a1',
       ${status === 'draft' ? 'NULL' : "'owner'"}, ${status === 'draft' ? 'NULL' : "'2098-12-31T00:00:00Z'"})`)
 }
-const post = () => db.raw.prepare('SELECT status, text, rev, edited_in_sada, scheduled_at FROM posts WHERE id = ?').get('p1') as
-  { status: string; text: string; rev: number; edited_in_sada: number; scheduled_at: string | null }
+const post = () => db.raw.prepare('SELECT status, text, rev, edited_in_sada, scheduled_at, approved_by, account_id FROM posts WHERE id = ?').get('p1') as
+  { status: string; text: string; rev: number; edited_in_sada: number; scheduled_at: string | null; approved_by: string | null; account_id: string | null }
 
 beforeEach(() => { db = fakeDb() })
 
@@ -95,12 +96,28 @@ describe('التعديل والسجلّ والاستعادة', () => {
   it('تعديلٌ على معتمَد يرجعه «ينتظر الاعتماد»', async () => {
     seed('approved')
     expect(await revisePost(db, 'o', 'p1', { text: 'جديد' }, 1, 'e', 'editor', NOW)).toMatchObject({ ok: true, after: 'await' })
-    expect(post().status).toBe('edited')
+    // ‏مسوّدةٌ بلا اعتماد: «edited» حالٌ يجدولها المُجدوِل، فلا تُترك عليها
+    expect(post()).toMatchObject({ status: 'draft', approved_by: null })
   })
   it('مجدوَلٌ يعدّله المحرّر يُسحب من الطابور وينتظر الاعتماد', async () => {
     seed('queued', '2099-01-02T08:00:00Z')
     expect(await revisePost(db, 'o', 'p1', { text: 'جديد' }, 1, 'e', 'editor', NOW)).toMatchObject({ ok: true, after: 'await' })
-    expect(post().status).toBe('edited')
+    expect(post()).toMatchObject({ status: 'draft', approved_by: null, account_id: null })
+  })
+  it('تعديلٌ خسر السباق على مجدوَل لا يسحبه من الطابور', async () => {
+    seed('queued', '2099-01-02T08:00:00Z')
+    // ‏غيرُه رفع النسخة بين القراءة والكتابة: يُقرأ رقمٌ قديم، والجملةُ الواحدة تردّه ويبقى في موعده
+    db.raw.exec("UPDATE posts SET rev = 2 WHERE id = 'p1'")
+    expect(await revisePost(db, 'o', 'p1', { text: 'جديد' }, 1, 'p', 'publisher', NOW)).toMatchObject({ ok: false, conflict: true })
+    expect(post()).toMatchObject({ status: 'queued', account_id: 'a1', text: 'النصّ الأوّل' })
+    expect(await postHistory(db, 'o', 'p1')).toHaveLength(0)
+  })
+  it('نسخةٌ لمنشورٍ آخر لا تُستعاد باسم هذا', async () => {
+    seed('draft')
+    await revisePost(db, 'o', 'p1', { text: 'ب' }, 1, 'a', 'owner', NOW)
+    const h = await postHistory(db, 'o', 'p1')
+    expect(await restoreEdit(db, 'o', h[0]!.id, 2, 'a', 'owner', NOW, 'غيره')).toMatchObject({ ok: false })
+    expect(await restoreEdit(db, 'o', h[0]!.id, 2, 'a', 'owner', NOW, 'p1')).toMatchObject({ ok: true, target: 'p1' })
   })
   it('مجدوَلٌ يعدّله الناشر يُسحب ويُعتمد من جديد', async () => {
     seed('queued', '2099-01-02T08:00:00Z')

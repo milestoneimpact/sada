@@ -112,7 +112,11 @@ function readRefs(raw: string | null): string[] {
  * **المُجدوِلُ الواحد للخطّة** (D-383 · المرحلة ٦): كلُّ معتمَدٍ من الخطّة إلى موعد بنده بمنطقة المالك، ثمّ `arrangeSlots`
  * (التباعد والتذبذب وساعات الهدوء)، ثمّ `schedulePost` بحرّاسها. **وموعدٌ مضى يُعرض ولا يُرحَّل** صامتًا.
  */
-export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: Date): Promise<PlanSchedule> {
+export async function schedulePlan(
+  db: Db, org: string, plan: StoredPlan, now: Date,
+  /** مفاتيحُ بنودٍ منعها الفحص (`blockedKeys`، بصيغة `itemKey` في review.ts): تبقى معتمَدةً بلا موعد ويُقال سببُها. */
+  blocked: ReadonlySet<string> = new Set(),
+): Promise<PlanSchedule> {
   const { results: posts } = await db
     .prepare("SELECT id, platform, source_id, source_refs, idempotency_key FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
     .bind(org, plan.id)
@@ -126,6 +130,7 @@ export async function schedulePlan(db: Db, org: string, plan: StoredPlan, now: D
     // ‏ومسوّدةُ فكرةٍ بلا مصدر (D-282): معرّفُ بندها `idea:<n>` في `source_refs`
     const item = plan.plan.items.find((i) => itemOwns(i, post))
     if (item === undefined) { skipped.push({ postId: post.id, reason: 'بندُه حُذف من الخطّة — جدوِله من بطاقته' }); continue }
+    if (blocked.size > 0 && blocked.has(`${item.id ?? item.sourceId}|${item.platform}|${item.day}|${item.time}`)) { skipped.push({ postId: post.id, reason: 'منعه الفحص، فأصلحه من شريط التحذيرات' }); continue }
     if (!peaks.has(post.platform)) peaks.set(post.platform, (await readPeaks(db, org, post.platform)).hours[0]?.hour ?? null)
     if (!accounts.has(post.platform)) {
       const acc = await db

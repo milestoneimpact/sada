@@ -45,7 +45,8 @@ export function stageOf(post: { readonly status: string; readonly scheduled_at?:
     const at = post.scheduled_at ? Date.parse(post.scheduled_at) : NaN
     return Number.isFinite(at) && at - now.getTime() <= FREEZE_MINUTES * 60_000 ? 'frozen' : 'scheduled'
   }
-  if (post.status === 'approved') return 'approved'
+  // ‏و«edited» حالٌ معتمَدةٌ يجدولها `schedulePlan`، فتُعامَل معاملةَ المعتمَد: تعديلُ المحرّر عليها يرجعها «ينتظر الاعتماد»
+  if (post.status === 'approved' || post.status === 'edited') return 'approved'
   return 'draft'
 }
 

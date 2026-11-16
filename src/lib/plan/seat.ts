@@ -289,16 +289,25 @@ export async function seatPlan(
 
   // ‏**إصدارٌ جديد لا حذف** (D-383): `(org_id, week_start, span)` فريد، فخطّةُ المدى نفسِه تُحدَّث في مكانها برقم إصدارٍ أعلى.
   // ‏وما ثُبّت منها قبلُ محفوظٌ في `plan_versions`، ومسوّداتُها السابقة تبقى في المنشورات بلا خطّة كما كانت بعد الحذف
-  const existing = await db
-    .prepare('SELECT id, version, plan_json, locked_at FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
-    .bind(org, start, span).first<{ id: string; version: number; plan_json: string; locked_at: string | null }>()
-  const planId = existing?.id ?? crypto.randomUUID()
-  const jobId = crypto.randomUUID()
+  type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
+  const sameSpan = await db
+    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
+    .bind(org, start, span).first<Existing>()
   const months = [...new Set(rowsOf.map((x) => x.n?.period ?? x.item.day.slice(0, 7)))]
   const period = span === 'month' && months.length === 1 ? months[0]! : null
+  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
+  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
+  const holder = period === null ? null : await db
+    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
+    .bind(org, period).first<Existing>()
+  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
+  const existing = intoPackage ? holder : sameSpan
+  const planId = existing?.id ?? crypto.randomUUID()
+  const jobId = crypto.randomUUID()
   const periodFree = period === null ? false : (await db.prepare('SELECT id FROM plans WHERE org_id = ? AND period = ? AND id <> ?')
     .bind(org, period, planId).first<{ id: string }>()) === null
   const planPeriod = periodFree ? period : null
+  const keepPackage = existing?.model === 'package'
   const itemRows = rowsOf.map(({ item, n }) => ({ id: crypto.randomUUID(), item, n }))
   // ‏المسوّدةُ تشير إلى بندها (`posts.plan_item_id`) بمرجعها
   for (const p of posts) p.itemId = itemRows.find((x) => x.item.sourceId === p.ref)!.id
@@ -313,12 +322,15 @@ export async function seatPlan(
         .bind(crypto.randomUUID(), planId, existing.version, existing.plan_json, org, org, planId))
     }
     statements.push(
-      db.prepare('UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ?').bind(org, planId),
+      // ‏ومنشوراتُ بنود الحزمة تبقى على خطّتها: الاستيرادُ يستبدل صفوفَه وحدها
+      db.prepare(`UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ?
+                    AND NOT EXISTS (SELECT 1 FROM plan_items i WHERE i.id = posts.plan_item_id AND i.source_kind = 'github')`).bind(org, planId),
       // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)
       db.prepare("DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github'").bind(org, planId),
-      db.prepare(`UPDATE plans SET plan_json = ?, model = 'import', status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL,
+      // ‏وخطّةُ الحزمة تبقى خطّةَ حزمة، ويُضاف مصدرُ الملفّ إلى مصادرها
+      db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL,
                          created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)
-        .bind(planJson, JSON.stringify(choices), planPeriod, JSON.stringify([kind]), planId, org),
+        .bind(planJson, keepPackage ? 1 : 0, JSON.stringify(choices), planPeriod, JSON.stringify(keepPackage ? ['github', kind] : [kind]), planId, org),
     )
   } else {
     statements.push(db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, period, source_kinds) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?, ?, ?)")
