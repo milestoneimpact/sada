@@ -1094,11 +1094,16 @@ plan.post('/panel/plan/import/confirm', async (c) => {
   const facts = await planFacts(c.env, org, c.req.header('Cookie') ?? null, new Date())
   // ‏«اكتب من الفكرة» (D-361): نداءٌ مدفوعٌ لكلّ بند، بضغطة المالك وعددُه على الزرّ (D-006 · D-008)
   const write = gate.form.get('write') === '1'
-  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write)
+  // ‏ومصدرُه في `import_jobs` (D-383): الجدولُ ملفٌّ، وما استخرجه النموذجُ نصّ
+  const seated = await seatPlan(c.env.DB, org, csv, facts, filled, imageStyle, p.rules ?? null, write, { kind: table.via === 'model' ? 'text' : 'csv' })
   await record(c.env.DB, {
     actor: 'panel', action: write ? 'plan.import.write' : 'plan.import.seat', target: seated.planId,
     detail: table.via + ' · ' + String(seated.seated) + ' سُكّنت · ' + String(seated.skipped.length) + ' تعذّرت',
   }, c.req.raw)
+  if (seated.unchanged === true) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'هذه الخطّةُ نفسُها سُكّنت من قبل، فلم يتغيّر شيء. عدّل الملفّ ثمّ ارفعه، أو راجع خطّتك.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
   if (seated.planId === null) {
     return bad('لم يُسكَّن شيء: ' + seated.skipped.slice(0, 3).map((x) => (x.line > 1 ? 'السطر ' + String(x.line) + ' ' : '') + '(' + x.reason + ')').join('، '))
   }
