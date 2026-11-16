@@ -423,7 +423,8 @@ export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan 
     const row = await db
       .prepare(
         `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
-          WHERE org_id = ? AND status <> 'superseded' ORDER BY week_start DESC, created_at DESC LIMIT 1`,
+          WHERE org_id = ? AND status <> 'superseded' AND model <> 'package' -- ‏خطّةُ الحزمة المعبّأة (0061) لا تُعرض قبل المرحلة ٧
+          ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
       .bind(org)
       .first<Record<string, string>>()

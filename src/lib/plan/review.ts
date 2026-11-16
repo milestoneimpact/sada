@@ -61,6 +61,8 @@ export interface PlanVersion {
   readonly lockedBy: string | null
   readonly scheduled: number
   readonly items: number
+  /** الاستيرادُ الذي صنع الإصدار (D-383 · 0061)، وغيابُه إصدارٌ من المعالج أو قبل 0061. */
+  readonly importJobId?: string
 }
 
 export interface ReviewModel {
@@ -92,9 +94,9 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
       .bind(org, plan.id)
       .all<{ id: string; post_id: string; mime: string; width: number | null; height: number | null }>().then((r) => r.results).catch(() => []),
-    db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
+    db.prepare('SELECT version, plan_json, scheduled, locked_by, locked_at, import_job_id FROM plan_versions WHERE org_id = ? AND plan_id = ? ORDER BY version DESC')
       .bind(org, plan.id)
-      .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string }>()
+      .all<{ version: number; plan_json: string; scheduled: number; locked_by: string | null; locked_at: string; import_job_id?: string | null }>()
       .then((r) => r.results).catch(() => []),
     draftFailures(db, org, plan.id),
   ])
@@ -140,7 +142,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     versions: versions.map((v) => {
       let items = 0
       try { items = (JSON.parse(v.plan_json) as { items?: unknown[] }).items?.length ?? 0 } catch { items = 0 }
-      return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items }
+      return { version: v.version, lockedAt: v.locked_at, lockedBy: v.locked_by, scheduled: v.scheduled, items, ...(v.import_job_id == null ? {} : { importJobId: v.import_job_id }) }
     }),
   }
 }
