@@ -1716,8 +1716,8 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
 
   it('نصف القطر من القائمة المغلقة، بالدور', () => {
     const r = css.rule(':root')
-    // ‏والزرّ ‏10 والبطاقة ‏14 والبطل ‏20 منذ D-246
-    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-hero'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '10px', '14px', '20px', '16px', '999px'])
+    // ‏والزرّ ‏10 والبطل ‏20 منذ D-246، والبطاقة ‏16 بمواصفات إعادة التصميم v1 (§3.4)
+    expect([r['--r-inline'], r['--r-control'], r['--r-card'], r['--r-hero'], r['--r-sheet'], r['--r-pill']]).toEqual(['4px', '10px', '16px', '20px', '16px', '999px'])
     // ‏وكلُّ زاويةٍ من القائمة: الورقةُ السفليّة ‏١٦ في زاويتيها العلويّتين وصفرٌ في السفليّتين (D-189)
     const values = new Set(css.decls().filter((d) => d.prop === 'border-radius').map((d) => d.value))
     expect([...values].filter((v) => !v.split(' ').every((p) => /^(0|50%|var\(--r-(inline|control|card|hero|sheet|pill)\))$/.test(p)))).toEqual([])
@@ -1729,7 +1729,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
 
   it('رموز التخطيط بقيمتيها، ونقاط الانكسار ثلاث من «BP»', () => {
     expect(css.rule(':root')).toMatchObject({
-      '--pad-card': 'var(--s-6d)', '--gap-card': 'var(--s-6d)', '--gap-section': 'var(--s-12d)', '--gutter': 'var(--s-8d)',
+      '--pad-card': 'var(--s-6d)', '--gap-card': 'var(--s-4d)', '--gap-section': 'var(--s-8d)', '--gutter': 'var(--s-8d)',
     })
     expect(css.rule(':root', `@media${below('sm')}`)).toMatchObject({
       '--pad-card': 'var(--s-4)', '--gap-card': 'var(--s-4)', '--gap-section': 'var(--s-8)', '--gutter': 'var(--s-4)',
