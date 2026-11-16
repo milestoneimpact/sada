@@ -1545,11 +1545,11 @@ describe('المرحلة ٠ — الإتقان السريع (D-183)', () => {
   })
 
   it('التحذير برتقاليّ بعيد عن النحاس، ولا إطار مكتوبًا بلونه في الوسم', () => {
-    expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fef3c7'])
-    // ‏**مجمَّدان** (D-196): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
+    expect([THEME.light['--warn'], THEME.light['--warn-wash']]).toEqual(['#b45309', '#fef6e6'])
+    // ‏**مثبَّتان** (D-196، ثمّ أُدفئت الأرضُ وأُعتمت أرضُ تحذير الليل في D-381): حبّةُ تحذير الليل على أرضها على الحدّ (Lc ‏٥٠)، وبُعدُه عن الذهب على الحدّ
     // ‏(ΔE_OK ‏٩٫٥)؛ وأرضُ النهار والتحذيرُ عليها على الحدّ (‏4.5:1). من يدفئ الأرضَ أو يُميل التحذيرَ يبدّل هنا
-    expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f2823b', '#231206'])
-    expect(THEME.light['--bg']).toBe('#f4f7f6')
+    expect([THEME.dark['--warn'], THEME.dark['--warn-wash']]).toEqual(['#f2823b', '#241707'])
+    expect(THEME.light['--bg']).toBe('#f6f5f1')
     const now = new Date('2026-09-27T12:00:00Z')
     const html = channelsSection(viewChannels([{
       id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
@@ -1667,20 +1667,21 @@ describe('الإشعار لا يغطّي البتّ، والرابط لا يُف
  */
 describe('المرحلة ٢أ — الرموز (D-187)', () => {
   it('اللوحة من القسم 3.2 قيمةً قيمة في الوضعين', () => {
-    // ‏اللوحةُ من لوحة الهويّة (D-196 · docs/BRAND.md): ورقٌ على رمل نهارًا، وأرضُ الغلاف ليلًا
+    // ‏اللوحةُ من مواصفات v1 §3.1–3.2 (D-381): أدفأ نهارًا، وما لا يبلغ ‏4.5:1 منها أُخذ أقربَ قيمةٍ تبلغه
     expect(THEME.light).toMatchObject({
-      '--bg': '#f4f7f6', '--surface': '#ffffff', '--surface-2': '#eef3f2', '--surface-3': '#e4ecea',
-      '--line': '#dde6e4', '--line-soft': '#eaf0ef', '--field': '#5a6b6a',
-      '--ink': '#0f1d1e', '--ink-2': '#3a4b4a', '--ink-3': '#4f605f',
+      '--bg': '#f6f5f1', '--surface': '#ffffff', '--surface-2': '#f1f0eb', '--surface-3': '#e8e6df',
+      '--line': '#e4e1d8', '--line-soft': '#efede7', '--field': '#5a6b6a',
+      '--ink': '#0f1d1e', '--ink-2': '#3a4b4a', '--ink-3': '#596866',
       '--brand': '#0e6b64', '--brand-hover': '#0b5c56', '--brand-press': '#084b46', '--on-brand': '#ffffff',
       '--link': '#0e6b64', '--selected': '#e9f3f1', '--selection': '#cceae7', '--au': '#7b5e20',
-      '--ok': '#065f46', '--ok-wash': '#d1fae5', '--bad': '#991b1b', '--bad-wash': '#fee2e2',
+      '--ok': '#0f7a52', '--ok-wash': '#e3f4ec', '--bad': '#b42318', '--bad-wash': '#fdeceb',
+      '--idle': '#596866', '--idle-wash': '#eeeeea',
     })
     expect(THEME.dark).toMatchObject({
-      '--bg': '#0a1213', '--surface': '#121d1e', '--surface-2': '#18272a', '--surface-3': '#1f3134',
-      '--line': '#24363a', '--line-soft': '#1a2a2d', '--field': '#6f8583', '--ink-3': '#93a7a5',
+      '--bg': '#0c1414', '--surface': '#121c1c', '--surface-2': '#182424', '--surface-3': '#1f2d2d',
+      '--line': '#263535', '--line-soft': '#1c2929', '--field': '#768c8a', '--ink-3': '#8c9b99',
       '--brand': '#1a766e', '--brand-hover': '#1c7a72', '--brand-press': '#17736b', '--on-brand': '#ffffff',
-      '--selected': '#16302f', '--selection': '#164a45', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#2a1414', '--ok-wash': '#0f1f17',
+      '--selected': '#16302f', '--selection': '#164a45', '--au': '#c9a96a', '--ok': '#62bc6b', '--bad': '#f49595', '--bad-wash': '#3a1614', '--ok-wash': '#11302a', '--idle': '#93a7a5', '--idle-wash': '#1f2a2a',
     })
     // ‏ورموزُ ما قبل اللوحة لا تعود في أيّ سياق: لا سطحَ ثالثَ ولا حدَّ «أقوى» ولا مادّةَ ولا وهج
     for (const gone of ['--chrome', '--line-strong', '--brand-soft', '--brand-wash', '--glow', '--hair', '--sheen', '--bloom']) {
@@ -1719,7 +1720,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     for (const mode of ['light', 'dark'] as const) {
       expect(Object.keys(THEME[mode]).filter((k) => /^--sh-/.test(k)), mode).toEqual(['--sh-1', '--sh-2', '--sh-3'])
     }
-    expect(THEME.light['--sh-1']).toBe('0 1px 2px rgba(11,47,49,.06), 0 1px 1px rgba(11,47,49,.04)')
+    expect(THEME.light['--sh-1']).toBe('0 1px 0 rgba(15,29,30,.04)')
     expect(THEME.dark['--sh-3']).toBe('0 4px 8px rgba(0,0,0,.5), 0 28px 56px -12px rgba(0,0,0,.7)')
     expect(css.rule('.ch:hover', '@media(hover:hover)')).toMatchObject({
       'box-shadow': 'var(--sh-2)', 'border-color': 'var(--field)',

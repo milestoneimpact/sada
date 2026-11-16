@@ -99,7 +99,7 @@ a.pill::after{content:''; position:absolute; inset:50% 0 auto; height:var(--tap)
 /* ── والإشعارُ يطفو حين يعمل السكربت (الخطّة 5.9 و7.8) ─────────────────
    كان في رأس المحتوى وحدَه، والفعل يعود إلى بطاقته في وسط اللوح — فبعد «اعتمد»
    أو رفع خطّة تُردّ كان الإشعار عند ‏-4445px، فوق الشاشة، **والمالك يرى البطاقة
-   كأنّ شيئًا لم يقع**. فيطفو أعلى الشاشة في الجوّال، وفي الزاوية السفليّة على الحاسوب.
+   كأنّ شيئًا لم يقع**. فيطفو أعلى الشاشة في الجوّال، وأسفلَها في الوسط على الحاسوب.
    **وبلا سكربتٍ يبقى في مكانه**: الصنفُ يضعه السكربتُ مع زرّ «أغلق» ومهلته، فلا
    إشعار عائم لا يُغلَق. والحاوية لا تأخذ النقر — ما فيها وحدَه يأخذه.
 
@@ -116,7 +116,8 @@ a.pill::after{content:''; position:absolute; inset:50% 0 auto; height:var(--tap)
   border:var(--bd); border-radius:var(--r-card); box-shadow:var(--sh-2)}
 .toast-x{flex:none; margin-inline-start:auto}
 @media${atLeast('md')}{
-  .toast{inset-inline-start:auto; inset-inline-end:var(--s-6); top:auto; bottom:var(--s-6); max-width:var(--measure)}
+  /* ‏وعلى العريض أسفلَ الشاشة في وسطها (مواصفات v1 §5.10 · D-381): الطرفان صفرٌ والهامشُ «auto» يوسّطانه */
+  .toast{inset-inline:0; margin-inline:auto; top:auto; bottom:var(--s-6); max-width:var(--measure)}
 }
 
 section[hidden]{display:none}

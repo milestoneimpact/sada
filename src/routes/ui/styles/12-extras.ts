@@ -623,7 +623,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .lib-tag-edit{min-width:0}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
-.rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}
+.rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-control); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}
 @media(hover:hover){.rv-tag:hover{text-decoration:line-through}}
 .rv-add{margin-top:var(--s-4)}
 .rv-add-f{display:grid; gap:var(--s-3); padding-top:var(--s-3)}

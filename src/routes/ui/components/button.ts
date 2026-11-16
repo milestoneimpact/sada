@@ -9,6 +9,8 @@
  *   btn-secondary  أرضُ السطح وحدُّ «--field» (‏3:1) — البدائل
  *   btn-quiet      بلا أرضٍ ولا حدّ، حبرُ الرابط وخطٌّ تحته دائمًا — «اعرض الكلّ»
  *   btn-danger     ثانويٌّ بحبر «--bad» — «احذف» و«ارفض»
+ *   danger-solid   الخطِرُ مصمتًا («btn-danger btn-danger-solid») — زرُّ التأكيد في حوار ما لا رجعةَ فيه وحدَه (v1 §5.1)
+ *   btn-ghost      بلا أرضٍ ولا حدّ، حبرُ المتن و«--surface-2» عند التمرير — فعلٌ داخل البطاقة والجدول (v1 §5.1)
  *   btn-icon       مربّعُ ‏٤٤ بلا نصٍّ ظاهر، واسمُه في «aria-label» — الإغلاق والقائمة
  *   btn-sm         حشوٌ أضيق بقامة الهدف نفسِها (‏٤٤ على كلّ عرض)
  *   btn-lg         قامةُ ‏٤٨ وحشوٌ أوسع — للفعل الواحد في شاشةٍ فارغة (مواصفات v1 §5.1)
@@ -19,12 +21,14 @@
  */
 import { escapeHtml } from '../escape'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'quiet' | 'danger' | 'icon'
+export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'quiet' | 'danger' | 'danger-solid' | 'icon'
 export type ButtonSize = 'md' | 'sm' | 'lg'
 
 /** صنفُ الزرّ بدرجته ومقاسه — **لمن يكتب الوسمَ بيده** في صفٍّ لا يسعه الكائن. */
 export function btnClass(variant: ButtonVariant, size: ButtonSize = 'md'): string {
-  return `btn btn-${variant}${size === 'md' ? '' : ' btn-' + size}`
+  // ‏والمصمتُ يحمل صنفَ الخطِر معه: السكربتُ يعرف الخطِرَ بـ«btn-danger» (`scripts.ts`) فيسأل قبل الفعل
+  const v = variant === 'danger-solid' ? 'danger btn-danger-solid' : variant
+  return `btn btn-${v}${size === 'md' ? '' : ' btn-' + size}`
 }
 
 export interface ButtonInput {

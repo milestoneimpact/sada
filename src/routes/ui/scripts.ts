@@ -100,7 +100,7 @@ export const CONFIRM_SCRIPT = `
     from=opener; go=then;
     dlg.querySelector('.dlg-t').textContent=msg;
     var ok=dlg.querySelector('[data-cf=ok]'), no=dlg.querySelector('[data-cf=no]');
-    ok.className='btn '+(danger?'btn-danger':'btn-primary'); ok.textContent=label||'تابع';
+    ok.className='btn '+(danger?'btn-danger btn-danger-solid':'btn-primary'); ok.textContent=label||'تابع';
     if(typeof dlg.showModal==='function'){if(!dlg.open)dlg.showModal();}else dlg.setAttribute('open','');
     (danger?no:ok).focus();
   }

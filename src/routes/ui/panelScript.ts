@@ -407,7 +407,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         setTimeout(function(){flashBox.appendChild(note);},150);
       }
     }else{
-      var arm=function(){clearTimeout(timer); timer=setTimeout(drop,6000);};
+      var arm=function(){clearTimeout(timer); timer=setTimeout(drop,4000);};
       var hold=function(){clearTimeout(timer);};
       note.addEventListener('mouseenter',hold); note.addEventListener('mouseleave',arm);
       note.addEventListener('focusin',hold); note.addEventListener('focusout',arm);
@@ -508,7 +508,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         var row=document.createElement('p'); row.className='hint'; row.setAttribute('role','status');
         row.appendChild(document.createTextNode('لديك نصّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
         var take=document.createElement('button'); take.type='button'; take.className='btn btn-secondary btn-sm'; take.textContent='استعده';
-        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-quiet btn-sm'; drop.textContent='تجاهله';
+        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-ghost btn-sm'; drop.textContent='تجاهله';
         row.appendChild(take); row.appendChild(document.createTextNode(' ')); row.appendChild(drop);
         edT.parentNode.insertBefore(row,edT);
         take.addEventListener('click',function(){edT.value=kept.t; edT.dispatchEvent(new Event('input')); row.remove(); edT.focus();});
