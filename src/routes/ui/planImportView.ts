@@ -71,6 +71,10 @@ function rowHtml(r: PlanRow, now: Date, reachNow: Reach): string {
  * والصفُّ بلا رقم مادّةٍ لا يُقال له شيء؛ و«نصّ فقط» يُقال كما هو.
  */
 export function mediaLine(r: PlanRow): string {
+  // ‏من حزمتك أوّلًا (D-366): الغلافُ لـ X وLinkedIn، والمقطعُ بالصوت لمنصّات المقاطع
+  if (r.packageRef !== undefined && r.packageRef !== null) {
+    return '<span class="ago">' + statusBadge('ok', '✓', 'من حزمتك') + ' للمادّة <bdi dir="ltr">' + escapeHtml(r.item) + '</bdi></span>'
+  }
   const m = r.media
   if (m === null) return ''
   if (m.kind === 'text') return '<span class="ago">نصّ فقط — بلا وسيطة</span>'

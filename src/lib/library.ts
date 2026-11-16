@@ -49,12 +49,13 @@ export function folderOf(a: Pick<Asset, 'kind' | 'origin' | 'at'>): string {
 const kindOf = (mime: string): AssetKind =>
   mime.startsWith('image/') ? 'image' : mime.startsWith('video/') ? 'video' : 'doc'
 
-const REF = /^([mufsd]):([A-Za-z0-9:_-]{1,200})$/
+const REF = /^([mufsdg]):([A-Za-z0-9:_-]{1,200})$/
 
 /** و`d:` وسيطةُ المالك من مجلّد Drive للوسائط (D-363) بمعرّف Drive — ما نُزّل منها إلى R2 وحده يُربط. */
-export function parseRef(ref: string): { readonly tag: 'm' | 'u' | 'f' | 's' | 'd'; readonly id: string } | null {
+// ‏و`g:` وسيطةُ حزمة المحتوى من GitHub (D-366) ببصمة git — المحتوى نفسُه هو المعرّف
+export function parseRef(ref: string): { readonly tag: 'm' | 'u' | 'f' | 's' | 'd' | 'g'; readonly id: string } | null {
   const m = REF.exec(ref)
-  return m === null ? null : { tag: m[1] as 'm' | 'u' | 'f' | 's' | 'd', id: m[2]! }
+  return m === null ? null : { tag: m[1] as 'm' | 'u' | 'f' | 's' | 'd' | 'g', id: m[2]! }
 }
 
 type Row = Record<string, string | number | null>
@@ -173,6 +174,11 @@ export async function findAsset(db: Db, org: string, ref: string): Promise<Asset
       return r === null ? null : { ref, origin: 'upload', kind: kindOf(str(r['mime'])), name: str(r['name']), mime: str(r['mime']),
         bytes: num(r['bytes']), at: '', preview: `/panel/assets/raw/${ref}`, drive: null }
     }
+    case 'g': {
+      const r = await one('SELECT path, mime, bytes FROM package_media WHERE blob_sha = ? AND org_id = ? AND r2_key IS NOT NULL')
+      return r === null ? null : { ref, origin: 'upload', kind: kindOf(str(r['mime'])), name: str(r['path']).split('/').pop() ?? '', mime: str(r['mime']),
+        bytes: num(r['bytes']), at: '', preview: `/panel/assets/raw/${ref}`, drive: null }
+    }
     case 's': {
       const r = await one('SELECT drive_file_id, name, mime, last_seen_at AS at FROM sources WHERE id = ? AND org_id = ?')
       return r === null ? null : { ref, origin: 'drive', kind: kindOf(str(r['mime'])), name: str(r['name']), mime: str(r['mime']),
@@ -184,8 +190,9 @@ export async function findAsset(db: Db, org: string, ref: string): Promise<Asset
 /** مفتاحُ R2 ونوعُه لمعاينةٍ خلف الجلسة — للمرفوعات وحدها (`/panel/media/:id` يخدم المولَّدة). */
 export async function rawObject(db: Db, org: string, ref: string): Promise<{ readonly key: string; readonly mime: string } | null> {
   const p = parseRef(ref)
-  if (p === null || (p.tag !== 'u' && p.tag !== 'f' && p.tag !== 'd')) return null
+  if (p === null || (p.tag !== 'u' && p.tag !== 'f' && p.tag !== 'd' && p.tag !== 'g')) return null
   const table = p.tag === 'u' ? "uploads WHERE id = ? AND org_id = ? AND status = 'ready'"
+    : p.tag === 'g' ? 'package_media WHERE blob_sha = ? AND org_id = ? AND r2_key IS NOT NULL'
     : p.tag === 'd' ? 'drive_media WHERE drive_file_id = ? AND org_id = ? AND missing = 0 AND r2_key IS NOT NULL'
       : 'library_files WHERE id = ? AND org_id = ?'
   const r = await db.prepare(`SELECT r2_key, mime FROM ${table}`).bind(p.id, org).first<{ r2_key: string; mime: string }>().catch(() => null)
@@ -208,6 +215,12 @@ export function attachStatement(db: Db, org: string, postId: string, ref: string
     : p.tag === 'u'
       ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'upload', 0, 'ready', ?3, width, height, org_id, brand_id
            FROM uploads WHERE id = ?4 AND org_id = ?5 AND status = 'ready'`
+      : p.tag === 'g'
+        // ‏وسيطةُ الحزمة (D-366): الغلافُ لأيّ منشور، والمقطعُ لمنصّات المقاطع وحدها — فالناشرُ لا يرفع مقطعًا إلى نهاية صور
+        ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'package', 0, 'ready', ?3, 1080, 1080, org_id,
+               coalesce((SELECT brand_id FROM posts WHERE id = ?2), 'brand_owner')
+             FROM package_media WHERE blob_sha = ?4 AND org_id = ?5 AND r2_key IS NOT NULL
+              AND (kind = 'image' OR (SELECT platform FROM posts WHERE id = ?2 AND org_id = ?5) IN ('youtube', 'tiktok', 'instagram'))`
       : p.tag === 'd'
         // ‏وسيطةُ Drive (D-363): صورةٌ نُزّلت إلى R2 وحاضرةٌ في المجلّد — والمقطعُ يُنشر من «فيديوهاتك» لا من هنا
         ? `SELECT ?1, ?2, r2_key, mime, bytes, '', 'drive', 0, 'ready', ?3, NULL, NULL, org_id,
