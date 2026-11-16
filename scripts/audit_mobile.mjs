@@ -334,7 +334,7 @@ for (const file of files) {
          * يقصّ، والرابطُ نفسُه داخل الشريط. فلم يره (١) ولا (٦) ولا (٥). فيُقاس نصُّ كلِّ ابنٍ
          * ظاهرٍ في الشريط على صندوقه، وكلُّ ابنين على تقاطعهما.
          */
-        for (const nav of document.querySelectorAll('nav.back')) {
+        for (const nav of document.querySelectorAll('header.page-top')) {
           const kids = [...nav.children].filter((k) => shown(k) && !k.classList.contains('grow'))
           for (const k of kids) {
             if ((k.textContent || '').trim() === '') continue

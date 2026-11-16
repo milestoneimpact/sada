@@ -32,6 +32,8 @@ export interface RailInput {
   readonly scope?: Scope
   /** التبويباتُ الاختياريّة (`Section.optional`) التي تُرسم — «حزمة المحتوى» حين رُبطت حزمةٌ أو للمالك. */
   readonly shown?: readonly string[]
+  /** شارةُ حال النظام مرسومةً (D-381): في ذيل الرافدة بجوار الإعدادات. واللوحةُ وحدَها تعرفها. */
+  readonly status?: string
 }
 
 /** الأقسامُ التي تُرسم لهذا الطلب: الثابتةُ كلُّها، والاختياريّةُ بطلبها. */
@@ -63,9 +65,7 @@ function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): 
 export function railHtml(input: RailInput): string {
   const counts = input.counts ?? {}
   let lastGroup = ''
-  const tabs = visible(input).map((s) => {
-    const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
-    lastGroup = s.group
+  const link = (s: (typeof SECTIONS)[number]): string => {
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
     // ‏والعددُ مكوّنُه (D-189)، ويعني «ينتظرك» وحدَها (خطّة التصميم 5.1)
     const n = counts[s.id] ?? 0
@@ -78,15 +78,25 @@ export function railHtml(input: RailInput): string {
     const label = s.tight === undefined
       ? `<span>${s.short ?? s.label}</span>`
       : `<span class="wide">${s.short ?? s.label}</span><span class="tight">${escapeHtml(s.tight)}</span>`
-    return `${head}<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
+    // ‏وفي الرافدة المطويّة (‏72px) يُخفى الاسمُ بصريًّا ولا يُنزَع: قارئُ الشاشة يقرؤه، والمرورُ يفتحها على اللوح
+    return `<a href="${escapeHtml(href)}"${attrs}>${s.icon}${label}${
       n > 0 ? count(n) : ''
     }</a>`
+  }
+  const tabs = visible(input).filter((s) => s.foot !== true).map((s) => {
+    const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
+    lastGroup = s.group
+    return head + link(s)
   }).join('\n    ')
+  // ‏ذيلُ الرافدة (D-381، §4.1): الإعداداتُ وحالُ النظام. وعلى الهاتف يُخفى، والإعداداتُ في «المزيد»
+  const foot = visible(input).filter((s) => s.foot === true).map(link).join('')
 
   return `<aside class="rail">
   <div class="rail-head">
     <div class="brand">${wordmark(true)}${input.env === undefined || input.env === 'production' ? '' : '<span>تجريبيّ</span>'}</div>
     <div class="glyph">${GLYPH_SVG}</div>
+    ${/* ‏زرُّ الطيّ (D-381): مخفيٌّ بلا سكربت فالرافدةُ ممدودة، والسكربتُ يسمّيه ويُظهره ويحفظ الحالَ في «sada-rail» (D-328) */''}
+    <button type="button" class="rail-fold btn-icon" id="rail-fold" hidden></button>
   </div>
   ${scopeMenu(input.scope)}
   ${/* ‏ولا «منشور جديد» هنا (D-308): زرُّ الترويسة (D-216) بأبوابه الأربعة ظاهرٌ في كلّ صفحة، وزرّان أوّليّان
@@ -94,6 +104,7 @@ export function railHtml(input: RailInput): string {
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}
     ${moreSheet(input, counts)}
+    <div class="rail-foot">${foot}${input.status ?? ''}</div>
   </nav>
   ${/* ‏والسمة والكثافة في قائمة الحساب أعلى الصفحة (D-215) — لا ذيل يُرى دائمًا */''}
 </aside>`

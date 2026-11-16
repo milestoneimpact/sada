@@ -168,7 +168,7 @@ for (const view of VIEWS) {
        * ‏ثابتةٌ في كلّ صفحة، ولصائقُ الشريط ‏١٣px بنصّ الخطّة (5.3) — فعلى صفحةٍ من خمسمئة حرفٍ
        * ‏تكون وحدَها ‏٩٪. والنسبةُ للمحتوى، والإطارُ يُفحَص نمطًا كغيره
        */
-      const CHROME = '.rail, .topbar, nav.back, nav.tabs'
+      const CHROME = '.rail, .topbar, nav.tabs'
 
       // مَن أُعلن له هامشٌ `auto` في الورقة — يُجمَع مرّةً ثمّ يُستثنى
       const autoMargin = new Set()

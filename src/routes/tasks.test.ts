@@ -246,9 +246,11 @@ describe('صفحة البوّابات وسطرُها في «ما عليك»', ()
     const html = await gates()
     expect(html).toContain('<title>صدى — بوّابات المراحل</title>')
     expect(html).toContain('<h1>بوّابات المراحل</h1>')
-    const back = /<nav class="back"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? ''
-    expect(back).toContain('href="/panel/tasks"')
-    expect(back).toContain('ما عليك')
+    // ‏الرأسُ الموحَّد (D-381): لا رابطَ رجوع، والقسمُ الأبُ معلَّمٌ في الرافدة
+    expect(html).not.toContain('<nav class="back"')
+    const top = /<header class="topbar page-top">[\s\S]*?<\/header>/.exec(html)?.[0] ?? ''
+    expect(top).toContain('cmdk-open')
+    expect(top).toContain('class="bell"')
     expect(html).toContain('href="/panel/tasks" aria-current="page"')
     expect(html).toContain('cmdk-open')
     // ‏والشرحُ مرّةً فوق البطاقات، لا في كلّ بطاقة
@@ -289,9 +291,11 @@ describe('«تفتح قدرة» صفحتُها، وسطرُها في «ما عل
     const html = await later()
     expect(html).toContain('<title>صدى — ما عليك · تفتح قدرة</title>')
     expect(html).toContain('<h1>تفتح قدرة</h1>')
-    const back = /<nav class="back"[\s\S]*?<\/nav>/.exec(html)?.[0] ?? ''
-    expect(back).toContain('href="/panel/tasks"')
-    expect(back).toContain('ما عليك')
+    // ‏الرأسُ الموحَّد (D-381): لا رابطَ رجوع، والقسمُ الأبُ معلَّمٌ في الرافدة
+    expect(html).not.toContain('<nav class="back"')
+    const top = /<header class="topbar page-top">[\s\S]*?<\/header>/.exec(html)?.[0] ?? ''
+    expect(top).toContain('cmdk-open')
+    expect(top).toContain('class="bell"')
     expect(html).toContain('href="/panel/tasks" aria-current="page"')
     expect(html).toContain('cmdk-open')
     expect(html).toContain('href="/panel/help"')
@@ -369,7 +373,8 @@ describe('وشريط الرموز المقتربة', () => {
     // ‏الشريطُ يسمّي ويحيل، والحالُ بأيّامها في البلاطة مرّةً (D-235)
     expect(html).toContain('<b><bdi>X</bdi></b> تحتاج يدَك.')
     expect(await accounts()).toMatch(/data-fact="x:expiring"><span class="st-ic">[\s\S]*?<\/span>تحتاج إعادة ربط خلال [34] أيّام/)
-    expect(html).toContain('class="toast-note warn"')
+    expect(html).toContain('class="sys-banner warn" role="alert"')
+    expect(html).toContain('جدّد إذن X')
     expect(html).not.toContain('إذن الوصول')
   })
 

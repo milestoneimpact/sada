@@ -30,7 +30,7 @@ import { sheet, type Decl, type Sheet } from '../../test/css'
 import { bar, fileName, glyph, pathArrows } from './parts'
 import { statusBadge } from './components/badge'
 import { refusedBody } from './oauthResult'
-import { backNav, ICON_BYTES, shell, soloPage } from './shell'
+import { pageTop, ICON_BYTES, shell, soloPage } from './shell'
 import { soloNav } from './rail'
 import { scopeSet } from '../../lib/oauth/scopes'
 import type { DraftRow } from '../../lib/draft/store'
@@ -573,8 +573,9 @@ describe('ما مشاه Tab (D-125)', () => {
     expect(SCRIPT).not.toContain('btn.disabled=true')
   })
 
-  it('ورابط العودة هدف لمس عرضا كما هو ارتفاعا', () => {
-    expect(css.rule('nav.back a')['min-width']).toBe('var(--tap)')
+  it('وبابُ الرئيسيّة في الرأس الموحَّد وجرسُه هدفا لمس عرضًا كما هما ارتفاعًا (D-381)', () => {
+    expect(css.rule('.bell')).toMatchObject({ 'min-width': 'var(--tap)', 'min-height': 'var(--tap)' })
+    expect(pageTop()).toMatch(/<a class="home glyph tb" href="\/panel" aria-label="صدى — الرئيسيّة">/)
   })
 })
 
@@ -1082,10 +1083,10 @@ describe('ما وراء المقاييس (D-149)', () => {
     })
     expect(css.where('.cmdk-g')).toContain('')
     for (const at of css.where('.cmdk-g')) expect(css.rule('.cmdk-g', at)['letter-spacing'], at).toBeUndefined()
-    // ‏وسهمُ العودة مرسومٌ يشير إلى البداية — اليمين هنا — لا حرفٌ من خطّ النظام (D-167)
-    expect(backNav('/panel#channels', 'القنوات')).toContain(`${ICON.back}القنوات</a>`)
+    // ‏والسهمُ مرسومٌ يشير إلى البداية — اليمين هنا — لا حرفٌ من خطّ النظام (D-167)، ولا رابطَ رجوع في الرأس (D-381)
     expect(ICON.back).toContain('m13 6 6 6-6 6')
-    expect(backNav('/panel#channels', 'القنوات')).not.toMatch(/[\u2190\u2192]/)
+    expect(pageTop()).not.toMatch(/[\u2190\u2192]/)
+    expect(pageTop()).not.toContain(ICON.back)
   })
   it('الوصول: حشو التمرير تحت الشريط، والرابط الهادئ بخيط لا بلون وحدَه، وحقل الأوامر يقول «هنا»', () => {
     expect(css.rule('html')['scroll-padding-top']).toBe('calc(var(--topbar) + var(--s-3))')
@@ -1113,19 +1114,27 @@ describe('ما وراء المقاييس (D-149)', () => {
   })
 })
 
-/** الشاشةُ المستقلّة تحمل العلامة (D-140): بابٌ إلى اللوحة قبل سهم العودة. */
-describe('شريط العودة (D-140)', () => {
-  it('العلامة أوّلًا بابًا إلى اللوحة، ثمّ السهم، ولا تنكمش', () => {
-    const html = backNav('/panel#channels', 'القنوات')
-    const home = html.indexOf('<a class="home" href="/panel"')
-    const back = html.indexOf(`${ICON.back}القنوات`)
-    expect(home).toBeGreaterThan(0)
-    expect(back).toBeGreaterThan(home)
-    expect(html).toContain('<span class="glyph glyph-sm">')
-    for (const s of ['nav.back .home', 'nav.back .home .glyph']) expect(css.rule(s).flex, s).toBe('none')
-    // ‏والعلامةُ الصغيرةُ مربّعٌ من السلّم (‏٣٢)، ورسمُها نسبةٌ منه كالكبيرة (D-189)
-    expect(css.rule('.glyph-sm')).toMatchObject({ width: 'var(--s-8)', height: 'var(--s-8)' })
+/**
+ * الرأسُ الموحَّد (D-381، §4.1، يَنسخ D-140 وD-167): رأسٌ واحدٌ في كلّ صفحة — لا شريطَ عودة ولا نمطَ رأسٍ ثانيًا.
+ * العلامةُ بابٌ إلى الرئيسيّة على الهاتف وحدَه، ثمّ «بحث وأوامر» بـ`Ctrl K`، ثمّ الجرسُ فالحساب.
+ */
+describe('الرأس الموحَّد (D-381)', () => {
+  it('ترتيبُه: العلامةُ ثمّ البحثُ ثمّ الجرسُ ثمّ الحساب، ولا رابطَ رجوع', () => {
+    const html = pageTop()
+    expect(html.startsWith('<header class="topbar page-top">')).toBe(true)
+    const at = ['class="home glyph tb"', 'class="cmdk-open"', 'class="bell"', 'class="menu-'].map((k) => html.indexOf(k))
+    for (const i of at) expect(i).toBeGreaterThan(0)
+    expect([...at].sort((x, y) => x - y)).toEqual(at)
+    expect(html).not.toContain('nav class="back"')
+    expect(html).not.toContain('مسار العودة')
+    // ‏والعلامةُ في الرأس للهاتف وحدَه: حيث الرافدةُ ظاهرةٌ رأسُها يحملها (D-187)
+    expect(css.rule('.topbar .glyph.tb').display).toBe('none')
+    expect(css.rule('.topbar .glyph.tb', `@media${below('md')}`).display).toBe('grid')
     expect(css.rule('.glyph svg')).toMatchObject({ width: '56%', height: '56%' })
+  })
+
+  it('وعلى الهاتف رأسٌ مختصر: لا بحثَ ولا حالَ فيه — هما في «المزيد» وبطاقة الآلة (§4.3)', () => {
+    for (const sel of ['.topbar > .cmdk-open', '.topbar > .pill']) expect(css.rule(sel, `@media${below('md')}`).display, sel).toBe('none')
   })
 })
 
@@ -1147,8 +1156,10 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
   it('soloPage يبني التخطّي والعلامة والعودة والمحتوى ويحمل سكربت الثيم', () => {
     const html = soloPage('صدى — تجربة', { href: '/panel#posts', label: 'المنشورات' }, '<p>x</p>', 'n')
     expect(html).toContain('<a class="skip" href="#main">')
-    expect(html).toContain('class="home"')
-    expect(html).toContain(`${ICON.back}المنشورات`)
+    // ‏والرأسُ الموحَّد قبل المحتوى، بلا رابط رجوع (D-381)
+    expect(html).toContain(pageTop())
+    expect(html.indexOf(pageTop())).toBeLessThan(html.indexOf('<main id="main">'))
+    expect(html).not.toContain(`${ICON.back}المنشورات`)
     expect(html).toContain('<main id="main"><p>x</p></main>')
     expect(html).toContain('sada-theme')
   })
@@ -1471,7 +1482,6 @@ describe('D-167 — الجوّال واللمس والرموز', () => {
     // ‏والرمزُ بمقاسٍ من أربعة (خطّة التصميم 3.4 · D-189): ‏٢٠ في الزرّ، و‏١٦ بجوار نصٍّ ‏١٥،
     // ‏و‏١٤ في الرقاقة — وسهمُ المسار وحدَه بقدر حرف السطر («1em»)
     expect(css.rule('.btn>svg')).toMatchObject({ width: 'var(--icon-md)', height: 'var(--icon-md)' })
-    expect(css.rule('nav.back a>svg:not(.wordmark)')).toMatchObject({ width: 'var(--icon-sm)', height: 'var(--icon-sm)' })
     expect(css.rule('a.chip>svg')).toMatchObject({ width: 'var(--icon-xs)', height: 'var(--icon-xs)' })
     expect(css.rule('.arw svg')).toMatchObject({ width: '1em', height: '1em' })
     expect(css.where('.cmdk-open svg')).toEqual([])
@@ -1737,7 +1747,7 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
     // ‏كلُّ استعلامِ عرضٍ في الورقة من «BP»: لا ‏720 ولا ‏960 ولا ‏1180
     const widths = (kind: string): Set<number> => new Set(css.rules().flatMap((rule) =>
       [...rule.at.matchAll(new RegExp(`${kind}[^@]*?(?:min|max)-width:(\\d+)px`, 'g'))].map((m) => Number(m[1]))))
-    const allowed = new Set(Object.values({ xs: 360, sm: 600, md: 900, lg: 1200 }).flatMap((v) => [v, v - 1]))
+    const allowed = new Set(Object.values({ xs: 360, sm: 600, md: 768, tab: 1024, lg: 1200 }).flatMap((v) => [v, v - 1]))
     expect([...widths('@media')].filter((w) => !allowed.has(w))).toEqual([])
     // ‏وحدُّ الحاوية من «CQ» وحدها (مراجعة D-187): الصفُّ يلتفّ بعرض قائمته لا بعرض الشاشة
     expect([...widths('@container')].sort((a, b) => a - b)).toEqual(Object.values(CQ).map((v) => v - 1).sort((a, b) => a - b))
@@ -1757,8 +1767,8 @@ describe('المرحلة ٢أ — الرموز (D-187)', () => {
       // ‏والعلامةُ في لحظتها هي العلامة: دورٌ واحدٌ بمحدّدين، في القالب T6 وحده
       '.moment-glyph{color:var(--mark-fg)}',
     ])
-    // ‏والعلامةُ مرّةً في الشاشة: حيث الرافدةُ ظاهرةٌ يغيب بابُ اللوحة من شريط العودة
-    expect(css.rule('.app nav.back .home', `@media${atLeast('md')}`).display).toBe('none')
+    // ‏والعلامةُ مرّةً في الشاشة: حيث الرافدةُ ظاهرةٌ يغيب بابُ الرئيسيّة من الرأس (D-381)
+    expect(css.rule('.topbar .glyph.tb').display).toBe('none')
   })
 })
 
@@ -1889,17 +1899,20 @@ describe('مراجعة المرحلة ٢ب (D-189)', () => {
   })
 
   /**
-   * **وشريطُ العودة يلتفّ قبل أن يُغطّى نصُّه**: اتّسع المقطعُ (‏١٤٤ ← ‏١٦٣px) فانكمش رابطُ العودة
-   * عند ‏٣٢٠ إلى ‏٤٩px ونصُّه ‏٨٦ — «المنشو» تحت المبدّل. فالمبدّلُ ينزل سطرًا إلى طرفه حين لا
-   * يسعهما سطر، وحشوُه على الهاتف ‏٨ كما كان. والقياسُ في «audit_mobile» (٧).
+   * **والرافدةُ تُطوى إلى ‏72px** (D-381، §4.1–4.2): على الحاسوب بزرٍّ يحفظ الحالَ (`sada-rail`)، وعلى اللوح مطويّةٌ أصلًا
+   * وتتّسع طبقةً بالمرور أو التركيز. **والاسمُ يُخفى بصريًّا ولا يُنزَع**، وبلا سكربت الرافدةُ ممدودةٌ على الحاسوب.
    */
-  it('شريط العودة يلتفّ، والمبدّل في طرف سطره، وحشوُه على الهاتف أضيق', () => {
-    expect(css.rule('nav.back')['flex-wrap']).toBe('wrap')
-    expect(css.rule('nav.back .seg')['margin-inline-start']).toBe('auto')
-    expect(css.rule('nav.back .seg button', `@media${below('sm')}`)['padding-inline']).toBe('var(--s-2)')
-    // ‏ولا يُفرض على رابط العودة حدٌّ أقصى يقصّ نصَّه
-    expect(found((d) => d.selectors.some((sel) => sel.startsWith('nav.back a')) &&
-      /^(max-width|overflow|text-overflow|white-space)$/.test(d.prop))).toEqual([])
+  it('الرافدة المطويّة: ‏72px بالزرّ على الحاسوب، وطبقةٌ على اللوح، والاسمُ لقارئ الشاشة', () => {
+    expect(css.rule(':root')['--rail-mini']).toBe('72px')
+    expect(css.rule('html[data-rail=mini] .app', `@media${atLeast('tab')}`)['grid-template-columns']).toBe('var(--rail-mini) minmax(0,1fr)')
+    const tablet = `@media${atLeast('md')} and ${below('tab')}`
+    expect(css.rule('.app', tablet)['grid-template-columns']).toBe('var(--rail-mini) minmax(0,1fr)')
+    for (const sel of ['.rail:hover', '.rail:focus-within']) expect(css.rule(sel, tablet), sel).toMatchObject({ width: 'var(--rail-w)', 'box-shadow': 'var(--sh-3)' })
+    const hide = css.rule('html[data-rail=mini] nav.tabs a > span:not(.count)', `@media${atLeast('tab')}`)
+    expect(hide).toMatchObject({ position: 'absolute', overflow: 'hidden', 'clip-path': 'inset(50%)' })
+    expect(hide.display).toBeUndefined()
+    // ‏والحالُ تُقرأ قبل الرسم فلا قفزة، والزرُّ يُظهره السكربتُ وحدَه
+    expect(shell('t', '', 'n')).toContain("localStorage.getItem('sada-rail')==='mini'")
   })
 })
 
@@ -1918,13 +1931,11 @@ describe('الهويّة من لوحتها (D-196)', () => {
   it('رمز القسم الحاليّ وخطّ عنوان الصفحة بحبر الرابط — لا ذهب رابعًا', () => {
     expect(css.rule('nav.tabs a[aria-current=page] svg').color).toBe('var(--link)')
     expect(css.rule('.page-head h1::after')).toMatchObject({ width: 'var(--s-6)', height: 'var(--stroke)', background: 'var(--link)' })
-    // ‏وتمريرُ شريط العودة لونٌ وخطّ: الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا
-    expect(css.rule('nav.back a:hover', '@media(hover:hover)')['text-decoration']).toBe('underline')
   })
 
   it('القفل كما في اللوحة: الاسم أوّلًا في الشيفرة فيقع الرمز يسارَه', () => {
     const order = (html: string): boolean => html.indexOf('class="wordmark"') < html.indexOf('class="glyph')
-    expect(order(backNav('/panel', 'اللوحة'))).toBe(true)
+    expect(order(railHtml({ inPanel: true }))).toBe(true)
     const login = loginPage({}, 'n')
     expect(login.indexOf('class="wordmark"')).toBeLessThan(login.indexOf('class="moment-glyph"'))
   })
@@ -2029,11 +2040,8 @@ describe('مراجعة الهويّة (D-196)', () => {
     expect(css.rule('.moment', '@media(forced-colors:active)')['forced-color-adjust']).toBe('none')
   })
 
-  it('اسم القفل في شريط العودة ليس أيقونة: «a>svg» لا يسحقه ‏16×16', () => {
-    const iconRules = found((d) => d.prop === 'width' && d.selectors.some((sel) => /^nav\.back a>svg/.test(sel)))
-    expect(iconRules.length).toBeGreaterThan(0)
-    for (const r of iconRules) expect(r).toContain(':not(.wordmark)')
-    expect(backNav('/panel', 'اللوحة')).toMatch(/<a class="home"[^>]*><svg class="wordmark"/)
+  it('ولا قاعدةَ لشريط العودة باقية: الرأسُ الموحَّد وحدَه (D-381)', () => {
+    expect(found((d) => d.selectors.some((sel) => sel.includes('nav.back')))).toEqual([])
   })
 
   it('شريط المتصفّح بأرض اللحظة دون «md» في صفحتَي اللحظة، وسكربتا الثيم لا يكتبان فوقه', () => {

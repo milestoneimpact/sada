@@ -698,7 +698,7 @@ export const TIP_SCRIPT = `
   function place(){
     if(!on)return;
     var r=on.getBoundingClientRect(), vw=root.clientWidth||window.innerWidth, w=tip.offsetWidth, h=tip.offsetHeight, gap=8;
-    var below=!!on.closest('.topbar,nav.back')||r.top<h+gap;
+    var below=!!on.closest('.topbar')||r.top<h+gap;
     tip.setAttribute('data-side',below?'below':'above');
     tip.style.top=Math.round(below?r.bottom+gap:r.top-h-gap)+'px';
     tip.style.left=Math.round(Math.max(gap,Math.min(vw-w-gap,r.left+r.width/2-w/2)))+'px';
@@ -771,5 +771,36 @@ export const TIP_SCRIPT = `
   });
   window.addEventListener('scroll',function(){if(on)place();},{capture:true,passive:true});
   window.addEventListener('resize',function(){if(on)place();},{passive:true});
+})();
+`
+
+/**
+ * طيُّ الرافدة وإغلاقُ تنبيه النظام (D-381، بسياسة D-328) — **طبقةٌ فوق صفحةٍ تعمل بدونها**.
+ *
+ * بلا سكربت: الرافدةُ ممدودة وزرُّ الطيّ مخفيّ، والتنبيهُ ظاهرٌ بلا زرّ إغلاق. والسكربتُ يُظهر الزرّين،
+ * ويحفظ الطيَّ في «sada-rail» (وسكربتُ الثيم في الرأس يقرؤه قبل الرسم فلا قفزة)، ويطوي التنبيهَ للجلسة
+ * وحدَها بمفتاح عطله. والحفظُ في `try` كالثيم: نافذةٌ خاصّة ترمي ولا تكسر شيئًا.
+ */
+export const RAIL_SCRIPT = `
+(function(){
+  var root=document.documentElement, fold=document.getElementById('rail-fold');
+  if(fold){
+    var set=function(mini){
+      if(mini)root.dataset.rail='mini'; else delete root.dataset.rail;
+      fold.setAttribute('aria-pressed',String(mini));
+      fold.setAttribute('aria-label',mini?'افتح القائمة':'اطوِ القائمة');
+      try{if(mini)localStorage.setItem('sada-rail','mini'); else localStorage.removeItem('sada-rail');}catch(e){}
+    };
+    set(root.dataset.rail==='mini');
+    fold.hidden=false;
+    fold.addEventListener('click',function(){set(root.dataset.rail!=='mini');});
+  }
+  document.querySelectorAll('.sys-banner[data-banner]').forEach(function(b){
+    var k='sada-banner:'+b.getAttribute('data-banner'), x=b.querySelector('[data-banner-close]');
+    try{if(sessionStorage.getItem(k)==='1'){b.hidden=true;return;}}catch(e){}
+    if(!x)return;
+    x.hidden=false;
+    x.addEventListener('click',function(){b.hidden=true;try{sessionStorage.setItem(k,'1');}catch(e){}});
+  });
 })();
 `

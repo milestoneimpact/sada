@@ -137,7 +137,7 @@ details[open]:not(.more-sheet):not(.menu)::details-content{height:auto; opacity:
 @starting-style{
   [data-tip]:focus-visible::before,.btn-icon[aria-label]:focus-visible::before{opacity:0; translate:calc(var(--dir) * 50%) var(--s-1)}
 }
-.topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before,nav.back [data-tip]::before,nav.back .btn-icon[aria-label]::before{
+.topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before{
   inset-block-end:auto; inset-block-start:calc(100% + var(--s-2)); translate:calc(var(--dir) * 50%) calc(-1 * var(--s-1))}
 /* ‏**ومتى جرى السكربتُ حلّ محلَّ الزائف عنصرٌ يُمسَك** (D-323 · WCAG 1.4.13): الزائفُ بلا أحداثِ مؤشّر وبينه وبين مرجعه
    فجوة، فمن حرّك المؤشّرَ إليه اختفى، ولا يظهر باللمس. فـ«data-tipjs» على الجذر يُطفئه، و«.tip» أدناه هو التلميح */

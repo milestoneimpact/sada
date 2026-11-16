@@ -18,6 +18,7 @@ import {
   DRAFT_CAP, normalize, searchKey, SECTIONS,
 } from './command'
 import { shell } from './shell'
+import { RAIL_SCRIPT } from './scripts'
 import { STYLE } from './styles'
 import { sheet } from '../../test/css'
 
@@ -227,22 +228,41 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
   })
 
-  /** والرافدةُ ثمانية (D-289): «الخطّة» بعد الرئيسيّة — محورُ المنصّة وجهةٌ — ثمّ ما كان. و«حزمة المحتوى» بعد «الخطّة» لمن يخصّه. */
-  it('**وثمانية في الرافدة** بترتيب الخطّة، و«حزمة المحتوى» تاسعةٌ اختياريّة بعد «الخطّة»', () => {
+  /**
+   * والرافدةُ مجموعتان وذيل (D-381، §4.1): ما يُفعل كلَّ يوم (الرئيسيّة · الخطّة · المنشورات · النتائج) بترتيب شريط الهاتف
+   * نفسِه، ثمّ ما يُعدّ له (المكتبة · حزمة المحتوى · الحسابات · ما عليك)، والإعداداتُ في الذيل بجوار حال النظام.
+   */
+  it('**مجموعتان وذيل** بترتيب §4.1، و«حزمة المحتوى» اختياريّةٌ بعد «المكتبة»', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'الخطّة', 'حزمة المحتوى', 'المنشورات', 'المكتبة', 'النتائج', 'الحسابات', 'ما عليك', 'الإعدادات'])
+      ['الرئيسيّة', 'الخطّة', 'المنشورات', 'النتائج', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
     expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(8)
-    expect(SECTIONS.find((s) => s.id === 'package')).toMatchObject({ group: 'العمل', page: '/panel/package', optional: true })
+    expect(SECTIONS.filter((s) => s.group === 'العمل').map((s) => s.id)).toEqual(['overview', 'plan', 'posts', 'results'])
+    expect(SECTIONS.filter((s) => s.group === 'الموارد').map((s) => s.id)).toEqual(['library', 'package', 'accounts', 'tasks'])
+    expect(SECTIONS.filter((s) => s.foot === true).map((s) => s.id)).toEqual(['settings'])
+    expect(SECTIONS.find((s) => s.id === 'package')).toMatchObject({ group: 'الموارد', page: '/panel/package', optional: true })
   })
 
-  it('«حزمة المحتوى» لا تُرسم إلّا بطلبها، وبشارةِ ما ينتظر قرارك تحت «العمل» بعد «الخطّة»', () => {
+  it('«حزمة المحتوى» لا تُرسم إلّا بطلبها، وبشارةِ ما ينتظر قرارك بين «المكتبة» و«الحسابات»', () => {
     expect(railHtml({ inPanel: true })).not.toContain('href="/panel/package"')
     const rail = railHtml({ inPanel: true, shown: ['package'], counts: { package: 3 } })
     const at = rail.indexOf('href="/panel/package"')
-    expect(at).toBeGreaterThan(rail.indexOf('href="/panel/plan"'))
-    expect(at).toBeLessThan(rail.indexOf('href="#posts"'))
+    expect(at).toBeGreaterThan(rail.indexOf('href="/panel/library"'))
+    expect(at).toBeLessThan(rail.indexOf('href="/panel/accounts"'))
     expect(rail.slice(at, rail.indexOf('</a>', at))).toContain('حزمة المحتوى')
     expect(rail.slice(at, rail.indexOf('</a>', at))).toMatch(/>3</)
+  })
+
+  it('والإعداداتُ وحالُ النظام في ذيل الرافدة، وزرُّ الطيّ مخفيٌّ بلا سكربت (D-381)', () => {
+    const rail = railHtml({ inPanel: true, status: '<a class="pill ok" href="#machine">يعمل</a>' })
+    const foot = rail.slice(rail.indexOf('<div class="rail-foot">'))
+    expect(foot).toMatch(/^<div class="rail-foot"><a href="\/panel\/settings"[^>]*>[\s\S]*الإعدادات[\s\S]*<a class="pill ok"/)
+    expect(rail.indexOf('<span class="lbl">الموارد</span>')).toBeGreaterThan(rail.indexOf('href="/panel/report"'))
+    expect(rail).toContain('<button type="button" class="rail-fold btn-icon" id="rail-fold" hidden></button>')
+    // ‏واسمُه وحالُه من السكربت وحدَه، فلا زرَّ بلا اسمٍ يظهر
+    expect(RAIL_SCRIPT).toContain("fold.setAttribute('aria-label',mini?'افتح القائمة':'اطوِ القائمة')")
+    expect(RAIL_SCRIPT.indexOf('fold.hidden=false')).toBeGreaterThan(RAIL_SCRIPT.indexOf("fold.setAttribute('aria-pressed'"))
+    // ‏والاسمُ نصٌّ في الرابط دائمًا: المطويّةُ تخفيه بصريًّا ولا تنزعه
+    expect(rail).toMatch(/<a href="\/panel\/library">[\s\S]*?<span>المكتبة<\/span><\/a>/)
   })
 
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */

@@ -45,6 +45,7 @@ import { notice, noticeText, toastRegion } from './ui/components/toast'
 import { field } from './ui/components/field'
 import { card } from './ui/components/card'
 import { button } from './ui/components/button'
+import { systemBanner } from './ui/components/banner'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import type { SpendRow } from '../lib/ai/spend'
@@ -1086,7 +1087,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    */
   const items: { kind: 'bad' | 'warn' | 'ok'; text: string; go?: string; label?: string }[] = []
 
-  const stale = d.channels.filter((c) => c.state === 'needs_reauth')
+  // ‏والمنصّةُ التي يقولها تنبيهُ النظام أعلى الصفحة لا تُعاد هنا (D-381، §4.4): الحكمُ نفسُه (`channelHealth`)
+  const stale = d.channels.filter((c) => c.state === 'needs_reauth' && !['broken', 'expiring'].includes(channelHealth(c, d.now).kind))
   for (const c of stale) {
     items.push({
       kind: 'bad',
@@ -1707,12 +1709,23 @@ export function panelPage(view: PaneView): string {
     .map((v) => ({ v, h: channelHealth(v, d.now) }))
     .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
   // ‏ولا شريطَ في «الحسابات» نفسِها (D-311): «افتح الحسابات» وأنت فيها تكرارٌ، وبطاقاتُها تقول الحالَ بزرّها
-  const expiring = needy.length === 0 || only === 'accounts' ? '' : notice({
-    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+  // ‏**تنبيهُ النظام الواحد** (D-381، §4.4): بفعلٍ واحد — «جدّد إذن YouTube» إلى صفحة المنصّة حين تكون واحدة،
+  // ‏و«افتح الحسابات» حين تكثر. و«ما ينتظرك» لا يعيد ما قاله (`overviewPane` يُسقط بندَه)
+  const one = needy.length === 1 ? needy[0] : undefined
+  const expiring = needy.length === 0 || only === 'accounts' ? '' : systemBanner({
+    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn',
+    key: needy.map(({ v }) => v.spec.id).join(','),
     // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
-    html: `${needy.slice(0, 3)
+    // ‏ومنصّةٌ واحدةٌ انتهى إذنُها يُقال سببُها هنا: «ما ينتظرك» لم يعد يقوله (D-381)
+    html: one !== undefined && one.v.state === 'needs_reauth'
+      ? html`<b><bdi>${one.v.spec.label}</bdi></b>: انتهى الإذن — والنشر متوقّف عليها.`.value
+      : `${needy.slice(0, 3)
       .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
-      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. ${button({ label: 'افتح الحسابات', size: 'sm', href: '#channels' })}` })
+      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك.`,
+    action: one === undefined
+      ? { label: 'افتح الحسابات', href: '#channels' }
+      : { label: 'جدّد إذن ' + one.v.spec.label, href: '/panel/channels/' + one.v.spec.id },
+  })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(
@@ -1766,7 +1779,7 @@ export function panelPage(view: PaneView): string {
 <div class="app">
 
 ${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
+${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, status: state, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">

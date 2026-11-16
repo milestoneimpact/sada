@@ -1715,11 +1715,18 @@ describe('القنوات — سجلّ صادق لا وعد بما لا يقع', 
     expect(html).toContain('مربوطة')
   })
 
-  it('**رمز انتهى يظهر في «ما ينتظرك»** — فلا يقف النشر صامتا', async () => {
+  it('**رمز انتهى يظهر مرّةً في تنبيه النظام** بفعله الواحد — فلا يقف النشر صامتا، ولا يُعاد في «ما ينتظرك» (D-381)', async () => {
     await seedAccount('x', 'needs_reauth')
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('انتهى الإذن')
+    expect(html.split('انتهى الإذن').length - 1).toBe(1)
+    const banner = html.slice(html.indexOf('<div class="sys-banner'), html.indexOf('</div>', html.indexOf('<div class="sys-banner')))
+    expect(banner).toContain('role="alert"')
+    expect(banner).toContain('انتهى الإذن')
+    expect(banner).toContain('href="/panel/channels/x"')
+    expect(banner).toContain('جدّد إذن X')
+    expect(banner.match(/class="btn /g)?.length).toBe(2)
+    expect(banner).toMatch(/data-banner-close[^>]*hidden/)
   })
 
   it('اسم يحمل HTML يُهرَّب ولا يُحقَن', async () => {

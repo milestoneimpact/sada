@@ -219,7 +219,7 @@ describe('الإشعار (7.8)', () => {
     expect(css.rule('.toast-note')['border-inline-start']).toBe('var(--s-1) solid var(--line)')
     expect(css.rule('.toast .toast-note')['box-shadow']).toBe('var(--sh-3)')
     expect(css.rule('.toast').top).toBe('calc(var(--topbar) + var(--s-3))')
-    expect(css.rule('.toast', '@media(min-width:900px)')).toMatchObject({ top: 'auto', bottom: 'var(--s-6)' })
+    expect(css.rule('.toast', '@media(min-width:768px)')).toMatchObject({ top: 'auto', bottom: 'var(--s-6)' })
   })
 })
 

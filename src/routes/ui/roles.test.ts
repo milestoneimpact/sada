@@ -38,7 +38,6 @@ describe('لكلّ لونٍ دورٌ واحد (D-325)', () => {
   })
 
   it('ورابطٌ يُمرَّر عليه يبقى بحبر الرابط لا بحبر الزرّ', () => {
-    expect(css.rule('nav.back a:hover', '@media(hover:hover)').color).toBe('var(--link)')
     expect(css.rule('.ch-name a:hover', '@media(hover:hover)').color).toBe('var(--link)')
   })
 

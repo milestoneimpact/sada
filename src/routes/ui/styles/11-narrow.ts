@@ -222,4 +222,63 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
     line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); margin-bottom:var(--s-0)}
   table:not(.pv) td:first-child::before{display:none}
 }
+
+/* ══ الرأسُ الموحَّد والرافدةُ المطويّة وتنبيهُ النظام (D-381، §4) ══════════════
+   **رأسٌ واحدٌ في كلّ صفحة** («.page-top» هو «.topbar» نفسُه): لا رابطَ رجوع، والعلامةُ بابٌ إلى
+   الرئيسيّة على الهاتف وحدَه حيث لا رافدة. و«بحث وأوامر» حقلٌ بطرفه «Ctrl K» قبل الجرس والحساب. */
+.page-top .home{text-decoration:none}
+/* ‏ذيلُ الرافدة: الإعداداتُ وحالُ النظام، ملتصقان بأسفلها مهما قصرت القائمة */
+.rail nav.tabs{flex:1 1 auto}
+.rail-foot{margin-top:auto; padding-top:var(--s-3); border-top:var(--bd-soft); display:flex; flex-direction:column; gap:var(--s-2)}
+.rail-foot .pill{align-self:flex-start; margin-inline-start:var(--s-3)}
+/* ‏زرُّ الطيّ في رأس الرافدة، وسهمُه يشير إلى ما يقع: نحو الحافّة حين تُطوى، وإلى الداخل حين تُفتح */
+.rail-fold{margin-inline-start:auto}
+.rail-fold::before{content:''; width:var(--s-2); height:var(--s-2); border:0 solid currentColor;
+  border-inline-end-width:var(--stroke); border-block-end-width:var(--stroke); transform:rotate(-45deg)}
+html[data-rail=mini] .rail-fold::before{transform:rotate(135deg)}
+/* ‏والمطويّةُ ‏72px أيقوناتٌ وحدَها، والاسمُ في «title» وفي قارئ الشاشة (النصّ يُخفى بصريًّا لا يُنزَع)،
+   والعددُ نقطةٌ على الأيقونة لا رقمٌ يُقصّ */
+@media${atLeast('tab')}{
+  html[data-rail=mini] .app{grid-template-columns:var(--rail-mini) minmax(0,1fr)}
+  html[data-rail=mini] .rail .brand,html[data-rail=mini] .rail .scope,html[data-rail=mini] nav.tabs .lbl{display:none}
+  html[data-rail=mini] .rail-head{flex-direction:column; padding-inline:var(--s-2)}
+  html[data-rail=mini] .rail-fold{margin-inline-start:0}
+  html[data-rail=mini] nav.tabs{padding-inline:var(--s-2)}
+  html[data-rail=mini] nav.tabs a{justify-content:center; padding-inline:0; position:relative}
+  html[data-rail=mini] nav.tabs a > span:not(.count),html[data-rail=mini] .rail-foot .pill{position:absolute; width:var(--ul); height:var(--ul);
+    overflow:hidden; clip-path:inset(50%); white-space:nowrap}
+  html[data-rail=mini] nav.tabs a .count{position:absolute; top:var(--s-1); inset-inline-end:var(--s-2); margin:0}
+}
+/* ‏اللوحُ (‏768–1023، §4.2): الرافدةُ مطويّةٌ أصلًا بلا سكربت، وتتّسع **طبقةً فوق المحتوى** حين يُمرّ عليها
+   أو يدخلها التركيز (لمسٌ أو لوحُ مفاتيح) — فلا تدفع المحتوى ولا تحتاج زرًّا. وزرُّ الطيّ لا معنى له هنا */
+@media${atLeast('md')} and ${below('tab')}{
+  .app{grid-template-columns:var(--rail-mini) minmax(0,1fr)}
+  .rail{width:var(--rail-mini); z-index:45; transition:width var(--dur-2) var(--ease-out), box-shadow var(--dur-2) var(--ease-out)}
+  .rail:hover,.rail:focus-within{width:var(--rail-w); box-shadow:var(--sh-3)}
+  .rail-fold{display:none}
+  .rail:not(:hover):not(:focus-within) .brand,.rail:not(:hover):not(:focus-within) .scope,
+  .rail:not(:hover):not(:focus-within) nav.tabs .lbl{display:none}
+  .rail:not(:hover):not(:focus-within) .rail-head{padding-inline:var(--s-2); justify-content:center}
+  .rail:not(:hover):not(:focus-within) nav.tabs{padding-inline:var(--s-2)}
+  .rail:not(:hover):not(:focus-within) nav.tabs a{justify-content:center; padding-inline:0; position:relative}
+  .rail:not(:hover):not(:focus-within) nav.tabs a > span:not(.count),
+  .rail:not(:hover):not(:focus-within) .rail-foot .pill{position:absolute; width:var(--ul); height:var(--ul); overflow:hidden; clip-path:inset(50%); white-space:nowrap}
+  .rail:not(:hover):not(:focus-within) nav.tabs a .count{position:absolute; top:var(--s-1); inset-inline-end:var(--s-2); margin:0}
+}
+/* ‏الهاتف (§4.3): رأسٌ مختصر — العلامةُ والعنوانُ والجرسُ والحساب؛ والبحثُ في «المزيد»، والحالُ في بطاقة الآلة.
+   وذيلُ الرافدة لا يُرى في شريط الإبهام: الإعداداتُ في «المزيد» */
+@media${below('md')}{
+  .topbar > .cmdk-open,.topbar > .pill{display:none}
+  .rail-foot{display:none}
+  /* ‏والمحتوى لا يختفي تحت «منشور جديد» العائم: حشوٌ بقدره فوق الشريط */
+  body:has(details.fab) .content{padding-bottom:calc(var(--s-16) + var(--s-16) + var(--safe-b))}
+}
+/* ‏تنبيهُ النظام الواحد (§4.4): أرضُ الخطر الخافتة، وأيقونةٌ ونصٌّ وفعلٌ واحد وإغلاقٌ مؤقّت */
+.sys-banner{display:flex; align-items:center; flex-wrap:wrap; gap:var(--s-3); padding:var(--s-3) var(--s-4);
+  margin-bottom:var(--s-4); border-radius:var(--r-card); border:var(--bd); color:var(--ink);
+  font-size:var(--t-ui); line-height:var(--lh-ui)}
+.sys-banner.bad{background:var(--bad-wash); border-color:var(--bad)}
+.sys-banner.warn{background:var(--warn-wash); border-color:var(--warn)}
+.sys-banner .toast-t{min-width:0; flex:1 1 16rem}
+.sys-banner[hidden]{display:none}
 `

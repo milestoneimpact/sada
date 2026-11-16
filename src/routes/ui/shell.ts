@@ -193,7 +193,8 @@ if(d==='compact')document.documentElement.dataset.density=d;
 var z=localStorage.getItem('sada-size');
 if(z==='large')document.documentElement.dataset.size=z;
 var mo=localStorage.getItem('sada-motion');
-if(mo==='reduced')document.documentElement.dataset.motion=mo;}catch(e){}
+if(mo==='reduced')document.documentElement.dataset.motion=mo;
+if(localStorage.getItem('sada-rail')==='mini')document.documentElement.dataset.rail='mini';}catch(e){}
 if(typeof window!=='undefined'&&window.addEventListener){['pagereveal','pageswap'].forEach(function(n){window.addEventListener(n,function(e){var t=e.viewTransition;if(!t)return;
 var no=function(){};[t.ready,t.finished,t.updateCallbackDone].forEach(function(p){if(p&&p.catch)p.catch(no);});});});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;
@@ -297,14 +298,13 @@ export function soloPage(
   rail?: string,
 ): string {
   // ‏الجسدُ والرافدةُ مرسومان في وحداتٍ لم تُحوَّل بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
-  const inner = html`${raw(backNav(back.href, back.label))}
-         <main id="main">${raw(back.at === undefined ? '' : familyTabs(back.at))}${raw(body)}</main>`
+  const inner = html`<main id="main">${raw(back.at === undefined ? '' : familyTabs(back.at))}${raw(body)}</main>`
   return shell(
     title,
     html`<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        ${rail === undefined
-         ? html`<div class="wrap">${inner}</div>`
-         : html`<div class="app">${raw(rail)}<div class="main"><div class="wrap">${inner}</div></div></div>`}`.value,
+         ? html`${raw(pageTop())}<div class="wrap">${inner}</div>`
+         : html`<div class="app">${raw(rail)}<div class="main">${raw(pageTop())}<div class="wrap">${inner}</div></div></div>`}`.value,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -321,22 +321,21 @@ export function bell(unread: number | null): string {
   return html`<a class="bell" href="/panel/notices" aria-label="${n > 0 ? 'الإشعارات: ' + n + ' جديدة' : 'الإشعارات'}" data-tip="${n > 0 ? 'الإشعارات: ' + n + ' جديدة' : 'الإشعارات'}">${raw(ICON.bell)}${n > 0 ? raw(count(n, { label: n + ' جديدة' })) : ''}</a>`.value
 }
 
-export function backNav(href: string, label: string): string {
-  /*
-   * **والعلامةُ في الشريط** (D-140): الشاشةُ المستقلّة كانت تبدأ بسهم عودةٍ
-   * وحدَه، فتُقرأ صفحةً خارج التطبيق. والعلامةُ بجانب السهم تقول «هذه من
-   * صدى» قبل أن يُقرأ العنوان — وهي بابٌ إلى اللوحة كذلك.
-   *
-   * **والسهمُ مرسومٌ لا حرف** (D-167): «→» ليس في خطٍّ مضمَّن (N-7)، فكان
-   * يُرسَم بخطّ النظام. و`ICON.back` يشير إلى بداية السطر — اليمين هنا.
-   */
-  // ‏العلامةُ والرمزُ ثابتان في الشيفرة يُخرَجان نصًّا لوحداتٍ لم تُحوَّل، وزرُّ الأوامر والقائمةُ من
-  // ‏العُدّة: كلُّها تُوثَق عند الحدّ (D-281)
-  return html`<nav class="back" aria-label="مسار العودة">
-    <a class="home" href="/panel" aria-label="صدى — اللوحة">${raw(wordmark(false))}<span class="glyph glyph-sm">${raw(GLYPH_SVG)}</span></a>
-    <a href="${href}">${raw(ICON.back)}${label}</a>
-    <span class="grow"></span>${raw(bell(null))}${raw(commandTrigger())}${raw(accountMenu())}
-  </nav>`.value
+/**
+ * رأسُ الصفحة الموحَّد (D-381، §4.1) — **رأسٌ واحدٌ في كلّ صفحة، ولا رابطَ رجوع**.
+ *
+ * كان للصفحة المستقلّة شريطُ عودةٍ («‹ المنشورات»، D-140 وD-167) وللّوحة رأسٌ ثانٍ، فكانت الصفحةُ تُقرأ
+ * بنمطين. والرافدةُ (D-178) صارت في كلّ صفحةٍ بقسمها معلَّمًا، فالرجوعُ بابُها لا سهمٌ. فالرأسُ هنا ما في
+ * رأس اللوحة نفسِه: العلامةُ بابًا إلى الرئيسيّة (على الهاتف وحدَه، حيث لا رافدة)، ثمّ «بحث وأوامر» بشكل
+ * حقلٍ ومعه `Ctrl K`، ثمّ الإشعاراتُ والحساب. **والعنوانُ `h1` أوّلُ ما في المحتوى تحته**: رأسُ الصفحة
+ * (`.page-head`) يحمل معه وصفَه وفعلَه، فنقلُه إلى الشريط يفصل العنوانَ عن فعله.
+ */
+export function pageTop(): string {
+  // ‏العلامةُ والرمزُ ثابتان في الشيفرة، وزرُّ الأوامر والقائمةُ من العُدّة: تُوثَق عند الحدّ (D-281)
+  return html`<header class="topbar page-top">
+    <a class="home glyph tb" href="/panel" aria-label="صدى — الرئيسيّة">${raw(GLYPH_SVG)}</a>
+    <span class="grow"></span>${raw(commandTrigger())}${raw(bell(null))}${raw(accountMenu())}
+  </header>`.value
 }
 
 /**

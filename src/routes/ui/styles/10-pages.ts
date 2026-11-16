@@ -3,16 +3,6 @@ export const PAGES = `/* ══ شاشةُ المنصّة ═══════�
    بطاقة القناة تجيب «أمربوطة أم لا» — وهو سؤال الضبط، يُسأل مرّةً.
    وهذه تجيب ما يُسأل كلّ يوم: ماذا نُشر، وأين رابطُه، وما فشل ولماذا.
    ولا موضع لأيّ من ذلك في بطاقة عرضُها نصف شاشة. */
-/* شريطُ العودة — صفحةٌ خارج اللوحة تحتاج بابا يُرجَع منه، ولا رافدةَ
-   فيها. و«رجوع» المتصفّح ليس بابا: مَن فتحها في تبويب جديد لا رجوع له. */
-nav.back{display:flex; flex-wrap:wrap; align-items:center; padding:var(--s-3) 0 var(--s-5);
-  border-bottom:var(--bd-soft); margin-bottom:var(--s-4); gap:var(--s-4)}
-nav.back a{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2); text-decoration:none;
-  display:inline-flex; align-items:center; gap:var(--s-1); min-height:var(--tap); min-width:var(--tap)}
-/* ‏والتمريرُ لونٌ **وخطّ** (D-196): الحبرُ الثانويُّ وحبرُ العلامة ليلًا متقاربان ضوءًا، فاللونُ وحدَه لا يُرى */
-@media(hover:hover){nav.back a:hover{color:var(--link); text-decoration:underline; text-underline-offset:var(--ul-off);
-  text-decoration-thickness:var(--ul)}}
-
 .plat-logo{width:var(--s-12); height:var(--s-12); border-radius:var(--r-control); flex:none; display:grid; place-items:center;
   background:var(--surface); border:var(--bd); color:var(--ink);
   box-shadow:var(--sh-1)}

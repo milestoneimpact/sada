@@ -59,7 +59,6 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
 .btn>svg,.btn-icon svg{width:var(--icon-md); height:var(--icon-md); flex:none}
 /* ‏**والاسمُ ليس أيقونة** (مراجعة D-196): «a>svg» كان يطابق «.wordmark» في بابِ اللوحة فيسحقه ‏١٦×١٦ —
    مسار نسبتُه ‏٣٫٢:١ يُرسَم شريطًا ارتفاعُه ‏٥px بين ‏600 و‏899؛ ويقيس «audit_mobile» نسبة كلّ اسم مرسوم */
-nav.back a>svg:not(.wordmark){width:var(--icon-sm); height:var(--icon-sm); flex:none}
 a.chip>svg{width:var(--icon-xs); height:var(--icon-xs); flex:none; vertical-align:-.125em}
 /* ── المعطّل: «aria-disabled» يبقى في ترتيب التركيز فيُقرأ سببُه (خطّة التصميم 7.1) ──
    و«disabled» الأصليّ للنماذج التي لم تُنقَل بعد. وكلاهما نصف شفافيّة، والسبب نصّ تحته
