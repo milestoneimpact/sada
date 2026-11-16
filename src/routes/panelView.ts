@@ -1157,6 +1157,16 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
+  ${/* ‏**«ما ينتظرك» أوّلًا بعرض اللوح** (SPEC-v1 §6.1): ما يوجب يدَ المالك قبل الخطّة والرحلة. */''}
+  <div class="mt-3">
+      <div class="card"><h2>ما ينتظرك</h2>
+        <p class="hint">مولَّد من حال النظام الآن — لا قائمة ثابتة</p>
+        ${todo === ''
+          ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
+          : `<ul class="todo">${todo}</ul>`}
+        <div class="row mt-3">${SCAN_BTN}
+          ${button({ label: 'مراجعة المصادر', size: 'sm', href: '#sources' })}</div></div>
+  </div>
   ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew())}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
@@ -1174,15 +1184,6 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    * ‏**قاعدةُ الحذف** (D-232، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
    * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
    */''}
-  <div class="mt-3">
-      <div class="card"><h2>ما ينتظرك</h2>
-        <p class="hint">مولَّد من حال النظام الآن — لا قائمة ثابتة</p>
-        ${todo === ''
-          ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
-          : `<ul class="todo">${todo}</ul>`}
-        <div class="row mt-3">${SCAN_BTN}
-          ${button({ label: 'مراجعة المصادر', size: 'sm', href: '#sources' })}</div></div>
-  </div>
   ${/*
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
