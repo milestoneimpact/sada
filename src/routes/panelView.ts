@@ -10,7 +10,9 @@
  * - **درجة الاستحقاق مقياس مقدار**، فتدرّجُ هيئةٍ واحدة لا قوس قزح
  * - النصّ يلبس ألوان النصّ لا لون العلامة بجانبه
  */
-import { html, raw } from './ui/html'
+import { rulesLink } from './ui/checksView'
+import { allows } from '../lib/access'
+import { html, raw, type Html } from './ui/html'
 import { agoTag } from './ui/time'
 import { filterBar } from './ui/components/filterbar'
 import { stamp } from '../lib/time/zone'
@@ -1348,6 +1350,9 @@ function postsPane(d: ShellData & PostsData): string {
 </section>`
 }
 
+/** قواعدُ الجدولة (D-383 · المرحلة ٥) لمن يضبطها: المديرُ فأعلى، والجلسةُ القديمةُ بلا دورٍ للمالك. */
+const allowsRules = (role: Role | undefined): boolean => allows(role ?? 'owner', 'admin')
+
 /** «الإعدادات» — الحدودُ والمزوّدون والأمانُ والمنظّمات وما للمطوّر. */
 function settingsPane(d: ShellData & SettingsData): string {
   const missing = d.providers.filter((p) => !p.configured).length
@@ -1425,6 +1430,8 @@ function settingsPane(d: ShellData & SettingsData): string {
       <span class="note self-center">المستهلَك اليوم: ${d.usedClips}</span>
     </form>
   </div>
+
+  ${allowsRules(d.role) ? rulesLink() : ''}
 
   <div class="card mt-3"><h2>سقف الترويج الأسبوعيّ</h2>
     <p class="hint"><b>ومنه وحده يأتي مبلغ التوصية.</b> رقم يؤلّفه صدى رقم بلا مصدر —
