@@ -262,8 +262,9 @@ export function videoStateLabel(state: string | null, error: string | null): str
   if (state === 'processing') return 'تعالجه المنصّة'
   if (state === 'ready') return 'جاهز'
   const hide = (t: string): string => t.replace(/\b\d{6,}\b|urn:li:video:\S+/g, '…')
-  if (state === 'failed') return `لم يُقبل: ${hide(error ?? 'بلا سبب')}`
-  if (state === null && error !== null && error !== '') return `يُرفع من جديد: ${hide(error)}`
+  const clean = (t: string): string => hide(t.replace(/^(?:(?:x|linkedin):\s*)?(?:[a-z_]+:\s*)?/i, ''))
+  if (state === 'failed') return `لم يُقبل: ${clean(error ?? 'بلا سبب')}`
+  if (state === null && error !== null && error !== '') return `يُرفع من جديد: ${clean(error)}`
   return null
 }
 

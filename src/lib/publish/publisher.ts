@@ -483,6 +483,8 @@ export async function publishPost(
       let reupload: string | null = null
       if (expired) {
         if (video.platform_media_resets >= 1) {
+          await db.prepare("UPDATE media SET platform_media_state = 'failed', platform_media_error = ?, platform_media_id = NULL, platform_media_expires_at = NULL WHERE id = ? AND org_id = ?")
+            .bind('انتهى معرّف المقطع بعد إعادة رفعه مرّة', video.id, post.org_id).run()
           throw new PublishError('x: media_expired: انتهى معرّف المقطع عند X بعد أن أُعيد رفعُه مرّة — أعده بيدك بعد أن تتحقّق', 400, false)
         }
         reupload = 'انتهت صلاحيّة معرّف المقطع عند X قبل النشر — رُفع من جديد'

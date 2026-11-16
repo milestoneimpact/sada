@@ -401,7 +401,14 @@ describe('D-379: حالُ المقطع بلسان المالك، والمعرّ�
     expect(videoStateLabel('uploading', null)).toBe('يُرفع الفيديو')
     expect(videoStateLabel('processing', null)).toBe('تعالجه المنصّة')
     expect(videoStateLabel('ready', null)).toBe('جاهز')
-    expect(videoStateLabel('failed', `x: رفض X المقطع ${ID} urn:li:video:C5F1`)).toBe('لم يُقبل: x: رفض X المقطع … …')
+    expect(videoStateLabel('failed', `x: رفض X المقطع ${ID} urn:li:video:C5F1`)).toBe('لم يُقبل: رفض X المقطع … …')
     expect(videoStateLabel(null, null)).toBeNull()
   })
+})
+
+import { videoStateLabel as label379 } from './video'
+import { test as t379, expect as e379 } from 'vitest'
+t379('D-379: سبب الردّ بلا رموز الآلة', () => {
+  e379(label379('failed', 'video_misfit: المقطع 600MB و X لا يقبل فوق 512MB')).toBe('لم يُقبل: المقطع 600MB و X لا يقبل فوق 512MB')
+  e379(label379('failed', 'x: media_rejected: رُدّ')).toBe('لم يُقبل: رُدّ')
 })
