@@ -310,7 +310,7 @@ async function transferMedia(deps: SyncDeps, source: PackageSource, repo: RepoRe
   for (const f of results) {
     if (used + f.size > cap) { deferred += 1; continue }
     const kind = mimeOf(f.path).startsWith('video/') ? 'video' : 'image'
-    const out = await storeBlob(deps.bucket, source.org, repo, commit, { path: f.path, blobSha: f.blob_sha, size: f.size, kind }, deps.fetchImpl)
+    const out = await storeBlob(deps.bucket, source.org, repo, commit, { path: f.path, blobSha: f.blob_sha, size: f.size, kind }, deps.fetchImpl, source.root)
     if (out.result === 'too_big' || out.result === 'lfs') { problems += 1; continue }
     if (out.result === 'stored') { used += f.size; stored += 1 }
     await db.prepare('UPDATE package_files SET r2_key = ? WHERE org_id = ? AND path = ? AND blob_sha = ?').bind(out.key, source.org, f.path, f.blob_sha).run()
