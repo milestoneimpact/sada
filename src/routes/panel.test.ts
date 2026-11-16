@@ -839,7 +839,7 @@ describe('هندسة نظرة عامّة (D-136 · D-232)', () => {
  * بلا رأس. والحارسُ يعدّ `h1` في كلّ `section[data-pane]`.
  */
 describe('رؤوس الألواح (D-137)', () => {
-  it('لكلّ لوح h1 واحد، ونظرة عامّة بلا رأس قصدًا', async () => {
+  it('لكلّ لوح h1 واحد، والشريطُ العلويّ بلا h1 (SPEC-v1 §8 · D-381)', async () => {
     const cookie = await login()
     // ‏**كلُّ مسارٍ يحمل ألواحَه وحدَها** (D-211): الرئيسيّةُ والمنشوراتُ في «/panel»، وكلُّ لوحٍ آخر في مساره
     const PAGES: Record<string, string[]> = {
@@ -858,7 +858,10 @@ describe('رؤوس الألواح (D-137)', () => {
       for (const p of body.split('<section data-pane="').slice(1)) {
         const name = p.slice(0, p.indexOf('"'))
         const h1s = (p.match(/<h1[\s>]/g) ?? []).length
-        expect(h1s, `${path} ${name}`).toBe(name === 'overview' ? 0 : 1)
+        expect(h1s, `${path} ${name}`).toBe(1)
+      }
+      for (const top of page.split('<header class="topbar').slice(1)) {
+        expect(top.slice(0, top.indexOf('</header>')), path).not.toMatch(/<h1[\s>]/)
       }
     }
     expect(html).toContain('<h1>النتائج</h1>')

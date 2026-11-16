@@ -28,6 +28,7 @@ import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
 import { PLAN_BUILD_SCRIPT, planBuildScreen } from '../src/routes/ui/planBuildView'
 import { libraryScreen } from '../src/routes/ui/libraryView'
+import { packageScreen } from '../src/routes/ui/packageView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
@@ -553,6 +554,21 @@ writeAudited(
     }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
   )
 }
+
+// ‏«حزمة المحتوى» (D-366): مزامنةٌ ناجحة ومادّتان ونقلٌ مكتمل
+writeAudited(
+  '/tmp/screen-package.html',
+  soloPage('صدى — حزمة المحتوى', { href: '/panel/library', label: 'المكتبة', at: '/panel/package' },
+    packageScreen({
+      source: { id: 'p1', org: 'o1', owner: 'milestone', repo: 'content', branch: 'main', root: 'week-46', lastCommit: 'a1b2c3d4e5f6a7b8', lastTree: null, lastEtag: null,
+        lastCheckedAt: '2026-11-15 08:00', status: 'ok', error: null, hasHook: true, sealedToken: null, variants: { x: 'dark', linkedin: 'light' }, followUpdates: true },
+      media: [
+        { blobSha: 'b1', itemNo: '01', variant: 'dark', kind: 'video', path: 'week-46/01/x.mp4', bytes: 8_400_000, r2Key: 'k1', version: 1, hasSound: true, coverBlobSha: 'c1', isCurrent: true, supersededBy: null },
+        { blobSha: 'b2', itemNo: '02', variant: 'light', kind: 'image', path: 'week-46/02/li.png', bytes: 420_000, r2Key: 'k2', version: 2, hasSound: false, coverBlobSha: null, isCurrent: true, supersededBy: null },
+      ],
+      tokenReady: true, revisions: [], missing: ['03 · x'], transfer: { total: 2, done: 2 },
+    }), 'n', '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })),
+)
 
 // ‏«عندي خطّة» (D-287): ملفٌّ أو نصٌّ يُلصق، ونوعُ الصورة
 writeAudited(

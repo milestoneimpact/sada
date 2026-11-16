@@ -121,12 +121,14 @@ details.ladder .verdict.bad{color:var(--bad)}
 }
 /* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
 .topbar .glyph.tb{display:none; width:var(--s-8); height:var(--s-8); border-radius:var(--r-control)}
-.topbar h1{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
+a.glyph.tb{position:relative}
+a.glyph.tb::after{content:''; position:absolute; inset:calc((var(--s-8) - var(--tap)) / 2)}
+.topbar .pt{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
 /* ‏وتحت العنوان كلمةُ البيئة لا النطاقُ (D-308): «sada2.basserh.com» لغةُ النظام، و«تجريبيّ» كلمةُ الرافدة نفسُها */
 .topbar .crumb{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 /* ‏والعنوانُ والنطاقُ يُقصّان لا يدفعان «خروج» خارج الشاشة (D-177): بعد رفع الحرف فاض
    الشريط ‏6px عند ‏320 — والزرّ الذي خرج هو الذي يُطلَب حين يُطلَب */
-.topbar h1,.topbar .crumb{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.topbar .pt,.topbar .crumb{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 /* عنوانُ الشريط يظهر **حين يغيب عنوانُ الصفحة** لا قبله.
    وعنوانان متطابقان فوق بعضهما تكرار يُقرأ عيبا؛ وشريط لاصق بلا
    عنوان بعد التمرير يترك القارئ بلا موضع. فالظهور مربوط بالإشارة

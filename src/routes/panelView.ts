@@ -1140,6 +1140,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     .join('')
 
   return `<section data-pane="overview" hidden>
+  <h1 class="vh">${escapeHtml(sectionLabel('overview'))}</h1>
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
     *
@@ -1795,7 +1796,7 @@ ${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, status: s
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
+  <div class="ttl">${/* ‏**عنوانٌ واحدٌ في الصفحة** (SPEC-v1 §8 · D-381): هذا صدى رأسِ اللوح يظهر عند التمرير، فلا يُعدّ عنوانًا ثانيًا — والتركيزُ عند التبديل ينتقل إلى h1 اللوح */''}<p id="pane-title" class="pt m-0" aria-hidden="true">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</p>
     ${d.env === 'production' ? '' : '<div class="crumb">تجريبيّ</div>'}</div>
   <div class="grow"></div>
   ${topNew()}

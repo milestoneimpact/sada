@@ -607,7 +607,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .src-drop>svg{width:var(--icon-lg); height:var(--icon-lg); color:var(--ink-3)}
 .src-drop-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
 .src-drop:has(:focus-visible),.src-drop:has(input:hover){border-color:var(--accent); background:var(--selected)}
-.src-drop input[type=file]{max-width:100%; font:inherit; font-size:var(--t-ui); color:var(--ink-2); cursor:pointer}
+.add-src .field,.src-drop{min-width:0}
+.src-drop input[type=file]{max-width:100%; min-width:0; font:inherit; font-size:var(--t-ui); color:var(--ink-2); cursor:pointer}
 .src-drop input[type=file]::file-selector-button{min-height:var(--tap); margin-inline-end:var(--s-3); padding:0 var(--s-4);
   border:var(--bd); border-radius:var(--r-control); background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer}
 @media(prefers-reduced-motion:reduce){.src-drop{transition:none}}
