@@ -1372,13 +1372,13 @@ function settingsPane(d: ShellData & SettingsData): string {
   <div data-sub id="appearance">
   <p class="hint">كيف تبدو اللوحة لك. <b>والسمة والكثافة والاختصارات تُحفظ في هذا المتصفّح وحده</b>، وبطاقات اللوح في حسابك.</p>
   <div class="card"><h2>السمة والكثافة والاختصارات</h2>
-    <div class="split"><p><b>السمة</b>: «النظام» يتبع جهازَك نهارًا وليلًا.</p>${themeSwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>السمة</b><p class="hint m-0">«النظام» يتبع جهازَك نهارًا وليلًا.</p></div>${themeSwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>الكثافة</b>: «مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p>${densitySwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>الكثافة</b><p class="hint m-0">«مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p></div>${densitySwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>الحركة</b>: «مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في جهازك.</p>${motionSwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>الحركة</b><p class="hint m-0">«مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في جهازك.</p></div>${motionSwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>اختصارات الحرف الواحد</b>: J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p>${shortcutsSwitch()}</div>
+    <div class="split set-row"><div class="set-lbl"><b>اختصارات الحرف الواحد</b><p class="hint m-0">J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p></div>${shortcutsSwitch()}</div>
   </div>
   ${tilePicker(d)}
   </div>

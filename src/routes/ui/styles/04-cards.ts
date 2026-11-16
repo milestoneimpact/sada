@@ -300,7 +300,9 @@ footer.page-foot{display:block; font-size:var(--t-caption); line-height:var(--lh
    تجعلها أربعةَ مواضع («audit_design» على «النتائج»). فأرقامُها الثلاثة سواءٌ بحبر النصّ وقياسِ المؤشّر */
 #success .grid>.tile:first-child .kv-v{font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink); letter-spacing:0}
 /* ‏وما لم يُقَس سطرٌ هادئ لا رقمٌ ذهبيّ كبير (SPEC-v1 §6.4) */
-.tile .kv-v .kv-none{font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-3); letter-spacing:0}
+.tile .kv-v .kv-none{font-size:var(--t-h1); line-height:var(--lh-h1); color:var(--ink-3); letter-spacing:0}
+.tile.is-bad{border-color:var(--bad)}
+.tile .kv-v .kv-un{display:block; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-3); font-family:var(--font-ui)}
 
 /* ‏«يُنشر اليوم» (D-267): الساعةُ ثمّ المنصّةُ بشعارها، سطرًا لكلّ منشور */
 .td-list{list-style:none; margin:0; padding:0; display:grid; gap:var(--s-2)}

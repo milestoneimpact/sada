@@ -389,7 +389,10 @@ export function channelsSection(
    */
   const all = byNeed(views.filter((v) => v.spec.built), now)
   const later = all.filter((v) => !(PLAN_NOW as readonly string[]).includes(v.spec.id) && channelHealth(v, now).kind === 'setup')
-  const built = [...all.filter((v) => !later.includes(v))].sort((a, b) => Number(!(PLAN_NOW as readonly string[]).includes(a.spec.id)) - Number(!(PLAN_NOW as readonly string[]).includes(b.spec.id)))
+  // ‏**وما يحتاج يدَك أوّلًا** (SPEC-v1 §6.7): المنقطعةُ والمقتربُ انقطاعُها قبل منصّات الخطّة المتّصلة، ثمّ الخطّةُ قبل غيرها
+  const plan = (v: ChannelView): number => Number(!(PLAN_NOW as readonly string[]).includes(v.spec.id))
+  const calm = (v: ChannelView): number => Number(channelHealth(v, now).kind === 'connected')
+  const built = [...all.filter((v) => !later.includes(v))].sort((a, b) => calm(a) - calm(b) || plan(a) - plan(b))
   const rest = views.filter((v) => !v.spec.built)
   const kinds = built.map((v) => channelHealth(v, now).kind)
   /*
@@ -403,7 +406,7 @@ export function channelsSection(
     <div class="card tile"><div class="kv-k">متّصلة</div>
       <div class="kv-v">${n('connected')}<em> / ${built.length}</em></div>
       <div class="note">تنشر الآن بلا فعل منك</div></div>
-    <div class="card tile"><div class="kv-k">تحتاج إعادة ربط</div>
+    <div class="card tile${relink > 0 ? ' is-bad' : ''}"><div class="kv-k">تحتاج إعادة ربط</div>
       <div class="kv-v">${relink}</div>
       <div class="note">${relink === 0 ? 'ولا ربط يقترب انقطاعُه' : n('broken') > 0
         ? '<b>النشر متوقّف على المنقطعة</b>' : 'تعمل الآن، وتنقطع بعد أيّام'}</div></div>

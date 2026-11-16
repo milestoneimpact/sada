@@ -163,6 +163,20 @@ ol.steps.wiz.nodot li::before{display:none}
 @media(hover:hover){.tab-item:hover{color:var(--ink); border-bottom-color:var(--line)}}
 .tab-item[aria-current=page],.tab-item[aria-selected=true],.tab-item[aria-pressed=true]{
   color:var(--ink); border-bottom-color:var(--ink)}
+/* ‏«الإعدادات» بعمودين على الحاسوب (SPEC-v1 §6.9): الأقسامُ قائمةٌ عموديّة يمينًا، والمحتوى يسارًا.
+   والمراسي والسكربتُ كما هي: الشريطُ نفسُه يُرسَم عموديًّا، وبلا سكربتٍ تبقى الأقسامُ كلُّها في العمود الثاني */
+@media${atLeast('tab')}{
+  section[data-pane=settings]:not([hidden]){display:grid; grid-template-columns:13rem minmax(0,1fr); column-gap:var(--s-6); align-items:start}
+  section[data-pane=settings]>*{grid-column:1 / -1}
+  section[data-pane=settings]>[data-sub]{grid-column:2}
+  section[data-pane=settings]>#settings-sub{grid-column:1; grid-row:2 / span 40; position:sticky; top:var(--s-4);
+    flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:var(--s-1); box-shadow:none}
+  #settings-sub .tab-item{border-bottom:0; border-inline-start:var(--stroke) solid transparent}
+  #settings-sub .tab-item[aria-current=page],#settings-sub .tab-item[aria-selected=true]{border-inline-start-color:var(--ink); background:var(--selected)}
+}
+/* ‏وكلُّ إعداد صفٌّ: التسميةُ ووصفُها، والعنصرُ في الطرف */
+.set-row{align-items:center}
+.set-lbl{display:grid; gap:var(--s-1); min-width:0}
 /* الصفُّ الفرعيّ «tabs({ sub })» — فرزٌ داخل التبويب لا تبويبٌ ثانٍ */
 .tab-sub{align-items:center; box-shadow:none; margin-top:calc(-1 * var(--s-2))}
 /* ‏صفُّ فرز المسوّدات شريطُ فلترٍ واحد (D-276) و«؟» آخرَه، والمختارُ في قائمتَيه بعلامة */

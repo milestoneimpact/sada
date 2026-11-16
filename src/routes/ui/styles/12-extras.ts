@@ -601,6 +601,16 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* «أضف مصدرًا» (D-343): نموذجان جنبًا إلى جنب حيث يتّسع، ومتتابعان حيث يضيق */
 /* وحقلُ الملفّ هدفُ لمسٍ كاملٌ كسائر الحقول */
 .add-src input[type=file]{min-height:var(--tap); padding-block:var(--s-2)}
+.src-drop{display:grid; justify-items:center; gap:var(--s-2); padding:var(--s-5) var(--s-4); text-align:center;
+  border:var(--stroke) dashed var(--line); border-radius:var(--r-control); background:var(--surface-2); color:var(--ink-2);
+  transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
+.src-drop>svg{width:var(--icon-lg); height:var(--icon-lg); color:var(--ink-3)}
+.src-drop-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.src-drop:has(:focus-visible),.src-drop:has(input:hover){border-color:var(--accent); background:var(--selected)}
+.src-drop input[type=file]{max-width:100%; font:inherit; font-size:var(--t-ui); color:var(--ink-2); cursor:pointer}
+.src-drop input[type=file]::file-selector-button{min-height:var(--tap); margin-inline-end:var(--s-3); padding:0 var(--s-4);
+  border:var(--bd); border-radius:var(--r-control); background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer}
+@media(prefers-reduced-motion:reduce){.src-drop{transition:none}}
 .add-src{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); align-items:start}
 /* مكتبةُ الأصول (D-347): شريطُ البحث صفٌّ ينكسر، وعلاماتُ البلاطة تحت أفعالها */
 .lib-find{display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--s-3); margin-bottom:var(--s-4)}
@@ -880,5 +890,13 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pk-text{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit}
 .pk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center}
 .pk-prog{gap:var(--s-2)}
+.task-id{flex:none; font-size:var(--t-ui); color:var(--ink-2); margin-inline-end:var(--s-2)}
+.task-h{margin:var(--s-3) 0 var(--s-1); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
+.task-h:first-child{margin-top:0}
+.task-how{margin-block:var(--s-2) var(--s-4)}
+.pk-sync{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap:var(--s-2)}
+.pk-sync form,.pk-sync .btn{display:flex; inline-size:100%; justify-content:center}
+.pk-foot{display:flex; justify-content:flex-end; padding-top:var(--s-3); border-top:var(--bd)}
+.pk-foot .btn-danger{background:transparent; background-image:none; border-color:transparent; box-shadow:none}
 .pk-prog progress{inline-size:100%; block-size:var(--s-2); accent-color:var(--link)}
 `

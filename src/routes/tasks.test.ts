@@ -51,7 +51,7 @@ const chip = (h: string): { done: number; todo: number; unknown: number } | null
   return m === null ? null : { done: Number(m[1]), todo: Number(m[2]), unknown: Number(m[3]) }
 }
 /** ‏رموزُ المهامّ المرسومة في الصفحة، معلّقةً أو مطويّةً فيما تمّ. */
-const codesIn = (h: string): string[] => [...h.matchAll(/<bdi dir="ltr">(M-\d+)<\/bdi><\/small>/g)].map((m) => m[1]!)
+const codesIn = (h: string): string[] => [...h.matchAll(/<bdi class="task-id mono" dir="ltr">(M-\d+)<\/bdi>/g)].map((m) => m[1]!)
 
 describe('الباب', () => {
   it('لا يُفتَح بلا جلسة', async () => {
@@ -439,10 +439,11 @@ describe('مهامّ الربط في «تفتح قدرة» (ر-1 · متابعة
 })
 
 describe('«ما عليك» بلغة المالك (D-203)', () => {
-  it('العنوان أوّل الصفّ والرمز صغير بعده، ولا مسار ملفّ نصًّا ظاهرًا — في الصفحتين', async () => {
+  // ‏SPEC-v1 §6.8 · D-381: رأسُ الطيّة المعرّفُ ثمّ العنوانُ ثمّ الوسوم
+  it('المعرّف أوّل رأس الطيّة ثمّ العنوان، ولا مسار ملفّ نصًّا ظاهرًا — في الصفحتين', async () => {
     for (const html of [await open(), await later()]) {
       expect(html).not.toMatch(/<span class="mono">M-\d+<\/span>/)
-      expect(html).toMatch(/<small class="ago"><bdi dir="ltr">M-\d+<\/bdi><\/small>/)
+      expect(html).toMatch(/<summary><bdi class="task-id mono" dir="ltr">M-\d+<\/bdi><span class="task-t" id="task-t-M-\d+">/)
       const shown = html.replace(/<[^>]*>/g, ' ')
       expect(shown).not.toMatch(/docs\/|STATUS\.md|PLAN\.md|MANUAL-TASKS\.md/)
       expect(html).toContain('data-tip="docs/MANUAL-TASKS.md">دليل المهامّ اليدويّة</a>')

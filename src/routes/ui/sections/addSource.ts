@@ -9,6 +9,7 @@ import { html, raw } from '../html'
 import { button } from '../components/button'
 import { field } from '../components/field'
 import { card } from '../components/card'
+import { ICON } from '../icons'
 import { UPLOAD_EXTENSIONS } from '../../../lib/sources/ingest'
 
 export function addSourceCard(): string {
@@ -19,7 +20,10 @@ export function addSourceCard(): string {
       <form method="POST" action="/panel/sources/upload" enctype="multipart/form-data" class="stack" data-busy="يُرفع ويُحلَّل…">
         <input type="hidden" name="return" value="library">
         ${raw(field({ id: 'add-src-file', label: 'ملفٌّ أو أكثر', hint: 'PDF وWord وExcel وPowerPoint ونصّ وملفُّ ترجمة مقطع، حتّى 10MB للملفّ.',
-          control: html`<input type="file" id="add-src-file" name="file" accept="${accept}" multiple required>`.value }))}
+          // ‏منطقةُ إسقاطٍ مرسومة (SPEC-v1 §5.6 · §6.5)، والحقلُ الأصليّ **ظاهرٌ فيها** لا شفّاف: بلا سكربتٍ يقول المتصفّحُ
+          // ‏أسماءَ ما اختير، والإسقاطُ على الحقل يعمل في المتصفّحات كلّها
+          control: html`<div class="src-drop">${raw(ICON.sources)}<span class="src-drop-t" aria-hidden="true">اسحب الملفّات إلى هنا أو اخترها</span>
+            <input type="file" id="add-src-file" name="file" accept="${accept}" multiple required></div>`.value }))}
         <div class="row">${raw(button({ label: 'ارفع وحلّل', type: 'submit' }))}</div>
       </form>
       <form method="POST" action="/panel/sources/link" class="stack" data-busy="يُقرأ الرابط…">

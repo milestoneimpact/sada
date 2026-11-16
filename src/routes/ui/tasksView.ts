@@ -81,11 +81,11 @@ function item(r: OwnerRow, env: string, open: boolean): string {
   const opens = OPENS[r.unblocks]
   const urgent = key === 'todo' && r.unblocks === 'gate'
   return `<details class="setup task${urgent ? ' urgent' : ''}"${open ? ' open' : ''}>
-    <summary><span class="task-t" id="task-t-${escapeHtml(r.code)}">${bold(r.title)} <small class="ago"><bdi dir="ltr">${escapeHtml(r.code)}</bdi></small></span>
+    <summary><bdi class="task-id mono" dir="ltr">${escapeHtml(r.code)}</bdi><span class="task-t" id="task-t-${escapeHtml(r.code)}">${bold(r.title)}</span>
       <span class="grow"></span>${statusBadge(opens.cls, '●', opens.label)} ${statusBadge(mark.cls, mark.g, mark.label)}</summary>
     <div class="setup-body">
-      ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<div class="sub">${bold(r.ifLeft)}</div>
-      ${r.measured === '' ? '' : `<div class="sub">${bold(r.measured)}</div>`}
+      ${/* ‏«div» لا «p»: فقرةُ المتن تحمل هامشًا بالحرف (‏14px) خارجَ السلّم، و«.sub» هامشُها من السلّم */ ''}<h4 class="task-h">ما يقع إن تُرك</h4><div class="sub">${bold(r.ifLeft)}</div>
+      ${r.measured === '' ? '' : `<h4 class="task-h">كيف يُقاس</h4><div class="sub">${bold(r.measured)}</div>`}
       ${commandBox(r, env)}
       ${r.state === true ? '' : `<div class="row gap-2 mt-2">
         ${r.go === undefined
@@ -285,8 +285,9 @@ function listCard(rows: readonly OwnerRow[], env: string, kinds: readonly Unbloc
     <div class="card-head"><h2>القائمة</h2><div class="grow"></div>
       <span class="chip">${done.length} تمّت · ${todo.length} عليك · ${
         unknown.length} لا تُعرَف</span></div>
+    <details class="fold task-how"><summary><span>كيف تعمل هذه القائمة</span></summary>
     <p class="hint"><b>الحالُ يُقرأ من صدى نفسِه</b>، ولا يُكتَب بيد. وما يقع عند المنصّة يُقال «لا يُعرَف من هنا».</p>
-    <p class="hint">${join(kinds.map((k) => html`<b>«${OPENS[k].label}»</b>: ${raw(bold(OPENS[k].why))}.`), html` `)}</p>
+    <p class="hint">${join(kinds.map((k) => html`<b>«${OPENS[k].label}»</b>: ${raw(bold(OPENS[k].why))}.`), html` `)}</p></details>
     ${raw(list(rows.filter((r) => r.state !== true), env))}
     ${done.length === 0
       ? ''

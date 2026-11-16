@@ -48,12 +48,15 @@ function progressLine(s: PackageSource, t: { readonly total: number; readonly do
       ${live ? raw('<meta http-equiv="refresh" content="6">') : ''}</div>`
 }
 
-
-function statusLine(s: PackageSource, zone: string | null): Html {
-  const face = s.status === 'ok' ? statusBadge('ok', '●', 'متصل')
+/** وسمُ الحال — في رأس بطاقة «المزامنة» بارزًا (SPEC-v1 §6.6). */
+function statusFace(s: PackageSource): string {
+  return s.status === 'ok' ? statusBadge('ok', '●', 'متصل')
     : s.status === 'partial' ? statusBadge('warn', '…', 'يُكمل النقل')
       : s.status === 'failed' ? statusBadge('bad', '!', 'تعذّرت المزامنة') : statusBadge('', '○', 'لم يُزامَن بعد')
-  return html`<p class="m-0">${raw(face)} · آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi>${localWhen(s.lastCheckedAt, zone)}</bdi>`}</p>
+}
+
+function statusLine(s: PackageSource, zone: string | null): Html {
+  return html`<p class="m-0">آخر دفعة <bdi dir="ltr">${short(s.lastCommit)}</bdi>${s.lastCheckedAt === null ? '' : html` · فُحص <bdi>${localWhen(s.lastCheckedAt, zone)}</bdi>`}</p>
     ${s.error === null ? html`` : html`<p class="hint m-0">${s.error}</p>${fixList(fixFor(s.error))}`}`
 }
 
@@ -161,16 +164,18 @@ export function packageScreen(m: PackageScreen): string {
     body: html`<p class="m-0">صدى لا تقرأ المستودع الخاصّ بلا رمز قراءة. خطواتُه في «ما عليك».</p>`.value }))
   const hook = m.hook === undefined ? html`` : raw(card({ variant: 'alert', tone: 'ok', title: 'انسخ هذين الآن — لا يُعرضان ثانية', level: 2,
     body: html`<p class="m-0">Payload URL: <code dir="ltr">${m.hook.url}</code></p><p class="m-0">Secret: <code dir="ltr">${m.hook.secret}</code></p>`.value }))
-  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, body: html`${statusLine(s, m.zone ?? null)}${progressLine(s, m.transfer)}
-    <form method="post" action="/panel/package" class="row">
-      <input type="hidden" name="do" value="sync">${raw(button({ label: 'زامن الآن', variant: 'primary', type: 'submit' }))}</form>
-    <form method="post" action="/panel/package" class="row">
-      <input type="hidden" name="do" value="test">${raw(button({ label: 'اختبر الرمز', type: 'submit' }))}
-      <span class="hint">قراءتان مجّانيّتان: المستودع ثمّ الفرع.</span></form>
-    <form method="post" action="/panel/package" class="row">
-      <input type="hidden" name="do" value="hook">${raw(button({ label: s.hasHook ? 'أعد توليد سرّ التحديث الفوري' : 'اربط التحديث الفوري', type: 'submit' }))}</form>
-    <form method="post" action="/panel/package" class="row">
-      <input type="hidden" name="do" value="disconnect">${raw(button({ label: 'افصل المستودع', variant: 'danger', type: 'submit' }))}</form>`.value }))
+  // ‏صفُّ الأفعال بعرضٍ متساوٍ: الأوّليّ ثمّ الثانويّان، والفصلُ وحده في التذييل بخطرٍ هادئ (SPEC-v1 §6.6)
+  const act = (verb: string, b: string): Html => html`<form method="post" action="/panel/package"><input type="hidden" name="do" value="${verb}">${raw(b)}</form>`
+  const acts = s === null ? [] : [
+    act('sync', button({ label: 'زامن الآن', variant: 'primary', type: 'submit' })),
+    act('test', button({ label: 'اختبر الرمز', type: 'submit' })),
+    act('hook', button({ label: s.hasHook ? 'أعد توليد سرّ التحديث الفوري' : 'اربط التحديث الفوري', type: 'submit' })),
+    act('disconnect', button({ label: 'افصل المستودع', variant: 'danger', type: 'submit' })),
+  ]
+  const actions = s === null ? html`` : raw(card({ title: 'المزامنة', level: 2, action: statusFace(s), body: html`${statusLine(s, m.zone ?? null)}${progressLine(s, m.transfer)}
+    <div class="pk-sync">${acts.slice(0, 3)}</div>
+    <p class="hint m-0">قراءتان مجّانيّتان: المستودع ثمّ الفرع.</p>
+    <div class="pk-foot">${acts[3]}</div>`.value }))
   const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
   return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? [], m.zone ?? null))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

@@ -352,7 +352,7 @@ export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {
   const tile = (k: string, v: string, note: string): string =>
     `<div class="card tile"><div class="kv-k">${k}</div><div class="kv-v">${v}</div><div class="note">${escapeHtml(note)}</div></div>`
   // ‏وما لم يُقَس لا يُرسَم بذهب العرض: سطرٌ هادئ بحبر ثالث (SPEC-v1 §6.4)
-  const num = (n: number | null): string => (n === null ? '<span class="kv-none">لم يُقَس</span>' : n.toLocaleString('en-US'))
+  const num = (n: number | null): string => (n === null ? '<span class="kv-none">—</span><span class="kv-un">لم يُقَس بعد</span>' : n.toLocaleString('en-US'))
   const imp = total(cur, 'impressions'), act = total(cur, 'interactions')
   return `<div class="card grid tiles c3 mb-4">
     ${tile('الظهور', num(imp), delta(imp, prev === null ? null : total(prev, 'impressions'), prev !== null))}
