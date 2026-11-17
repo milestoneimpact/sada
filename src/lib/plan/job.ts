@@ -28,12 +28,12 @@ import { anthropicChat } from '../ai/anthropic'
 import { chatCompletion } from '../ai/openaiCompat'
 import { portableSchema } from '../ai/portableSchema'
 import { spentOf, type Spent } from '../ai/spent'
-import { localToUtc } from '../time/local'
 import {
   applyTimes, asSpan, CALL_CAP, DEFAULT_CHANNELS, EMPTY_CHOICES, maxItems, parsePlan, planSchema, readChoices, spanDays, systemPrompt, userPrompt, weekStart,
   type Cadence, type Plan, type PlanChoices, type PlanImageStyle, type PlanPlatform, type PlanSource, type PlanSpan,
 } from './prompt'
 import type { Db } from '../tokens'
+import { localizePlan } from './timeBasis'
 
 /** أقلُّ ما يُخطَّط له: مصدرٌ واحدٌ محلَّل لا يصنع أسبوعا — والفكرةُ تُعدّ مادّة. */
 export const MIN_SOURCES = 2
@@ -345,18 +345,8 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   }
   await tell(windows.length)
   // ‏وأوقاتُ المالك لكلّ منصّة تغلب ما كتبه المخطِّط، ولكلّ بندٍ معرّفُه (D-329)
-  const zone = deps.zone ?? null
-  const timed = applyTimes(
-    parts.flatMap((p) => p.plan.items),
-    deps.times ?? {},
-    (day, time) => {
-      const [y, mo, d] = day.split('-').map(Number)
-      const [h, mi] = time.split(':').map(Number)
-      const at = localToUtc(y!, mo!, d!, h!, mi!, zone)
-      return at === null ? null : { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16) }
-    },
-    (day) => day >= start && day < addDays(start, spanDays(span)),
-  )
+  // ‏ويبقى البندُ بتوقيت المالك (D-384): التحويلُ إلى UTC عند الجدولة وحدها
+  const timed = applyTimes(parts.flatMap((p) => p.plan.items), deps.times ?? {})
   const merged: Plan = {
     rationale: [...new Set(parts.map((p) => p.plan.rationale).filter((r) => r !== ''))].join(' ثمّ '),
     items: timed.map((item) => ({ ...item, id: crypto.randomUUID().replace(/-/g, '').slice(0, 10) })),
@@ -371,7 +361,7 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   const choices: PlanChoices = {
     channels, cadence, sources: only === 'all' ? 'all' : [...only], ideas, assets: [...(deps.assets ?? [])],
     autoImage: deps.autoImage === true, imageStyle: deps.imageStyle ?? 'infographic', startDay: start,
-    imageStyles: deps.imageStyles ?? {}, times: deps.times ?? {}, zone: zone ?? '',
+    imageStyles: deps.imageStyles ?? {}, times: deps.times ?? {}, zone: deps.zone ?? '',
   }
   const planId = crypto.randomUUID()
   await deps.db
@@ -383,7 +373,7 @@ export async function planSpan(deps: PlanDeps): Promise<PlanOutcome> {
   // ‏الحذفُ والإدراجُ معا أو لا شيء (D-270): سقوطٌ بينهما كان يضيّع خطّةَ المدى ودفعَ ثمنها
   const remove = deps.db.prepare('DELETE FROM plans WHERE org_id = ? AND week_start = ? AND span = ?').bind(org, start, span)
   const insert = deps.db
-    .prepare('INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json) VALUES (?, ?, ?, ?, ?, ?, ?, ?)')
+    .prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, time_basis) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'local')")
     .bind(planId, start, JSON.stringify(merged), ran, 'draft', org, span, JSON.stringify(choices))
   if (deps.db.batch !== undefined) await deps.db.batch([remove, insert])
   else { await remove.run(); await insert.run() }
@@ -417,6 +407,18 @@ export interface StoredPlan {
   readonly lockedAt?: string | null
 }
 
+/**
+ * صفٌّ بـ `time_basis = 'utc'` (قبل 0064 · D-384) يُحوَّل بنودُه إلى توقيت المالك مرّةً ويُعاد قراءتُه، فلا يرى قارئٌ
+ * خطّةً بتوقيتين.
+ */
+async function localRow(db: Db, org: string, row: Record<string, string> | null): Promise<Record<string, string> | null> {
+  if (row === null || row['time_basis'] !== 'utc') return row
+  await localizePlan(db, org, String(row['id']))
+  return await db.prepare(`SELECT ${PLAN_COLUMNS} FROM plans WHERE org_id = ? AND id = ?`).bind(org, String(row['id'])).first<Record<string, string>>() ?? row
+}
+
+const PLAN_COLUMNS = 'id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at, time_basis'
+
 /** صفُّ `plans` إلى خطّةٍ مخزونة — مشتركٌ بين `latestPlan` و`planForPeriod`. */
 function storedOf(row: Record<string, string>): StoredPlan {
   return {
@@ -436,10 +438,11 @@ function storedOf(row: Record<string, string>): StoredPlan {
 /** خطّةُ الشهر بقيدها الفريد `(org_id, period)` (0061)، أو `null`. */
 export async function planForPeriod(db: Db, org: string, period: string): Promise<StoredPlan | null> {
   try {
-    const row = await db.prepare(`SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+    const row = await db.prepare(`SELECT ${PLAN_COLUMNS} FROM plans
                                     WHERE org_id = ? AND period = ? AND status <> 'superseded' ORDER BY created_at DESC LIMIT 1`)
       .bind(org, period).first<Record<string, string>>()
-    return row === null ? null : storedOf(row)
+    const local = await localRow(db, org, row)
+    return local === null ? null : storedOf(local)
   } catch {
     return null
   }
@@ -448,10 +451,11 @@ export async function planForPeriod(db: Db, org: string, period: string): Promis
 /** خطّةٌ بمعرّفها في منظّمتها، ما لم تُستبدَل — لما يُرسل معرّفَه (شاشةُ الشهر، والإصلاح، والمراجعة). */
 export async function planForId(db: Db, org: string, id: string): Promise<StoredPlan | null> {
   try {
-    const row = await db.prepare(`SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+    const row = await db.prepare(`SELECT ${PLAN_COLUMNS} FROM plans
                                     WHERE org_id = ? AND id = ? AND status <> 'superseded'`)
       .bind(org, id).first<Record<string, string>>()
-    return row === null ? null : storedOf(row)
+    const local = await localRow(db, org, row)
+    return local === null ? null : storedOf(local)
   } catch {
     return null
   }
@@ -462,14 +466,14 @@ export async function latestPlan(db: Db, org = 'org_owner'): Promise<StoredPlan 
   try {
     const row = await db
       .prepare(
-        `SELECT id, week_start, plan_json, model, status, created_at, span, choices_json, version, locked_at FROM plans
+        `SELECT ${PLAN_COLUMNS} FROM plans
           WHERE org_id = ? AND status <> 'superseded' AND model <> 'package' -- ‏خطّةُ الحزمة المعبّأة (0061) لا تُعرض قبل المرحلة ٧
           ORDER BY week_start DESC, created_at DESC LIMIT 1`,
       )
       .bind(org)
       .first<Record<string, string>>()
-    if (row === null) return null
-    return storedOf(row)
+    const local = await localRow(db, org, row)
+    return local === null ? null : storedOf(local)
   } catch {
     // جدولٌ لم يُرحَّل أو JSON فاسد: لوحةٌ بلا خطّةٍ خيرٌ من لوحةٍ لا تُفتح
     return null

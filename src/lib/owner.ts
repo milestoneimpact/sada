@@ -669,6 +669,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏النجاحُ منشوراتٌ تُجدوَل ثمّ تعود معتمدةً على staging، لا في حقائق «ما عليك»
     done: () => null,
   },
+  {
+    code: 'M-63',
+    title: 'صحِّح مواعيد منشورات الخطّة المجدولة قبل D-384 (الترحيل ثمّ SQL ثمّ النشر)',
+    ifLeft: 'المنشورات المجدولة من خطّة قبل الإصلاح تُنشر مبكّرة ثلاث ساعات. خطر قائم.',
+    unblocks: 'guard',
+    // ‏النجاحُ معاينةٌ فارغة في Console الخاصّ بـ D1، لا في حقائق «ما عليك»
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

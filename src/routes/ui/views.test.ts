@@ -1203,7 +1203,7 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
     expect(html).not.toMatch(/>youtube</)
   })
 
-  it('موعد البند بمنطقة المالك حين تُعرف (D-203)، والبند مخزَّن بـ UTC', async () => {
+  it('موعد البند كما هو بتوقيت المالك (D-384)، واسمُ المنطقة إن كانت احتياطًا', async () => {
     const { planSection } = await import('./sections/plan')
     const input = {
       plan: {
@@ -1214,8 +1214,9 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
       },
       names: { s: 'مصدر' }, ready: true, analyzed: 2, now: new Date('2026-09-13T00:00:00Z'),
     }
-    expect(planSection({ ...input, zone: 'America/New_York' })).toContain('<div class="mono">2026-09-14 05:00</div>')
-    expect(planSection(input)).toContain('<div class="mono">2026-09-14 12:00 بتوقيت الرياض</div>')
+    // ‏كان البندُ يُقرأ UTC فيُحوَّل (05:00 نيويورك و12:00 الرياض)؛ وهو الآن بتوقيت المالك فلا يُحوَّل
+    expect(planSection({ ...input, zone: 'America/New_York' })).toContain('<div class="mono">2026-09-14 09:00</div>')
+    expect(planSection(input)).toContain('<div class="mono">2026-09-14 09:00 بتوقيت الرياض</div>')
   })
 })
 

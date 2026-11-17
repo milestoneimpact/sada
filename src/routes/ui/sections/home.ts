@@ -22,7 +22,7 @@ import { html, raw, type Html } from '../html'
 import { card } from '../components/card'
 // ‏باسمٍ آخر: «button» اسمُ حقلٍ في حال المنصّة (`h.button`)، وحارسُ القالب يقرأ الاسم
 import { button as kitButton } from '../components/button'
-import { stamp, todayKey } from '../../../lib/time/zone'
+import { todayKey } from '../../../lib/time/zone'
 import { SPAN_LABEL, spanDays } from '../../../lib/plan/prompt'
 import type { StoredPlan } from '../../../lib/plan/job'
 import { dayLabel, shift } from '../planReviewView'
@@ -351,7 +351,7 @@ export function planCard(
       <span><b>${ar(c.ready)}</b> من ${ar(total)} معتمَدة${c.pending > 0 ? ' · ' + ar(c.pending) + ' تنتظرك' : ''}${c.written < total ? ' · ' + ar(total - c.written) + ' تُكتب' : ''}</span></div>
     ${next.length === 0 ? html`` : html`<ol class="hp-next" aria-label="أقربُ ما في الخطّة">${next.map((i) => html`<li>
       <span class="pf-logo rv-pf" data-pf="${i.platform}" aria-hidden="true">${raw(LOGOS[i.platform] ?? '')}</span>
-      <b>${dayLabel(i.day)}</b><bdi class="mono">${stamp(i.day + ' ' + i.time, zone).slice(11, 16)}</bdi><span class="hp-a">${i.angle}</span></li>`)}</ol>`}
+      <b>${dayLabel(i.day)}</b><bdi class="mono">${i.time}</bdi><span class="hp-a">${i.angle}</span></li>`)}</ol>`}
     <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked && !expired ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}</div>
   </div>`.value
 }

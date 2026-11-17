@@ -7,7 +7,7 @@
  */
 import type { ReviewModel, ReviewCard } from '../../lib/plan/review'
 import { postStatus } from '../../lib/status'
-import { stamp } from '../../lib/time/zone'
+import { itemStamp, stamp } from '../../lib/time/zone'
 import { platformLabel } from '../../lib/oauth/providers'
 import { counted, NOUNS } from '../../lib/format'
 import { pageHead } from './parts'
@@ -19,7 +19,7 @@ import { html, raw, type Html } from './html'
 function row(c: ReviewCard, zone: string | null): Html {
   const post = c.post!
   const face = postStatus(post.status)
-  const when = post.scheduledAt === null ? stamp(c.item.day + ' ' + c.item.time, zone) : stamp(post.scheduledAt, zone)
+  const when = post.scheduledAt === null ? itemStamp(c.item.day, c.item.time, zone) : stamp(post.scheduledAt, zone)
   return html`<li class="pf-row"><a class="tap" href="/panel/journey/${post.id}">
     ${raw(statusBadge(face.tone, face.glyph, face.label))}
     <span class="pf-when" dir="ltr">${when.slice(0, 16)}</span>

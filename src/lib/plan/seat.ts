@@ -31,6 +31,7 @@ import { checkAllowance, blockerReason } from '../limits'
 import { askWriter, type BriefDeps } from '../image/brief'
 import { readPeaks } from '../schedule/peak'
 import { localParts } from '../time/zone'
+import { utcToLocalSlot } from './timeBasis'
 import { driveAssetRef, driveMediaRow, parseCsvRecords, readPlan, rowKey, type PlanFacts, type PlanRow } from './import'
 import { PLAN_CHANNELS, spanDays, type PlanItem, type PlanPlatform, type PlanSpan, type PlanImageStyle } from './prompt'
 import { cleanConverted, type ToMarkdown } from '../sources/ingest'
@@ -206,6 +207,11 @@ const SPANS: readonly PlanSpan[] = ['week', '2weeks', 'month', '2months']
  * **يُسكِّن**: الصفُّ السليمُ بندٌ ومسوّدة، والمدى أصغرُ ما يحمل مواعيدَه، والخطّةُ السابقةُ لهذا المدى تُستبدَل كما في
  * `planSpan`. وما يمنعه — منصّةٌ لا تُعرف، أو موعدٌ لم يُفهم أو مضى، أو نصٌّ فارغ — يُسمّى بسطره وسببه.
  */
+/** موعدُ الصفّ بـ UTC إلى يومٍ وساعةٍ بتوقيت المالك (D-384): بندُ الخطّة محلّيٌّ، ولو كتب الصفُّ منطقةً غيرَها. */
+function ownerSlot(whenUtc: string, zone: string): { day: string; time: string } {
+  return utcToLocalSlot(whenUtc.slice(0, 10), whenUtc.slice(11, 16), zone === '' ? null : zone)
+}
+
 export async function seatPlan(
   db: Db, org: string, csv: string, facts: PlanFacts, filled: ReadonlyMap<number, string>, imageStyle: PlanImageStyle | null,
   /** قواعدُ ورقة الإرشادات — تُحفظ مع اختيارات الخطّة. */
@@ -257,7 +263,7 @@ export async function seatPlan(
       const notes = [filled.get(r.line) ?? ''].filter((x) => x !== '')
       const item: PlanItem = {
         sourceId: 'idea:i' + String(importIdeas.length), platform: r.platform as PlanPlatform, kind: 'text',
-        angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
+        angle: [...r.text].slice(0, 120).join(''), ...ownerSlot(r.whenUtc!, facts.zone), why: 'من خطّتك المرفوعة، يُكتب من فكرته',
         ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
         // ‏ووسيطتُه من مكتبة Drive (D-363) على البند: `draftMessage` يحملها، والطابورُ يربطها بالمسوّدة بـ`attachStatement` فلا تُرسم أخرى
         ...(driveAssetRef(r) === null ? {} : { asset: driveAssetRef(r)! }),
@@ -275,7 +281,7 @@ export async function seatPlan(
     const item: PlanItem = {
       // ‏ونصُّ X بسطر `---` بندُ سلسلة (D-324)، كما يكتبه الموجّه
       sourceId: ref, platform: r.platform as PlanPlatform, kind: isThread(r.platform ?? '', r.text) ? 'thread' : 'text',
-      angle: [...r.text].slice(0, 120).join(''), day: r.whenUtc!.slice(0, 10), time: r.whenUtc!.slice(11, 16), why: 'من خطّتك المرفوعة',
+      angle: [...r.text].slice(0, 120).join(''), ...ownerSlot(r.whenUtc!, facts.zone), why: 'من خطّتك المرفوعة',
       ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
     }
     items.push(item)
@@ -328,12 +334,12 @@ export async function seatPlan(
       // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)
       db.prepare("DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github'").bind(org, planId),
       // ‏وخطّةُ الحزمة تبقى خطّةَ حزمة، ويُضاف مصدرُ الملفّ إلى مصادرها
-      db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL,
+      db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL, time_basis = 'local',
                          created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)
         .bind(planJson, keepPackage ? 1 : 0, JSON.stringify(choices), planPeriod, JSON.stringify(keepPackage ? ['github', kind] : [kind]), planId, org),
     )
   } else {
-    statements.push(db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, period, source_kinds) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?, ?, ?)")
+    statements.push(db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, period, source_kinds, time_basis) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?, ?, ?, 'local')")
       .bind(planId, start, planJson, org, span, JSON.stringify(choices), planPeriod, JSON.stringify([kind])))
   }
   statements.push(

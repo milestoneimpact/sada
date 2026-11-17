@@ -152,3 +152,47 @@ WHERE key = 'paused'` ‏`true`؛ و`/ready` ‏`"database":"ok"`؛ و«الحس
 5. **فقدتَ حسابَ Cloudflare أو GitHub**: استرجاعُه عندهما (رموزُ الاسترداد التي حفظتها لهما، أو دعمُهما) — صدى لا يملك بابًا إليه.
 
 **التحقّق**: تدخل وتفتح «الضبط ← الأمان» فترى عاملًا واحدًا على الأقلّ وثمانيةَ رموز استرداد، و«سجلّ النشاط» يقول الدخولَ بطريقه.
+
+## D-384 · تصحيحُ مواعيد منشورات الخطّة المجدولة قبل الإصلاح
+
+**متى**: مرّةً واحدة، **بعد** ترحيل 0064 و**قبل** نشر شيفرة D-384 (تقرأ `time_basis = 'utc'`، والشيفرةُ تحوّلها عند أوّل قراءة).
+**ما يمسّ**: منشوراتٌ `queued` من خطّة معالجٍ أو استيرادٍ أو إضافةٍ يدويّة، موعدُها «البند − 3 ساعات» بالضبط (الرياض UTC+3)، لم تُرسَل، وموعدُها المصحَّح بعد ربع ساعة. ولا يمسّ الحزمة (`package_period`) ولا ما غيّره المالكُ بيده إلى موعدٍ آخر ولا ما جاء من أرجح الساعات.
+**الحذر**: المعاينةُ أوّلًا وحدَها، على staging ثمّ الإنتاج. وإن لم تكن منطقةُ المالك الرياض فبدّل `-3 hours` بفارقها.
+
+```sql
+-- ١ · المعاينة: ما سيتغيّر، ولا يُكتب شيء
+SELECT p.id, p.org_id, p.platform, p.scheduled_at AS was,
+       datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time')) AS becomes
+  FROM posts p
+  JOIN plans pl ON pl.id = p.plan_id AND pl.org_id = p.org_id
+  JOIN json_each(pl.plan_json, '$.items') i
+    ON instr(p.source_refs, '"item:' || json_extract(i.value, '$.id') || '"') > 0
+ WHERE p.status = 'queued' AND p.dispatched_at IS NULL AND p.package_period IS NULL
+   AND pl.model <> 'package' AND pl.time_basis = 'utc'
+   AND p.scheduled_at = datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time'), '-3 hours')
+   AND datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time')) > datetime('now', '+15 minutes');
+
+-- ٢ · التصحيح: الشروطُ نفسُها، وإعادتُه لا تغيّر شيئًا (الموعدُ المصحَّح لا يساوي «البند − 3 ساعات»)
+UPDATE posts
+   SET scheduled_at = (
+         SELECT datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time'))
+           FROM plans pl JOIN json_each(pl.plan_json, '$.items') i
+          WHERE pl.id = posts.plan_id AND pl.org_id = posts.org_id
+            AND instr(posts.source_refs, '"item:' || json_extract(i.value, '$.id') || '"') > 0
+            AND posts.scheduled_at = datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time'), '-3 hours')
+          LIMIT 1),
+       enqueued_for = NULL,
+       rev = rev + 1
+ WHERE id IN (
+   SELECT p.id
+     FROM posts p
+     JOIN plans pl ON pl.id = p.plan_id AND pl.org_id = p.org_id
+     JOIN json_each(pl.plan_json, '$.items') i
+       ON instr(p.source_refs, '"item:' || json_extract(i.value, '$.id') || '"') > 0
+    WHERE p.status = 'queued' AND p.dispatched_at IS NULL AND p.package_period IS NULL
+      AND pl.model <> 'package' AND pl.time_basis = 'utc'
+      AND p.scheduled_at = datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time'), '-3 hours')
+      AND datetime(json_extract(i.value, '$.day') || ' ' || json_extract(i.value, '$.time')) > datetime('now', '+15 minutes'));
+```
+
+**التحقّق**: تعيد المعاينةُ صفرَ صفوف بعد التصحيح، وتُري «المتابعة» المنشورَ في 09:00 بتوقيت المالك.

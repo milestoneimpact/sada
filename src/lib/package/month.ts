@@ -28,8 +28,8 @@ async function monthPlan(db: Db, org: string, period: string): Promise<string> {
   if (had !== null && had.status !== 'superseded') return had.id
   // ‏المُستبدَلةُ لا تحمل الشهر: شاشةُ الشهر لا تراها، فيُترك شهرُها لخطّةٍ حيّة
   if (had !== null) await db.prepare("UPDATE plans SET period = NULL WHERE id = ? AND org_id = ? AND status = 'superseded'").bind(had.id, org).run()
-  await db.prepare(`INSERT OR IGNORE INTO plans (id, week_start, plan_json, model, status, org_id, span, period, source_kinds)
-                    VALUES (?, ?, '{"rationale":"حزمة المحتوى","items":[]}', 'package', 'draft', ?, 'month', ?, '["github"]')`)
+  await db.prepare(`INSERT OR IGNORE INTO plans (id, week_start, plan_json, model, status, org_id, span, period, source_kinds, time_basis)
+                    VALUES (?, ?, '{"rationale":"حزمة المحتوى","items":[]}', 'package', 'draft', ?, 'month', ?, '["github"]', 'local')`)
     .bind(packagePlanId(org, period), period, org, period).run()
   const now = await db.prepare("SELECT id FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'").bind(org, period).first<{ id: string }>()
   return now?.id ?? packagePlanId(org, period)

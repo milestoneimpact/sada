@@ -53,7 +53,7 @@ describe('التسكين', () => {
     const plan = db.raw.prepare("SELECT week_start, span, model, status, plan_json FROM plans").get() as { week_start: string; span: string; model: string; status: string; plan_json: string }
     expect(plan).toMatchObject({ week_start: '2099-01-04', span: 'week', model: 'import', status: 'draft' })
     const items = (JSON.parse(plan.plan_json) as { items: { sourceId: string; day: string; time: string; note?: string }[] }).items
-    expect(items.map((i) => [i.sourceId, i.day, i.time])).toEqual([['import:2', '2099-01-04', '06:00'], ['import:3', '2099-01-06', '10:00']])
+    expect(items.map((i) => [i.sourceId, i.day, i.time])).toEqual([['import:2', '2099-01-04', '09:00'], ['import:3', '2099-01-06', '13:00']]) // ‏بتوقيت المالك كما في الملفّ (D-384)؛ كانت 06:00 و10:00 بـ UTC
     expect(items[1]!.note).toContain('الساعةُ أرجحُ ساعات المنصّة')
     expect(db.raw.prepare("SELECT status, source_refs FROM posts ORDER BY source_refs").all()).toEqual([
       { status: 'draft', source_refs: '["import:2"]' }, { status: 'draft', source_refs: '["import:3"]' },
