@@ -889,7 +889,7 @@ const R1first: Journey = {
   },
   async run({ page, m, stack, leftSite }) {
     m.note(`قائمة البدء في الرئيسيّة: ${await firstRunText(page)}`)
-    const go = visible(page.locator('.card.next a.btn-primary')).first()
+    const go = visible(page.locator('.todo-next a.btn-primary, .empty-ok a.btn-primary')).first()
     const goLabel = ((await go.textContent().catch(() => '')) ?? '').trim()
     await m.tap(go, `«${goLabel || 'الزرّ الأوّليّ'}» في «خطوتك التالية»`, { key: true })
     const at = new URL(page.url())
