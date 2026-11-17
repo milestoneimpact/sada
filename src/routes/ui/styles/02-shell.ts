@@ -3,7 +3,11 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
 /* **«dvh» لا «vh»** (D-086): يحسب iOS مئةً من «vh» بلا شريطِ المتصفّح،
    فيمتدّ العمود تحته ويُقطَع أسفلُه. و«dvh» تتبع المرئيّ وهو يتحرّك.
    والسطر الأوّل احتياط لمتصفّح لا يعرفها — يقرؤه ثمّ يدهسه الثاني. */
-.app{display:grid; grid-template-columns:var(--rail-w) 1fr; min-height:100vh; min-height:100dvh}
+.app{display:grid; grid-template-columns:var(--rail-w) 1fr; min-height:100vh; min-height:100dvh; position:relative; isolation:isolate}
+/* ‏عمودُ الرافدة بسطحها إلى آخر الصفحة (§8): الرافدةُ لاصقةٌ بارتفاع الشاشة، فكان ما تحتها في صفحةٍ طويلة فراغًا بلون الخلفيّة.
+   طبقةٌ خلفها بعرض عمودها، لا تمدُّ الرافدةَ نفسَها (فتبقى لاصقةً ويتمرّر ما فيها وحدَه) */
+.app::before{content:""; position:absolute; z-index:-1; inset-block:0; inset-inline-start:0; width:var(--rail-w);
+  background:var(--surface); border-inline-start:var(--bd)}
 
 /* ── الرافدة ───────────────────────────────────────────────── */
 .rail{background:var(--surface); border-inline-start:var(--bd); display:flex;
@@ -30,7 +34,7 @@ export const SHELL = `/* ══ هيكلُ التطبيق ═══════�
    فيُقرأ المربّع لطخةً — وهي عين العلّة التي مُنعت في رمز التبويب. */
 /* والعلامةُ وحدها تجمع اللونين: نعناعٌ على عمقٍ ثابتان في الوضعين («MARK»، D-196؛ وكانا حبرًا
    ونحاسًا منذ D-144) — ولا يتكرّر هذا الجمع في موضع آخر، فيبقى للعلامة معناها، **وهي أوّل
-   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٢:١ — تذوب**،
+   مواضع الذهب الثلاثة في الشاشة** (D-187). **وأرضُها العميقة على أرض الليل ‏١٫٣٠:١ — تذوب**،
    فحلقتُها «--mark-ring» ليلًا ‏٢:١ فأكثر (D-183) */
 .glyph{display:grid; place-items:center; flex:none; width:var(--s-10); height:var(--s-10); border-radius:var(--r-control);
   background:var(--mark-bg); color:var(--mark-fg);
@@ -121,12 +125,14 @@ details.ladder .verdict.bad{color:var(--bad)}
 }
 /* العلامةُ في الشريط للجوّال وحدَه (D-123): رأسُ الرافدة يختفي هناك */
 .topbar .glyph.tb{display:none; width:var(--s-8); height:var(--s-8); border-radius:var(--r-control)}
-.topbar h1{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
+a.glyph.tb{position:relative}
+a.glyph.tb::after{content:''; position:absolute; inset:calc((var(--s-8) - var(--tap)) / 2)}
+.topbar .pt{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
 /* ‏وتحت العنوان كلمةُ البيئة لا النطاقُ (D-308): «sada2.basserh.com» لغةُ النظام، و«تجريبيّ» كلمةُ الرافدة نفسُها */
 .topbar .crumb{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 /* ‏والعنوانُ والنطاقُ يُقصّان لا يدفعان «خروج» خارج الشاشة (D-177): بعد رفع الحرف فاض
    الشريط ‏6px عند ‏320 — والزرّ الذي خرج هو الذي يُطلَب حين يُطلَب */
-.topbar h1,.topbar .crumb{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.topbar .pt,.topbar .crumb{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 /* عنوانُ الشريط يظهر **حين يغيب عنوانُ الصفحة** لا قبله.
    وعنوانان متطابقان فوق بعضهما تكرار يُقرأ عيبا؛ وشريط لاصق بلا
    عنوان بعد التمرير يترك القارئ بلا موضع. فالظهور مربوط بالإشارة

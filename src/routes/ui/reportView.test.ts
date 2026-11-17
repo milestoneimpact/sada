@@ -180,7 +180,7 @@ describe('ثلاثة أرقام بفرقها في رأس «النتائج» (D-2
   it('وما لم يُقَس يقول ذلك، ولا فرق بلا أسبوع قبله', async () => {
     const { weekKpis } = await import('./reportView')
     const html = weekKpis(week(null, null, 0), null)
-    expect(html).toContain('<div class="kv-v">لم يُقَس</div>')
+    expect(html).toContain('<div class="kv-v"><span class="kv-none">—</span><span class="kv-un">لم يُقَس بعد</span></div>')
     expect(html).toContain('لا أسبوع قبله يُقارَن به')
     expect(weekKpis(week(null, 5, 0), week(10, 5, 0))).toContain('لا يُقارَن: أحد الأسبوعين لم يُقَس')
   })

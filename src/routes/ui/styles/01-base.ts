@@ -53,6 +53,8 @@ code,kbd,samp,pre{font-family:inherit}
    **والقصُّ نفسُه لما يُقرأ ولا يُرى** («.vh»): اسمُ عمودِ الأفعال في الجدول (axe «empty-table-header»). */
 .skip,.vh{position:absolute; width:1px; height:1px; overflow:hidden;
   clip-path:inset(50%); white-space:nowrap}
+/* ‏والمقصوصُ نصٌّ من السلّم كغيره: لا يورث ‏2em و‏700 من «h1» ولا هوامشَ «p» */
+.vh{margin:0; font-size:var(--t-small); line-height:var(--lh-small); font-weight:400}
 .skip{
   background:var(--brand); color:var(--on-brand);
   padding:var(--s-3) var(--s-4); border-radius:var(--r-control); z-index:99; font-weight:600}

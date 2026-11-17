@@ -15,7 +15,7 @@ import { allows } from '../lib/access'
 import { html, raw, type Html } from './ui/html'
 import { agoTag } from './ui/time'
 import { filterBar } from './ui/components/filterbar'
-import { stamp } from '../lib/time/zone'
+import { stamp, zoneNote } from '../lib/time/zone'
 import { relativeTime, money } from '../lib/format'
 import { chosenTiles, TILE_MAX, TILE_MIN, TILES } from '../lib/dashboard'
 import { LIMITS as SETTING_LIMITS } from '../lib/settings'
@@ -24,7 +24,7 @@ import { channelHealth, unsignedAccounts, type ChannelView } from '../lib/channe
 import { channelsSection } from './ui/channels'
 import { buildCommands, commandTrigger, SECTIONS, sectionLabel } from './ui/command'
 import type { Peaks } from '../lib/schedule/peak'
-import { draftsParts, type MediaView, type Target } from './ui/sections/drafts'
+import { approvalTip, draftsParts, type MediaView, type Target } from './ui/sections/drafts'
 import { editorPane } from './ui/sections/editor'
 import { earliestLocal } from './ui/when'
 import { tabs } from './ui/components/tabs'
@@ -47,6 +47,7 @@ import { notice, noticeText, toastRegion } from './ui/components/toast'
 import { field } from './ui/components/field'
 import { card } from './ui/components/card'
 import { button } from './ui/components/button'
+import { systemBanner } from './ui/components/banner'
 import type { Pulse } from '../lib/ops/heartbeat'
 import { areaChart, barChart } from './ui/chart'
 import type { SpendRow } from '../lib/ai/spend'
@@ -1002,7 +1003,7 @@ function topNew(): string {
  * ‏فلا زرّان بالاسم نفسِه في شاشة. والعائمُ يبقى في «المكتبة» ويخرج من الرئيسيّة لهذا.
  */
 function homeNew(): string {
-  return menu({ label: 'منشور جديد', variant: 'secondary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
+  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
 }
 
 /**
@@ -1090,7 +1091,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    */
   const items: { kind: 'bad' | 'warn' | 'ok'; text: string; go?: string; label?: string }[] = []
 
-  const stale = d.channels.filter((c) => c.state === 'needs_reauth')
+  // ‏والمنصّةُ التي يقولها تنبيهُ النظام أعلى الصفحة لا تُعاد هنا (D-381، §4.4): الحكمُ نفسُه (`channelHealth`)
+  const stale = d.channels.filter((c) => c.state === 'needs_reauth' && !['broken', 'expiring'].includes(channelHealth(c, d.now).kind))
   for (const c of stale) {
     items.push({
       kind: 'bad',
@@ -1140,10 +1142,11 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
 
   const todo = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
-      ${i.go === undefined ? '' : button({ label: i.label ?? 'اذهب', size: 'sm', href: i.go })}</li>`)
+      ${i.go === undefined ? '' : `<span class="todo-go">${button({ label: i.label ?? 'اذهب', size: 'sm', variant: 'secondary', href: i.go })}</span>`}</li>`)
     .join('')
 
   return `<section data-pane="overview" hidden>
+  <h1 class="vh">${escapeHtml(sectionLabel('overview'))}</h1>
   ${/*
     * **الشاشةُ اليوميّةُ تبدأ بجوابها** (D-114).
     *
@@ -1163,7 +1166,11 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     */''}
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew())}
+  ${/* ‏**«ما ينتظرك» بعد التحيّة بعرض اللوح** (SPEC-v1 §6.1 · D-381): يرسمها `homeTop`، وصفوفُها من هنا وأدواتُها ثانويّة */''}
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
+    rows: todo,
+    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
+  })}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
    * والمالُ كلُّه (كيف تغيّر، ثمّ أين يذهب) رصّةً في الثاني. كانت بطاقةُ
@@ -1180,21 +1187,22 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    * ‏**قاعدةُ الحذف** (D-232، والدرسُ العكسيّ من Hootsuite): ما يُضاف إلى الرئيسيّة يُطوى مقابلَه شيء. و«ما وقع اليوم»
    * ‏سجلٌّ لا قرار، فنزل إلى المطويّ مع الكلفة، وبقي «ما ينتظرك» وحدَه هنا بعرض اللوح.
    */''}
-  <div class="mt-3">
-      <div class="card"><h2>ما ينتظرك</h2>
-        <p class="hint">مولَّد من حال النظام الآن — لا قائمة ثابتة</p>
-        ${todo === ''
-          ? emptyState({ title: 'لا شيء ينتظر', html: 'كلّ ما بُني مضبوط.' })
-          : `<ul class="todo">${todo}</ul>`}
-        <div class="row mt-3">${SCAN_BTN}
-          ${button({ label: 'مراجعة المصادر', size: 'sm', href: '#sources' })}</div></div>
-  </div>
   ${/*
    * ‏**التشغيلُ والكلفة مطويّان** (D-216): المالُ كان يُعرض أربعَ مرّاتٍ في الرئيسيّة (بطاقتان ورسمٌ وأعمدة)، و«هل الآلةُ
    * ‏تعمل؟» معلومةُ تشغيلٍ لا قرار. فبقيت بطاقتا الإنفاق في «اليوم بالأرقام»، وما عداهما هنا، مطويًّا بسطرٍ يقول حالَه.
    */''}
-  <details class="card home-ops mt-3" id="ops">
-    <summary><h2>الكلفة وما وقع</h2><span class="grow"></span><span class="ago">اليوم بالأرقام، والإنفاق 14 يومًا، وأين يذهب المال، وسجلّ اليوم</span></summary>
+  ${/*
+   * ‏**«الكلفة وما وقع» بطاقةً مضغوطة برقمين** (SPEC-v1 §6.1 · D-381، بدل الطيّ الكامل في D-216): إنفاقُ اليوم وإنفاقُ 14 يومًا
+   * ‏يُقرآن بلا فتح، وما عداهما خلف «التفاصيل» — طيٌّ أصيلٌ يعمل بلا سكربت. والرقمان من السلسلة نفسِها التي يرسمها الرسمُ تحته.
+   */''}
+  <div class="card home-cost mt-3" role="region" aria-labelledby="hc-t">
+    <div class="card-head"><h2 id="hc-t">الكلفة وما وقع</h2></div>
+    <dl class="hc-nums">
+      <div><dt>إنفاق اليوم</dt><dd class="num">${escapeHtml(money(d.series[d.series.length - 1]?.total ?? 0))}</dd></div>
+      <div><dt>إنفاق 14 يومًا</dt><dd class="num">${escapeHtml(money(d.series.reduce((n, x) => n + x.total, 0)))}</dd></div>
+    </dl>
+  <details class="home-ops" id="ops">
+    <summary>التفاصيل<span class="ago">اليوم بالأرقام، وأين يذهب المال، وسجلّ اليوم</span></summary>
   <h2 class="home-sub mt-3">اليوم بالأرقام</h2>${tileRow(d)}
   <div class="mt-3">${todayList(d)}</div>
   <div class="mt-3">${activityCard(facts, d.now)}</div>
@@ -1217,6 +1225,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     </div>
   </div>
   </details>
+  </div>
 </section>`
 }
 
@@ -1317,7 +1326,7 @@ function postsPane(d: ShellData & PostsData): string {
     * ‏وظنّ أنّه كتب (ر-2). والثلاثةُ مراسٍ تنزل إلى بطاقاتها في اللوح نفسِه.
     */''}
   ${/* ‏بلا فقرةٍ (D-274، المرحلة د): جملةُ القيد في «؟» بجانب الفرز، لا سطرٌ فوق كلّ فتحة */''}
-  ${pageHead('التحرير', sectionLabel('posts'), '', headNew())}
+  ${pageHead('التحرير', sectionLabel('posts'), '', headNew(), approvalTip())}
   ${quotaCard(d.imageQuota)}
   ${postsTabs(d, draftsParts({
     drafts: d.drafts,
@@ -1373,13 +1382,13 @@ function settingsPane(d: ShellData & SettingsData): string {
   <div data-sub id="appearance">
   <p class="hint">كيف تبدو اللوحة لك. <b>والسمة والكثافة والاختصارات تُحفظ في هذا المتصفّح وحده</b>، وبطاقات اللوح في حسابك.</p>
   <div class="card"><h2>السمة والكثافة والاختصارات</h2>
-    <div class="split"><p><b>السمة</b>: «النظام» يتبع جهازَك نهارًا وليلًا.</p>${themeSwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>السمة</b><p class="hint m-0">«النظام» يتبع جهازَك نهارًا وليلًا.</p></div>${themeSwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>الكثافة</b>: «مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p>${densitySwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>الكثافة</b><p class="hint m-0">«مضغوط» يُظهر صفوفًا أكثر في الشاشة.</p></div>${densitySwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>الحركة</b>: «مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في جهازك.</p>${motionSwitch(false)}</div>
+    <div class="split set-row"><div class="set-lbl"><b>الحركة</b><p class="hint m-0">«مخفّفة» تطفئ الانتقالاتِ والحركة كإعداد «تقليل الحركة» في جهازك.</p></div>${motionSwitch(false)}</div>
     <hr>
-    <div class="split"><p><b>اختصارات الحرف الواحد</b>: J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p>${shortcutsSwitch()}</div>
+    <div class="split set-row"><div class="set-lbl"><b>اختصارات الحرف الواحد</b><p class="hint m-0">J وK وA وR وE وS و/ في المنشورات. أطفئها إن كانت تعترض قارئَ الشاشة أو الإدخالَ الصوتيّ.</p></div>${shortcutsSwitch()}</div>
   </div>
   ${tilePicker(d)}
   </div>
@@ -1717,12 +1726,23 @@ export function panelPage(view: PaneView): string {
     .map((v) => ({ v, h: channelHealth(v, d.now) }))
     .filter(({ h }) => h.kind === 'broken' || h.kind === 'expiring')
   // ‏ولا شريطَ في «الحسابات» نفسِها (D-311): «افتح الحسابات» وأنت فيها تكرارٌ، وبطاقاتُها تقول الحالَ بزرّها
-  const expiring = needy.length === 0 || only === 'accounts' ? '' : notice({
-    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn', alert: true, g: '!',
+  // ‏**تنبيهُ النظام الواحد** (D-381، §4.4): بفعلٍ واحد — «جدّد إذن YouTube» إلى صفحة المنصّة حين تكون واحدة،
+  // ‏و«افتح الحسابات» حين تكثر. و«ما ينتظرك» لا يعيد ما قاله (`overviewPane` يُسقط بندَه)
+  const one = needy.length === 1 ? needy[0] : undefined
+  const expiring = needy.length === 0 || only === 'accounts' ? '' : systemBanner({
+    tone: needy.some(({ h }) => h.kind === 'broken') ? 'bad' : 'warn',
+    key: needy.map(({ v }) => v.spec.id).join(','),
     // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
-    html: `${needy.slice(0, 3)
+    // ‏ومنصّةٌ واحدةٌ انتهى إذنُها يُقال سببُها هنا: «ما ينتظرك» لم يعد يقوله (D-381)
+    html: one !== undefined && one.v.state === 'needs_reauth'
+      ? html`<b><bdi>${one.v.spec.label}</bdi></b>: انتهى الإذن — والنشر متوقّف عليها.`.value
+      : `${needy.slice(0, 3)
       .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
-      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك. <a class="tap" href="#channels">افتح الحسابات</a>` })
+      .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك.`,
+    action: one === undefined
+      ? { label: 'افتح الحسابات', href: '#channels' }
+      : { label: 'جدّد إذن ' + one.v.spec.label, href: '/panel/channels/' + one.v.spec.id },
+  })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه
   const flash = `${expiring}${toastRegion(
@@ -1776,7 +1796,7 @@ export function panelPage(view: PaneView): string {
 <div class="app">
 
 ${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, ...(only === null ? {} : { active: only }) })}
+${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, status: state, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">
@@ -1787,7 +1807,7 @@ ${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, ...(only 
     * علامتان في شاشةٍ واحدة تكرار.
     */''}
   <div class="glyph tb" aria-hidden="true">${GLYPH_SVG}</div>
-  <div class="ttl"><h1 id="pane-title" aria-live="polite">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</h1>
+  <div class="ttl">${/* ‏**عنوانٌ واحدٌ في الصفحة** (SPEC-v1 §8 · D-381): هذا صدى رأسِ اللوح يظهر عند التمرير، فلا يُعدّ عنوانًا ثانيًا — والتركيزُ عند التبديل ينتقل إلى h1 اللوح */''}<p id="pane-title" class="pt m-0" aria-hidden="true">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</p><p id="pane-say" class="vh" aria-live="polite"></p>
     ${d.env === 'production' ? '' : '<div class="crumb">تجريبيّ</div>'}</div>
   <div class="grow"></div>
   ${topNew()}
@@ -1803,8 +1823,7 @@ ${panesOf(view)}
 
 ${fabNew()}
 ${/* ‏والذيل اسم وساعة (D-215): «كلّ زرّ هنا يحرسه قيد مُختبَر في الخادم» جملة للمطوّر لا للمالك */''}
-<footer><span>صدى</span>
-  <span class="mono">${escapeHtml(stamp(d.now, null))}</span></footer>
+<footer class="page-foot">صدى · <bdi class="num" dir="ltr">${escapeHtml(stamp(d.now, d.zone ?? null).replace(/ بتوقيت.*$/, ''))}</bdi>${escapeHtml(zoneNote(d.zone ?? null))}</footer>
 </main>
 </div>
 </div>`

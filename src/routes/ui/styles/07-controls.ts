@@ -15,32 +15,37 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
   border-radius:var(--r-control)}
 /* ‏والضغطة تصغير خفيف لا إزاحة (D-246): «scale» لا يهزّ الصفّ لأنّه لا يغيّر التخطيط */
 .btn:active:not(:disabled):not([aria-disabled="true"]){transform:scale(.97)}
-/* ── زجاجٌ هادئ (صفاء): كلُّ زرٍّ قطعةُ بلّورٍ من العائلة نفسِها — خيطُ ضوءٍ أعلاه بلا تمويه، والمادّةُ تختلف.
-   **ولا تمويهَ في ظلٍّ داخليّ**: الخيطان «0 1px 0» حادّان، والظلُّ المموَّه «--sh-*» وحدَه (audit_tokens) */
-/* ‏الأوّليّ: لوحُ زجاجٍ ملوّن بثلاث درجاتٍ من الهويّة مخبوزةٍ في الرموز، يرتفع بكسلًا عند التمرير */
-.btn-primary{background:var(--brand); background-image:linear-gradient(180deg,var(--brand-hi),var(--brand) 55%,var(--brand-lo)); color:var(--on-brand);
-  box-shadow:var(--crystal), var(--sh-1)}
-@media(hover:hover){.btn-primary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-hover); background-image:linear-gradient(180deg,var(--brand-hover-hi),var(--brand-hover));
-  box-shadow:var(--crystal), var(--sh-2); transform:translateY(calc(-1 * var(--ul)))}}
-.btn-primary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-press); background-image:linear-gradient(180deg,var(--brand-press),var(--brand-press));
-  box-shadow:var(--crystal-in)}
-/* ‏والثانويُّ زجاجٌ مُصقَّع بلمسة تركواز، وحدُّه «--field» الذي يبلغ ‏3:1 (WCAG 1.4.11) */
-.btn-secondary{background:var(--surface); background-image:linear-gradient(180deg,var(--surface),var(--surface-2)); color:var(--ink); border-color:var(--field);
-  box-shadow:var(--gleam-hi), var(--sh-1)}
-@media(hover:hover){.btn-secondary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--hover); background-image:linear-gradient(180deg,var(--hover),var(--hover)); box-shadow:var(--gleam-hi), var(--sh-2)}}
-.btn-secondary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--press); background-image:none; box-shadow:inset 0 0 0 var(--stroke) var(--line)}
+/* ── مصمتٌ لا زجاج (مواصفات v1 §5.1 · D-381، مراجعةً لـ«صفاء»): الأوّليُّ أرضُ «--brand» وحدَها، والتمريرُ
+   «--brand-hover» والضغطُ «--brand-press» — ثلاثُ درجاتٍ تُقاس كلٌّ بنصّها (validate_contrast)، لا تدرّجٌ
+   تُقاس قمّتُه وقاعُه. والظلُّ «--sh-1» ساكنًا و«--sh-2» عند التمرير، بلا خيط ضوءٍ داخليّ */
+.btn-primary{background:var(--brand); color:var(--on-brand); box-shadow:var(--sh-1)}
+@media(hover:hover){.btn-primary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-hover);
+  box-shadow:var(--sh-2); transform:translateY(calc(-1 * var(--ul)))}}
+.btn-primary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--brand-press); box-shadow:none}
+/* ‏والثانويُّ أرضُ السطح وحبرُ المتن. **وحدُّه «--field» لا «--line»** (خلافًا للمواصفات عن قصد): «--line» على
+   البطاقة ‏١٫٢:١ فلا يُرى للزرّ حدّ، و«--field» يبلغ ‏3:1 (WCAG 1.4.11) */
+.btn-secondary{background:var(--surface); color:var(--ink); border-color:var(--field); box-shadow:var(--sh-1)}
+@media(hover:hover){.btn-secondary:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--hover); box-shadow:var(--sh-2)}}
+.btn-secondary:active:not(:disabled):not([aria-disabled="true"]){background-color:var(--press); box-shadow:none}
+/* ‏والشبحُ (Ghost، §5.1) للفعل داخل البطاقة والجدول: بلا أرضٍ ولا حدٍّ ساكنًا، حبرُ المتن، و«--surface-2» عند
+   التمرير. **ويُعرَف زرًّا بأيقونته أو بموضعه في صفّ الأفعال** — والفعلُ الذي يُقرأ رابطًا يبقى «btn-quiet» بخطّه */
+.btn-ghost{background:transparent; border-color:transparent; color:var(--ink)}
+@media(hover:hover){.btn-ghost:hover:not(:disabled):not([aria-disabled="true"]){background:var(--surface-2)}}
+.btn-ghost:active:not(:disabled):not([aria-disabled="true"]){background:var(--press)}
 /* ‏والهادئُ رابطٌ بهيئة زرّ: بلا أرضٍ ولا حدّ، حبرُ الرابط **وخطٌّ تحته دائمًا** — «--link» و
    «--ink-2» ليلًا متقاربان ضوءًا، فاللون وحدَه لا يكفي؛ والخطّ يثخن عند التمرير على غسلةٍ من الهويّة */
 .btn-quiet{background:transparent; border-color:transparent; color:var(--link);
   text-decoration:underline; text-decoration-thickness:var(--ul); text-underline-offset:var(--ul-off)}
 @media(hover:hover){.btn-quiet:hover{text-decoration-thickness:var(--stroke); background:var(--tint-wash)}}
-/* ‏والخطِرُ زجاجٌ مُصقَّعٌ بحمرة: حبرُ «--bad» وحدُّه — والمصمتُ الأحمرُ لحوار ما لا رجعةَ فيه وحدَه */
-.btn-danger{background:var(--surface); background-image:linear-gradient(180deg,var(--surface),var(--bad-wash) 260%); color:var(--bad);
-  border-color:color-mix(in oklab,var(--bad) 34%,transparent); box-shadow:var(--gleam-hi), var(--sh-1)}
-@media(hover:hover){.btn-danger:hover:not(:disabled):not([aria-disabled="true"]){background-color:var(--bad-wash); background-image:linear-gradient(180deg,var(--bad-wash),var(--bad-wash)); box-shadow:var(--gleam-hi), var(--sh-2)}}
+/* ‏والخطِرُ حبرُ «--bad» على السطح وحدُّه بلونه، **وعند التأكيد مصمتٌ** («btn-danger-solid»، §5.1): أرضُ «--bad»
+   وحبرُ السطح (أبيضُ نهارًا وعمقٌ ليلًا، فيُقرأ في الثيمين) — لحوار ما لا رجعةَ فيه وحدَه */
+.btn-danger{background:var(--surface); color:var(--bad); border-color:color-mix(in oklab,var(--bad) 34%,transparent); box-shadow:var(--sh-1)}
+@media(hover:hover){.btn-danger:hover:not(:disabled):not([aria-disabled="true"]){background:var(--bad-wash); box-shadow:var(--sh-2)}}
+.btn-danger-solid{background:var(--bad); color:var(--surface); border-color:var(--bad)}
+@media(hover:hover){.btn-danger-solid:hover:not(:disabled):not([aria-disabled="true"]){background:var(--bad); filter:brightness(.92)}}
 /* ‏وزرُّ الأيقونة مربّعُ الهدف نفسِه، واسمُه في «aria-label» وتلميحُه في «title» (3.4) */
 .btn-icon{padding:0; width:var(--tap); background:transparent; color:var(--ink-2)}
-@media(hover:hover){.btn-icon:hover:not(:disabled):not([aria-disabled="true"]){background:var(--hover); color:var(--ink); box-shadow:var(--gleam-hi)}}
+@media(hover:hover){.btn-icon:hover:not(:disabled):not([aria-disabled="true"]){background:var(--hover); color:var(--ink)}}
 @media(prefers-reduced-motion:reduce) and (hover:hover){.btn-primary:hover{transform:none}}
 /* ‏وفي الألوان القسريّة: «border-color» وحدَه — «var(--bd) ButtonText» لونان في قيمةٍ واحدة فتسقط القيمة كلُّها،
    وكلُّ حالات الأوّليّ تُسمّى، وإلّا صار «HighlightText» على «Canvas» عند التمرير فاختفى النصّ */
@@ -52,12 +57,13 @@ button,.btn{font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-
 /* «الصغير» أضيقُ حشوا لا أقصرُ قامة ولا أصغرُ حرفًا: زرٌّ في جدولٍ يزدحم عرضا لا
    طولا، وتقصيرُه يُسقطه دون حدّ الهدف — وهو ما كان يقع. **وحرفُه حرف الأزرار** (D-185). */
 .btn-sm{padding:var(--s-1) var(--s-3)}
+/* ‏والكبيرُ قامةُ ‏٤٨ (مواصفات v1 §5.1): أعلى من الهدف لا أدنى، وحرفُه حرفُ الأزرار */
+.btn-lg{min-height:var(--s-12); padding:var(--s-2) var(--s-6)}
 /* ‏والرمزُ في الزرّ ‏٢٠ (خطّة التصميم 3.4)، وفي سهم العودة ‏١٦ بجوار نصٍّ ‏١٥، وفي الرقاقة ‏١٤.
    **وSVG بلا قياسٍ في حاويةٍ مرنة يُرسَم ‏٠×‏٠** (D-167): هكذا غاب سهمُ «افتح في Drive» مرّة */
 .btn>svg,.btn-icon svg{width:var(--icon-md); height:var(--icon-md); flex:none}
 /* ‏**والاسمُ ليس أيقونة** (مراجعة D-196): «a>svg» كان يطابق «.wordmark» في بابِ اللوحة فيسحقه ‏١٦×١٦ —
    مسار نسبتُه ‏٣٫٢:١ يُرسَم شريطًا ارتفاعُه ‏٥px بين ‏600 و‏899؛ ويقيس «audit_mobile» نسبة كلّ اسم مرسوم */
-nav.back a>svg:not(.wordmark){width:var(--icon-sm); height:var(--icon-sm); flex:none}
 a.chip>svg{width:var(--icon-xs); height:var(--icon-xs); flex:none; vertical-align:-.125em}
 /* ── المعطّل: «aria-disabled» يبقى في ترتيب التركيز فيُقرأ سببُه (خطّة التصميم 7.1) ──
    و«disabled» الأصليّ للنماذج التي لم تُنقَل بعد. وكلاهما نصف شفافيّة، والسبب نصّ تحته
@@ -147,17 +153,26 @@ p,li,.sub,.ch-note,.lede-note,.hint,.draft-why{max-width:var(--measure);
    «حفظ» ‏٢٠px تحت «حدّث» في صفّ التوجيه. */
 .mp-note:empty{display:none}
 
-/* ── الحالةُ الفارغة (خطّة التصميم 7.7 · D-189) ──────────────────────────────────────
-   عنوان بنمط «h3» يقول ما هنا، ثمّ جملة بنمط «small» بحبر «--ink-2»، ثمّ فعل واحد — والكتلة
-   في الوسط بعرض أقصى «--measure». ودالّتُها «emptyState()»، والأيقونة فوقها ‏٢٤ إن وُجدت. */
-.empty{padding:var(--s-8) var(--s-5); text-align:center; border:var(--bd-soft);
+/* ── الحالةُ الفارغة مضغوطة (مواصفات v1 §5.5 · D-381، مراجعةً لـ 7.7) ─────────────────────────────
+   كانت عنوانًا بنمط «h3» تحت نقشٍ ‏160×96 وحشوٍ ‏32 — ‏٢٨٠px تقريبًا لتقول «لا شيء بعد». فصارت لا تتجاوز ‏١٦٠:
+   الأيقونةُ (أو النقش) ‏٣٢ بحبر «--ink-3» **في سطر العنوان نفسِه**، والعنوانُ بنمط «ui»، ثمّ الجملةُ بنمط «small»،
+   ثمّ فعلٌ واحدٌ ثانويّ. والشبكةُ عمودان «auto» في الوسط: ما لا أيقونةَ له يأخذ العرضَ كلَّه. */
+.empty{display:grid; grid-template-columns:auto auto; justify-content:center; align-items:center;
+  column-gap:var(--s-3); row-gap:var(--s-1); padding:var(--s-4); text-align:center; border:var(--bd-soft);
   background:transparent; border-radius:var(--r-card)}
-.empty-t{margin:0 auto var(--s-1); font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; color:var(--ink)}
-.empty-p{margin:0 auto var(--s-3); font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
-.empty-echo{display:block; width:10rem; height:6rem; margin:0 auto var(--s-6); color:var(--ink-3)}
+.empty>*{grid-column:1/-1; justify-self:center}
+.empty>:is(.empty-ic,.empty-echo){grid-column:1}
+.empty>:is(.empty-ic,.empty-echo)+.empty-t{grid-column:2; text-align:start}
+.empty-t{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink)}
+/* ‏والحالةُ التي هي الصفحة (‏٤٠٤ و‏٥٠٠) عنوانُها «h1» بمظهر «h3»: عنوانُ صفحةٍ لا يُكتب بحرف الأزرار */
+h1.empty-t{font-size:var(--t-h3); line-height:var(--lh-h3)}
+.empty-p{margin:0; max-width:var(--measure); font-size:var(--t-small); color:var(--ink-2); line-height:var(--lh-small)}
+.empty>:is(.btn,form,a):last-child{margin-top:var(--s-2)}
+.empty-echo{display:block; height:var(--s-8); aspect-ratio:5/3; color:var(--ink-3)}
+.empty>:is(.empty-ic,.empty-echo)~.empty-p{margin-top:var(--s-5)}
 .empty-echo svg{width:100%; height:100%; display:block}
-.empty-ic{display:inline-flex; margin-bottom:var(--s-2); color:var(--ink-3)}
-.empty-ic svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
+.empty-ic{display:inline-flex; width:var(--s-8); height:var(--s-8); color:var(--ink-3)}
+.empty-ic svg{width:100%; height:100%; display:block}
 
 .split{display:flex; gap:var(--s-4); align-items:center; justify-content:space-between; flex-wrap:wrap}
 .split p{margin:0; font-size:var(--t-small); color:var(--ink-2); max-width:var(--measure); line-height:var(--lh-small)}
@@ -176,6 +191,7 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
 .todo .dot.warn{background:var(--warn)} .todo .dot.bad{background:var(--bad)}
 .todo .dot.ok{background:var(--ok)}
 .todo a,.todo form{margin-inline-start:auto}
+
 /* أزرارُ الصفوف عمودٌ واحدٌ لا حافّةٌ مسنّنة (D-136): عرضٌ أدنى واحد،
    والأطول يتجاوزه بحقّه. */
 .todo>li>a.btn,.todo>li>form .btn{flex:none; background:transparent; border-color:transparent;
@@ -184,6 +200,11 @@ footer{margin-top:var(--s-6); padding-top:var(--s-4); border-top:var(--bd-soft);
   /* ‏زرٌّ هادئ: حبرُ الرابط وخطٌّ تحته بلونه (D-149 ثمّ D-187) — كان الخطُّ نحاسيًّا، فيُعدّ
      كلّ زرّ في «ما ينتظرك» موضعًا (أحد عشر في الرئيسيّة) */
   text-decoration:underline; text-underline-offset:var(--ul-off); text-decoration-thickness:var(--ul)}
+/* ‏وفي «ما ينتظرك» بالرئيسيّة أزرارٌ حقًّا لا روابطُ نصّيّة (SPEC-v1 §2.3 · D-381): ثانويّةٌ، والخطوةُ التالية وحدَها أوّليّة */
+.todo-act>li{padding-block:var(--s-2)}
+.todo-act>li>span:not(.dot,.todo-go){flex:1; min-width:0}
+/* ‏والزرُّ في غلافه، فلا يلبس قاعدةَ الزرّ الهادئ أعلاه («.todo>li>a.btn») — ويبقى ثانويًّا أو أوّليًّا كما رُسم */
+.todo-go{flex:none; margin-inline-start:auto; display:inline-flex}
 
 /* ── صفٌّ عاجلٌ في «ما عليك» (D-123) ────────────────────────────────
    مهمّة توقف بوّابة مرحلة ولم تتمّ. **وكان الصنف يُكتب في الوسم ولا

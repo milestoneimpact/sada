@@ -275,7 +275,7 @@ export function planNewScreen(d: PlanNewData): string {
   const preset = PACES.some((x) => x.n === d.perWeek) ? d.perWeek : Math.max(1, d.perWeek)
   const count = shown.length * preset * 4
   const canBuild = blocker(d, shown) === null
-  const head = pageHead('المنشورات', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
+  const head = pageHead('', 'خطّة جديدة', 'أربعُ خطوات، ثمّ يبني صدى الخطّة وتراجعها قبل أن يُنشر شيء.')
   const ways = planWays('build', d.hasPackage === true)
   const bar = html`<ol class="wz-bar" aria-label="خطوات المعالج">${STEPS.map((s, i) => html`<li data-to="${String(i + 1)}"${i === 0 ? raw(' aria-current="step"') : ''}><span class="wz-n">${String(i + 1)}</span><span class="wz-l">${s}</span></li>`)}</ol>`
   const foot = html`<div class="wz-foot">

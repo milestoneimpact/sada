@@ -107,6 +107,9 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       if(m){t.setAttribute('aria-current','page');
         var sp=t.querySelector('span');
         if(sp&&head){head.textContent=sp.textContent; document.title=sp.textContent+' — صدى';}
+        // ‏وتبديلٌ لا ينقل التركيز (الرجوعُ والتقدّمُ في المتصفّح) يُقال في منطقةٍ حيّة مخفيّة: «#pane-title» صدىً مرئيٌّ مخفيٌّ عن قارئ الشاشة
+        var say=document.getElementById('pane-say');
+        if(sp&&say&&!focus&&fromAt>=0&&fromAt!==toAt)say.textContent=sp.textContent;
       }else{t.removeAttribute('aria-current');}
     });
     // ‏وفي اللوح أقسامٌ («المنشورات»: المسوّداتُ واكتب والفيديو والخطّة، D-195): يظهر القسمُ الذي
@@ -407,7 +410,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         setTimeout(function(){flashBox.appendChild(note);},150);
       }
     }else{
-      var arm=function(){clearTimeout(timer); timer=setTimeout(drop,6000);};
+      var arm=function(){clearTimeout(timer); timer=setTimeout(drop,4000);};
       var hold=function(){clearTimeout(timer);};
       note.addEventListener('mouseenter',hold); note.addEventListener('mouseleave',arm);
       note.addEventListener('focusin',hold); note.addEventListener('focusout',arm);
@@ -508,7 +511,7 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         var row=document.createElement('p'); row.className='hint'; row.setAttribute('role','status');
         row.appendChild(document.createTextNode('لديك نصّ لم يُحفظ'+(at?' من '+at:'')+' على هذا الجهاز. '));
         var take=document.createElement('button'); take.type='button'; take.className='btn btn-secondary btn-sm'; take.textContent='استعده';
-        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-quiet btn-sm'; drop.textContent='تجاهله';
+        var drop=document.createElement('button'); drop.type='button'; drop.className='btn btn-ghost btn-sm'; drop.textContent='تجاهله';
         row.appendChild(take); row.appendChild(document.createTextNode(' ')); row.appendChild(drop);
         edT.parentNode.insertBefore(row,edT);
         take.addEventListener('click',function(){edT.value=kept.t; edT.dispatchEvent(new Event('input')); row.remove(); edT.focus();});
@@ -739,6 +742,15 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     onFilter('draft-bucket',function(b){bucket=b.value; bucketOf=b.dataset.of?b.dataset.of.split(' '):null; refilter();});
     onFilter('draft-platform',function(b){platform=b.value; refilter();});
     onFilter('draft-order',function(b){order=b.value; reorder();});
+    // ‏قائمةٌ أو شبكة (§6.3): تفضيلُ عرضٍ يُحفظ في المتصفّح وحدَه
+    (function(){
+      var cols=document.querySelector('.dcols'), bs=document.querySelectorAll('[data-dlayout]'); if(!cols||!bs.length)return;
+      function lay(v){if(v!=='grid')v='list'; cols.setAttribute('data-layout',v);
+        bs.forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-dlayout')===v));});
+        try{localStorage.setItem('draft-layout',v);}catch(e){}}
+      try{lay(localStorage.getItem('draft-layout')||'list');}catch(e){}
+      bs.forEach(function(b){b.addEventListener('click',function(){lay(b.getAttribute('data-dlayout'));});});
+    })();
     refilter();
     // ‏رابطٌ إلى بطاقةٍ في «الأرشيف» (‎/panel#d-…‎ من الخطّ الزمنيّ أو إشعار) يفتح «الكلّ» فلا يصل إلى بطاقةٍ مخفيّة
     (function(){

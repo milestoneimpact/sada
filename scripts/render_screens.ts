@@ -30,6 +30,7 @@ import { PLAN_NEW_SCRIPT, planNewScreen } from '../src/routes/ui/planNewView'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen } from '../src/routes/ui/planReviewView'
 import { PLAN_BUILD_SCRIPT, planBuildScreen } from '../src/routes/ui/planBuildView'
 import { libraryScreen } from '../src/routes/ui/libraryView'
+import { packageScreen } from '../src/routes/ui/packageView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
 import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
@@ -498,7 +499,7 @@ writeAudited(
     now: new Date('2026-11-02T08:00:00Z'), linked: ['linkedin'], perWeek: 3,
     sources: [{ id: 's1', name: 'تقرير الأثر 2025', kind: 'drive' }, { id: 's2', name: 'مراجعة المحفظة', kind: 'upload' }, { id: 's3', name: 'قيادة القيمة لا تُقاس بالمخرجات', kind: 'url' }],
     perDraft: 0.012, perImage: 0.011, perInfographic: 0.018, freeLeft: { draft: 173, final: 7 }, autoImage: true, ready: true, replacing: false,
-  }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+  }), 'n', PLAN_NEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
 )
 
 // ‏مراجعةُ الخطّة (D-286): بطاقةٌ معتمَدةٌ بصورتها، وأخرى تنتظر، وثالثةٌ لم تُكتب، ورابعةٌ مجدولة، وموعدان مكرَّران
@@ -527,7 +528,7 @@ writeAudited(
   writeAudited(
     '/tmp/screen-plan-build.html',
     soloPage('صدى — بناء الخطّة', { href: '/panel#posts', label: 'المنشورات' },
-      planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+      planBuildScreen({ id: 'b1', state: 'planning', done: 1, total: 4, startedAt: '2026-11-12T08:00:00Z' }, new Date('2026-11-12T08:02:10Z')), 'n', PLAN_BUILD_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
   // ‏«كلُّ الأصول» (D-347): البحثُ والمفضّلةُ والوسومُ على بلاطاتها — مولَّدةٌ ومرفوعةٌ ومقطعٌ ومصدرُ Drive
   writeAudited(
@@ -545,22 +546,37 @@ writeAudited(
   )
   writeAudited(
     '/tmp/screen-plan-review.html',
-    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+    soloPage('صدى — راجع الخطّة', { href: '/panel#posts', label: 'المنشورات' }, planReviewScreen(reviewSample, null, { week: '1', orgName: 'ميلستون', authors: { linkedin: 'عمر', x: 'عمر' } }), 'n', PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
   writeAudited(
     '/tmp/screen-plan-doc.html',
     soloPage('صدى — خطّةُ النشر', { href: '/panel/plan/review', label: 'المراجعة' }, planDocScreen({
       model: reviewSample, orgName: 'مؤسّسة المعالم للأثر', authors: { linkedin: 'عمر عبدالحميد', x: '@omar_ah' },
       sources: { s1: 'تقرير الأثر 2025', s2: 'مراجعة المحفظة' }, zone: null,
-    }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('posts')),
+    }), 'n', PLAN_DOC_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
   )
 }
+
+// ‏«حزمة المحتوى» (D-366): مزامنةٌ ناجحة ومادّتان ونقلٌ مكتمل
+writeAudited(
+  '/tmp/screen-package.html',
+  soloPage('صدى — حزمة المحتوى', { href: '/panel/library', label: 'المكتبة', at: '/panel/package' },
+    packageScreen({
+      source: { id: 'p1', org: 'o1', owner: 'milestone', repo: 'content', branch: 'main', root: 'week-46', lastCommit: 'a1b2c3d4e5f6a7b8', lastTree: null, lastEtag: null,
+        lastCheckedAt: '2026-11-15 08:00', status: 'ok', error: null, hasHook: true, sealedToken: null, variants: { x: 'dark', linkedin: 'light' }, followUpdates: true },
+      media: [
+        { blobSha: 'b1', itemNo: '01', variant: 'dark', kind: 'video', path: 'week-46/01/x.mp4', bytes: 8_400_000, r2Key: 'k1', version: 1, hasSound: true, coverBlobSha: 'c1', isCurrent: true, supersededBy: null },
+        { blobSha: 'b2', itemNo: '02', variant: 'light', kind: 'image', path: 'week-46/02/li.png', bytes: 420_000, r2Key: 'k2', version: 2, hasSound: false, coverBlobSha: null, isCurrent: true, supersededBy: null },
+      ],
+      tokenReady: true, revisions: [], missing: ['03 · x'], transfer: { total: 2, done: 2 },
+    }), 'n', '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })),
+)
 
 // ‏«عندي خطّة» (D-287): ملفٌّ أو نصٌّ يُلصق، ونوعُ الصورة
 writeAudited(
   '/tmp/screen-plan-seat.html',
   soloPage('صدى — عندي خطّة', { href: '/panel#posts', label: 'المنشورات' }, planSeatScreen({ canRead: true }), 'n', PLAN_SEAT_SCRIPT,
-    buildCommands({ onPanel: false }), soloNav('posts')),
+    buildCommands({ onPanel: false }), soloNav('plan')),
 )
 
 // الدخولُ بوجهيه: مفتاحُ مرورٍ مسجَّل، ورمزٌ رُفض

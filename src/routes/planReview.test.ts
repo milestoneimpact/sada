@@ -340,7 +340,8 @@ describe('«أضف منشورًا» إلى يومٍ في الخطّة (D-336)', 
     expect(html).toContain('<div class="scroll rv-list"><table>')
     expect((html.match(/<tr><td><span class="ago">/g) ?? []).length).toBe(3)
     expect(html).toMatch(/<a href="#c-0" data-sheet="0">نصُّ المنشور الأوّل/)
-    expect(html).toContain('<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>')
+    expect(html).toContain('<span class="rv-vw" hidden><div class="seg" role="group" aria-label="طريقة العرض">')
+    expect(html).toContain('<button type="button" data-view="cards" aria-pressed="true">بطاقات</button>')
   })
 
   it('من المنشور إلى أصله (D-345): لوحُ البطاقة يسمّي مصدرَها برابطٍ إلى المكتبة، ورحلتُه بعد أن يُجدول', async () => {
@@ -577,7 +578,8 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('class="card home-plan"')
     expect(html).toContain('مسوّدة · الإصدار 1')
-    expect(html).toContain('<b>1</b> معتمَدةً من 3')
+    expect(html).toContain('<b>1</b> من 3 معتمَدة')
+    expect(html).not.toContain('خطّة منتهية')
     expect(html).toContain('href="/panel/plan/review">تابع الكتابة</a>')
     expect(html).toContain('class="hp-next"')
     // ‏و«اليوم بالأرقام» في المطويّ لا أعلى الرئيسيّة
@@ -591,9 +593,10 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     db.raw.exec("UPDATE accounts SET status = 'needs_reauth'")
     const { cookie } = await session()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    // ‏‏D-355: سطرُ التحيّة صار رأسَ الرئيسيّة (`home-head`)، والقاعدةُ نفسُها: زرٌّ صغيرٌ فيه
-    expect(html).toContain('class="home-head home-hello"')
-    expect(html).toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
+    // ‏‏D-381 (§4.4): التنبيهُ الواحدُ أعلى الصفحة يحمل الزرّ، فلا يُعاد بجانب التحيّة ولا صفًّا في «ما ينتظرك»
+    expect(html).not.toContain('class="todo-next" data-tone="bad"')
+    expect(html.match(/class="sys-banner /g)).toHaveLength(1)
+    expect(html).not.toContain('href="/oauth/linkedin/start">جدّد إذن LinkedIn</a>')
     expect(html).not.toContain('card-alert next is-slim" data-tone="bad"')
   })
 })
@@ -632,7 +635,8 @@ describe('ما تعذّرت كتابتُه يُقال ولا يُنتظر (PL-23
     const { cookie, csrf } = await session()
     const html = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('تعذّرت كتابتُه: مفتاحُ خدمة الكتابة مرفوض')
-    expect(html).toContain('وتعذّرت كتابةُ 1: مفتاحُ خدمة الكتابة مرفوض')
+    // ‏والعدُّ «كُتب س من ص» في سطر الحالة وحدَه (§6.2)، وسطرُ التقدّم يقول ما تعذّر وسببَه
+    expect(html).toContain('تعذّرت كتابةُ 1: مفتاحُ خدمة الكتابة مرفوض')
     expect(html).not.toContain('صدى يكتب الباقي الآن')
     expect(html).not.toContain('data-live="write"')
     expect(html).toContain('أعد كتابة ما تعذّر (1)')

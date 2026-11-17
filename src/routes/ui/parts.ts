@@ -77,11 +77,13 @@ export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: Tone; label
  * الجدول المحوريّ وحدَه بلا رأس، فقُرئ ناقصًا بين ألواحٍ لكلٍّ منها اسمٌ
  * وسطرٌ. ونظرةٌ عامّة تُفتَح كلَّ صباحٍ فتحمل السطرَ وحدَه قصدًا.
  */
-export function pageHead(eyebrow: string, title: string, lede: string, aside = ''): string {
+export function pageHead(eyebrow: string, title: string, lede: string, aside = '', tip = ''): string {
+  // ‏و`tip` مساعدةٌ بجانب العنوان (ⓘ · D-381) خارج «h1» — فلا يدخل اسمُها اسمَ الصفحة
+  const h1 = '<h1>' + escapeHtml(title) + '</h1>'
   return `<div class="page-head">
     <div class="txt">
-      <div class="eyebrow"><span class="ln"></span>${escapeHtml(eyebrow)}</div>
-      <h1>${escapeHtml(title)}</h1>
+      ${eyebrow === '' ? '' : '<div class="eyebrow"><span class="ln"></span>' + escapeHtml(eyebrow) + '</div>'}
+      ${tip === '' ? h1 : '<div class="ph-row">' + h1 + tip + '</div>'}
       ${lede === '' ? '' : `<p class="lede">${lede}</p>`}
     </div>
     ${aside === '' ? '' : `<div class="aside">${aside}</div>`}

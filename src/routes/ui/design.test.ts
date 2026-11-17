@@ -37,7 +37,7 @@ describe('القمعُ يُبرز ما ينتظرك الآن وحدَه (D-325 �
     counts: { perPlatform: { x: { draft: 2, approved: 1, queued: 0, published: 0, failed: 0, recentFailed: 0, nextAt: null } }, publishedWeek: 0 },
   })
   const funnel = (html: string): string[] => {
-    const ol = html.slice(html.indexOf('<ol class="funnel">'), html.indexOf('</ol>', html.indexOf('<ol class="funnel">')))
+    const ol = html.slice(html.indexOf('<ol class="jsteps">'), html.indexOf('</ol>', html.indexOf('<ol class="jsteps">')))
     return ol.split('<li').slice(1)
   }
 

@@ -8,6 +8,8 @@ table{width:100%; border-collapse:collapse; font-size:var(--t-ui); line-height:v
 th{text-align:start; color:var(--ink-2); font-size:var(--t-caption); line-height:var(--lh-caption); padding:0 var(--s-2) var(--s-2);
   border-bottom:var(--bd); white-space:nowrap; font-weight:600}
 td{padding:var(--s-3) var(--s-2); border-bottom:var(--bd-soft); vertical-align:top}
+/* ‏والصفُّ ‏٥٦ على الأقلّ (مواصفات v1 §5.8 · D-381): «height» في صفّ الجدول حدٌّ أدنى لا سقف، فالصفُّ الأطول يطول */
+tbody tr{height:calc(var(--s-12) + var(--s-2))}
 tbody tr:last-child td{border-bottom:0}
 @media(hover:hover){tbody tr:hover{background:var(--hover)}}
 /* ── اللوحُ المحوريّ (D-120) ───────────────────────────────────────
@@ -126,7 +128,8 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 
 /* الحالة: لونٌ **ورمزٌ ونصّ** — لا لون وحده */
 .st{display:inline-flex; align-items:center; gap:var(--s-1); padding:var(--s-0) var(--s-2); border-radius:var(--r-pill);
-  font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; border:var(--bd-clear); white-space:nowrap}
+  font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; border:var(--bd-clear); white-space:nowrap;
+  min-height:var(--s-6); box-sizing:border-box}
 /* الرمزُ مرسومٌ لا حرفٌ من خطّ النظام (D-154). **واسمُه له وحدَه** (D-183): كان
    «.g» — وهو صنف الزرّ الشبحيّ نفسُه، فلبس الرمز أرض الزرّ البيضاء وحبرَه
    داخل كلّ حبّة ملوّنة (‏٩٦ شارةً في الرئيسيّة). والرمز بلا أرض ولا حدّ:
@@ -139,7 +142,10 @@ input.mono,textarea.mono{display:block; width:100%; min-height:var(--tap);
 .st.bad{color:var(--bad); background:var(--bad-wash); border-color:color-mix(in srgb,var(--bad) 28%,transparent)}
 /* ‏والمحايدان بحبر «--ink-2» لا «--ink-3» (D-185): لا نصَّ تحت ‏١٥px بالحبر الثالث (خطّة التصميم 4.3).
    **ويفترقان بالرمز لا باللون** (7.2): «pending» ينتظر ساعةً، و«idle» لم يبدأ دائرةً متقطّعة */
-.st.idle,.st.pending{color:var(--ink-2); background:var(--surface-2); border-color:var(--line)}
+.st.pending{color:var(--ink-2); background:var(--surface-2); border-color:var(--line)}
+/* ‏و«لم يبدأ» بنغمته المسمّاة (مواصفات v1 §5.2 · D-381): «--idle» على «--idle-wash» — ‏6.3:1 نهارًا و‏5.8:1 ليلًا.
+   ‏ونهارًا أغمقُ من «--ink-3» درجةً: كان يساويه، والحبرُ الثالثُ ممنوعٌ تحت ‏15px (audit_scale) والشارةُ ‏13px */
+.st.idle{color:var(--idle); background:var(--idle-wash); border-color:var(--line)}
 .chip{display:inline-block; padding:var(--s-0) var(--s-2); border-radius:var(--r-pill); font-size:var(--t-caption);
   line-height:var(--lh-caption); font-weight:600;
   background:var(--surface-2); border:var(--bd-soft); color:var(--ink-2);

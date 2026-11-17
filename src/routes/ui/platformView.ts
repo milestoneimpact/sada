@@ -896,7 +896,7 @@ function disconnectBlock(platform: Platform, accountId: string, name: string, in
         <li>واسحب التطبيق بيدك من <a class="tap" href="${escapeHtml(page.url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(page.label)}</a> لتطمئنّ.</li>
       </ul>
       <p class="hint">والربط من جديد ممكن متى شئت بزرّ الربط.</p>`,
-      actions: button({ label: 'افصل واحذف الرموز', variant: 'danger', type: 'submit', attrs: `form="${formId}"` }),
+      actions: button({ label: 'افصل واحذف الرموز', variant: 'danger-solid', type: 'submit', attrs: `form="${formId}"` }),
     })}`
 }
 

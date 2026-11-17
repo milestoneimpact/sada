@@ -30,6 +30,7 @@ import { dayLabel, shift } from '../planReviewView'
 const ar = num
 import { RUNG_MARK } from '../parts'
 import { statusBadge } from '../components/badge'
+import { glyph } from '../icons'
 import { dayBars } from '../chart'
 import { total } from '../../../lib/home'
 
@@ -41,24 +42,20 @@ import { total } from '../../../lib/home'
 const STEP_LABEL: Readonly<Partial<Record<JourneyStep['state'], string>>> = { failed: 'فشلت' }
 
 /**
- * القمع (D-194): **سبعُ محطّاتٍ أشرطةً بطولِ ما مرّ بكلٍّ منها** — بدل سبع بطاقاتٍ متساوية تُقرأ
- * كلُّها «تنتظر». والطولُ نسبةٌ إلى أكبرها، والمحطّةُ المميَّزة (ما يتكلّم عنه الفعلُ فوقها) وحدَها
- * بلون حالها؛ والباقي حبرٌ واحد (قياسٌ لا هويّة). والصفُّ كلُّه رابطٌ إلى موضع المحطّة.
+ * ‏**رحلةُ المنشور خطَّ مراحلَ عموديًّا** (SPEC-v1 §6.1 · D-381، بدل أشرطة D-194): الشريطُ بطول العدد كان يُقرأ «تقدّمًا» وهو
+ * ‏عدد، فتطول «المسوّدة» وتقصر «النتائج» ولا يُفهم لماذا. فصارت كلُّ مرحلةٍ دائرةَ حالٍ على خطٍّ واحد، واسمَها وعددَها وسطرَها.
+ * ‏**والمرحلةُ المميَّزة وحدَها مغسولةٌ بلون حالها** (`--warn-wash` لما ينتظرك، `--bad-wash` لما فشل) — سبعُ برتقاليّاتٍ ضجيج.
+ * ‏ومرحلةٌ «تامّة» لم يمرّ بها شيء (النتائج 0) لا تلبس «تامّة»: تُرسَم «تنتظر» — فلا يُقرأ الصفرُ إنجازًا.
  */
-function leg(s: JourneyStep, i: number, focus: number, max: number): string {
-  const mark = RUNG_MARK[s.state]
-  const w = max === 0 ? 0 : Math.max(s.count === 0 ? 0 : 4, Math.round((s.count / max) * 100))
-  /*
-   * ‏**ولونُ التحذير للمحطّة التي تنتظر المالكَ الآن وحدَها** (D-325 · Refactoring UI «أخفِ الثانويّ»): كانت خمسٌ من سبعٍ
-   * ‏تلبس شارةَ «تنتظرك» البرتقاليّةَ نفسَها، فلا تقول أيُّها. فما ينتظره ولم يُسمَّ يبقى «تنتظرك» برمزه وكلمته بحبرٍ محايد
-   * ‏— والحالُ نصٌّ لا لون (D-043) — وما فشل يبقى أحمر: الفشلُ ليس انتظارًا
-   */
-  const tone = s.state === 'now' && i !== focus ? 'idle' : mark.cls
-  return `<li data-state="${s.state}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
-      <span class="fn-t"><b>${escapeHtml(s.title)}</b>${statusBadge(tone, mark.g, escapeHtml(STEP_LABEL[s.state] ?? mark.label))}</span>
-      <span class="fn-bar" aria-hidden="true"><span style="--w:${w}%"></span></span>
-      <span class="fn-n num">${s.count}</span>
-      <span class="fn-note">${escapeHtml(s.note)}</span></a></li>`
+function leg(s: JourneyStep, i: number, focus: number): string {
+  const shown = s.state === 'done' && s.count === 0 ? 'waiting' : s.state
+  const mark = RUNG_MARK[shown]
+  const tone = shown === 'now' && i !== focus ? 'idle' : mark.cls
+  return `<li data-state="${shown}"${i === focus ? ' data-focus' : ''}><a href="${escapeHtml(s.href)}">
+      <span class="js-dot" data-tone="${tone}" aria-hidden="true">${glyph(mark.g)}</span>
+      <span class="js-t"><b>${escapeHtml(s.title)}</b>${statusBadge(tone, mark.g, escapeHtml(STEP_LABEL[shown] ?? mark.label))}</span>
+      <span class="js-n num">${s.count}</span>
+      <span class="js-note">${escapeHtml(s.note)}</span></a></li>`
 }
 
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -71,43 +68,51 @@ const WEEKDAYS_SHORT = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 
 const WEEKDAYS_MIN = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س']
 
 /**
- * شريطُ الأسبوع (D-194): سبعةُ أيّامٍ من اليوم **بتوقيت المالك**، وفي كلٍّ مربّعُ شعارٍ بلون منصّتها لكلّ
- * منشورٍ مجدول. **والشعارُ يحمل المنصّةَ لا لونُه** (D-325): كانت نقطةً بلونها وحدَه، وX وTikTok أسودان لا
- * يُفرَّقان (ΔE_OK ‏1.7) — فصار المربّعُ برمزه الأبيض كمربّعات البطاقات، والعددُ مكتوبٌ، والأسماءُ في اسم اليوم.
+ * ‏**«هذا الأسبوع» ويُنشر اليومَ فيه** (SPEC-v1 §6.1 · D-381): كانا بطاقتين، و«يُنشر اليوم» صندوقٌ كاملٌ لعبارةٍ فارغة. فصار اليومُ
+ * ‏أوّلَ الشريط بإطار العلامة، وما يخرج فيه قائمةٌ تحت الشريط بساعته ومنصّته. وسبعةُ أيّامٍ من اليوم **بتوقيت المالك**، في كلٍّ
+ * ‏مربّعُ شعارٍ بلون منصّته (`--pf-*`) لكلّ منشورٍ مجدول وعددُها. **والمربّعُ لا النقطة** (D-325 باقٍ، أقوى من نصّ المواصفة):
+ * ‏نقطةُ X ونقطةُ TikTok سوداوان لا تُفرَّقان (ΔE_OK ‏1.7)، والرمزُ الأبيضُ يفرّقهما. **ويومٌ فيه منشوراتٌ يُفتح** (`details` باسمٍ
+ * ‏واحد، فلا يُفتح يومان معًا): قائمةُ منشوراته بساعاتها، بلا سكربت ومن لوحة المفاتيح.
  */
 function week(items: readonly { platform: string; at: string }[], now: Date, zone: string | null): string {
   const key = (d: Date): string => { const p = localParts(d, zone); return `${p.year}-${p.month}-${p.day}` }
   const days = Array.from({ length: 7 }, (_, i) => new Date(now.getTime() + i * 86_400_000))
-  const by = new Map<string, string[]>()
+  const by = new Map<string, { platform: string; at: string; d: Date }[]>()
   for (const it of items) {
     const at = parseSqliteUtc(it.at)
     if (at === null || at.getTime() < now.getTime() - 3_600_000) continue
     const k = key(at)
-    by.set(k, [...(by.get(k) ?? []), it.platform])
+    by.set(k, [...(by.get(k) ?? []), { platform: it.platform, at: it.at, d: at }])
   }
+  for (const v of by.values()) v.sort((x, y) => x.d.getTime() - y.d.getTime())
   const total = days.reduce((n, d) => n + (by.get(key(d))?.length ?? 0), 0)
+  const timed = (list: readonly { platform: string; at: string }[]): string => list.map((it) => html`<li><bdi dir="ltr" class="num">${clock(it.at, zone)}</bdi>
+      <span class="td-pf">${raw(LOGOS[it.platform] ?? '')}${platformLabel(it.platform as never)}</span></li>`.value).join('')
   const cols = days.map((d, i) => {
     const p = localParts(d, zone)
-    const pfs = by.get(key(d)) ?? []
-    // ‏والمنصّاتُ بأسمائها في اسم النقاط وتلميحها (D-323): كان التلميحُ على كلّ نقطةٍ معرّفَها الخامّ («linkedin») على
-    // ‏وسمٍ لا يأخذ التركيز داخل صورةٍ لا يُقرأ ما فيها — فاللونُ وحدَه كان يقول المنصّة. والاسمُ الآن لقارئ الشاشة وللّمس
+    const list = by.get(key(d)) ?? []
+    const pfs = list.map((x) => x.platform)
+    // ‏والمنصّاتُ بأسمائها في اسم المربّعات (D-323): اللونُ وحدَه لا يقول المنصّة
     const names = pfs.map((pf) => platformLabel(pf)).join(' · ')
     const day = i === 0
       ? 'اليوم'
       : html`<span class="wk-long" aria-hidden="true">${WEEKDAYS[p.weekday] ?? ''}</span><span class="wk-short" aria-hidden="true">${
         WEEKDAYS_SHORT[p.weekday] ?? ''}</span><span class="wk-min" aria-hidden="true">${WEEKDAYS_MIN[p.weekday] ?? ''}</span><span class="vh">${WEEKDAYS[p.weekday] ?? ''}</span>`.value
-    return `<li${i === 0 ? ' data-today' : ''}><span class="wk-d">${day}</span>
+    const cell = `<span class="wk-d">${day}</span>
       <span class="wk-n num">${p.day}</span>
-      <span class="wk-dots" role="img" aria-label="${pfs.length === 0 ? 'لا منشور' : escapeHtml(String(pfs.length) + ' منشور: ' + names)}"${
-        pfs.length === 0 ? '' : ' tabindex="0" data-tip="' + escapeHtml(names) + '"'}>${pfs.slice(0, 6).map((pf) =>
+      <span class="wk-dots" role="img" aria-label="${pfs.length === 0 ? 'لا منشور' : escapeHtml(String(pfs.length) + ' منشور: ' + names)}">${pfs.slice(0, 6).map((pf) =>
         `<span class="wk-pf" data-pf="${escapeHtml(pf)}">${LOGOS[pf] ?? ''}</span>`).join('')}</span>
-      <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span></li>`
+      <span class="wk-c num">${pfs.length === 0 ? '—' : pfs.length}</span>`
+    // ‏واليومُ يُفتح كغيره (§6.1.5): ما يخرج اليومَ في خانته المميَّزة، لا صندوقًا ثانيًا تحت الشريط
+    const body = list.length === 0 ? cell
+      : html`<details class="wk-day" name="wk"><summary>${raw(cell)}</summary><ol class="td-list wk-pop">${raw(timed(list))}</ol></details>`.value
+    return `<li${i === 0 ? ' data-today' : ''}>${body}</li>`
   }).join('')
-  return `<div class="card home-card">
-    <div class="card-head"><h2>هذا الأسبوع</h2><div class="grow"></div>
+  return `<div class="card home-card" role="region" aria-labelledby="wk-t">
+    <div class="card-head"><h2 id="wk-t">هذا الأسبوع</h2><div class="grow"></div>
       <span class="ago">مجدول ${total}</span></div>
     <ol class="wk">${cols}</ol>
-    <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ مربّعٍ منشورٌ بشعار منصّته.'}</p>
+    <p class="hint wk-hint">${total === 0 ? 'لا شيء مجدول في الأيّام السبعة — اعتمد مسوّدةً واختر لها موعدًا.' : 'كلّ مربّعٍ منشورٌ بشعار منصّته، وافتح اليوم لترى ساعاته.'}</p>
   </div>`
 }
 
@@ -131,22 +136,22 @@ export function greeting(now: Date, zone: string | null): string {
   return h >= 4 && h < 12 ? 'صباح الخير' : h >= 12 && h < 17 ? 'نهارك سعيد' : 'مساء الخير'
 }
 
-/** أربعةُ أرقامٍ من العدّ المجمَّع نفسِه — لا رقمَ يُخترَع. */
+/**
+ * ‏أربعةُ أرقامٍ من العدّ المجمَّع نفسِه — لا رقمَ يُخترَع — **في بطاقةٍ واحدةٍ مضغوطة** (SPEC-v1 §6.1، 5.4): كانت أربعَ بطاقاتٍ
+ * ‏أصفارًا تحتلّ أفضلَ مساحة. **والصفرُ لا يُرى بلا سياق** (مبدأ «الثقة»): تحته سطرٌ يقول ماذا يعني وماذا يُفعل.
+ */
 function stats(f: HomeFacts): string {
   const failed = Object.values(f.counts.perPlatform).reduce((n, p) => n + (p.recentFailed ?? p.failed), 0)
-  /*
-   * ‏**والحافّةُ الملوّنة لما ليس صفرًا وحدَه، و«بانتظار قرارك» محايدة** (D-325 · خطّة التصميم 3.2): كانت الأربعُ ملوّنةً معًا
-   * ‏— تحذيرٌ وجيّدٌ وعلامةٌ وخطر — وصفرٌ بلونه يُقرأ حالًا لم تقع، و«بانتظار قرارك» برتقاليّةٌ والخطّةُ تقول «ليست تحذيرًا»
-   */
-  const cells: readonly [string, number, string, string][] = [
-    ['بانتظار قرارك', total(f.counts, 'draft'), '#posts', 'wait'],
-    ['مجدولة', total(f.counts, 'queued'), '#posts', 'sched'],
-    ['نُشرت هذا الأسبوع', f.counts.publishedWeek, '#results', 'ok'],
-    ['فشلت هذا الأسبوع', failed, '#posts', 'bad'],
+  // ‏والحافّةُ الملوّنة لما ليس صفرًا وحدَه، و«بانتظار قرارك» محايدة (D-325)
+  const cells: readonly [string, number, string, string, string][] = [
+    ['بانتظار قرارك', total(f.counts, 'draft'), '#posts', 'wait', 'لا مسوّدة تنتظرك'],
+    ['مجدولة', total(f.counts, 'queued'), '#posts', 'sched', 'اعتمد مسوّدةً واختر موعدها'],
+    ['نُشرت هذا الأسبوع', f.counts.publishedWeek, '#results', 'ok', 'لم يُنشر شيء بعد'],
+    ['فشلت هذا الأسبوع', failed, '#posts', 'bad', 'لا فشل هذا الأسبوع'],
   ]
-  return `<ul class="hstats">${cells.map(([k, n, href, tone]) =>
+  return `<ul class="hstats">${cells.map(([k, n, href, tone, zero]) =>
     `<li data-tone="${n === 0 ? 'idle' : tone}"><a href="${escapeHtml(href)}"><span class="hs-k">${escapeHtml(k)}</span>
-      <b class="hs-n num">${n}</b></a></li>`).join('')}</ul>`
+      <b class="hs-n num">${n}</b>${n === 0 ? `<span class="hs-z">${escapeHtml(zero)}</span>` : ''}</a></li>`).join('')}</ul>`
 }
 
 /** ما كُتب في أربعة عشر يومًا بتوقيت المالك — من المنشورات المرسومة وحدها. */
@@ -171,24 +176,6 @@ export function activityCard(f: HomeFacts, now: Date): string {
       html: 'اكتب فكرة في جملة، وصدى يحوّلها مسوّدة لكلّ قناة.',
       action: '<a class="btn btn-primary btn-sm" href="/panel#idea">اكتب فكرة</a>',
     })}
-  </div>`
-}
-
-/**
- * **«يُنشر اليوم»** (D-267 · EASE د): ما يخرج قبل منتصف ليل المالك، بساعته ومنصّته — أوّلُ ما يُسأل عنه صباحًا.
- * من المجدول نفسِه الذي يرسم «هذا الأسبوع»، فلا استعلامَ جديد. وما مضى بأكثرَ من ساعةٍ يسقط كما يسقط هناك.
- */
-function today(items: readonly { platform: string; at: string }[], now: Date, zone: string | null): string {
-  const key = (d: Date): string => { const p = localParts(d, zone); return `${p.year}-${p.month}-${p.day}` }
-  const list = items
-    .map((it) => ({ platform: it.platform, at: it.at, d: parseSqliteUtc(it.at) }))
-    .filter((it): it is { platform: string; at: string; d: Date } => it.d !== null && it.d.getTime() >= now.getTime() - 3_600_000 && key(it.d) === key(now))
-    .sort((a, b) => a.d.getTime() - b.d.getTime())
-  const rows = list.map((it) => `<li><bdi dir="ltr" class="num">${escapeHtml(clock(it.at, zone))}</bdi>
-      <span class="td-pf">${LOGOS[it.platform] ?? ''}${escapeHtml(platformLabel(it.platform as never))}</span></li>`).join('')
-  return `<div class="card home-card">
-    <div class="card-head"><h2>يُنشر اليوم</h2><div class="grow"></div><span class="count">${list.length}</span></div>
-    ${list.length === 0 ? '<p class="hint">لا شيء يُنشر اليوم.</p>' : `<ol class="td-list">${rows}</ol>`}
   </div>`
 }
 
@@ -248,58 +235,70 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
   return html`<div class="mb-3">${raw(card({ id: 'first-run', title: 'البدء في ثلاث خطوات', titleId: 'fr-t', attrs: 'role="region" aria-labelledby="fr-t"', body }))}</div>`.value
 }
 
+/** ما يُمرَّر إلى «ما ينتظرك»: صفوفُها (`<li>`) وأدواتُها الثانويّة (المسح ومراجعة المصادر). */
+export interface Waiting {
+  readonly rows: string
+  readonly tools: string
+}
+
+/** عددُ ما يُنشر في الأيّام السبعة من الآن — العددُ نفسُه الذي يقوله «هذا الأسبوع». */
+function weekCount(items: readonly { at: string }[], now: Date): number {
+  return items.filter((it) => {
+    const at = parseSqliteUtc(it.at)
+    return at !== null && at.getTime() >= now.getTime() - 3_600_000 && at.getTime() < now.getTime() + 7 * 86_400_000
+  }).length
+}
+
 /**
- * ‏`entry`: بابُ الكتابة في سطر التحيّة (D-326 · «أنشئ من كلّ مكان»): «منشور جديد ▾» ثانويٌّ بجانب التحيّة على الهاتف، حيث
- * ‏لا ترويسةَ تحمله — فلا يُبحث عن الكتابة خلف زرٍّ عائمٍ بلا اسمٍ يُرى، ولا زرَّ أوّليًّا ثانيًا في البطاقة.
+ * ‏**الرئيسيّة بترتيب SPEC-v1 §6.1** (D-381، بدل ترتيب D-177 وتخطيط D-355): التحيّةُ وسطرُ حالٍ واحد وبابُ الكتابة، ثمّ «ما
+ * ‏ينتظرك» بعرض اللوح — **وخطوتُك التالية أوّلُ صفوفها** لا سطرًا مستقلًّا فوقها (موضعٌ بارزٌ واحد، وزرٌّ أوّليٌّ واحد فيه) — ثمّ
+ * ‏البدءُ إن كان، وما ينتظر قرارَك، والأرقامُ صفًّا واحدًا، ثمّ عمودان: الأسبوعُ (2/3) والرحلةُ (1/3)، ثمّ الخطّة.
+ *
+ * ‏`entry`: «منشور جديد» في سطر التحيّة — أوّليٌّ، ويُرسَم حيث لا ترويسةَ تحمله (D-326)، فلا زرّان بالاسم نفسِه في شاشة.
  */
-export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = ''): string {
+export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '', waiting: Waiting = { rows: '', tools: '' }): string {
   const next = nextAction(f, now)
   const trip = journeySteps(f)
   const focus = focusOf(trip, next.step)
   const run = firstRun(f)
-  /*
-   * ‏**والمؤشّراتُ مخفيّةٌ حتّى تتوفّر بيانات** (خطّة التصميم 5.5 · D-326): رئيسيّةٌ لا مصدرَ فيها ولا منشورَ ولا موعد كانت تُري
-   * ‏أربعةَ أصفار، وقمعًا بسبع محطّاتٍ فارغة، وأسبوعًا خاليًا — شاشتين من لا شيء فوق ما يفعله المالكُ أوّلًا.
-   */
+  // ‏والمؤشّراتُ مخفيّةٌ حتّى تتوفّر بيانات (D-326)
   const written = (['draft', 'approved', 'queued', 'published', 'failed'] as const).reduce((n, k) => n + total(f.counts, k), 0)
   const bare = run !== null && f.sources.total === 0 && written === 0 && (f.scheduled ?? []).length === 0
-  /*
-   * ‏**ولا تُقال الحالُ مرّتين** (D-289): منصّةٌ انقطعت أو قارب إذنُها يقولها شريطُ اللوحة فوق كلّ لوح بزرّه، فكانت الرئيسيّةُ
-   * ‏تعيدها بطاقةً حمراءَ كاملةً تحته — أوّلَ ما يُرى في كلّ فتحة. فخطوةٌ عن منصّةٍ والشريطُ يقولها تُترك له، ويبقى التحيّةُ سطرًا.
-   */
-  // ‏والزرُّ يبقى بضغطةٍ واحدة صغيرًا بجانب التحيّة: الشريطُ يقول الحالَ، وهذا يصلحها
+  // ‏ولا تُقال الحالُ مرّتين (D-289 · §4.4): منصّةٌ انقطعت يقولها تنبيهُ النظام أعلى الصفحة بزرّه، فلا صفَّ لها هنا
   const repeated = next.tone === 'bad' && next.href.startsWith('/oauth/')
-  /*
-   * ‏**التخطيطُ المعتمد** (D-355): رأسٌ بالتحيّة وزرِّ الدخول، ثمّ سطرُ «خطوتك التالية» مضغوطًا لا كتلةً تملأ أوّلَ الشاشة، ثمّ شريطُ
-   * ‏الأرقام، ثمّ عمودان: الرئيسيُّ للقرار (ينتظر قرارك ورحلةُ المنشور)، والجانبيُّ للسياق (الخطّةُ واليومُ والأسبوع). كان كلُّه عمودًا
-   * ‏واحدًا تتزاحم فيه البطاقاتُ وثلثا الشاشة فارغان.
-   */
-  // ‏منصّةٌ انقطعت يقولها الشريطُ (D-289): زرُّها صغيرٌ في سطر التحيّة، ولا سطرَ «خطوتك التالية» أحمر
-  const head = html`<div class="home-head${repeated ? ' home-hello' : ''}"><p class="hello m-0">${greeting(now, f.zone)}</p><span class="grow"></span>${raw(entry)}${repeated
-    ? html`<a class="btn btn-secondary btn-sm" href="${next.href}">${next.label}</a>` : html``}</div>`
-  const nextRow = repeated ? html`` : html`<div class="card card-alert next is-slim" data-tone="${next.tone}">
-    <div class="next-body"><span class="next-k">خطوتُك التالية</span><p class="next-t m-0">${next.text}</p></div>
-    <a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a>
+  // ‏و«لا شيء ينتظرك» من `nextAction` ليست بندًا: هي الحالُ الفارغةُ نفسُها، فتُقال فيها لا صفًّا
+  const idle = next.tone === 'ok' && next.text.startsWith('لا شيء ينتظرك')
+  const waitingN = total(f.counts, 'draft')
+  const status = html`<p class="hello-status m-0"><b class="num">${String(waitingN)}</b> بانتظار قرارك · <b class="num">${String(weekCount(f.scheduled ?? [], now))}</b> مجدولة هذا الأسبوع</p>`
+  const head = html`<div class="home-head"><div class="hello-t"><p class="hello m-0">${greeting(now, f.zone)}</p>${bare ? html`` : status}</div><span class="grow"></span>${raw(entry)}</div>`
+  const nextRow = repeated || idle ? '' : html`<li class="todo-next" data-tone="${next.tone}"><span class="dot ${next.tone}"></span>
+      <span><span class="next-k">خطوتُك التالية</span> ${next.text}</span>
+      <span class="todo-go"><a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a></span></li>`.value
+  const rows = nextRow + waiting.rows
+  const box = html`<div class="card home-waiting" role="region" aria-labelledby="hw-t">
+    <div class="card-head"><h2 id="hw-t">ما ينتظرك</h2></div>
+    ${rows === ''
+      ? html`<div class="empty empty-ok"><p class="empty-t m-0"><span class="dot ok"></span> لا شيء ينتظرك الآن</p><p class="hint m-0">${idle ? next.text : 'كلّ ما بُني مضبوط.'}</p>${idle ? html`<p class="m-0 mt-2"><a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a></p>` : html``}</div>`
+      : html`<ul class="todo todo-act">${raw(rows)}</ul>`}
+    ${waiting.tools === '' ? html`` : html`<div class="row gap-2 mt-3">${raw(waiting.tools)}</div>`}
   </div>`
   return `${head.value}
-  ${nextRow.value}
+  ${box.value}
   ${run === null ? '' : firstRunCard(run, f, now)}
   ${bare ? '' : stats(f)}
-  <div class="home-grid">
-    <div class="home-main">
-      ${kpis}
-      ${bare ? '' : html`<div class="card home-card">
+  ${/* ‏وطابورُ القرار بعد الأرقام (§6.1): بطاقةٌ بمنشورين كاملين كانت تدفع الأرقامَ تحت الطيّة، والخطوةُ الأولى في «ما ينتظرك» أصلًا */''}
+  ${kpis}
+  ${bare ? '' : html`<div class="home-grid">
+    <div class="home-main">${raw(week(f.scheduled ?? [], now, f.zone))}</div>
+    <aside class="home-aside" aria-label="رحلة المنشور">
+      <div class="card home-card">
         <div class="card-head"><h2>رحلة المنشور</h2><div class="grow"></div>
-          <span class="ago">كم مرّ بكلّ محطّة</span></div>
-        <ol class="funnel">${raw(trip.map((s, i) => leg(s, i, focus, Math.max(...trip.map((t) => t.count)))).join(''))}</ol>
-      </div>`.value}
-    </div>
-    <aside class="home-aside" aria-label="سياقُ الأسبوع">
-      ${lead}
-      ${bare ? '' : today(f.scheduled ?? [], now, f.zone)}
-      ${bare ? '' : week(f.scheduled ?? [], now, f.zone)}
+          <span class="ago">كم مرّ بكلّ مرحلة</span></div>
+        <ol class="jsteps">${raw(trip.map((s, i) => leg(s, i, focus)).join(''))}</ol>
+      </div>
     </aside>
-  </div>`
+  </div>`.value}
+  ${lead}`
 }
 
 /**
@@ -328,23 +327,31 @@ export function planCard(
   const state = locked
     ? html`<span class="st ok">مثبَّتة · الإصدار ${ar(plan.version ?? 1)}</span>`
     : html`<span class="st idle">مسوّدة · الإصدار ${ar(plan.version ?? 1)}</span>`
-  const go = locked
+  /*
+   * ‏**وخطّةٌ انقضى أسبوعُها تقول ذلك** (SPEC-v1 §6.1 · D-381): كانت الرئيسيّةُ تعرض أسبوع 4-10 أكتوبر واليومُ 16 نوفمبر، وزرُّها
+   * ‏«تابع الكتابة» لخطّةٍ لن تُنشر. فوسمُ تحذير «خطّة منتهية»، والزرُّ الأوّليُّ الواحدُ يبني خطّةَ الأسبوع الحاليّ (المسارُ القائم).
+   * ‏واليومُ بتوقيت المالك لا بـ UTC
+   */
+  const today = todayKey(now, zone)
+  const expired = end < today
+  const go = expired
+    ? { href: '/panel/plan/new', label: 'أنشئ خطّة الأسبوع الحاليّ' }
+    : locked
     ? { href: '/panel/plan/view', label: 'اعرض الخطّة' }
     : c.written < total
       ? { href: '/panel/plan/review', label: 'تابع الكتابة' }
       : c.pending > 0
         ? { href: '/panel/plan/review', label: 'راجع واعتمد (' + ar(c.pending) + ')' }
         : { href: '/panel/plan/review', label: 'ثبّت الخطّة' }
-  const today = todayKey(now, zone)
-  const next = [...plan.plan.items].filter((i) => i.day >= today).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
+  const next = expired ? [] : [...plan.plan.items].filter((i) => i.day >= today).sort((a, b) => (a.day + a.time).localeCompare(b.day + b.time)).slice(0, 3)
   return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
-    <div class="card-head"><h2 id="hp-t">خطّةُ ${span === 'شهر' ? 'الشهر' : span}</h2><span class="grow"></span>${state}</div>
+    <div class="card-head"><h2 id="hp-t">خطّةُ ${span === 'شهر' ? 'الشهر' : span}</h2><span class="grow"></span>${expired ? html`<span class="st warn">خطّة منتهية</span>` : html``}${state}</div>
     <p class="hint m-0">${dayLabel(plan.week)} — ${dayLabel(end)}</p>
     <div class="hp-prog"><progress max="${String(Math.max(1, total))}" value="${String(c.ready)}" aria-label="المعتمَد من الخطّة"></progress>
-      <span><b>${ar(c.ready)}</b> معتمَدةً من ${ar(total)}${c.pending > 0 ? ' · ' + ar(c.pending) + ' تنتظرك' : ''}${c.written < total ? ' · ' + ar(total - c.written) + ' تُكتب' : ''}</span></div>
+      <span><b>${ar(c.ready)}</b> من ${ar(total)} معتمَدة${c.pending > 0 ? ' · ' + ar(c.pending) + ' تنتظرك' : ''}${c.written < total ? ' · ' + ar(total - c.written) + ' تُكتب' : ''}</span></div>
     ${next.length === 0 ? html`` : html`<ol class="hp-next" aria-label="أقربُ ما في الخطّة">${next.map((i) => html`<li>
       <span class="pf-logo rv-pf" data-pf="${i.platform}" aria-hidden="true">${raw(LOGOS[i.platform] ?? '')}</span>
       <b>${dayLabel(i.day)}</b><bdi class="mono">${stamp(i.day + ' ' + i.time, zone).slice(11, 16)}</bdi><span class="hp-a">${i.angle}</span></li>`)}</ol>`}
-    <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}</div>
+    <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked && !expired ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}</div>
   </div>`.value
 }

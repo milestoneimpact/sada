@@ -20,13 +20,14 @@ import { pageHead } from './parts'
 import { LOGOS } from './logos'
 import { nativePost } from './nativePost'
 import { maySpend } from '../../lib/access'
-import { button } from './components/button'
+import { btnClass, button } from './components/button'
 import { menu, menuAction, menuItem } from './components/menu'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
 import { localParts, stamp, todayKey } from '../../lib/time/zone'
 import { field } from './components/field'
+import { segmented, tabs as tabBar } from './components/tabs'
 import { AR_LATN, num } from '../../lib/format'
 import { SPAN_LABEL, imageFor, spanDays } from '../../lib/plan/prompt'
 import { GAP_LABEL, type Gap, type ReviewCard, type ReviewModel } from '../../lib/plan/review'
@@ -172,11 +173,13 @@ function clientSaid(v: { readonly verdict: 'approve' | 'changes'; readonly note:
 }
 
 /** «شارك مع العميل» (D-353): رابطٌ يُنشأ ويُعرض مرّةً، أو حالُ الرابط النافذ وإلغاؤه. */
+const shareBtn = btnClass('secondary', 'sm')
 function shareBox(m: ReviewModel, view: ReviewView): Html {
   const s = view.share ?? { count: 0, until: null }
   const said = view.verdicts === undefined ? 0 : [...view.verdicts.values()].length
   const changes = view.verdicts === undefined ? 0 : [...view.verdicts.values()].filter((v) => v.verdict === 'changes').length
-  return html`<details class="fold rv-share"><summary><span>شارك مع العميل${s.count > 0 ? ' · رابطٌ نافذ' : ''}${said > 0 ? ' · قال رأيه في ' + AR(said) + (changes > 0 ? '، ويطلب تعديلَ ' + AR(changes) : '') : ''}</span></summary>
+  // ‏فعلٌ ثانويٌّ بأيقونة المشاركة (§6.2) لا طيّةٌ بعرض الصفحة: الطيُّ نفسُه «details» فيعمل بلا سكربت
+  return html`<details class="rv-share"><summary class="${shareBtn}">${raw(ICON.share)}<span>شارك مع العميل${s.count > 0 ? ' · رابطٌ نافذ' : ''}${said > 0 ? ' · قال رأيه في ' + AR(said) + (changes > 0 ? '، ويطلب تعديلَ ' + AR(changes) : '') : ''}</span></summary>
     <p class="hint">رابطٌ يرى به العميلُ منشورات هذه الخطّة بشكل كلّ منصّة، ويقول في كلٍّ منها «موافق» أو «أطلب تعديلًا» بملحوظة. لا ينشر ولا يعتمد، ولا يرى شيئًا سواها. وينتهي بعد أربعة عشر يومًا، أو حين تُبنى خطّةٌ أحدث.</p>
     <div class="row gap-2">
       <form class="inline" method="POST" action="/panel/plan/share" data-busy="جار…"><input type="hidden" name="id" value="${m.plan.id}">
@@ -231,8 +234,8 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
         const text = c.post === null ? (c.failed !== undefined ? 'تعذّرت كتابتُه' : 'تُكتب الآن') : face(c.post.status).text
         const movable = c.post === null || c.post.status !== 'published'
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
-          ${c.mediaId === null || (c.mediaMime ?? '').startsWith('video/') ? html`` : html`<img class="rv-mini-img" src="/panel/media/${c.mediaId}?w=160" alt="" loading="lazy" decoding="async" width="28" height="28">`}
-          <span class="pf-logo rv-pf rv-dot" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
+          ${/* ‏ولا مصغَّرةَ صورةٍ في خانة اليوم (§6.2): ‏28px لا تُقرأ، وصورةٌ لم تصل كانت أيقونةَ صورةٍ مكسورة. الشعارُ والشريطُ بلون المنصّة يقولانها */''}
+          <i class="pf-stripe" data-pf="${c.item.platform}" aria-hidden="true"></i><span class="pf-logo rv-pf rv-dot" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
           <bdi class="mono">${stamp(c.item.day + ' ' + c.item.time, board.zone).slice(11, 16)}</bdi><span class="rv-mini-t" aria-hidden="true">${c.item.angle}</span><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
       })}
     </div>`)
@@ -278,7 +281,8 @@ function planActions(m: ReviewModel): Html {
   const scheduled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
   const drafts = m.cards.filter((c) => c.post !== null && (c.post.status === 'draft' || c.post.status === 'approved')).length
   const keep = scheduled === 0 ? '' : ' ويبقى ما جُدول (' + AR(scheduled) + ') في موعده؛ تسحبه من «المنشورات» إن شئت.'
-  return html`${raw(menu({ label: 'أفعال الخطّة', variant: 'secondary', size: 'sm', items: [
+  // ‏«⋯» (§6.2): أفعالُ الخطّة كلِّها نادرةٌ ولا تنافس «اعتمد» — زرُّ أيقونةٍ اسمُه «أفعال الخطّة»
+  return html`${raw(menu({ label: 'أفعال الخطّة', variant: 'icon', size: 'sm', icon: ICON.more, items: [
     menuItem({ label: 'تابع ما جُدول ونُشر', href: '/panel/plan/follow' }),
     menuItem({ label: 'اعرض واطبع', href: '/panel/plan/view' }),
     menuItem({ label: 'أعد بناء الخطّة', href: '/panel/plan/new' }),
@@ -297,7 +301,8 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     : m.versions.length > 0
       ? html`<span class="st warn">عُدّلت بعد التثبيت · الإصدار ${AR(m.version)} غير مثبَّت</span>`
       : html`<span class="st idle">مسوّدة · الإصدار ${AR(m.version)}</span>`
-  const head = pageHead('المنشورات', 'خطّةُ النشر', span + ' · ' + dayLabel(m.plan.week) + ' – ' + dayLabel(end))
+  // ‏بلا لصيقةٍ فوق العنوان (§8 «رأسٌ واحد بلا روابط رجوع»): «المنشورات» فوق «خطّةُ النشر» كانت فتاتَ خبزٍ في ثوبٍ آخر، والموضعُ في الرافدة
+  const head = pageHead('', 'خطّةُ النشر', span + ' · ' + dayLabel(m.plan.week) + ' – ' + dayLabel(end))
   const written = m.cards.filter((c) => c.post !== null).length
   // ‏ما تعذّر لا يُنتظر (PL-23): يُقال سببُه ومعه «أعد كتابة ما تعذّر»، والصفحةُ لا تتحدّث له
   const failed = m.cards.filter((c) => c.post === null && c.failed !== undefined)
@@ -308,9 +313,9 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const progress = html`<div class="rv-progress">
       <progress class="rv-prog" max="${String(Math.max(1, m.cards.length))}" value="${String(settled)}" aria-label="${'مجدولٌ أو منشور: ' + AR(settled) + ' من ' + AR(m.cards.length)}"></progress>
       <span class="hint" role="status">${inFlight > 0
-        ? 'كُتب ' + AR(written) + ' من ' + AR(m.cards.length) + ' — صدى يكتب الباقي الآن بصوره، والصفحةُ تتحدّث وحدَها.'
+        ? 'صدى يكتب الباقي الآن بصوره، والصفحةُ تتحدّث وحدَها.'
         : failed.length > 0
-        ? 'كُتب ' + AR(written) + ' من ' + AR(m.cards.length) + '، وتعذّرت كتابةُ ' + AR(failed.length) + ': ' + failed[0]!.failed!
+        ? 'تعذّرت كتابةُ ' + AR(failed.length) + ': ' + failed[0]!.failed!
         : AR(settled) + ' من ' + AR(m.cards.length) + ' مجدولةٌ أو منشورة' + (m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : '')}</span>
       ${inFlight === 0 && failed.length > 0 ? html`<form class="inline" method="POST" action="/panel/plan/review/redraft"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'أعد كتابة ما تعذّر (' + AR(failed.length) + ')', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}</div>`
   const visible = [...m.cards]
@@ -334,8 +339,14 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   })
   const table = visible.length === 0 ? html`` : html`<div class="scroll rv-list"><table><caption class="vh">منشوراتُ ${scopeName(m, shown)} قائمةً</caption>
       <thead><tr><th scope="col">الموعد</th><th scope="col">المنصّة</th><th scope="col">الحال</th><th scope="col">المنشور</th></tr></thead><tbody>${rows}</tbody></table></div>`
-  const toggle = html`<span class="rv-vw" role="group" aria-label="طريقة العرض" hidden>
-      ${raw(button({ label: 'بطاقات', size: 'sm', attrs: 'data-view="cards" aria-pressed="true"' }))}${raw(button({ label: 'قائمة', size: 'sm', attrs: 'data-view="list" aria-pressed="false"' }))}</span>`
+  // ‏مقطعٌ (segmented · §6.2) لا زرّان متساويان: اختيارٌ واحدٌ من اثنين، بلغة «الاختيار» في D-189
+  const toggle = html`<span class="rv-vw" hidden>${raw(segmented('طريقة العرض', 'view', [{ value: 'cards', label: 'بطاقات', pressed: true }, { value: 'list', label: 'قائمة' }]))}</span>`
+  // ‏تبويباتُ الخطّة تحت العنوان (§6.2): ثلاثُ صفحاتٍ لشيءٍ واحد، فالتنقّلُ بينها بلغة التنقّل
+  const sub = tabBar('صفحات الخطّة', [
+    { label: 'الخطّة', href: '/panel/plan/review', current: true },
+    { label: 'عرض للطباعة', href: '/panel/plan/view' },
+    { label: 'خطّة جديدة', href: '/panel/plan/new' },
+  ])
   const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
       <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${AR(v.items)} بندًا، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
   // ‏«اعتمد الأسبوع»: مسوّداتُ المعروض كلُّها بنموذج الجملة نفسِه — لا طريقَ ثانيًا حول فحص الاعتماد
@@ -368,12 +379,19 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
           ${raw(button({ label: 'أضف واكتبه', variant: 'primary', type: 'submit' }))}
         </div>
       </form></details>`
+  /*
+   * ‏**زرُّ سطر الحالة الأوّليّ** (§6.2): «تابع الكتابة» إلى أوّل بندٍ يحتاج يدَ المالك — لم يُكتب، أو كُتب وينتظر قرارَه — في أسبوعه.
+   * ‏رابطٌ لا نموذج: الكتابةُ تجري وحدَها، والمالكُ يتابع من حيث وقفت. وحين لا شيء ينتظر لا زرّ: الحالُ تقول ذلك
+   */
+  const due = [...m.cards].filter((c) => (c.post === null && c.failed === undefined) || waits(c))
+    .sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))[0]
+  const next = due === undefined ? html`` : raw(button({ label: 'تابع الكتابة', variant: 'primary', size: 'sm', href: '?w=' + String(weekOfDay(m.plan.week, due.item.day)) + '#c-' + String(due.index) }))
   const weekHref = (day: string): string => '?w=' + String(weekOfDay(m.plan.week, day)) + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
-    <div class="row gap-2 mb-3">${state}<span class="grow"></span>${toggle}${planActions(m)}</div>
+    ${raw(sub)}
+    <div class="row gap-2 mb-3 rv-status">${state}<span class="hint">كُتب ${AR(written)} من ${AR(m.cards.length)}</span>${next}<span class="grow"></span>${toggle}${shareBox(m, view)}${planActions(m)}</div>
     ${progress}
-    ${shareBox(m, view)}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) })}
     ${weekTabs(m, shown)}
     ${gapsBar(m)}

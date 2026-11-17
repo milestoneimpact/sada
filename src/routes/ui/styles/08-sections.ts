@@ -163,6 +163,20 @@ ol.steps.wiz.nodot li::before{display:none}
 @media(hover:hover){.tab-item:hover{color:var(--ink); border-bottom-color:var(--line)}}
 .tab-item[aria-current=page],.tab-item[aria-selected=true],.tab-item[aria-pressed=true]{
   color:var(--ink); border-bottom-color:var(--ink)}
+/* ‏«الإعدادات» بعمودين على الحاسوب (SPEC-v1 §6.9): الأقسامُ قائمةٌ عموديّة يمينًا، والمحتوى يسارًا.
+   والمراسي والسكربتُ كما هي: الشريطُ نفسُه يُرسَم عموديًّا، وبلا سكربتٍ تبقى الأقسامُ كلُّها في العمود الثاني */
+@media${atLeast('tab')}{
+  section[data-pane=settings]:not([hidden]){display:grid; grid-template-columns:13rem minmax(0,1fr); column-gap:var(--s-6); align-items:start}
+  section[data-pane=settings]>*{grid-column:1 / -1}
+  section[data-pane=settings]>[data-sub]{grid-column:2}
+  section[data-pane=settings]>#settings-sub{grid-column:1; grid-row:2 / span 40; position:sticky; top:var(--s-4);
+    flex-direction:column; flex-wrap:nowrap; align-items:stretch; gap:var(--s-1); box-shadow:none}
+  #settings-sub .tab-item{border-bottom:0; border-inline-start:var(--stroke) solid transparent}
+  #settings-sub .tab-item[aria-current=page],#settings-sub .tab-item[aria-selected=true]{border-inline-start-color:var(--ink); background:var(--selected)}
+}
+/* ‏وكلُّ إعداد صفٌّ: التسميةُ ووصفُها، والعنصرُ في الطرف */
+.set-row{align-items:center}
+.set-lbl{display:grid; gap:var(--s-1); min-width:0}
 /* الصفُّ الفرعيّ «tabs({ sub })» — فرزٌ داخل التبويب لا تبويبٌ ثانٍ */
 .tab-sub{align-items:center; box-shadow:none; margin-top:calc(-1 * var(--s-2))}
 /* ‏صفُّ فرز المسوّدات شريطُ فلترٍ واحد (D-276) و«؟» آخرَه، والمختارُ في قائمتَيه بعلامة */
@@ -402,7 +416,7 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .pc-body{display:flex; align-items:flex-start; gap:var(--s-4)}
 .pc-text{flex:1; min-width:0; margin:0; font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink);
-  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden}
+  overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden}
 /* ‏«المكتبة ← الصور» (D-206): شبكةٌ تملأ عرضَها، والصورةُ كاملةٌ لا مقصوصة (contain · D-170) */
 .lib-grid{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fill,minmax(min(100%,11.75rem),1fr)); margin-top:var(--s-3)}
 .lib-img{display:flex; flex-direction:column; gap:var(--s-2); color:var(--ink); text-decoration:none}
@@ -410,8 +424,17 @@ details.fold[open] > summary{margin-bottom:var(--s-2)}
   background:var(--surface-2); border:var(--bd-soft)}
 @media(hover:hover){.lib-img:hover img{border-color:var(--ink-3)}}
 .lib-cap{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.pc-thumb{flex:none; width:var(--s-16); height:var(--s-16); border-radius:var(--r-control);
+.pc-thumb{flex:none; width:calc(2 * var(--s-12)); height:calc(2 * var(--s-12)); border-radius:var(--r-control);
   object-fit:cover; background:var(--surface-2); border:var(--bd-soft)}
+/* ‏وبلا صورةٍ شعارُ المنصّة بحبرٍ خافتٍ على «--surface-2» (§6.3): يقول المنصّةَ ولا يدّعي صورة */
+.pc-ph{display:grid; place-items:center; color:var(--ink-3)}
+.pc-ph svg{width:var(--icon-lg); height:var(--icon-lg); display:block}
+/* ‏قائمةٌ أو شبكة (§6.3): القائمةُ عمودٌ بترتيب الأهمّيّة، والشبكةُ صورتُها ‏16:9 فوق النصّ */
+.dcols[data-layout=list]{columns:1; max-width:48rem}
+.dcols[data-layout=grid]{columns:auto; display:grid; gap:var(--gap-card); grid-template-columns:repeat(auto-fill,minmax(min(100%,18rem),1fr))}
+.dcols[data-layout=grid] > *{margin-bottom:0}
+.dcols[data-layout=grid] .pc-body{flex-direction:column-reverse}
+.dcols[data-layout=grid] .pc-thumb{width:100%; height:auto; aspect-ratio:16/9}
 .pc-line{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap; margin:0; max-width:none;
   font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .pc-line[data-tone=bad]{color:var(--bad)}

@@ -40,6 +40,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
   html,body{background:#fff!important; color:#000!important}
   .rail,.topbar,.seg,.skip,footer,nav.tabs,button,.btn,form{display:none!important}
   .app{display:block}
+  .app::before{display:none}
   /* والهوامشُ من @page لا من الحاوية: حاويةٌ بلا حدٍّ أقصى تمدّ السطرَ
      عبر الورقة كلّها، وقيد المقاس على الفقرات يبقى قائما */
   .content,.doc{padding:0; margin:0; max-width:100%}
@@ -137,7 +138,7 @@ details[open]:not(.more-sheet):not(.menu)::details-content{height:auto; opacity:
 @starting-style{
   [data-tip]:focus-visible::before,.btn-icon[aria-label]:focus-visible::before{opacity:0; translate:calc(var(--dir) * 50%) var(--s-1)}
 }
-.topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before,nav.back [data-tip]::before,nav.back .btn-icon[aria-label]::before{
+.topbar [data-tip]::before,.topbar .btn-icon[aria-label]::before{
   inset-block-end:auto; inset-block-start:calc(100% + var(--s-2)); translate:calc(var(--dir) * 50%) calc(-1 * var(--s-1))}
 /* ‏**ومتى جرى السكربتُ حلّ محلَّ الزائف عنصرٌ يُمسَك** (D-323 · WCAG 1.4.13): الزائفُ بلا أحداثِ مؤشّر وبينه وبين مرجعه
    فجوة، فمن حرّك المؤشّرَ إليه اختفى، ولا يظهر باللمس. فـ«data-tipjs» على الجذر يُطفئه، و«.tip» أدناه هو التلميح */
@@ -301,7 +302,9 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   border:var(--bd); background:var(--surface-2); cursor:pointer; color:var(--ink-2);
   font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400;
   transition:border-color var(--dur-1) var(--ease), color var(--dur-1) var(--ease);
-  border-radius:var(--r-pill); padding:0 var(--s-4)}
+  border-radius:var(--r-control); padding:0 var(--s-3); min-inline-size:14rem}
+/* بشكل حقل بحث (المواصفات v1 §4.1): الاختصارُ في آخر الحقل */
+.cmdk-open .kbd{margin-inline-start:auto}
 @media(hover:hover){
   .cmdk-open:hover{border-color:var(--field); color:var(--ink-2)}
 }
@@ -310,6 +313,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 @media${below('sm')}{
   .cmdk-veil{padding:var(--s-4) var(--s-3)}
   .cmdk-open span{display:none}
+  .cmdk-open{min-inline-size:0}
 }
 
 /* ── الخطّةُ لوحةً أو قائمة (D-259) ─────────────────────────────────────
@@ -501,7 +505,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-pf-more{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); margin-top:var(--s-4); align-items:start}
 .wz-times input{flex:1 1 6rem; min-width:0}
 .wz-pill{display:inline-flex; align-items:center; gap:var(--s-2); min-height:var(--tap); padding:var(--s-1) var(--s-4);
-  border:var(--bd); border-radius:var(--r-pill); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
+  border:var(--bd); border-radius:var(--r-control); background:var(--surface); cursor:pointer; font-size:var(--t-ui); line-height:var(--lh-ui)}
 .wz-pill input[type=radio]{margin:0; accent-color:var(--accent)}
 .wz-pill:has(input[type=radio]:checked){border-color:var(--accent); background:var(--selected); color:var(--ink)}
 .wz-pill input[type=number]{width:calc(3ch + var(--s-8))}
@@ -509,6 +513,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-drop{position:relative; display:flex; flex-direction:column; align-items:center; gap:var(--s-1); padding:var(--s-6) var(--s-4);
   text-align:center; border:var(--stroke) dashed var(--line); cursor:pointer;
   transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
+/* ‏ومنطقةُ الرفع في حقلٍ من العُدّة بلا صنف البطاقة (مواصفات v1 §5.6): الحقلُ الأصليّ شفّافٌ فوقها، فتعمل بلا سكربت */
+.wz-drop:not(.card){border-radius:var(--r-card)}
 .wz-drop input[type=file]{position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer}
 .wz-drop.is-over{border-color:var(--accent); background:var(--selected)}
 @media(hover:hover){.wz-drop:hover{border-color:var(--accent); background:var(--selected)}}
@@ -596,6 +602,18 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 /* «أضف مصدرًا» (D-343): نموذجان جنبًا إلى جنب حيث يتّسع، ومتتابعان حيث يضيق */
 /* وحقلُ الملفّ هدفُ لمسٍ كاملٌ كسائر الحقول */
 .add-src input[type=file]{min-height:var(--tap); padding-block:var(--s-2)}
+.src-drop{display:grid; justify-items:center; gap:var(--s-2); padding:var(--s-5) var(--s-4); text-align:center;
+  border:var(--stroke) dashed var(--line); border-radius:var(--r-control); background:var(--surface-2); color:var(--ink-2);
+  transition:border-color var(--dur-2) var(--ease), background var(--dur-2) var(--ease)}
+.src-drop>svg{width:var(--icon-lg); height:var(--icon-lg); color:var(--ink-3)}
+.src-drop-t{font-size:var(--t-ui); line-height:var(--lh-ui)}
+.src-drop:has(:focus-visible){border-color:var(--accent); background:var(--selected)}
+@media(hover:hover){.src-drop:has(input:hover){border-color:var(--accent); background:var(--selected)}}
+.add-src .field,.src-drop{min-width:0}
+.src-drop input[type=file]{max-width:100%; min-width:0; font:inherit; font-size:var(--t-ui); color:var(--ink-2); cursor:pointer}
+.src-drop input[type=file]::file-selector-button{min-height:var(--tap); margin-inline-end:var(--s-3); padding:0 var(--s-4);
+  border:var(--bd); border-radius:var(--r-control); background:var(--surface); color:var(--ink); font:inherit; font-weight:600; cursor:pointer}
+@media(prefers-reduced-motion:reduce){.src-drop{transition:none}}
 .add-src{display:grid; gap:var(--s-5); grid-template-columns:repeat(auto-fit,minmax(min(100%,18rem),1fr)); align-items:start}
 /* مكتبةُ الأصول (D-347): شريطُ البحث صفٌّ ينكسر، وعلاماتُ البلاطة تحت أفعالها */
 .lib-find{display:flex; flex-wrap:wrap; align-items:flex-end; gap:var(--s-3); margin-bottom:var(--s-4)}
@@ -608,7 +626,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .lib-tag-edit{min-width:0}
 .rv-tags{display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .rv-tags:empty{display:none}
-.rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-pill); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}
+.rv-tag{display:inline-flex; align-items:center; min-height:var(--tap); padding:var(--s-0) var(--s-3); border:var(--bd-soft); border-radius:var(--r-control); background:var(--surface-2); color:var(--ink); font:inherit; cursor:pointer}
 @media(hover:hover){.rv-tag:hover{text-decoration:line-through}}
 .rv-add{margin-top:var(--s-4)}
 .rv-add-f{display:grid; gap:var(--s-3); padding-top:var(--s-3)}
@@ -637,11 +655,22 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   background:var(--surface); border:var(--bd-soft); color:var(--ink-2); text-decoration:none; font-size:var(--t-caption); line-height:var(--lh-caption); min-width:0}
 .rv-mini[draggable=true]{cursor:grab}
 .rv-mini.is-drag{opacity:.35}
-.rv-mini-img{flex:none; width:var(--s-6); height:var(--s-6); object-fit:cover; border-radius:var(--r-inline)}
 .rv-mini bdi{flex:none}
 /* ‏سطرٌ من الزاوية تحت المصغَّرة (D-351): الساعةُ والشعارُ وحدهما لا يقولان أيُّ منشور. في سطرٍ ثانٍ — في سطرها كان يبقى منه حرفان — يُقصّ بنقاط */
-.rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
-.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1)}
+.rv-mini-t{order:9; flex:1 1 100%; min-width:0; overflow:hidden; overflow-wrap:anywhere; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.rv-cal.is-board .rv-mini{flex-wrap:wrap; row-gap:0; padding-block:var(--s-1); position:relative; overflow:hidden; padding-top:calc(var(--s-1) + var(--s-1))}
+/* ‏شريطٌ علويٌّ بلون المنصّة (§6.2) — زينةٌ تُعين العين، والشعارُ بجانبه يقول المنصّةَ فلا يقع المعنى على اللون وحده */
+.pf-stripe{position:absolute; inset-inline:0; top:0; height:var(--s-1); background:var(--ink-3)}
+.pf-stripe[data-pf=linkedin]{background:var(--pf-linkedin)}
+.pf-stripe[data-pf=x]{background:var(--pf-x)}
+.pf-stripe[data-pf=instagram]{background:var(--pf-instagram)}
+.pf-stripe[data-pf=tiktok]{background:var(--pf-tiktok)}
+.pf-stripe[data-pf=youtube]{background:var(--pf-youtube)}
+.rv-status{flex-wrap:wrap; align-items:center}
+.rv-share{position:relative}
+.rv-share > summary{list-style:none}
+.rv-share > summary::-webkit-details-marker{display:none}
+.rv-share[open]{flex-basis:100%; order:9; padding:var(--s-3); border:var(--bd-soft); border-radius:var(--r-control)}
 /* ‏حالُ المصغَّرة نقطةٌ بلونها، واسمُها نصٌّ لقارئ الشاشة بجانبها — اللونُ لا يقول وحدَه */
 .rv-st{flex:none; margin-inline-start:auto; width:var(--s-2); height:var(--s-2); border-radius:var(--r-pill); background:var(--ink-3)}
 .rv-mini[data-st=wait] .rv-st{background:var(--warn)}
@@ -669,16 +698,20 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-wk.is-on{background:var(--selected); border-color:var(--accent)}
 .rv-acts{margin-top:auto}
 .rv-acts form{display:inline-flex; flex-wrap:wrap; gap:var(--s-2)}
-.rv-foot{position:sticky; bottom:var(--s-3); z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
-  margin-top:var(--s-6); padding:var(--s-3) var(--s-4)}
+.rv-foot{position:sticky; bottom:0; z-index:6; display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-3);
+  margin-top:var(--s-6); padding:var(--s-3) var(--s-4) calc(var(--s-3) + var(--safe-b)); background:var(--surface); box-shadow:var(--sh-3);
+  border-end-start-radius:0; border-end-end-radius:0}
+/* ‏والشريطُ اللاصقُ يلامس حافّة الشاشة بسطحٍ مصمت (لا فجوةَ يطلّ منها نصٌّ مقصوص)، والقفزُ إلى بطاقةٍ يتركها فوقه */
+.rv-day,.rv-day .rv{scroll-margin-bottom:calc(var(--s-16) + var(--s-6))}
 @media${below('md')}{.rv-foot{bottom:calc(var(--s-16) + var(--safe-b))}}
 @media${below('sm')}{
   .rv-foot .btn{flex:1 1 auto}
   .rv-wk{flex:1 1 auto}
   /* ‏اللوحةُ على الهاتف شريطُ أيّامٍ بعددها كما كانت — المصغَّراتُ في بطاقات الأسبوع تحتها */
-  .rv-cal.is-board .rv-cd{min-height:var(--tap); padding:0 var(--s-2); align-items:center; justify-content:center}
-  .rv-mini{display:none}
-  .rv-cd-h{flex-direction:column; justify-content:center; gap:0}
+  /* ‏وعلى الهاتف قائمةُ أيّامٍ عموديّة (§6.2): يومٌ صفًّا بمنشوراته تحته — لا سبعةُ أعمدةٍ بعرض ‏40px */
+  .rv-cal.is-board{display:flex; flex-direction:column}
+  .rv-cal.is-board .rv-wd,.rv-cal.is-board .rv-cd:not(.is-on){display:none}
+  .rv-cal.is-board .rv-cd{padding:var(--s-2); gap:var(--s-1)}
   .rv-sheet{inset-block:auto 0; inset-inline:0; width:100%; height:auto; max-height:92%; border-inline-start:0; border-top:var(--bd); border-radius:var(--r-sheet) var(--r-sheet) 0 0}
   /* ‏والمعاينةُ داخل بطاقةٍ أضيقُ من عرض المنصّة عند 320: شريطُ أفعال LinkedIn يفيض بـ2px بالخطّ الأكبر — فتأخذ من حشوة البطاقة */
   .rv-pv{margin-inline:calc(-1 * var(--s-3))}
@@ -718,6 +751,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .ph-echo{position:absolute; top:0; inset-inline-end:0; width:55%; height:100%; z-index:-1; pointer-events:none; opacity:.16; color:var(--accent);
   -webkit-mask-image:linear-gradient(to right, currentColor 35%, transparent); mask-image:linear-gradient(to right, currentColor 35%, transparent)}
 .ph-echo svg{display:block; width:100%; height:100%}
+.page-head:has(.why-tip[open]) .ph-echo{display:none}
 .ph-eyebrow{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--link)}
 .ph-title{margin:0; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .ph-lede{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
@@ -812,7 +846,7 @@ details.card .nt-list{margin-top:var(--s-4)}
 .cr-saved{margin:0 0 var(--s-4); padding:var(--s-3) var(--s-4); border-radius:var(--r-control); background:var(--ok-wash); color:var(--ink); font-weight:600}
 .rv-client{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-client q{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.rv-share{margin-bottom:var(--s-4)}
+/* (rv-share: قاعدتُه الواحدة مع شريط الحال) */
 /* ── تقويمُ العملاء في المحفظة (D-354 · رونق) ─────────────
    سبعةُ أيّامٍ في الصفّ، وفي كلّ يومٍ رقائقُ بشعار المنصّة والساعة واسم الشركة. الحالُ شريطٌ على حافّة الرقاقة، واليومُ الفارغ أهدأ. */
 .pc-cal{margin-top:var(--s-8)}
@@ -862,5 +896,13 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pk-text{margin:0; white-space:pre-wrap; overflow-wrap:anywhere; font:inherit}
 .pk-acts{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center}
 .pk-prog{gap:var(--s-2)}
+.task-id{flex:none; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--ink-2); margin-inline-end:var(--s-2)}
+.task-h{margin:var(--s-3) 0 var(--s-1); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink-2)}
+.task-h:first-child{margin-top:0}
+.task-how{margin-block:var(--s-2) var(--s-4)}
+.pk-sync{display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr)); gap:var(--s-2)}
+.pk-sync form,.pk-sync .btn{display:flex; inline-size:100%; justify-content:center}
+.pk-foot{display:flex; justify-content:flex-end; padding-top:var(--s-3); border-top:var(--bd)}
+.pk-foot .btn-danger{background:transparent; background-image:none; border-color:transparent; box-shadow:none}
 .pk-prog progress{inline-size:100%; block-size:var(--s-2); accent-color:var(--link)}
 `

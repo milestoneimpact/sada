@@ -814,8 +814,12 @@ describe('هندسة نظرة عامّة (D-136 · D-232)', () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     expect(html).toContain('<div class="card grid tiles c4">')
-    const waiting = html.indexOf('<h2>ما ينتظرك</h2>')
-    const ops = html.indexOf('id="ops"', waiting)
+    const waiting = html.indexOf('<h2 id="hw-t">ما ينتظرك</h2>')
+    // ‏والكلفةُ بطاقةٌ برقمين، وما عداهما خلف «التفاصيل» (D-381 · SPEC-v1 §6.1)
+    const cost = html.indexOf('<h2 id="hc-t">الكلفة وما وقع</h2>', waiting)
+    expect(cost).toBeGreaterThan(waiting)
+    expect(html.slice(cost, html.indexOf('id="ops"', cost))).toMatch(/إنفاق اليوم[\s\S]*إنفاق 14 يومًا/)
+    const ops = html.indexOf('id="ops"', cost)
     const happened = html.indexOf('<h2>ما وقع اليوم</h2>', ops)
     const spend = html.indexOf('الإنفاق — 14 يومًا', happened)
     const money = html.indexOf('أين يذهب المال', spend)
@@ -835,7 +839,7 @@ describe('هندسة نظرة عامّة (D-136 · D-232)', () => {
  * بلا رأس. والحارسُ يعدّ `h1` في كلّ `section[data-pane]`.
  */
 describe('رؤوس الألواح (D-137)', () => {
-  it('لكلّ لوح h1 واحد، ونظرة عامّة بلا رأس قصدًا', async () => {
+  it('لكلّ لوح h1 واحد، والشريطُ العلويّ بلا h1 (SPEC-v1 §8 · D-381)', async () => {
     const cookie = await login()
     // ‏**كلُّ مسارٍ يحمل ألواحَه وحدَها** (D-211): الرئيسيّةُ والمنشوراتُ في «/panel»، وكلُّ لوحٍ آخر في مساره
     const PAGES: Record<string, string[]> = {
@@ -854,7 +858,10 @@ describe('رؤوس الألواح (D-137)', () => {
       for (const p of body.split('<section data-pane="').slice(1)) {
         const name = p.slice(0, p.indexOf('"'))
         const h1s = (p.match(/<h1[\s>]/g) ?? []).length
-        expect(h1s, `${path} ${name}`).toBe(name === 'overview' ? 0 : 1)
+        expect(h1s, `${path} ${name}`).toBe(1)
+      }
+      for (const top of page.split('<header class="topbar').slice(1)) {
+        expect(top.slice(0, top.indexOf('</header>')), path).not.toMatch(/<h1[\s>]/)
       }
     }
     expect(html).toContain('<h1>النتائج</h1>')
@@ -1715,11 +1722,18 @@ describe('القنوات — سجلّ صادق لا وعد بما لا يقع', 
     expect(html).toContain('مربوطة')
   })
 
-  it('**رمز انتهى يظهر في «ما ينتظرك»** — فلا يقف النشر صامتا', async () => {
+  it('**رمز انتهى يظهر مرّةً في تنبيه النظام** بفعله الواحد — فلا يقف النشر صامتا، ولا يُعاد في «ما ينتظرك» (D-381)', async () => {
     await seedAccount('x', 'needs_reauth')
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
-    expect(html).toContain('انتهى الإذن')
+    expect(html.split('انتهى الإذن').length - 1).toBe(1)
+    const banner = html.slice(html.indexOf('<div class="sys-banner'), html.indexOf('</div>', html.indexOf('<div class="sys-banner')))
+    expect(banner).toContain('role="alert"')
+    expect(banner).toContain('انتهى الإذن')
+    expect(banner).toContain('href="/panel/channels/x"')
+    expect(banner).toContain('جدّد إذن X')
+    expect(banner.match(/class="btn /g)?.length).toBe(2)
+    expect(banner).toMatch(/data-banner-close[^>]*hidden/)
   })
 
   it('اسم يحمل HTML يُهرَّب ولا يُحقَن', async () => {
@@ -2730,7 +2744,7 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
    * **وشريطُ البطاقة يلتصق حيث فيه قرار** (رحلات R-3 وR-6 وR-9): كان صفُّ البطاقة
    * المقروءة يلتصق بأسفل الهاتف بلا زرٍّ فيه، ويغطّي رأسَ البطاقة وحبّةَ حالها.
    */
-  it('البطاقة المختصرة (D-198): «اعتمد» و«عدّل» على المسوّدة وحدَها، والمقروءة «افتح» بلا اعتماد', async () => {
+  it('البطاقة المختصرة (D-198 · D-381 §6.3): «اعتمد» على المسوّدة وحدَها، و«افتح» ثانويٌّ على كلّ بطاقة', async () => {
     const open = await seedPost('linkedin', 'draft')
     const read = await seedPost('x', 'rejected', 'نصّ رُفض على X')
     const cookie = await login()
@@ -2738,7 +2752,7 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     const draft = cardOf(html, open)
     expect(draft).toContain('<div class="pc-foot">')
     expect(draft).toContain('value="approve"')
-    expect(draft).toMatch(new RegExp(`href="/panel\\?open=${open}#ed" data-edit\\s+aria-label="عدّل: [^"]+">عدّل</a>`))
+    expect(draft).toMatch(new RegExp(`href="/panel\\?open=${open}#ed" data-edit\\s+aria-label="افتح: [^"]+">افتح</a>`))
     // ‏والنصُّ ثلاثةُ أسطرٍ تُقرأ، لا مربّعٌ يُحرَّر: التحريرُ في المحرّر
     expect(draft).toContain('class="pc-text"')
     expect(draft).not.toContain('<textarea')
@@ -4216,7 +4230,8 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     // ‏لا منصّةَ متّصلة: الفعلُ الأوّلُ الربطُ لا المسوّدات
     expect(home).toContain('اربط أوّل منصّة')
     expect(home).toContain('تنتظر قرارك مسوّدتان')
-    expect(home).toContain('<ol class="funnel">')
+    // ‏والرحلةُ خطُّ مراحلَ عموديّ بسبع (D-381 · SPEC-v1 §6.1)
+    expect(home).toContain('<ol class="jsteps">')
     expect((home.match(/<li data-state=/g) ?? []).length).toBe(7)
     // ‏والمنصّاتُ في صفحتها «الحسابات» (D-309 · خطّة التصميم 5.5)، لا بطاقةً تعيدها في الرئيسيّة
     expect(home).not.toContain('<h2>المنصّات</h2>')
@@ -4257,7 +4272,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     await seedPost('draft')
     const html = await (await app.request('/panel', withSession(await login()), env)).text()
     const id = (await db.prepare(`SELECT id FROM posts WHERE status = 'draft'`).first<{ id: string }>())!.id
-    const trip = html.slice(html.indexOf('<ol class="funnel">'), html.indexOf('</ol>', html.indexOf('<ol class="funnel">')))
+    const trip = html.slice(html.indexOf('<ol class="jsteps">'), html.indexOf('</ol>', html.indexOf('<ol class="jsteps">')))
     expect(trip).toContain(`href="#d-${id}"`)
     expect(trip).toContain(`href="#i-${id}"`)
     expect(trip).toContain('href="#write"')
@@ -4292,7 +4307,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     // ‏والبطاقةُ في «النظام» بالإعدادات (D-221)، والمرساةُ تُتبَع إليها
     expect(html).not.toContain('id="machine"')
     expect(await (await app.request('/panel/settings', withSession(await login()), env)).text()).toContain('id="machine"')
-    const next = html.slice(html.indexOf('<div class="card card-alert next is-slim"'), html.indexOf('<div class="home-grid">'))
+    const next = html.slice(html.indexOf('<li class="todo-next"'), html.indexOf('</li>', html.indexOf('<li class="todo-next"')))
     expect(next).toContain('href="#machine"')
     expect(next).toContain('قبل 3 أيّام')
   })
@@ -4305,7 +4320,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
       .run()
     await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 6.06 })
     const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
-    const next = html.slice(html.indexOf('<div class="card card-alert next is-slim"'), html.indexOf('<div class="home-grid">'))
+    const next = html.slice(html.indexOf('<li class="todo-next"'), html.indexOf('</li>', html.indexOf('<li class="todo-next"')))
     expect(next).toContain('href="#c2"')
     expect(next).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
     expect(html).toContain('id="c2"')

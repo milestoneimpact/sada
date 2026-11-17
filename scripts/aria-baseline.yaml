@@ -2,6 +2,7 @@
   - /url: "#main"
 - complementary:
   - img "صدى"
+  - button "اطوِ القائمة"
   - navigation "أقسام اللوحة":
     - text: العمل
     - link "الرئيسيّة":
@@ -10,23 +11,21 @@
       - /url: /panel/plan
     - link "المنشورات":
       - /url: /panel#posts
-    - link "المكتبة":
-      - /url: /panel/library
     - link "النتائج":
       - /url: /panel/report
+    - text: الموارد
+    - link "المكتبة":
+      - /url: /panel/library
     - link "الحسابات":
       - /url: /panel/accounts
-    - text: الضبط
     - link "ما عليك":
       - /url: /panel/tasks
     - link "الإعدادات":
       - /url: /panel/settings
-- navigation "مسار العودة":
-  - link "اللوحة":
-    - /url: /panel
+- banner:
+  - button "بحث وأوامر Ctrl K"
   - link "الإشعارات":
     - /url: /panel/notices
-  - button "بحث وأوامر Ctrl K"
   - group
 - main:
   - text: للمطوّر

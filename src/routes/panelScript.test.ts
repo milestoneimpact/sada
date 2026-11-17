@@ -345,12 +345,12 @@ describe('الإشعار العائم', () => {
     expect(block).not.toBeNull()
   })
 
-  it('يطفو، ومعه «أغلق» يُغلقه — وبلا فعل يذهب بعد ستّ ثوان', () => {
+  it('يطفو، ومعه «أغلق» يُغلقه — وبلا فعل يذهب بعد أربع ثوان (v1 §5.10)', () => {
     const t = mount('ok')
     expect([...t.box]).toEqual(['toast'])
     expect(t.shut['textContent']).toBe('أغلق')
     expect(t.shut['aria-label']).toBe('أغلق الإشعار')
-    t.advance(5999)
+    t.advance(3999)
     expect(t.state.attached).toBe(true)
     t.advance(1)
     expect(t.state.attached).toBe(false)
@@ -384,18 +384,18 @@ describe('الإشعار العائم', () => {
 
   it('ويقف العدّ ما دام المؤشّر أو التركيز عليه، ثمّ يبدأ من جديد', () => {
     const t = mount('ok')
-    t.advance(5000)
+    t.advance(3000)
     t.on['mouseenter']!()
     t.advance(60_000)
     expect(t.state.attached).toBe(true)
     t.on['mouseleave']!()
-    t.advance(5999)
+    t.advance(3999)
     expect(t.state.attached).toBe(true)
     t.on['focusin']!()
     t.advance(60_000)
     expect(t.state.attached).toBe(true)
     t.on['focusout']!()
-    t.advance(6000)
+    t.advance(4000)
     expect(t.state.attached).toBe(false)
   })
 

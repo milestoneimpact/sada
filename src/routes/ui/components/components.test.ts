@@ -96,7 +96,9 @@ describe('الشارة والعدد (7.2)', () => {
     expect(statusBadge('', '○', 'لا')).toMatch(/^<span class="st">/)
     // ‏والنغماتُ الخمس في الورقة، والمحايدان يفترقان بالرمز لا باللون
     for (const t of ['ok', 'warn', 'bad', 'idle', 'pending']) expect(Object.keys(css.rule(`.st.${t}`)).length, t).toBeGreaterThan(0)
-    expect(css.rule('.st.pending')).toEqual(css.rule('.st.idle'))
+    // ‏و«لم يبدأ» بنغمته المسمّاة (v1 §5.2 · D-381)، و«ينتظر» بحبر الثانويّ — ويفترقان بالرمز أيضًا
+    expect(css.rule('.st.idle')).toMatchObject({ color: 'var(--idle)', background: 'var(--idle-wash)' })
+    expect(css.rule('.st.pending')).toMatchObject({ color: 'var(--ink-2)', background: 'var(--surface-2)' })
   })
 
   it('العدد: رقم ‏١٣ بوزن ‏٦٠٠ على السطح الثالث، والفاشل بنغمته، وباسم لقارئ الشاشة إن طُلب', () => {
@@ -219,7 +221,7 @@ describe('الإشعار (7.8)', () => {
     expect(css.rule('.toast-note')['border-inline-start']).toBe('var(--s-1) solid var(--line)')
     expect(css.rule('.toast .toast-note')['box-shadow']).toBe('var(--sh-3)')
     expect(css.rule('.toast').top).toBe('calc(var(--topbar) + var(--s-3))')
-    expect(css.rule('.toast', '@media(min-width:900px)')).toMatchObject({ top: 'auto', bottom: 'var(--s-6)' })
+    expect(css.rule('.toast', '@media(min-width:768px)')).toMatchObject({ top: 'auto', bottom: 'var(--s-6)' })
   })
 })
 
@@ -253,7 +255,9 @@ describe('الحالة الفارغة (7.7)', () => {
     expect(emptyState({ title: '<x>', heading: 1 })).toBe('<div class="empty"><h1 class="empty-t">&lt;x&gt;</h1></div>')
     expect(emptyState({ title: 'ت', id: 'none', hidden: true })).toMatch(/^<div class="empty" id="none" hidden>/)
     expect(emptyState({ title: 'ت', icon: ICON.search })).toContain('<span class="empty-ic" aria-hidden="true"><svg')
-    expect(css.rule('.empty-ic svg')).toMatchObject({ width: 'var(--icon-lg)', height: 'var(--icon-lg)' })
+    // ‏‏٣٢ في سطر العنوان (مواصفات v1 §5.5 · D-381): المربّعُ يقيسها والرسمُ يملؤه
+    expect(css.rule('.empty-ic')).toMatchObject({ width: 'var(--s-8)', height: 'var(--s-8)' })
+    expect(css.rule('.empty-ic svg')).toMatchObject({ width: '100%', height: '100%' })
   })
 })
 

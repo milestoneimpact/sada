@@ -94,7 +94,9 @@ export interface Section {
   readonly label: string
   readonly note: string
   readonly icon: string
-  readonly group: 'العمل' | 'الضبط'
+  readonly group: 'العمل' | 'الموارد' | 'الضبط'
+  /** في ذيل الرافدة لا في مجموعاتها (D-381): الإعداداتُ وحدَها، بجوار حال النظام. */
+  readonly foot?: boolean
   readonly alias: string
   /**
    * اسمٌ أقصرُ للرافدة.
@@ -148,14 +150,16 @@ export const SECTIONS: readonly Section[] = [
    * ‏(بلا خطّة «خطّة جديدة»، ومسوّدةٌ «المراجعة»، ومثبَّتةٌ «العرض»). وفي شريط الهاتف مكانَ «المكتبة»، والمكتبةُ في «المزيد».
    */
   { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
-  // ‏«حزمة المحتوى» بعد «الخطّة» (D-366): منها تُبنى الخطّة، وشارتُها ما ينتظر قرارك من تغييراتها
-  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'العمل', alias: 'github مستودع', page: '/panel/package', optional: true },
+  // ‏المنشوراتُ ثمّ النتائج في المجموعة الأولى (D-381، §4.1): ما يُفعل كلَّ يوم، وبترتيب شريط الهاتف نفسِه
   { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
-  { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'العمل', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
-  { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'العمل', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
-  { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الضبط', alias: 'tasks todo مهام', page: '/panel/tasks' },
-  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings' },
+  // ‏والثانيةُ ما يُعدّ له (D-381 يَنسخ ترتيبَ D-366): المكتبةُ ثمّ حزمةُ المحتوى ثمّ الحساباتُ ثمّ ما عليك
+  { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'الموارد', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
+  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'الموارد', alias: 'github مستودع', page: '/panel/package', optional: true },
+  { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'الموارد', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
+  { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الموارد', alias: 'tasks todo مهام', page: '/panel/tasks' },
+  // ‏والإعداداتُ في ذيل الرافدة مع حال النظام (`foot`)، وفي «المزيد» على الهاتف
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings', foot: true },
 ]
 
 /**
