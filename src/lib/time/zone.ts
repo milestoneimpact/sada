@@ -189,6 +189,14 @@ export function stamp(value: string | Date, zone: string | null): string {
   return `${p.year}-${two(p.month)}-${two(p.day)} ${two(p.hour)}:${two(p.minute)}${zoneNote(zone)}`
 }
 
+/**
+ * يومُ بند الخطّة وساعتُه **كما هما** (D-384): البندُ بتوقيت المالك، فلا يُحوَّل كما يُحوَّل موعدٌ مخزونٌ بـ UTC بـ`stamp`،
+ * ويُلحق به اسمُ المنطقة إن كانت احتياطًا كما يفعل `stamp`.
+ */
+export function itemStamp(day: string, time: string, zone: string | null): string {
+  return `${day} ${time}${zoneNote(zone)}`
+}
+
 /** أسماءُ المدن الشائعة بالعربيّة، وما سواها يُقرأ من اسم المنطقة نفسه («America/Chicago» يصير «Chicago»). */
 const CITY: Readonly<Record<string, string>> = {
   'Asia/Riyadh': 'الرياض', 'Asia/Dubai': 'دبي', 'Asia/Kuwait': 'الكويت', 'Asia/Qatar': 'الدوحة',

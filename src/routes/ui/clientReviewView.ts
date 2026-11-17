@@ -10,7 +10,6 @@ import { ICON } from './icons'
 import { echo } from './echo'
 import { dayLabel } from './planReviewView'
 import { platformLabel } from '../../lib/oauth/providers'
-import { stamp } from '../../lib/time/zone'
 import { NOTE_MAX, type VerdictRow } from '../../lib/clientReview'
 import type { ReviewCard } from '../../lib/plan/review'
 
@@ -38,7 +37,7 @@ function item(c: ClientCard, d: ClientReviewData, n: number): Html {
   const it = c.card.item
   const post = c.card.post
   if (post === null) return html``
-  const local = stamp(it.day + ' ' + it.time, d.zone).slice(11, 16)
+  const local = it.time
   const v = d.verdicts.get(c.card.key)
   const media = c.card.mediaId === null || c.mediaSrc === null ? null
     : { id: c.card.mediaId, mime: c.card.mediaMime ?? 'image/png', composed: true, width: c.card.mediaWidth ?? null, height: c.card.mediaHeight ?? null, src: c.mediaSrc }

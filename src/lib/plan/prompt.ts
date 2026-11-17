@@ -178,7 +178,7 @@ export function systemPrompt(options: PromptOptions = {}): string {
     dense
       ? 'وقناةٌ إيقاعُها فوق سبعةٍ في الأسبوع تأخذ أكثر من منشورٍ في اليوم بأوقاتٍ بينها ثلاثُ ساعاتٍ فأكثر؛ وما سواها لا منشورين لها في يوم واحد.'
       : 'ولا تضع منشورين في يوم واحد على القناة نفسها.',
-    'والأوقات بـ UTC، واختر ما بين 05:00 و 15:00 — وهو نهار الخليج.',
+    'والأوقات بتوقيت المالك المحلّيّ، واختر ما بين 08:00 و 18:00 — وهو نهارُه.',
     '',
     '## المخرَج',
     '',
@@ -200,11 +200,11 @@ export function systemPrompt(options: PromptOptions = {}): string {
     ...(channels.includes('x') ? ['  أو `thread` لبند `x` وحدها: سلسلةٌ من ثلاث تغريدات إلى ستّ حين لا تتّسع الفكرةُ لتغريدة.'] : []),
     '- `angle`: الزاوية في جملة واحدة (عشرة أحرف فأكثر).',
     '- `day`: تاريخ بصيغة YYYY-MM-DD من الأيّام المذكورة في الرسالة.',
-    '- `time`: الساعة بـ UTC بصيغة HH:MM (مثل 07:30).',
+    '- `time`: الساعة بتوقيت المالك بصيغة HH:MM (مثل 10:30).',
     '- `why`: لماذا هذا المصدر في هذا اليوم، في جملة.',
     '',
     'مثال على الشكل لا على المضمون:',
-    `{"rationale":"…","items":[{"source_id":"src:…","platform":"${channels[0]}","kind":"${kindFor(channels[0]!)}","angle":"…","day":"2026-01-04","time":"07:30","why":"…"}]}`,
+    `{"rationale":"…","items":[{"source_id":"src:…","platform":"${channels[0]}","kind":"${kindFor(channels[0]!)}","angle":"…","day":"2026-01-04","time":"10:30","why":"…"}]}`,
   ].join('\n')
 }
 
@@ -290,7 +290,7 @@ export interface PlanItem {
   readonly angle: string
   /** `YYYY-MM-DD` داخل المدى. */
   readonly day: string
-  /** `HH:MM` بـ UTC. */
+  /** `HH:MM` بتوقيت المالك (D-384)، ومعه `day` — والتحويلُ إلى UTC عند الجدولة وحدها (`slotFor`). */
   readonly time: string
   readonly why: string
   /** ما يُنشر مع النصّ (D-282) — وغيابُه في خطّةٍ قديمة يعني `text`. */
@@ -528,14 +528,12 @@ export function parsePlan(
 
 /**
  * **أوقاتُ المالك لكلّ منصّة** (D-329): منشوراتُ اليوم على المنصّة تأخذ أوقاتَها بالترتيب (الأوّلُ الأوّلَ، وما زاد يدور)،
- * محوَّلةً من توقيته إلى UTC. ومنصّةٌ بلا أوقاتٍ تبقى على ما كتبه المخطِّط. ووقتٌ يُخرج البندَ من يومه بـ UTC (فجرُ الرياض)
- * يُحفظ بيومه الجديد إن بقي في المدى، وإلّا بقي البندُ كما كان.
+ * **بتوقيته كما هي** (D-384): بندُ الخطّة يومٌ وساعةٌ محلّيّان، ولا يُحوَّل إلى UTC إلّا عند الجدولة (`slotFor`).
+ * كان يُحوَّل هنا ثمّ يُحوَّل ثانيةً عند الجدولة، فخرج منشورُ 09:00 الرياض في 03:00Z. ومنصّةٌ بلا أوقاتٍ تبقى على ما كتبه المخطِّط.
  */
 export function applyTimes(
   items: readonly PlanItem[],
   times: PlanChoices['times'],
-  toUtc: (day: string, time: string) => { day: string; time: string } | null,
-  inSpan: (day: string) => boolean,
 ): PlanItem[] {
   const seen = new Map<string, number>()
   return [...items]
@@ -546,8 +544,7 @@ export function applyTimes(
       const slot = `${item.platform}|${item.day}`
       const n = seen.get(slot) ?? 0
       seen.set(slot, n + 1)
-      const at = toUtc(item.day, list[n % list.length]!)
-      return at === null || !inSpan(at.day) ? item : { ...item, day: at.day, time: at.time }
+      return { ...item, time: list[n % list.length]! }
     })
     .sort((a, b) => `${a.day}${a.time}`.localeCompare(`${b.day}${b.time}`))
 }

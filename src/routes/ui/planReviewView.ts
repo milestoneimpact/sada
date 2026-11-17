@@ -25,7 +25,7 @@ import { menu, menuAction, menuItem } from './components/menu'
 import { ICON } from './icons'
 import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
-import { localParts, stamp, todayKey } from '../../lib/time/zone'
+import { stamp, todayKey } from '../../lib/time/zone'
 import { field } from './components/field'
 import { segmented, tabs as tabBar } from './components/tabs'
 import { AR_LATN, num } from '../../lib/format'
@@ -113,7 +113,7 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
 
 function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewView, w: string): Html {
   const planId = m.plan.id
-  const local = stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)
+  const local = c.item.time
   const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
   const hidden = html`<input type="hidden" name="id" value="${planId}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
   const label = platformLabel(c.item.platform as never)
@@ -236,7 +236,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
         return html`<a class="rv-mini" href="${board.cardHref(c)}" data-sheet="${String(c.index)}" data-st="${st}"${movable ? raw(' draggable="true" data-move="' + String(c.index) + '"') : ''} data-key="${c.key}">
           ${/* ‏ولا مصغَّرةَ صورةٍ في خانة اليوم (§6.2): ‏28px لا تُقرأ، وصورةٌ لم تصل كانت أيقونةَ صورةٍ مكسورة. الشعارُ والشريطُ بلون المنصّة يقولانها */''}
           <i class="pf-stripe" data-pf="${c.item.platform}" aria-hidden="true"></i><span class="pf-logo rv-pf rv-dot" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
-          <bdi class="mono">${stamp(c.item.day + ' ' + c.item.time, board.zone).slice(11, 16)}</bdi><span class="rv-mini-t" aria-hidden="true">${c.item.angle}</span><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
+          <bdi class="mono">${c.item.time}</bdi><span class="rv-mini-t" aria-hidden="true">${c.item.angle}</span><i class="rv-st" aria-hidden="true"></i><span class="vh ago">${platformLabel(c.item.platform as never)}، ${text}</span></a>`
       })}
     </div>`)
   }
@@ -333,7 +333,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const rows = visible.map((c) => {
     const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
     const text = c.post === null ? c.item.angle : c.post.text.replace(/\s+/g, ' ').trim()
-    return html`<tr><td><span class="ago">${dayLabel(c.item.day, 'short')}</span> <bdi dir="ltr" class="mono">${stamp(c.item.day + ' ' + c.item.time, zone).slice(11, 16)}</bdi></td>
+    return html`<tr><td><span class="ago">${dayLabel(c.item.day, 'short')}</span> <bdi dir="ltr" class="mono">${c.item.time}</bdi></td>
       <td>${platformLabel(c.item.platform as never)}</td><td><span class="st ${st.tone}">${st.text}</span></td>
       <td><a href="#c-${String(c.index)}" data-sheet="${String(c.index)}">${text.length > 80 ? text.slice(0, 80) + '…' : text}</a></td></tr>`
   })
@@ -427,10 +427,9 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
   const label = platformLabel(c.item.platform as never)
   const status = c.post?.status ?? ''
   const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(status)
-  const local = localParts(new Date(c.item.day + 'T' + c.item.time + ':00Z'), zone)
-  const two = (n: number): string => String(n).padStart(2, '0')
-  const localDay = String(local.year) + '-' + two(local.month) + '-' + two(local.day)
-  const localTime = two(local.hour) + ':' + two(local.minute)
+  // ‏البندُ بتوقيت المالك كما هو (D-384)
+  const localDay = c.item.day
+  const localTime = c.item.time
   const hidden = html`<input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
   const preview = c.post === null
     ? html`<div class="pd-pending"><p class="m-0">${c.item.angle}</p><span class="hint">${c.failed !== undefined ? 'تعذّرت كتابتُه: ' + c.failed : 'صدى يكتبه الآن — يظهر هنا وحدَه.'}</span></div>`

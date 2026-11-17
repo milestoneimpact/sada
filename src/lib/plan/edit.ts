@@ -4,6 +4,7 @@
  * والتحقّقُ هنا لا في المتصفّح: اليومُ داخلَ مدى الخطّة (أسبوعٌ أو شهر)، والمنصّةُ من قائمةٍ مغلقة، والخطّةُ لعميلِ الجلسة
  * وغيرُ مستبدَلة. **والفهرسُ ثابت**: البنودُ لا تُرتَّب عند الحفظ، فبطاقةٌ في الصفحة لا يتبدّل بندُها تحتها.
  */
+import { localizePlan } from './timeBasis'
 import type { Db } from '../tokens'
 import { asSpan, kindFor, PLAN_CHANNELS, spanDays, type PlanSpan } from './prompt'
 import { findAsset } from '../library'
@@ -28,6 +29,7 @@ export async function editPlanItem(
   index: number,
   change: { readonly day?: string; readonly platform?: string; readonly time?: string; readonly asset?: string; readonly angle?: string },
 ): Promise<EditResult> {
+  await localizePlan(db, org, planId)
   const row = await db
     .prepare("SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?")
     .bind(planId, org)
@@ -77,6 +79,7 @@ export async function editPlanItem(
  * **حذفُ بند** — والفهرسُ يتبدّل بعده، فالصفحةُ تُعاد بعد الحذف ولا تبقى بطاقاتُها القديمة. والخطّةُ المستبدَلة لا تُمسّ.
  */
 export async function removePlanItem(db: Db, org: string, planId: string, index: number): Promise<EditResult> {
+  await localizePlan(db, org, planId)
   const row = await db
     .prepare('SELECT plan_json, status FROM plans WHERE id = ? AND org_id = ?')
     .bind(planId, org)
@@ -101,6 +104,7 @@ export async function addPlanItem(
   planId: string,
   item: { readonly sourceId: string; readonly platform: string; readonly day: string; readonly time: string; readonly angle: string },
 ): Promise<EditResult> {
+  await localizePlan(db, org, planId)
   const row = await db
     .prepare('SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?')
     .bind(planId, org)

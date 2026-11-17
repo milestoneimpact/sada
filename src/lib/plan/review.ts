@@ -24,6 +24,7 @@ import { reschedulePost, unschedule } from '../schedule/job'
 import { itemOwns, schedulePlan, type PlanSchedule } from './schedule'
 import { localToUtc } from '../time/local'
 import { storedZone } from '../time/ownerZone'
+import { localizePlan } from './timeBasis'
 import { dayWithin, touchPlan } from './edit'
 import { asSpan, imageFor, type PlanItem } from './prompt'
 import type { StoredPlan } from './job'
@@ -165,6 +166,7 @@ async function postOf(
 type Act = { readonly ok: true; readonly note?: string } | { readonly ok: false; readonly reason: string }
 
 async function itemAt(db: Db, org: string, planId: string, index: number, key: string): Promise<{ plan: { items: PlanItem[] }; start: string; span: string } | string> {
+  await localizePlan(db, org, planId)
   const row = await db
     .prepare("SELECT plan_json, week_start, span, status FROM plans WHERE id = ? AND org_id = ?")
     .bind(planId, org)
@@ -251,6 +253,7 @@ export async function addItem(
   const angle = input.angle.replace(/\s+/g, ' ').trim()
   if (angle.length < 3) return { ok: false, reason: 'اكتب في جملةٍ ما يقوله المنشور' }
   if (angle.length > 200) return { ok: false, reason: 'الجملةُ أطولُ من 200 حرف' }
+  await localizePlan(db, org, planId)
   const row = await db
     .prepare('SELECT plan_json, week_start, span, status, choices_json FROM plans WHERE id = ? AND org_id = ?')
     .bind(planId, org)

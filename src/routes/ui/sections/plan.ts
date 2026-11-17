@@ -12,7 +12,7 @@
  * «اعتمد الخطّة» لا يكتب حرفا ولا يُنفق. هو علامةٌ تقول: قرأتُ منطقَ
  * الأسبوع ووافقتُ عليه. **وزرٌّ يوهم بأنّه ينفّذ أسوأ من غيابه.**
  */
-import { stamp } from '../../../lib/time/zone'
+import { itemStamp } from '../../../lib/time/zone'
 import { escapeHtml } from '../escape'
 import { platformLabel } from '../../../lib/oauth/providers'
 import { relativeTime } from '../../../lib/format'
@@ -109,7 +109,7 @@ function row(
   const gone = names[item.sourceId] === undefined
   return `<tr>
     <td data-label="متى"><b>${escapeHtml(dayName(item.day))}</b>
-      <div class="mono">${escapeHtml(stamp(`${item.day} ${item.time}`, zone))}</div></td>
+      <div class="mono">${escapeHtml(itemStamp(item.day, item.time, zone))}</div></td>
     <td data-label="المنصّة"><span class="chip">${escapeHtml(platformLabel(item.platform))}</span> ${kindChip(item.kind).value}</td>
     <td data-label="المصدر"><div class="nm">${escapeHtml(name)}</div>
       <div class="sub">${escapeHtml(item.angle)}</div>

@@ -39,7 +39,7 @@ function figure(n: number, label: string): Html {
 }
 
 function post(c: ReviewCard, d: PlanDocData): Html {
-  const local = stamp(c.item.day + ' ' + c.item.time, d.zone).slice(11, 16)
+  const local = c.item.time
   const platform = c.item.platform as 'linkedin' | 'x'
   const frame = c.post === null
     ? html`<div class="pd-pending"><b>${platformLabel(platform)}</b><p class="m-0">${c.item.angle}</p><span class="hint">يُكتب الآن</span></div>`

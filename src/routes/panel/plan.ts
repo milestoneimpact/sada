@@ -840,26 +840,21 @@ plan.post('/panel/plan/review/delay', async (c) => {
 
 /**
  * **انقل البند** (D-330): يومٌ بتوقيت المالك (من السحب في اللوحة أو من لوح البطاقة) وساعةٌ إن ذُكرت — وإلّا ساعتُه كما هي بتوقيته.
- * يُحوَّلان إلى UTC هنا، والحكمُ كلُّه في `moveItem`.
+ * يُمرَّران كما هما (البندُ محلّيّ · D-384)، والتحويلُ إلى UTC والحكمُ كلُّه في `moveItem`.
  */
 plan.post('/panel/plan/review/move', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const org = activeOrg(gate.session.record)
   const f = gate.form
-  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const current = await latestPlan(c.env.DB, org)
   const item = current === null || current.id !== String(f.get('id') ?? '') ? undefined : current.plan.items[Number(f.get('index'))]
   const day = String(f.get('day') ?? '')
   let result: Awaited<ReturnType<typeof moveItem>> = { ok: false, reason: 'تغيّرت الخطّة منذ فتحت الصفحة — أعد تحميلها' }
   if (item !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
-    const was = localParts(new Date(item.day + 'T' + item.time + ':00Z'), zone)
-    const asked = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.get('time') ?? '')) ? String(f.get('time')).split(':').map(Number) : [was.hour, was.minute]
-    const [y, mo, d] = day.split('-').map(Number)
-    const at = localToUtc(y!, mo!, d!, asked[0]!, asked[1]!, zone)
-    result = at === null
-      ? { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
-      : await moveItem(c.env.DB, org, current!.id, Number(f.get('index')), String(f.get('key') ?? ''), { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16) }, new Date())
+    // ‏البندُ بتوقيت المالك (D-384)، فاليومُ والساعةُ يُمرَّران كما هما، و`moveItem` يحوّل الموعدَ وحدَه
+    const asked = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(f.get('time') ?? '')) ? String(f.get('time')) : item.time
+    result = await moveItem(c.env.DB, org, current!.id, Number(f.get('index')), String(f.get('key') ?? ''), { day, time: asked }, new Date())
   }
   await record(c.env.DB, { actor: 'panel', action: 'plan.review.move', target: String(f.get('id') ?? ''), detail: result.ok ? day : ('refused:' + result.reason).slice(0, 200) }, c.req.raw)
   await setFlash(c.env, c.req.raw, result.ok ? { kind: 'ok', text: 'نُقل البند — ومنشورُه المجدولُ معه.' } : { kind: 'bad', text: result.reason })
@@ -1078,18 +1073,13 @@ plan.post('/panel/plan/review/add', async (c) => {
   const org = activeOrg(gate.session.record)
   const f = gate.form
   const id = String(f.get('id') ?? '')
-  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
   const day = String(f.get('day') ?? '')
   const time = String(f.get('time') ?? '')
   let result: Awaited<ReturnType<typeof addItem>> = { ok: false, reason: 'يومٌ أو ساعةٌ غير صالحة' }
   if ((await readSettings(c.env.DB)).paused) result = { ok: false, reason: 'صدى موقوفٌ مؤقّتًا — لا يُكتب شيءٌ حتّى يُرفع الإيقاف' }
   else if (/^\d{4}-\d{2}-\d{2}$/.test(day) && /^([01]\d|2[0-3]):[0-5]\d$/.test(time)) {
-    const [y, mo, d] = day.split('-').map(Number)
-    const [h, mi] = time.split(':').map(Number)
-    const at = localToUtc(y!, mo!, d!, h!, mi!, zone)
-    if (at !== null) {
-      result = await addItem(c.env.DB, org, id, { day: at.toISOString().slice(0, 10), time: at.toISOString().slice(11, 16), platform: String(f.get('platform') ?? ''), angle: String(f.get('angle') ?? '') })
-    }
+    // ‏بتوقيت المالك كما كُتب (D-384)
+    result = await addItem(c.env.DB, org, id, { day, time, platform: String(f.get('platform') ?? ''), angle: String(f.get('angle') ?? '') })
   }
   if (result.ok) {
     const current = await latestPlan(c.env.DB, org)
@@ -1144,6 +1134,22 @@ plan.post('/panel/plan/review/drop', async (c) => {
   return toCard(f, false)
 })
 
+/** حالُ ما بُتّ فيه من قبل، بكلمته في الرسالة — و`undefined` لمسوّدةٍ أو ما يُبتّ فيه. */
+function decidedWord(status: string): string | undefined {
+  if (status === 'approved') return 'معتمَدة'
+  if (status === 'queued') return 'مجدولة'
+  if (status === 'published') return 'منشورة'
+  return undefined
+}
+
+/** «· 2 مجدولة من قبل فتُركت» — لكلّ حالٍ عددُه، ولا شيء إن لم يُترك شيء. */
+function sayAlready(already: readonly string[]): string {
+  if (already.length === 0) return ''
+  const n = new Map<string, number>()
+  for (const w of already) n.set(w, (n.get(w) ?? 0) + 1)
+  return ' · ' + [...n].map(([w, k]) => String(k) + ' ' + w).join('، و') + ' من قبل فتُركت'
+}
+
 /**
  * **فعلٌ واحدٌ على المحدَّد**: اعتمادٌ أو تأخيرٌ يومًا أو حذف. والحذفُ والتأخيرُ من آخر البنود إلى أوّلها فلا يتبدّل فهرسُ ما بعدُ،
  * وكلُّ بندٍ ببصمته — فما تغيّر منذ فُتحت الصفحة يُردّ وحدَه ويُسمّى.
@@ -1167,9 +1173,17 @@ plan.post('/panel/plan/review/bulk', async (c) => {
   let done = 0
   let tail = ''
   const failed: string[] = []
+  // ‏ما بُتّ فيه من قبل (معتمَدٌ أو مجدولٌ أو منشور) يُترك ويُعدّ وحدَه — ليس «تعذّرًا» (D-384)
+  const already: string[] = []
   if (act === 'approve') {
-    const ids = picked.map((p) => p.post).filter((x) => x !== '')
-    const r = await approveMany(c.env.DB, org, ids, deciderOf(gate.session.record.via))
+    const all = picked.map((p) => p.post).filter((x) => x !== '')
+    const status = new Map<string, string>()
+    for (const id of all) {
+      const row = await c.env.DB.prepare('SELECT status FROM posts WHERE id = ? AND org_id = ?').bind(id, org).first<{ status: string }>()
+      if (row !== null) status.set(id, row.status)
+    }
+    const ids = all.filter((id) => { const w = decidedWord(status.get(id) ?? ''); if (w === undefined) return true; already.push(w); return false })
+    const r = ids.length === 0 ? { done: [], failed: [] } : await approveMany(c.env.DB, org, ids, deciderOf(gate.session.record.via))
     done = r.done.length
     failed.push(...r.failed.map((x) => x.reason))
     finalizeLater(c, org, r.done)
@@ -1188,7 +1202,8 @@ plan.post('/panel/plan/review/bulk', async (c) => {
   const verb = act === 'approve' ? 'اعتُمد' : act === 'delay' ? 'أُخّر' : 'حُذف'
   await setFlash(c.env, c.req.raw, {
     kind: failed.length === 0 ? 'ok' : done === 0 ? 'bad' : 'warn',
-    text: verb + ' ' + String(done) + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ') + '.') + tail,
+    text: verb + ' ' + String(done) + sayAlready(already)
+      + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ') + '.') + tail,
   })
   return toCard(f, false)
 })

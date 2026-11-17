@@ -644,11 +644,24 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     const out = applyTimes(
       [it0('linkedin', '2026-11-02', '11:00', 'ب'), it0('linkedin', '2026-11-02', '06:00', 'أ'), it0('linkedin', '2026-11-02', '13:00', 'ج'), it0('x', '2026-11-02', '07:00', 'س')],
       { linkedin: ['09:00', '18:30'] },
-      // ‏الرياض: UTC+3
-      (day, time) => ({ day, time: `${String(Number(time.slice(0, 2)) - 3).padStart(2, '0')}${time.slice(2)}` }),
-      () => true,
     )
-    expect(out.map((i) => `${i.platform} ${i.time} ${i.angle}`)).toEqual(['linkedin 06:00 أ', 'linkedin 06:00 ج', 'x 07:00 س', 'linkedin 15:30 ب'])
+    // ‏بتوقيت المالك كما اختارها (D-384) — كانت تُحوَّل هنا إلى UTC (06:00 و15:30) ثمّ تُحوَّل ثانيةً عند الجدولة
+    expect(out.map((i) => `${i.platform} ${i.time} ${i.angle}`)).toEqual(['x 07:00 س', 'linkedin 09:00 أ', 'linkedin 09:00 ج', 'linkedin 18:30 ب'])
+  })
+
+  it('خطّةُ المعالج تحفظ أوقاتَ المالك بتوقيته (D-384): 09:00 لـ LinkedIn و20:00 لـ X في الرياض كما هما، لا 06:00 و17:00', async () => {
+    const a = await seedSource('الأوّل', 0.9)
+    const b = await seedSource('الثاني', 0.8)
+    const out = await planSpan({
+      ...deps(net({ payload: plan([item(a, { day: '2026-09-14', time: '10:00' }), item(b, { platform: 'x', day: '2026-09-14', time: '11:00' })]) })),
+      sources: [a, b], channels: ['linkedin', 'x'], times: { linkedin: ['09:00'], x: ['20:00'] }, zone: 'Asia/Riyadh',
+    })
+    expect(out).toMatchObject({ kind: 'planned', items: 2 })
+    const stored = await latestPlan(db)
+    expect(stored!.plan.items.map((i) => `${i.platform} ${i.day} ${i.time}`)).toEqual(['linkedin 2026-09-14 09:00', 'x 2026-09-14 20:00'])
+    expect(await db.prepare('SELECT time_basis FROM plans WHERE id = ?').bind(stored!.id).first<{ time_basis: string }>()).toEqual({ time_basis: 'local' })
+    // ‏والموجّهُ يطلب الساعةَ بتوقيت المالك لا بـ UTC
+    expect(systemPrompt({ channels: ['linkedin'] })).not.toContain('بـ UTC')
   })
 
   it('إيقاعٌ فوق سقف النداء يُقسَم نوافذَ أقصر، والشهران شهرٌ وشهر، وما يتّسع نافذةٌ واحدة', () => {
