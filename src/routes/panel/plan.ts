@@ -48,7 +48,7 @@ import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
 import { asImageChoice, asImageStyle, asSpan, asTimes, imageFor, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanChoices, type PlanPlatform } from '../../lib/plan/prompt'
-import { sayApprovedAll, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
+import { sayDecided, sayPlanned, sayStarted, sayUnlinked } from '../../lib/plan/say'
 import { listUploads } from '../../lib/media/uploads'
 import { soloNav } from '../ui/rail'
 import { buildCommands } from '../ui/command'
@@ -455,7 +455,7 @@ plan.post('/panel/plan/approve-all', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: 'plan.approve_all', target: plan.id, detail: String(done.done) + ' اعتُمدت · ' + String(done.failed.length) + ' تعثّرت · ' + String(settled === null || settled === 'paused' ? 0 : settled.scheduled) + ' جُدولت' }, c.req.raw)
   await setFlash(c.env, c.req.raw, {
     kind: done.done === 0 && done.failed.length === 0 ? 'warn' : done.failed.length === 0 ? 'ok' : done.done === 0 ? 'bad' : 'warn',
-    text: sayApprovedAll(done.done, done.failed) + (settled === null ? '' : ' ' + saySettled(settled)),
+    text: sayDecided('اعتُمد', done.done, [], done.failed) + (settled === null ? '' : ' ' + saySettled(settled)),
   })
   // ‏وبعد اعتماد الخطّة كلِّها من المراجعة تنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)
   // ‏ومن التيّار إليه (D-386)
@@ -662,7 +662,7 @@ async function settleNow(env: Env, org: string, plan: NonNullable<Awaited<Return
 }
 
 /** جملةُ ما جُدول بعد الاعتماد — وما تعذّر بسببه الأوّل. */
-function saySettled(settled: (PlanSchedule & { readonly version: number }) | 'paused'): string {
+function saySettled(settled: PlanSchedule | 'paused'): string {
   if (settled === 'paused') return 'وصدى موقوفٌ مؤقّتًا، فلا يُجدوَل شيءٌ حتّى يُرفع الإيقاف.'
   const first = settled.skipped[0]
   return (settled.scheduled === 0 ? 'ولم يُجدوَل شيء' : settled.scheduled === 1 ? 'وجُدول منشورٌ في موعده' : 'وجُدول ' + String(settled.scheduled) + ' في مواعيدها') +
@@ -946,12 +946,12 @@ plan.post('/panel/plan/month/approve', async (c) => {
   const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
   await record(c.env.DB, { actor: 'panel', action: 'plan.month.approve', target: stored.id, detail: 'v' + String(done.version) + ':' + String(settled.scheduled) }, c.req.raw)
   const held = settled.skipped.length
+  // ‏بجملة D-384: ما اعتُمد وما بقي بلا موعدٍ وسببُه — ثمّ التيّارُ (D-387) حيث يُرى المجدولُ في مواعيده
   await setFlash(c.env, c.req.raw, {
     kind: held === 0 ? 'ok' : 'warn',
-    text: 'اعتُمد الإصدار ' + String(done.version) + '، وجُدول ' + String(settled.scheduled) +
-      (held === 0 ? '.' : '، وبقي ' + String(held) + ' معتمَدًا بلا موعد: ' + settled.skipped[0]!.reason + '.'),
+    text: 'اعتُمد الإصدار ' + String(done.version) + '. ' + saySettled(settled),
   })
-  return c.redirect(to, 303)
+  return c.redirect('/panel/feed', 303)
 })
 
 /** «ألغِ جدولة الشهر»: كلُّ مجدوَلٍ لم يُرسَل من خطّة الشهر وحزمته يعود معتمَدًا بلا موعد، وما أُرسل يُقال. */
@@ -1145,14 +1145,6 @@ function decidedWord(status: string): string | undefined {
   return undefined
 }
 
-/** «· 2 مجدولة من قبل فتُركت» — لكلّ حالٍ عددُه، ولا شيء إن لم يُترك شيء. */
-function sayAlready(already: readonly string[]): string {
-  if (already.length === 0) return ''
-  const n = new Map<string, number>()
-  for (const w of already) n.set(w, (n.get(w) ?? 0) + 1)
-  return ' · ' + [...n].map(([w, k]) => String(k) + ' ' + w).join('، و') + ' من قبل فتُركت'
-}
-
 /**
  * **فعلٌ واحدٌ على المحدَّد**: اعتمادٌ أو تأخيرٌ يومًا أو حذف. والحذفُ والتأخيرُ من آخر البنود إلى أوّلها فلا يتبدّل فهرسُ ما بعدُ،
  * وكلُّ بندٍ ببصمته — فما تغيّر منذ فُتحت الصفحة يُردّ وحدَه ويُسمّى.
@@ -1205,9 +1197,11 @@ plan.post('/panel/plan/review/bulk', async (c) => {
   const verb = act === 'approve' ? 'اعتُمد' : act === 'delay' ? 'أُخّر' : 'حُذف'
   await setFlash(c.env, c.req.raw, {
     kind: failed.length === 0 ? 'ok' : done === 0 ? 'bad' : 'warn',
-    text: verb + ' ' + String(done) + sayAlready(already)
-      + (failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ') + '.') + tail,
+    text: sayDecided(verb, done, already, failed) + tail,
   })
+  // ‏والاعتمادُ يهبط في التيّار (D-387)؛ والتأخيرُ والحذفُ يبقيان في الورشة
+  if (act === 'approve' && f.get('back') === 'feed') return c.redirect('/panel/feed', 303)
+  f.delete('back')
   return toCard(f, false)
 })
 

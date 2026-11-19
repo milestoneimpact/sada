@@ -10,7 +10,7 @@
   "routes/oauth.ts": 7,
   "routes/panel/channels.ts": 38,
   "routes/panel/client.ts": 18,
-  "routes/panel/drafts.ts": 54,
+  "routes/panel/drafts.ts": 52,
   "routes/panel/home.ts": 18,
   "routes/panel/media.ts": 52,
   "routes/panel/plan.ts": 20,

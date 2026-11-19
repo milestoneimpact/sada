@@ -145,15 +145,15 @@ export const SECTIONS: readonly Section[] = [
    * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها الجديدة.
    */
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
-  // ‏**والتيّارُ بعد الرئيسيّة** (D-386): ما سيُنشر وما نُشر في عمودٍ واحد، وفيه الاعتماد. وليس في شريط الهاتف بعدُ (أربعٌ لا تزيد): من «المزيد»
-  { id: 'feed', label: 'التيّار', note: 'ما سيُنشر وما نُشر في تيّارٍ واحد — وهنا يقع الاعتماد', icon: ICON.feed, group: 'العمل', alias: 'feed stream timeline تيار سيل', page: '/panel/feed' },
+  // ‏**والتيّارُ بعد الرئيسيّة** (D-386)، **وفي شريط الهاتف مكانَ «المنشورات»** (D-387): الاعتمادُ يقع فيه، والمنشوراتُ من «المزيد»
+  { id: 'feed', label: 'التيّار', note: 'ما سيُنشر وما نُشر في تيّارٍ واحد — وهنا يقع الاعتماد', icon: ICON.feed, group: 'العمل', alias: 'feed stream timeline تيار سيل', page: '/panel/feed', bar: true },
   /*
    * ‏**والخطّةُ وجهةٌ لا بطاقةٌ في لوح** (D-289): محورُ المنصّة يُبلَغ بضغطةٍ من كلّ صفحة، و`/panel/plan` يفتح ما يناسب حالَها
    * ‏(بلا خطّة «خطّة جديدة»، ومسوّدةٌ «المراجعة»، ومثبَّتةٌ «العرض»). وفي شريط الهاتف مكانَ «المكتبة»، والمكتبةُ في «المزيد».
    */
   { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
   // ‏المنشوراتُ ثمّ النتائج في المجموعة الأولى (D-381، §4.1): ما يُفعل كلَّ يوم، وبترتيب شريط الهاتف نفسِه
-  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة — وهنا يقع الاعتماد', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', bar: true, tight: 'منشورات' },
+  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', tight: 'منشورات' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
   // ‏والثانيةُ ما يُعدّ له (D-381 يَنسخ ترتيبَ D-366): المكتبةُ ثمّ حزمةُ المحتوى ثمّ الحساباتُ ثمّ ما عليك
   { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'الموارد', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
@@ -258,6 +258,9 @@ export function buildCommands(
   }
   // ‏و«خطّة جديدة» شاشتُها (D-283): كان «ولّد خطّة الأسبوع» ينقل إلى رأس «المنشورات» والنموذجُ في آخرها
   out.push({
+    label: 'منشورات جديدة', note: 'يكتبها المساعد، أو من ملفّ، أو من GitHub', group: 'الأفعال',
+    href: '/panel/new', icon: ICON.add, alias: 'new posts plan منشورات جديده خطه جديده',
+  }, {
     label: 'خطّة جديدة', note: 'أسبوع أو أسبوعان أو شهر — على المنصّات المربوطة', group: 'الأفعال',
     href: '/panel/plan/new', icon: '', alias: 'plan generate new week month خطه جديده اسبوع شهر',
   })

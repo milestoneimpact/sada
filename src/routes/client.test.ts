@@ -298,7 +298,8 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE status IN ('queued', 'published')").get()).toEqual({ n: 0 })
     expect(db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'plan.approve_all'").get()).toEqual({ detail: '2 اعتُمدت · 0 تعثّرت · 0 جُدولت' })
     const after = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
-    expect(after).toContain('اعتُمدت مسوّدتان من الخطّة كما كُتبت')
+    // ‏بجملة D-384 (D-387): العددُ، لا نثرٌ عن «جدول المعتمَد»
+    expect(after).toContain('اعتُمد 2.')
     expect(after).toContain('action="/panel/plan/schedule"')
     expect(after).not.toContain('action="/panel/plan/approve-all"')
   })

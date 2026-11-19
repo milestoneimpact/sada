@@ -236,7 +236,7 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     expect(SECTIONS.map((s) => s.label)).toEqual(
       ['الرئيسيّة', 'التيّار', 'الخطّة', 'المنشورات', 'النتائج', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
     expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(9)
-    // ‏و«التيّار» بعد الرئيسيّة (D-386) في العمل لا في شريط الهاتف
+    // ‏و«التيّار» بعد الرئيسيّة (D-386) في العمل، وفي شريط الهاتف (D-387)
     expect(SECTIONS.filter((s) => s.group === 'العمل').map((s) => s.id)).toEqual(['overview', 'feed', 'plan', 'posts', 'results'])
     expect(SECTIONS.filter((s) => s.group === 'الموارد').map((s) => s.id)).toEqual(['library', 'package', 'accounts', 'tasks'])
     expect(SECTIONS.filter((s) => s.foot === true).map((s) => s.id)).toEqual(['settings'])
@@ -269,8 +269,8 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
   /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
   it('وهي أقسام العمل اليوميّ', () => {
     const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
-    // ‏و«الخطّة» مكانَ «المكتبة» في اليد (D-289): المكتبةُ تُفتح حين تُضاف مصادر، والخطّةُ كلَّ يوم
-    expect(bar).toEqual(['overview', 'plan', 'posts', 'results'])
+    // ‏و«الخطّة» مكانَ «المكتبة» في اليد (D-289)، و«التيّار» مكانَ «المنشورات» (D-387): الاعتمادُ يقع فيه، والمنشوراتُ في «المزيد»
+    expect(bar).toEqual(['overview', 'feed', 'plan', 'results'])
   })
 
   /**
@@ -298,7 +298,7 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
-    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/feed', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#posts', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
     expect(sheet).toContain('بحث وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })

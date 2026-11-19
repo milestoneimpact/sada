@@ -166,13 +166,15 @@ describe('الاعتماد يعرض الموعد (D-218)', () => {
       mediaReady: READY,
     })
 
-  it('حساب واحد يناسبها: «اعتمد · غدًا» أوّلًا بحسابه وموعده، و«اعتمد فقط» بجوارها', () => {
+  it('حساب واحد يناسبها: «اعتمد · غدًا» وحدَه بحسابه وموعده — ولا «اعتمد فقط» بجوارها (D-387)، والفعلُ يعود إلى التيّار', () => {
     const html = section([{ id: 'a1', platform: 'linkedin', label: 'عمر' }])
     expect(html).toContain('value="approve-schedule"')
     expect(html).toContain('name="account" value="a1"')
     expect(html).toContain('name="preset" value="tomorrow"')
     expect(html).toContain('اعتمد · غدًا 9:00 ص')
-    expect(html.indexOf('approve-schedule')).toBeLessThan(html.indexOf('value="approve"'))
+    expect(html).not.toContain('اعتمد فقط')
+    expect(html).not.toContain('value="approve" data-optimistic')
+    expect(html).toContain('<input type="hidden" name="back" value="feed">')
   })
 
   it('لا حساب أو حسابان: «اعتمد» وحده كما كان، فلا يُختار عن المالك', () => {
@@ -1175,7 +1177,9 @@ describe('D-151 — قالب واحد للشاشة المستقلّة وقامو
     const html = soloPage('صدى — LinkedIn', { href: '/panel#channels', label: 'الحسابات' }, '<p>x</p>', 'n', '', undefined,
       soloNav('accounts', 'linkedin'))
     expect(html).toContain('<aside class="rail">')
-    expect(html).toContain('<a href="/panel#posts" data-bar aria-label="')
+    // ‏والتيّارُ في شريط الهاتف مكانَ «المنشورات» (D-387)
+    expect(html).toContain('<a href="/panel/feed" data-bar aria-label="')
+    expect(html).not.toContain('<a href="/panel#posts" data-bar')
     expect(html).toContain('<a href="/panel/tasks" aria-label="')
     expect(html).toContain('<a href="/panel/accounts" aria-current="true" aria-label="')
     // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (D-205): الرافدةُ سبعة

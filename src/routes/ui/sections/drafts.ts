@@ -301,13 +301,13 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
   const id = escapeHtml(d.id)
   const fit = targets.filter((t) => t.platform === d.platform)
   const oneStep = fit.length === 1 && missingMedia(d.platform, readyMimes(d, media)) === null
+  // ‏و«اعتمد فقط» زال من هنا (D-387): الاعتمادُ بلا موعدٍ في شاشة التعديل وحدَها. وبلا سكربتٍ يعود الفعلُ إلى بطاقته في التيّار
   return `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جار…" data-swap>
-             <input type="hidden" name="id" value="${id}">${oneStep
+             <input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="feed">${oneStep
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule" data-optimistic="اعتُمدت وجُدولت"
-               data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>
-             <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد فقط</button>`
+               data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>`
     : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}
              <button class="btn btn-danger btn-sm" type="submit" name="do" value="reject" data-optimistic="رُفضت">ارفض</button></form>`
 }

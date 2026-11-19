@@ -191,7 +191,8 @@ describe('«خطّةُ أسبوع» انقضى أسبوعُها (D-381 · SPEC-v
   it('وسمُ «خطّة منتهية» وزرٌّ أوّليٌّ واحد إلى بناء خطّة الأسبوع الحاليّ، بلا «تابع الكتابة» ولا أقربِ منشوراتٍ مضت', () => {
     const html = planCard(plan('2026-09-20'), { written: 0, ready: 0, pending: 0 }, NOW, null)
     expect(html).toContain('<span class="st warn">خطّة منتهية</span>')
-    expect(html).toContain('<a class="btn btn-primary" href="/panel/plan/new">أنشئ خطّة الأسبوع الحاليّ</a>')
+    // ‏ومن الباب الواحد (D-387)
+    expect(html).toContain('<a class="btn btn-primary" href="/panel/new">أنشئ خطّة الأسبوع الحاليّ</a>')
     expect(html).not.toContain('تابع الكتابة')
     expect(html).not.toContain('class="hp-next"')
     expect(html.match(/btn-primary/g)).toHaveLength(1)

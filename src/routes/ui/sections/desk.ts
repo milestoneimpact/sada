@@ -25,7 +25,7 @@ export function deskQueue(drafts: readonly DraftRow[], now: Date): string {
     const act = failed
       ? `<a class="btn btn-primary btn-sm" href="/panel#d-${escapeHtml(d.id)}">أصلحه</a>`
       : `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جار…">
-           <input type="hidden" name="id" value="${escapeHtml(d.id)}">
+           <input type="hidden" name="id" value="${escapeHtml(d.id)}"><input type="hidden" name="back" value="feed">
            <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve">اعتمد</button></form>
          <a class="btn btn-secondary btn-sm" href="${escapeHtml(editorHref(d.id))}">عدّل</a>`
     return `<li class="desk-row">

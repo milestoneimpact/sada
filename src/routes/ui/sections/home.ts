@@ -315,8 +315,9 @@ export function planCard(
   if (plan === null) {
     return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
       <div class="card-head"><h2 id="hp-t">خطّةُ الشهر</h2></div>
-      <p class="m-0">لا خطّة بعد. ابنِ خطّة أسبوعٍ أو شهرٍ في أربع خطوات، أو ارفع خطّتك كما هي.</p>
-      <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/plan/new">ابنِ خطّة</a><a class="btn btn-secondary" href="/panel/plan/import">عندي خطّة</a></div>
+      ${/* ‏بابٌ واحد (D-387): يكتبها المساعد، أو من ملفّ، أو من GitHub — والاختيارُ في صفحته لا هنا */''}
+      <p class="m-0">لا خطّة بعد. يكتبها المساعد في أربع خطوات، أو ترفع خطّتك من ملفّ، أو تُزامن حزمتك من GitHub.</p>
+      <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/new">منشورات جديدة</a></div>
     </div>`.value
   }
   const total = plan.plan.items.length
@@ -335,7 +336,7 @@ export function planCard(
   const today = todayKey(now, zone)
   const expired = end < today
   const go = expired
-    ? { href: '/panel/plan/new', label: 'أنشئ خطّة الأسبوع الحاليّ' }
+    ? { href: '/panel/new', label: 'أنشئ خطّة الأسبوع الحاليّ' }
     : locked
     ? { href: '/panel/plan/view', label: 'اعرض الخطّة' }
     : c.written < total

@@ -125,7 +125,7 @@
     "inputs": 0
   },
   "routes/ui/sections/drafts.ts": {
-    "buttons": 25,
+    "buttons": 24,
     "cards": 11,
     "inputs": 9
   },
@@ -135,7 +135,7 @@
     "inputs": 0
   },
   "routes/ui/sections/home.ts": {
-    "buttons": 7,
+    "buttons": 6,
     "cards": 6,
     "inputs": 0
   },
@@ -145,7 +145,7 @@
     "inputs": 0
   },
   "routes/ui/sections/plan.ts": {
-    "buttons": 7,
+    "buttons": 6,
     "cards": 2,
     "inputs": 0
   },

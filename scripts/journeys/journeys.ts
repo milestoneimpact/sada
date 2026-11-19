@@ -380,7 +380,7 @@ const R2stop: Journey = {
     m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'}`)
     m.note(`أبواب الكتابة في الرئيسيّة: في الشاشة الأولى ${doors.first.join(' · ') || 'لا شيء'} · وتحتها ${doors.below.join(' · ') || 'لا شيء'}`)
     const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await goSection(page, m, 'المنشورات')
     const goal = /اكتب|أنشئ|جديد|اعتمد/
     const screens: string[] = []
     let writeAt: number | null = null
@@ -630,7 +630,7 @@ const R9: Journey = {
     const { page, m, stack } = j
     const id = stack.seeded.posts.queued
     const was = status(stack, id)?.scheduled_at
-    await m.tap(navItem(page, 'المنشورات'), '«المنشورات» في التنقّل')
+    await goSection(page, m, 'المنشورات')
     await m.tap(button(page.locator('#posts, main'), /^مجدولة/), 'تبويب «مجدولة»')
     // ‏«انقلها إلى» على بطاقتها نفسِها (D-200): «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح المحرّر
     await m.tap(button(page.locator(`#d-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة', { key: true })
@@ -717,7 +717,10 @@ const R12: Journey = {
     return 'حُلّل العرضُ أيضًا: الخطّةُ تحتاج مصدرين محلَّلين'
   },
   async run({ page, m, stack }) {
-    await m.tap(link(page, 'ابنِ خطّة'), '«ابنِ خطّة» في بطاقة «خطّةُ الشهر»')
+    // ‏البابُ الواحد (D-387): «منشورات جديدة» ثمّ «ابنِ لي خطّة» في بطاقة «يكتبها المساعد» — خطوةٌ زادت وبابٌ واحدٌ بدل ثلاثة
+    await m.tap(link(page, 'منشورات جديدة'), '«منشورات جديدة» في بطاقة «خطّةُ الشهر»')
+    await page.waitForURL(/\/panel\/new/)
+    await m.tap(link(page.locator('#nw-assistant'), 'ابنِ لي خطّة'), '«ابنِ لي خطّة» في «يكتبها المساعد»')
     // ‏على الشاشة العريضة المنشئُ شاشةٌ واحدة (D-338): الخطواتُ كلُّها ظاهرةٌ ولا «التالي» — وعلى الهاتف خطوةٌ في كلّ شاشة
     const stepped = async (label: string): Promise<void> => { if (await page.locator('#wz-next').isVisible()) await m.tap(button(page, 'التالي'), label) }
     await stepped('«التالي» — الفترة: شهر، مختارةٌ سلفًا')
@@ -1041,6 +1044,29 @@ const R17: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17]
+/**
+ * ‏**ر-18 · منشورات جديدة من الرئيسيّة** (D-387): «منشورات جديدة» في بطاقة «خطّةُ الشهر» يفتح المختارَ (ثلاثُ بطاقات)، و«ابنِ لي
+ * ‏خطّة» في «يكتبها المساعد» يفتح أوّلَ شاشة المعالج. النجاحُ من الصفحة: المختارُ ببطاقاته الثلاث، ثمّ المعالجُ بعنوانه «خطّة جديدة».
+ */
+const R18: Journey = {
+  id: 'R-18',
+  title: 'منشورات جديدة من الرئيسيّة: «منشورات جديدة» ثمّ «يكتبها المساعد» إلى أوّل شاشة المعالج',
+  plan: { target: '3 = البابُ ثمّ الطريقُ في المختار (D-387) — والمعالجُ شاشتُه الأولى بلا خطوةٍ ثالثة' },
+  async run({ page, m }) {
+    await m.tap(link(page, 'منشورات جديدة'), '«منشورات جديدة» في بطاقة «خطّةُ الشهر»')
+    await page.waitForURL(/\/panel\/new/)
+    const ways = await page.locator('.nw-way').count()
+    await m.tap(link(page.locator('#nw-assistant'), 'ابنِ لي خطّة'), '«ابنِ لي خطّة» في «يكتبها المساعد»')
+    await page.waitForURL(/\/panel\/plan\/new/)
+    const h1 = ((await page.locator('h1').first().textContent().catch(() => '')) ?? '').trim()
+    const at = new URL(page.url()).pathname
+    return {
+      success: ways === 3 && at === '/panel/plan/new' && h1 === 'خطّة جديدة',
+      verified: `بطاقاتُ المختار: ${ways} · الصفحة ${at} · العنوان «${h1}»`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
 
 export { Blocked }
