@@ -124,10 +124,11 @@ export interface Section {
   /** صفحةٌ مستقلّة لا لوحٌ في اللوحة — فرابطُها مسارٌ لا مرساة. */
   readonly page?: string
   /**
-   * تبويبٌ لا يُرسم في الرافدة إلّا لمن يخصّه (`RailInput.shown`) — «حزمة المحتوى» لمنظّمةٍ ربطت حزمةً أو للمالك.
-   * ‏ولوحةُ الأوامر تفهرسه دائمًا: الصفحةُ نفسُها تقول «اربط حزمتك» لمن لم يربط.
+   * ‏**مطويٌّ** (D-388): قسمٌ خرج من الرافدة ومن «أقسام» لوحة الأوامر، وبقي مسارُه وبقي في الجدول (رأسُه وعنوانُه من
+   * ‏`sectionLabel`). ‏`'more'` يُبلَغ من «المزيد» على الهاتف ومن أفعال اللوحة؛ و`'palette'` من أفعال اللوحة وحدَها —
+   * ‏والطريقُ المرئيُّ إليه من حيث يُحتاج: «ورشة الخطّة» من رأس التيّار، و«حزمة المحتوى» من الإعدادات و«من GitHub».
    */
-  readonly optional?: true
+  readonly tucked?: 'more' | 'palette'
 }
 
 /**
@@ -139,29 +140,27 @@ export interface Section {
  */
 export const SECTIONS: readonly Section[] = [
   /*
-   * ‏**خمسُ وجهاتٍ ثمّ اثنتان** (خطّة التصميم 5.1 · D-204): كانت عشرةً في الرافدة، ستّةٌ منها لوحُ
-   * ‏ضبطٍ يُفتح نادرًا. فالمصادرُ صارت «المكتبة»، والتقريرُ والجدولُ المحوريُّ «النتائج»، والقنواتُ
-   * ‏«الحسابات»، والحدودُ والمزوّدون والأمانُ تبويباتٌ في «الإعدادات». **والمراسي القديمة تبقى**:
-   * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها الجديدة.
+   * ‏**ثلاثُ وجهاتٍ ثمّ ثلاثٌ ثمّ الذيل** (D-388، بعد «خمسٍ ثمّ اثنتين» في D-204): **العمل** الرئيسيّةُ والتيّارُ والنتائج،
+   * ‏**والموارد** المكتبةُ والحساباتُ وما عليك، **والإعدادات** في الذيل. والتيّارُ محورٌ: الخطّةُ ورشةٌ تُبلَغ من رأسه،
+   * ‏والمنشوراتُ من «المزيد» على الهاتف ومن «افتح» على بطاقاته، وحزمةُ المحتوى من الإعدادات. **والمراسي القديمة تبقى**:
+   * ‏`#sources` و`#channels` و`#pivot` و`#providers` و`#security` معرّفاتُ أقسامٍ في ألواحها.
    */
   { id: 'overview', label: 'الرئيسيّة', note: 'خطوتُك التالية، واليوم بالأرقام، وما ينتظرك', icon: ICON.overview, group: 'العمل', alias: 'overview home', bar: true },
-  // ‏**والتيّارُ بعد الرئيسيّة** (D-386)، **وفي شريط الهاتف مكانَ «المنشورات»** (D-387): الاعتمادُ يقع فيه، والمنشوراتُ من «المزيد»
+  // ‏**والتيّارُ بعد الرئيسيّة** (D-386) وفي شريط الهاتف (D-387): الاعتمادُ يقع فيه، ومنه الورشةُ والتقويمُ وبابا المنشور (D-388)
   { id: 'feed', label: 'التيّار', note: 'ما سيُنشر وما نُشر في تيّارٍ واحد — وهنا يقع الاعتماد', icon: ICON.feed, group: 'العمل', alias: 'feed stream timeline تيار سيل', page: '/panel/feed', bar: true },
-  /*
-   * ‏**والخطّةُ وجهةٌ لا بطاقةٌ في لوح** (D-289): محورُ المنصّة يُبلَغ بضغطةٍ من كلّ صفحة، و`/panel/plan` يفتح ما يناسب حالَها
-   * ‏(بلا خطّة «خطّة جديدة»، ومسوّدةٌ «المراجعة»، ومثبَّتةٌ «العرض»). وفي شريط الهاتف مكانَ «المكتبة»، والمكتبةُ في «المزيد».
-   */
-  { id: 'plan', label: 'الخطّة', note: 'خطّةُ الشهر: ابنِها أو راجعها أو اعرضها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع', bar: true, page: '/panel/plan' },
-  // ‏المنشوراتُ ثمّ النتائج في المجموعة الأولى (D-381، §4.1): ما يُفعل كلَّ يوم، وبترتيب شريط الهاتف نفسِه
-  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو والخطّة', icon: ICON.posts, group: 'العمل', alias: 'posts drafts plan video مسودات خطه فيديو', tight: 'منشورات' },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
-  // ‏والثانيةُ ما يُعدّ له (D-381 يَنسخ ترتيبَ D-366): المكتبةُ ثمّ حزمةُ المحتوى ثمّ الحساباتُ ثمّ ما عليك
+  // ‏والمنشوراتُ مطويّة (D-388): لوحُها باقٍ بمسوّداته ومحرّره، يُبلَغ من «المزيد» ومن بطاقات التيّار، لا من الرافدة
+  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو', icon: ICON.posts, group: 'العمل', alias: 'posts drafts video مسودات فيديو', tight: 'منشورات', tucked: 'more' },
+  // ‏والخطّةُ ورشةٌ لا وجهة (D-388، بعد D-289): `/panel/plan` يفتح المراجعةَ، و«ورشة الخطّة» رابطُها في رأس التيّار
+  { id: 'plan', label: 'الخطّة', note: 'ورشةُ الخطّة: راجعها واعتمدها وعدّلها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع ورشه', page: '/panel/plan', tucked: 'palette' },
+  // ‏والثانيةُ ما يُعدّ له: المكتبةُ ثمّ الحساباتُ ثمّ ما عليك
   { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'الموارد', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
-  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'الموارد', alias: 'github مستودع', page: '/panel/package', optional: true },
+  // ‏وحزمةُ المحتوى من الإعدادات («المصادر والقواعد») ومن بطاقة «من GitHub» (D-388)، ولوحةُ الأوامر تفهرسها دائمًا
+  { id: 'package', label: 'حزمة المحتوى', note: 'وسائطك وخطّتك ونصوصك من GitHub', icon: ICON.package, group: 'الموارد', alias: 'github مستودع', page: '/panel/package', tucked: 'palette' },
   { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'الموارد', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الموارد', alias: 'tasks todo مهام', page: '/panel/tasks' },
   // ‏والإعداداتُ في ذيل الرافدة مع حال النظام (`foot`)، وفي «المزيد» على الهاتف
-  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات', page: '/panel/settings', foot: true },
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان — والمصادر والقواعد', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions rules imports ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات قواعد استيرادات', page: '/panel/settings', foot: true },
 ]
 
 /**
@@ -215,11 +214,12 @@ export function buildCommands(
   input: { readonly onPanel: boolean; readonly drafts?: readonly DraftRef[] } = { onPanel: true },
 ): Command[] {
   const base = input.onPanel ? '' : '/panel'
+  // ‏والمطويُّ (D-388) يُفهرَس بين الأفعال لا الأقسام: اللوحةُ تصل إليه، والرافدةُ لا تحمله
   const out: Command[] = SECTIONS.map((s) => ({
     label: s.label,
     note: s.note,
     href: s.page ?? `${base}#${s.id}`,
-    group: 'الأقسام',
+    group: s.tucked === undefined ? 'الأقسام' : 'الأفعال',
     icon: s.icon,
     alias: s.alias,
   }))
@@ -290,9 +290,10 @@ export function buildCommands(
     label: 'المساعدة', note: 'كيف يعمل صدى في سبع محطّات، والأسئلةُ الأولى، والاختصارات', group: 'الأفعال',
     href: '/panel/help', icon: '', alias: 'help faq keys shortcuts guide مساعده اسئله اختصارات دليل',
   },
+  // ‏وتقويمُ الشهر (D-388) بدل الخطّ الزمنيّ للمحفظة الذي حلّ التيّارُ محلَّه: شاراتُ الحمل و«اعتمد الشهر»
   {
-    label: 'الخطّ الزمنيّ للمحفظة', note: 'كلّ منشور شريط على الأيّام — في النتائج', group: 'الأفعال',
-    href: '/panel/timeline', icon: '', alias: 'gantt timeline portfolio roadmap غانت جانت خط زمني محفظه',
+    label: 'تقويم الشهر', note: 'شهرٌ بشارات حمل كلّ يوم، و«اعتمد الشهر» — من رأس التيّار', group: 'الأفعال',
+    href: '/panel/plan/month', icon: '', alias: 'calendar month timeline gantt تقويم شهر خط زمني',
   })
 
   /*

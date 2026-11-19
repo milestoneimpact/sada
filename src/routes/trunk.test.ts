@@ -27,7 +27,7 @@ beforeEach(() => {
 
 const PAGES = [
   '/panel', '/panel/library', '/panel/report', '/panel/accounts', '/panel/tasks',
-  '/panel/settings', '/panel/notices', '/panel/help', '/panel/timeline', '/panel/client',
+  '/panel/settings', '/panel/notices', '/panel/help', '/panel/feed', '/panel/client',
 ]
 
 describe('اختبارُ الجذع على عشر صفحات', () => {

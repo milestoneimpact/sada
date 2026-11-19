@@ -30,14 +30,12 @@ export interface RailInput {
   readonly parent?: boolean
   /** المنظّماتُ والنشطةُ منها: مبدّلٌ تحت العلامة حين تكون أكثرَ من واحدة (`scope.ts`). */
   readonly scope?: Scope
-  /** التبويباتُ الاختياريّة (`Section.optional`) التي تُرسم — «حزمة المحتوى» حين رُبطت حزمةٌ أو للمالك. */
-  readonly shown?: readonly string[]
   /** شارةُ حال النظام مرسومةً (D-381): في ذيل الرافدة بجوار الإعدادات. واللوحةُ وحدَها تعرفها. */
   readonly status?: string
 }
 
-/** الأقسامُ التي تُرسم لهذا الطلب: الثابتةُ كلُّها، والاختياريّةُ بطلبها. */
-const visible = (input: RailInput) => SECTIONS.filter((s) => s.optional !== true || (input.shown ?? []).includes(s.id))
+/** الأقسامُ التي تُرسم في الرافدة: ما ليس مطويًّا (D-388). */
+const visible = () => SECTIONS.filter((s) => s.tucked === undefined)
 
 /**
  * «المزيد» على الهاتف — **قائمةٌ لا بحث** (خطّة التصميم 5.3 · D-208).
@@ -47,7 +45,8 @@ const visible = (input: RailInput) => SECTIONS.filter((s) => s.optional !== true
  * فلا يختفي «ينتظرك» تحت زرٍّ لا رقمَ عليه. وعلى الحاسوب لا يُرسم: الرافدةُ تحمل السبعة.
  */
 function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): string {
-  const rest = visible(input).filter((s) => s.bar !== true)
+  // ‏وما طُوي عن الرافدة ويُبلَغ من هنا (`tucked: 'more'`، D-388): «المنشورات» على الهاتف حيث لا بطاقاتِ تيّارٍ أمامَ العين
+  const rest = SECTIONS.filter((s) => s.tucked === undefined ? s.bar !== true : s.tucked === 'more')
   const total = rest.reduce((n, s) => n + (counts[s.id] ?? 0), 0)
   const links = rest.map((s) => {
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
@@ -64,6 +63,10 @@ function moreSheet(input: RailInput, counts: Readonly<Record<string, number>>): 
 
 export function railHtml(input: RailInput): string {
   const counts = input.counts ?? {}
+  // ‏وصفحةٌ قسمُها مطويٌّ (الخطّةُ وحزمتُها والمنشورات) تُعلِّم «التيّار» أبًا (D-388): هو بابُها المرئيّ، ولا تُعلَن صفحتان حاليّتان
+  const tuckedActive = input.active !== undefined && SECTIONS.some((s) => s.id === input.active && s.tucked !== undefined)
+  const active = tuckedActive ? 'feed' : input.active
+  const parent = tuckedActive || input.parent === true
   let lastGroup = ''
   const link = (s: (typeof SECTIONS)[number]): string => {
     const href = s.page ?? (input.inPanel ? `#${s.id}` : `/panel#${s.id}`)
@@ -73,7 +76,7 @@ export function railHtml(input: RailInput): string {
      * **وسمةُ الشريط تُقرأ من الجدول** (D-107): الرافدةُ نفسُها تصير
      * شريطا سفليّا في الجوّال، **ولا وسمَ ثانٍ يُبنى**.
      */
-    const attrs = `${s.bar === true ? ' data-bar' : ''}${input.active === s.id ? ` aria-current="${input.parent === true ? 'true' : 'page'}"` : ''}`
+    const attrs = `${s.bar === true ? ' data-bar' : ''}${active === s.id ? ` aria-current="${parent ? 'true' : 'page'}"` : ''}`
     // ‏والاسمُ الأقصرُ للشريط الضيّق بجانبه، ويُبدَّل بينهما في الورقة لا في السكربت (D-185)
     const label = s.tight === undefined
       ? `<span>${s.short ?? s.label}</span>`
@@ -86,13 +89,13 @@ export function railHtml(input: RailInput): string {
       n > 0 ? count(n) : ''
     }</a>`
   }
-  const tabs = visible(input).filter((s) => s.foot !== true).map((s) => {
+  const tabs = visible().filter((s) => s.foot !== true).map((s) => {
     const head = s.group === lastGroup ? '' : `<span class="lbl">${s.group}</span>`
     lastGroup = s.group
     return head + link(s)
   }).join('\n    ')
   // ‏ذيلُ الرافدة (D-381، §4.1): الإعداداتُ وحالُ النظام. وعلى الهاتف يُخفى، والإعداداتُ في «المزيد»
-  const foot = visible(input).filter((s) => s.foot === true).map(link).join('')
+  const foot = visible().filter((s) => s.foot === true).map(link).join('')
 
   return `<aside class="rail">
   <div class="rail-head">
@@ -114,7 +117,7 @@ export function railHtml(input: RailInput): string {
 }
 
 /** رافدةُ الصفحة المستقلّة — بقسمها معلَّمًا، ومساراتُها إلى اللوحة، ومنصّتُها إن كانت. */
-export function soloNav(active: string, platform?: string, nav?: Pick<RailInput, 'shown' | 'counts'>): string {
+export function soloNav(active: string, platform?: string, nav?: Pick<RailInput, 'counts'>): string {
   return railHtml({
     // ‏ولا قائمةَ منصّاتٍ تحت «الحسابات» (خطّة التصميم 5.1 · D-205): سبعةٌ في الرافدة، والمنصّاتُ في لوحها
     active, inPanel: false, parent: platform !== undefined, ...(nav ?? {}),

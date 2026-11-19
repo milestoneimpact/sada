@@ -928,9 +928,6 @@ drafts.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  // ‏ومن سحبٍ في الخطّ الزمنيّ (D-232) يعود إليه بنافذته نفسِها، نجح أو رُدّ، فيُقرأ الإشعارُ حيث سُحب
-  const back = String(form.get('back') ?? '')
-  if (form.get('from') === 'timeline' && /^\/panel\/timeline(\?[a-z0-9=&-]*)?$/.test(back)) return c.redirect(back, 303)
   return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
 })
 

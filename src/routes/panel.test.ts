@@ -2873,26 +2873,6 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at).toBe('2031-01-05 18:30:00')
   })
 
-  it('والسحب في الخطّ الزمنيّ (D-232): المجدول قابل للسحب، والنقل يعود إلى نافذته', async () => {
-    const id = await seedPost('linkedin', 'draft')
-    const account = await seedAccount('linkedin', 'عمر')
-    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
-    const soon = new Date(Date.now() + 2 * 864e5)
-    const local = new Date(soon.getTime() + 3 * 3600e3).toISOString().slice(0, 16)
-    await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account, preset: 'custom', local, text: 'ن'.repeat(300) })
-    const html = await (await app.request('/panel/timeline?span=14', withSession(cookie), env)).text()
-    expect(html).toContain(`data-move="${id}"`)
-    expect(html).toContain('<form id="gt-move" method="POST" action="/panel/drafts/reschedule" hidden><input type="hidden" name="_csrf"')
-    const when = new Date(soon.getTime() + 864e5).toISOString().slice(0, 16)
-    const r = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: '/panel/timeline?span=14' })
-    expect(where(r)).toBe('/panel/timeline?span=14')
-    expect((await db.prepare('SELECT scheduled_at FROM posts WHERE id = ?').bind(id).first<{ scheduled_at: string }>())?.scheduled_at)
-      .toBe(`${when.replace('T', ' ')}:00`)
-    // ‏ورجوعٌ إلى غير الخطّ الزمنيّ لا يُتّبع
-    const odd = await post(cookie, '/panel/drafts/reschedule', { id, when, from: 'timeline', back: 'https://evil.example/' })
-    expect(where(odd)).toBe(`/panel#d-${id}`)
-  })
-
   it('«انقلها إلى» على بطاقة المجدولة: ضغطة واحدة تغيّر الموعد بتوقيت المالك (D-200)', async () => {
     const id = await seedPost('linkedin', 'draft')
     const account = await seedAccount('linkedin', 'عمر')
@@ -5450,6 +5430,22 @@ describe('الكتابة من فكرة ومن وصف المقطع، والربط
   })
 })
 
+describe('«المصادر والقواعد» في الإعدادات (D-388)', () => {
+  it('بطاقةٌ في «الإنفاق والحدود» بروابط حزمة المحتوى والاستيرادات وقواعد الجدولة — ولا «حزمة المحتوى» في الرافدة', async () => {
+    const html = await (await app.request('/panel/settings', withSession(await login()), env)).text()
+    const limits = html.slice(html.indexOf('<div data-sub id="limits">'), html.indexOf('<div data-sub id="security-all">'))
+    const card = limits.slice(limits.indexOf('id="sources-rules"'))
+    expect(card).toContain('المصادر والقواعد')
+    for (const [href, label] of [['/panel/package', 'حزمة المحتوى'], ['/panel/plan/imports', 'الاستيرادات'], ['/panel/plan-rules', 'قواعد الجدولة']]) {
+      expect(card).toContain(`href="${href}">${label}</a>`)
+    }
+    const rail = html.slice(html.indexOf('<aside class="rail">'), html.indexOf('</aside>'))
+    expect(rail).not.toContain('href="/panel/package"')
+    expect(rail).not.toContain('href="/panel/plan"')
+    expect(rail.slice(0, rail.indexOf('<details class="more-sheet">'))).not.toContain('href="#posts"')
+  })
+})
+
 describe('«المظهر» و«النظام» في الإعدادات (D-221)', () => {
   it('أربعة أقسام (EASE-PLAN ز)، والمبدّلان بلا معرّف ثان، والآلة في «النظام» تحت «متقدّم»', async () => {
     const html = await (await app.request('/panel/settings', withSession(await login()), env)).text()
@@ -5646,7 +5642,7 @@ describe('لا رابطَ ميّتًا داخل اللوحة (EASE-PLAN أ-1)', 
   it('كلُّ مرساةٍ في كلّ صفحةٍ تصل إلى معرّفٍ موجود — في صفحتها أو في الصفحة التي انتقل إليها', async () => {
     const cookie = await login()
     // ‏و«تفتح قدرة» (متابعة D-324): مراسي المهامّ التي خرجت إليها (`taskHref`) تُطلَب في صفحتها
-    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/tasks/later', '/panel/gates', '/panel/timeline']
+    const pages = [...PANEL_PAGES, '/panel/report', '/panel/tasks', '/panel/tasks/later', '/panel/gates', '/panel/feed']
     const html = new Map<string, string>()
     for (const p of pages) html.set(p, await (await app.request(p, withSession(cookie), env)).text())
     const ids = (page: string): Set<string> =>

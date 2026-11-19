@@ -77,8 +77,16 @@ async function goSection(page: Page, m: Meter, label: string): Promise<void> {
     await m.tap(direct, `«${label}» في التنقّل`)
     return
   }
-  await m.tap(visible(page.locator('details.more-sheet > summary')).first(), '«المزيد» في شريط الهاتف')
-  await m.tap(visible(page.locator('details.more-sheet .more-panel a').filter({ hasText: label })).first(), `«${label}» في «المزيد»`)
+  const more = visible(page.locator('details.more-sheet > summary')).first()
+  if ((await more.count()) > 0) {
+    await m.tap(more, '«المزيد» في شريط الهاتف')
+    await m.tap(visible(page.locator('details.more-sheet .more-panel a').filter({ hasText: label })).first(), `«${label}» في «المزيد»`)
+    return
+  }
+  // ‏وما طُوي عن الرافدة على الحاسوب (D-388: «المنشورات») يُبلَغ من لوحة الأوامر: الزرُّ، ثمّ الاسمُ يُكتب، ثمّ المدخل — وكلُّها تُعدّ
+  await m.tap(visible(page.locator('.cmdk-open')).first(), '«بحث وأوامر» في الترويسة')
+  await m.type(page.locator('#cmdk-q'), label, `كتابة «${label}» في لوحة الأوامر`)
+  await m.tap(visible(page.locator('#cmdk-l a.cmdk-o').filter({ hasText: label })).first(), `«${label}» في لوحة الأوامر`)
 }
 
 function button(scope: Page | Locator, name: string | RegExp): Locator {
@@ -630,8 +638,11 @@ const R9: Journey = {
     const { page, m, stack } = j
     const id = stack.seeded.posts.queued
     const was = status(stack, id)?.scheduled_at
-    await goSection(page, m, 'المنشورات')
-    await m.tap(button(page.locator('#posts, main'), /^مجدولة/), 'تبويب «مجدولة»')
+    // ‏من التيّار (D-388): المجدولُ بطاقةٌ فيه و«افتح» عليها يفتح بطاقتَه في لوح المنشورات — لا «المنشورات» ثمّ تبويب «مجدولة»
+    await goSection(page, m, 'التيّار')
+    await page.waitForURL(/\/panel\/feed/)
+    await m.tap(link(page.locator(`#f-${id}`), 'افتح'), '«افتح» على بطاقة المجدولة في التيّار')
+    await page.waitForURL(/\/panel#d-/)
     // ‏«انقلها إلى» على بطاقتها نفسِها (D-200): «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح المحرّر
     await m.tap(button(page.locator(`#d-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة', { key: true })
     m.mark('rescheduled')

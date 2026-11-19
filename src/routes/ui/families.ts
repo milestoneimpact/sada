@@ -20,7 +20,8 @@ export const FAMILIES: Readonly<Record<string, { readonly label: string; readonl
     label: 'النتائج',
     members: [
       { href: '/panel/report', label: 'الأسبوع' }, { href: '/panel/analysis', label: 'الأداء' },
-      { href: '/panel/insights', label: 'ما ينجح' }, { href: '/panel/timeline', label: 'الخطّ الزمنيّ' },
+      // ‏ولا «الخطّ الزمنيّ» (D-388): حلّ التيّارُ محلَّه
+      { href: '/panel/insights', label: 'ما ينجح' },
     ],
   },
   plan: {

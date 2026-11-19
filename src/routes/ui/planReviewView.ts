@@ -283,7 +283,8 @@ function planActions(m: ReviewModel): Html {
   const keep = scheduled === 0 ? '' : ' ويبقى ما جُدول (' + AR(scheduled) + ') في موعده؛ تسحبه من «المنشورات» إن شئت.'
   // ‏«⋯» (§6.2): أفعالُ الخطّة كلِّها نادرةٌ ولا تنافس «اعتمد» — زرُّ أيقونةٍ اسمُه «أفعال الخطّة»
   return html`${raw(menu({ label: 'أفعال الخطّة', variant: 'icon', size: 'sm', icon: ICON.more, items: [
-    menuItem({ label: 'تابع ما جُدول ونُشر', href: '/panel/plan/follow' }),
+    // ‏وما جُدول ونُشر في التيّار (D-388) لا في «متابعة» رابعة
+    menuItem({ label: 'ما جُدول ونُشر — في التيّار', href: '/panel/feed' }),
     menuItem({ label: 'اعرض واطبع', href: '/panel/plan/view' }),
     menuItem({ label: 'أعد بناء الخطّة', href: '/panel/plan/new' }),
     menuAction({ label: 'ألغِ الخطّة', action: '/panel/plan/cancel', fields: { id: m.plan.id }, danger: true,

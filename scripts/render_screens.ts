@@ -33,8 +33,6 @@ import { libraryScreen } from '../src/routes/ui/libraryView'
 import { packageScreen } from '../src/routes/ui/packageView'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../src/routes/ui/planSeatView'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../src/routes/ui/planDocView'
-import { timelineScreen, timelineTitle } from '../src/routes/ui/timelineView'
-import { gantt, windowOf } from '../src/lib/gantt'
 import { loginPage } from '../src/routes/panelView'
 import { enrolPage, resumePage, secondFactorPage, stepUpPage } from '../src/routes/authView'
 import { notFoundPage, serverErrorPage } from '../src/routes/ui/errorView'
@@ -572,7 +570,7 @@ writeAudited(
         { blobSha: 'b2', itemNo: '02', variant: 'light', kind: 'image', path: 'week-46/02/li.png', bytes: 420_000, r2Key: 'k2', version: 2, hasSound: false, coverBlobSha: null, isCurrent: true, supersededBy: null },
       ],
       tokenReady: true, revisions: [], missing: ['03 · x'], transfer: { total: 2, done: 2 },
-    }), 'n', '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })),
+    }), 'n', '', buildCommands({ onPanel: false }), soloNav('package')),
 )
 
 // ‏«عندي خطّة» (D-287): ملفٌّ أو نصٌّ يُلصق، ونوعُ الصورة
@@ -632,29 +630,6 @@ writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace'
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 
 console.log('رُسمت تسع عشرة في /tmp')
-
-// ‏الخطُّ الزمنيّ للمحفظة (D-212) عيّنةٌ مدقَّقة (D-213): صفحةٌ لا يرسمها شيءٌ لا يقرؤها حارس
-{
-  const zone = 'Asia/Riyadh'
-  const win = windowOf(now, zone, 30, 0)
-  const post = (id: string, platform: string, accountId: string, account: string, status: string,
-    createdAt: string, approvedAt: string | null, scheduledAt: string | null, publishedAt: string | null) =>
-    ({ id, platform, accountId, account, status, text: `منشور ${id}: قيادة القيمة لا تُقاس بالمخرجات`, createdAt, approvedAt, scheduledAt, publishedAt })
-  const posts = [
-    post('t1', 'linkedin', 'a1', 'عمر عبدالحميد', 'published', '2026-08-28 08:00:00', '2026-08-29 10:00:00', '2026-08-31 06:00:00', '2026-08-31 06:00:04'),
-    post('t2', 'linkedin', 'a1', 'عمر عبدالحميد', 'queued', '2026-09-03 09:00:00', '2026-09-04 12:00:00', '2026-09-08 06:00:00', null),
-    post('t3', 'x', 'a3', '@omar_ah', 'failed', '2026-09-01 07:00:00', '2026-09-01 08:00:00', '2026-09-02 06:00:00', null),
-    post('t4', 'x', 'a3', '@omar_ah', 'draft', '2026-09-04 15:00:00', null, null, null),
-    post('t5', 'tiktok', '', '', 'draft', '2026-09-05 11:00:00', null, null, null),
-  ]
-  const plans = [{ id: 'w1', weekStart: '2026-08-31', status: 'approved' }]
-  writeAudited(
-    '/tmp/screen-timeline.html',
-    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة' }, timelineScreen({
-      chart: gantt({ posts, plans }, win, now, zone), span: 30, shift: 0, capped: false, cap: 1500, zone, now,
-    }), 'n', '', buildCommands({ onPanel: false }), soloNav('results')),
-  )
-}
 
 // ‏شاشةُ الشهر (D-383 · المرحلة ٨): رحلةُ الشهرين بتنبيهها، وشريطُ الفحص بأزرار الإصلاح، والتقويمُ بشاراته الثلاث، والفرقُ، وسطرُ الاعتماد
 writeAudited(
