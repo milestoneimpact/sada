@@ -149,3 +149,73 @@ describe('التيّار (D-386)', () => {
     expect((await app.request('/panel/feed?before=x', { headers: { Cookie: cookie } }, env)).status).toBe(200)
   })
 })
+
+/**
+ * ‏**رأسُ التيّار بابُ كلّ شيء** (D-388): أوّليٌّ واحدٌ بحاله، و«منشور جديد ▾» ثانويٌّ بجوار «منشورات جديدة»، و«ورشة الخطّة»
+ * ‏و«تقويم الشهر» حين تكون خطّة؛ و«افتح» على ما ليس من خطّةٍ يفتح بطاقتَه في لوح المنشورات؛ والقارئُ بلا أبواب.
+ */
+describe('رأس التيّار بحالاته (D-388)', () => {
+  const head = (html: string): string => html.slice(html.indexOf('<div class="row gap-2 fd-entry">'), html.indexOf('<div class="fd">'))
+
+  it('ينتظر شيء: «اعتمد كلّ ما ينتظر» أوّليٌّ وحدَه، و«منشورات جديدة» ثمّ «منشور جديد ▾» ثانويّان، والرابطان الصغيران', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
+    const h = head(html)
+    expect(h).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
+    expect(h).toContain('href="/panel/plan/month">تقويم الشهر</a>')
+    expect(h.indexOf('منشورات جديدة')).toBeLessThan(h.indexOf('data-feed-new'))
+    expect(h.indexOf('data-feed-new')).toBeLessThan(h.indexOf('اعتمد كلّ ما ينتظر'))
+    expect(h).toMatch(/<a class="btn btn-secondary[^"]*" href="\/panel\/new"/)
+    expect(h).toMatch(/<details[^>]*data-feed-new[^>]*>\s*<summary class="btn btn-secondary/)
+    expect((h.match(/btn-primary/g) ?? []).length).toBe(1)
+    expect(h).toContain('اعتمد كلّ ما ينتظر')
+    // ‏والأبوابُ الخمسة بمساراتها إلى اللوح
+    for (const href of ['/panel#idea', '/panel#write', '/panel#own', '/panel/library#videos', '/panel#plan-import']) expect(h).toContain(`href="${href}"`)
+  })
+
+  it('لا شيءَ ينتظر: «منشورات جديدة» أوّليٌّ و«منشور جديد ▾» ثانويّ — أوّليٌّ واحدٌ أبدًا؛ وبلا خطّةٍ لا رابطَ ورشةٍ ولا تقويم', async () => {
+    db.raw.exec("UPDATE posts SET status = 'queued', scheduled_at = '2099-01-04 06:00:00', approved_by = 'owner', approved_at = datetime('now') WHERE status = 'draft'")
+    const { cookie } = await session()
+    let h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
+    expect(h).not.toContain('اعتمد كلّ ما ينتظر')
+    expect(h).toMatch(/<a class="btn btn-primary[^"]*" href="\/panel\/new"/)
+    expect((h.match(/btn-primary/g) ?? []).length).toBe(1)
+    expect(h).toContain('data-feed-new')
+    db.raw.exec("UPDATE plans SET status = 'superseded'")
+    h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
+    expect(h).not.toContain('ورشة الخطّة')
+    expect(h).not.toContain('تقويم الشهر')
+    expect(h).toContain('data-feed-new')
+  })
+
+  it('«افتح» على مجدولٍ ليس من خطّةٍ يفتح بطاقتَه في لوح المنشورات، ومنشورُ الخطّة شاشةَ التعديل', async () => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, account_id, scheduled_at, approved_by, approved_at, created_at) VALUES
+      ('q9', 'x', 'text', '${TEXT} المجدول وحدَه', 'queued', 'k9', 'a1', '2099-02-01 06:00:00', 'owner', datetime('now'), '2026-01-01 14:00:00')`)
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('href="/panel#d-q9"')
+    expect(html).toContain('href="/panel/plan/post/p2"')
+  })
+
+  it('القارئُ بلا «منشورات جديدة» ولا «منشور جديد ▾»، والرابطان الصغيران يبقيان له', async () => {
+    db.raw.prepare("INSERT INTO members (email, role, orgs, invited_by) VALUES ('v2@example.com', 'viewer', '*', 'owner')").run()
+    const { cookie } = await session('v2@example.com')
+    // ‏الرأسُ وحدَه: لوحةُ الأوامر تفهرس «منشورات جديدة» لكلّ أحد، والصفحةُ نفسُها تردّ القارئ
+    const h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
+    expect(h).not.toContain('href="/panel/new"')
+    expect(h).not.toContain('data-feed-new')
+    expect(h).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
+    expect(h).toContain('href="/panel/plan/month">تقويم الشهر</a>')
+  })
+
+  it('الخطُّ الزمنيّ والمتابعةُ و«الخطّة» تحويلاتٌ لا صفحات', async () => {
+    const { cookie } = await session()
+    const to = async (path: string): Promise<[number, string | null]> => {
+      const r = await app.request(path, { headers: { Cookie: cookie } }, env)
+      return [r.status, r.headers.get('Location')]
+    }
+    expect(await to('/panel/timeline')).toEqual([301, '/panel/feed'])
+    expect(await to('/panel/plan/follow')).toEqual([303, '/panel/feed'])
+    expect(await to('/panel/plan')).toEqual([303, '/panel/plan/review'])
+  })
+})

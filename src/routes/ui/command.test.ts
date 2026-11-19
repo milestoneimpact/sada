@@ -223,34 +223,50 @@ describe('النصّ البرمجيّ — وقواعد اللوحة تُوَرَ
  * قائمةٌ ثانيةٌ تُبنى للشريط **تشيخ وحدَها**: قسمٌ يُضاف غدا يدخل الرافدةَ
  * واللوحةَ ولا يدخلها، **ولا حارسَ يمسك غيابا**.
  */
-describe('شريط الجوّال — خمسة في اليد: أربع وجهات و«المزيد» (D-204)', () => {
-  it('**وأربع وجهات لا أقلّ ولا أكثر**، والخامسة «المزيد»', () => {
-    expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(4)
+describe('شريط الجوّال — أربعة في اليد: ثلاث وجهات و«المزيد» (D-388، بعد D-204)', () => {
+  it('**وثلاث وجهات لا أقلّ ولا أكثر**، والرابعة «المزيد»', () => {
+    expect(SECTIONS.filter((s) => s.bar === true)).toHaveLength(3)
   })
 
   /**
-   * والرافدةُ مجموعتان وذيل (D-381، §4.1): ما يُفعل كلَّ يوم (الرئيسيّة · الخطّة · المنشورات · النتائج) بترتيب شريط الهاتف
-   * نفسِه، ثمّ ما يُعدّ له (المكتبة · حزمة المحتوى · الحسابات · ما عليك)، والإعداداتُ في الذيل بجوار حال النظام.
+   * والرافدةُ مجموعتان وذيل (D-388، §4.1): العملُ (الرئيسيّة · التيّار · النتائج) بترتيب شريط الهاتف نفسِه، ثمّ الموارد
+   * (المكتبة · الحسابات · ما عليك)، والإعداداتُ في الذيل. والمطويُّ في الجدول بمساره ولا يُرسم: «المنشورات» من «المزيد»،
+   * و«الخطّة» و«حزمة المحتوى» من رأس التيّار والإعدادات ولوحة الأوامر.
    */
-  it('**مجموعتان وذيل** بترتيب §4.1، و«حزمة المحتوى» اختياريّةٌ بعد «المكتبة»', () => {
+  it('**مجموعتان وذيل** بترتيب D-388، والمطويُّ في الجدول لا في الرافدة', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'التيّار', 'الخطّة', 'المنشورات', 'النتائج', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
-    expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(9)
-    // ‏و«التيّار» بعد الرئيسيّة (D-386) في العمل، وفي شريط الهاتف (D-387)
-    expect(SECTIONS.filter((s) => s.group === 'العمل').map((s) => s.id)).toEqual(['overview', 'feed', 'plan', 'posts', 'results'])
-    expect(SECTIONS.filter((s) => s.group === 'الموارد').map((s) => s.id)).toEqual(['library', 'package', 'accounts', 'tasks'])
+      ['الرئيسيّة', 'التيّار', 'النتائج', 'المنشورات', 'الخطّة', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
+    expect(SECTIONS.filter((s) => s.tucked === undefined).map((s) => s.id)).toEqual(['overview', 'feed', 'results', 'library', 'accounts', 'tasks', 'settings'])
+    expect(SECTIONS.filter((s) => s.tucked !== undefined).map((s) => [s.id, s.tucked])).toEqual([['posts', 'more'], ['plan', 'palette'], ['package', 'palette']])
+    expect(SECTIONS.filter((s) => s.group === 'العمل' && s.tucked === undefined).map((s) => s.id)).toEqual(['overview', 'feed', 'results'])
+    expect(SECTIONS.filter((s) => s.group === 'الموارد' && s.tucked === undefined).map((s) => s.id)).toEqual(['library', 'accounts', 'tasks'])
     expect(SECTIONS.filter((s) => s.foot === true).map((s) => s.id)).toEqual(['settings'])
-    expect(SECTIONS.find((s) => s.id === 'package')).toMatchObject({ group: 'الموارد', page: '/panel/package', optional: true })
+    const rail = railHtml({ inPanel: true })
+    expect(rail).toContain('<span class="lbl">العمل</span>')
+    expect(rail).toContain('<span class="lbl">الموارد</span>')
+    for (const href of ['href="#posts"', 'href="/panel/plan"', 'href="/panel/package"']) expect(rail.slice(0, rail.indexOf('<details class="more-sheet">'))).not.toContain(href)
+    expect([...rail.matchAll(/<a href="([^"]+)"[^>]*aria-label=/g)].map((m) => m[1])).toEqual(
+      ['#overview', '/panel/feed', '/panel/report', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
   })
 
-  it('«حزمة المحتوى» لا تُرسم إلّا بطلبها، وبشارةِ ما ينتظر قرارك بين «المكتبة» و«الحسابات»', () => {
-    expect(railHtml({ inPanel: true })).not.toContain('href="/panel/package"')
-    const rail = railHtml({ inPanel: true, shown: ['package'], counts: { package: 3 } })
-    const at = rail.indexOf('href="/panel/package"')
-    expect(at).toBeGreaterThan(rail.indexOf('href="/panel/library"'))
-    expect(at).toBeLessThan(rail.indexOf('href="/panel/accounts"'))
-    expect(rail.slice(at, rail.indexOf('</a>', at))).toContain('حزمة المحتوى')
-    expect(rail.slice(at, rail.indexOf('</a>', at))).toMatch(/>3</)
+  it('والمطويُّ في لوحة الأوامر بين الأفعال لا الأقسام، و«تقويم الشهر» بدل الخطّ الزمنيّ', () => {
+    const cmds = buildCommands({ onPanel: false })
+    expect(cmds.filter((c) => c.group === 'الأقسام').map((c) => c.label)).toEqual(['الرئيسيّة', 'التيّار', 'النتائج', 'المكتبة', 'الحسابات', 'ما عليك', 'الإعدادات'])
+    for (const label of ['المنشورات', 'الخطّة', 'حزمة المحتوى']) expect(cmds.find((c) => c.label === label)?.group).toBe('الأفعال')
+    expect(cmds.find((c) => c.label === 'تقويم الشهر')?.href).toBe('/panel/plan/month')
+    expect(cmds.some((c) => c.href === '/panel/timeline')).toBe(false)
+  })
+
+  /** وصفحةٌ قسمُها مطويّ تعلِّم «التيّار» أبًا: الخطّةُ وحزمتُها بابُهما رأسُ التيّار */
+  it('وصفحةٌ قسمُها مطويٌّ تعلِّم التيّار أبًا لا نفسَها', () => {
+    for (const active of ['plan', 'package', 'posts']) {
+      const rail = railHtml({ inPanel: false, active })
+      expect(rail).toContain('<a href="/panel/feed" data-bar aria-current="true" aria-label="')
+      expect(rail.slice(0, rail.indexOf('<details class="more-sheet">'))).not.toContain('aria-current="page"')
+    }
+    // ‏و«المنشورات» في «المزيد» تُعلَّم صفحةً حين تكون هي المفتوحة
+    expect(railHtml({ inPanel: true, active: 'posts' })).toContain('<a href="#posts" aria-current="page">')
+    expect(railHtml({ inPanel: false, active: 'feed' })).toContain('<a href="/panel/feed" data-bar aria-current="page" aria-label="')
   })
 
   it('والإعداداتُ وحالُ النظام في ذيل الرافدة، وزرُّ الطيّ مخفيٌّ بلا سكربت (D-381)', () => {
@@ -266,11 +282,11 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     expect(rail).toMatch(/<a href="\/panel\/library">[\s\S]*?<span>المكتبة<\/span><\/a>/)
   })
 
-  /** والخمسةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
+  /** والثلاثةُ هي التي تُفتَح كلَّ يوم — لا الضبطُ الذي يُفتَح مرّة. */
   it('وهي أقسام العمل اليوميّ', () => {
     const bar = SECTIONS.filter((s) => s.bar === true).map((s) => s.id)
-    // ‏و«الخطّة» مكانَ «المكتبة» في اليد (D-289)، و«التيّار» مكانَ «المنشورات» (D-387): الاعتمادُ يقع فيه، والمنشوراتُ في «المزيد»
-    expect(bar).toEqual(['overview', 'feed', 'plan', 'results'])
+    // ‏الرئيسيّةُ والتيّارُ والنتائج (D-388): الاعتمادُ والخطّةُ وبابا المنشور كلُّها من التيّار، والمنشوراتُ من «المزيد»
+    expect(bar).toEqual(['overview', 'feed', 'results'])
   })
 
   /**
@@ -293,7 +309,7 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
   })
 
   /** و«المزيد» قائمةٌ لا بحث (خطّة التصميم 5.3 · D-208): ما ليس في الشريط بأعداده، ويعمل بلا سكربت. */
-  it('و«المزيد» ورقة فيها المكتبة والحسابات وما عليك والإعدادات، وعددُها مجموعُها', () => {
+  it('و«المزيد» ورقة فيها المنشورات والمكتبة والحسابات وما عليك والإعدادات، وعددُها مجموعُها', () => {
     const html = railHtml({ inPanel: true, counts: { accounts: 1, tasks: 4, settings: 0 } })
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')

@@ -84,7 +84,7 @@ async function render(env: Env, csrf: string, m: PackageScreen, req: Request): P
   const zone = await ownerZone(env.DB, req.headers.get('Cookie'))
   m = { ...m, zone }
   return page((nonce) => soloPage('صدى — حزمة المحتوى', { href: '/panel/library', label: 'المكتبة', at: '/panel/package' },
-    injectCsrf(packageScreen(m), csrf), nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
+    injectCsrf(packageScreen(m), csrf), nonce, '', buildCommands({ onPanel: false }), soloNav('package')))
 }
 
 pkg.get('/panel/package', async (c) => {
@@ -243,7 +243,7 @@ pkg.get('/panel/plan/package', async (c) => {
       : chosen !== null && preview === null ? { tone: 'warn', text: 'تعذّرت قراءةُ هذه النسخة: ' + (chosen.error ?? 'لم تُحسب بعد') + '. اختر غيرها.' } : null,
   })
   return page((nonce) => soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
-    '', buildCommands({ onPanel: false }), soloNav('plan', undefined, { shown: ['package'] })))
+    '', buildCommands({ onPanel: false }), soloNav('plan')))
 })
 
 pkg.post('/panel/plan/package', async (c) => {
@@ -308,7 +308,7 @@ pkg.get('/panel/plan/package/schedule', async (c) => {
     back: c.req.query('from') === 'changes' && /^rev_[a-z0-9]{1,40}$/.test(c.req.query('rev') ?? '') ? '/panel/package/changes/' + (c.req.query('rev') ?? '') : '/panel/plan/package',
   })
   return page((nonce) => soloPage('صدى — اعتمد الخطّة وجدولها', { href: '/panel/plan/package', label: 'من حزمتك', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
-    '', buildCommands({ onPanel: false }), soloNav('plan', undefined, { shown: ['package'] })))
+    '', buildCommands({ onPanel: false }), soloNav('plan')))
 })
 
 pkg.post('/panel/plan/package/schedule', async (c) => {
@@ -372,7 +372,7 @@ pkg.get('/panel/package/changes/:rev', async (c) => {
   const schedulable = revision.status === 'applied' && allows(session.record.role ?? 'owner', 'admin') ? (await planPackageSchedule(c.env.DB, org, zone, new Date())).ready.length : 0
   return page((nonce) => soloPage('صدى — ما تغيّر في حزمتك', { href: '/panel/package', label: 'حزمة المحتوى', at: '/panel/package' },
     injectCsrf(changesScreen({ revision, changes, history, zone, schedulable, flash: flash === null ? null : { tone: flash.kind, text: flash.text } }), session.record.csrf),
-    nonce, '', buildCommands({ onPanel: false }), soloNav('package', undefined, { shown: ['package'] })))
+    nonce, '', buildCommands({ onPanel: false }), soloNav('package')))
 })
 
 pkg.post('/panel/package/changes/:rev/decide', async (c) => {

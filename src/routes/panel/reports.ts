@@ -19,9 +19,6 @@ import { listReports, readReport } from '../../lib/report/weekly'
 import { successThisMonth } from '../../lib/report/success'
 import { decide as decidePromotion, openSuggestions } from '../../lib/report/promote'
 import { reportScreen } from '../ui/reportView'
-import { TIMELINE_SCRIPT, timelineScreen, timelineTitle } from '../ui/timelineView'
-import { gantt, readShift, readSpan as readGanttSpan, windowOf } from '../../lib/gantt'
-import { GANTT_CAP, loadGantt } from '../../lib/ganttStore'
 import { ownerRows, TASKS_LATER, TASKS_PAGE } from '../../lib/owner'
 import { gatesScreen, laterScreen, laterTitle, tasksScreen } from '../ui/tasksView'
 import { vitalsSummary } from '../../lib/vitals'
@@ -146,34 +143,10 @@ reports.get('/panel/report', async (c) => {
 })
 
 /**
- * الخطُّ الزمنيّ للمحفظة (D-212) — **تبويبٌ ثالثٌ في «النتائج»**.
- *
- * المدى والنافذةُ من العنوان بقوائم سماح (`readSpan` و`readShift`)، **فما لا يُعرَف يعود
- * إلى افتراضه** ولا يُسقط الصفحة. والأيّامُ بمنطقة المالك (D-201): يومُ الرياض يبدأ قبل
- * يوم غرينتش بثلاث ساعات، ومنشورُ الثانية فجرًا يقع في يومه لا في أمسه.
+ * **الخطُّ الزمنيّ للمحفظة صار التيّار** (D-388): كانت أشرطةُ غانت (D-212) صفحةً ثامنةً يظهر فيها المنشور، والتيّارُ (D-386)
+ * يقول الشيءَ نفسَه عمودًا واحدًا بفعلٍ على كلّ بطاقة. فالمسارُ يبقى للروابط المحفوظة ويحوّل دائمًا (301) إلى التيّار.
  */
-reports.get('/panel/timeline', async (c) => {
-  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, c.req.raw)
-
-  const q = new URL(c.req.url).searchParams
-  const span = readGanttSpan(q.get('span'))
-  const shift = readShift(q.get('at'))
-  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const now = new Date()
-  const win = windowOf(now, zone, span, shift)
-  const loaded = await loadGantt(c.env.DB, activeOrg(session.record), win.from, win.to)
-  const body = timelineScreen({
-    chart: gantt(loaded, win, now, zone),
-    span, shift, capped: loaded.capped, cap: GANTT_CAP, zone, now,
-    flash: await takeFlash(c.env, c.req.raw),
-  })
-
-  return page((nonce) =>
-    soloPage(timelineTitle(), { href: '/panel', label: 'اللوحة', at: '/panel/timeline' }, injectCsrf(body, session.record.csrf), nonce, TIMELINE_SCRIPT,
-      buildCommands({ onPanel: false }), soloNav('results')),
-  )
-})
+reports.get('/panel/timeline', (c) => c.redirect('/panel/feed', 301))
 
 /**
  * رحلةُ منشور (D-104) — `‎/panel/journey/:id`.

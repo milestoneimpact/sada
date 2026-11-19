@@ -179,11 +179,6 @@
     "cards": 2,
     "inputs": 4
   },
-  "routes/ui/timelineView.ts": {
-    "buttons": 5,
-    "cards": 2,
-    "inputs": 0
-  },
   "routes/ui/when.ts": {
     "buttons": 0,
     "cards": 0,

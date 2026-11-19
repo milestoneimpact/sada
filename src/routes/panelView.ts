@@ -56,6 +56,7 @@ import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { activityCard, homeTop, planCard } from './ui/sections/home'
+import { newPostMenu } from './ui/newMenu'
 import { deskQueue } from './ui/sections/desk'
 import { menu, menuItem } from './ui/components/menu'
 import { railHtml } from './ui/rail'
@@ -979,20 +980,8 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  * ‏**«منشور جديد» على الحاسوب أيضًا** (D-216): كان الزرُّ العائم على الهاتف وحدَه، وعلى الحاسوب أربعةُ أزرار بدءٍ داخل
  * ‏«المنشورات» فقط. فصار في الترويسة من كلّ صفحة، بالبدايات الأربع نفسِها، ومساراتُها إلى «/panel» لتصل من أيّ لوح.
  */
-/** ‏أبوابُ الكتابة الخمسة بمساراتها إلى «/panel» — لتصل من أيّ لوح. */
-function newItems(): string[] {
-  return [
-    menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
-    menuItem({ label: 'من مصدر', note: 'ملفّ محلَّل من Drive', href: '/panel#write' }),
-    // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
-    menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
-    menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
-    menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
-  ]
-}
-
 function topNew(): string {
-  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-tb-new', items: newItems() })
+  return newPostMenu('data-tb-new')
 }
 
 /**
@@ -1003,7 +992,7 @@ function topNew(): string {
  * ‏فلا زرّان بالاسم نفسِه في شاشة. والعائمُ يبقى في «المكتبة» ويخرج من الرئيسيّة لهذا.
  */
 function homeNew(): string {
-  return menu({ label: 'منشور جديد', variant: 'primary', size: 'sm', icon: ICON.add, attrs: 'data-home-new', items: newItems() })
+  return newPostMenu('data-home-new')
 }
 
 /**
@@ -1368,6 +1357,21 @@ function postsPane(d: ShellData & PostsData): string {
 const allowsRules = (role: Role | undefined): boolean => allows(role ?? 'owner', 'admin')
 
 /** «الإعدادات» — الحدودُ والمزوّدون والأمانُ والمنظّمات وما للمطوّر. */
+/**
+ * ‏**«المصادر والقواعد»** (D-388): حزمةُ المحتوى والاستيراداتُ وقواعدُ الجدولة خرجت من الرافدة ومن أفعال الخطّة إلى الإعدادات —
+ * ‏ضبطٌ يُفتح نادرًا، وبابُه الثاني بطاقةُ «من GitHub» في «منشورات جديدة».
+ */
+function sourcesRulesCard(): string {
+  const rows = [
+    ['/panel/package', 'حزمة المحتوى', 'وسائطُك وخطّتُك ونصوصُك من GitHub، وما تغيّر فيها'],
+    ['/panel/plan/imports', 'الاستيرادات', 'سجلُّ كلّ ملفٍّ وحزمةٍ قُرئت: الشهرُ والبصمةُ وما تغيّر'],
+    ['/panel/plan-rules', 'قواعد الجدولة', 'سقوفُ اليوم والفاصلُ وساعاتُ الهدوء التي يفحص بها «التيّار» و«تقويم الشهر»'],
+  ] as const
+  return card({ id: 'sources-rules', title: 'المصادر والقواعد', level: 2, body: html`
+    <p class="hint">من أين تأتي الخطّةُ وبأيّ قواعدَ تُجدوَل. <b>ولا شيءَ منها يُنشر بلا اعتمادك في التيّار.</b></p>
+    <ul class="plain stack m-0">${rows.map(([href, label, note]) => html`<li><a class="tap" href="${href}">${label}</a> <span class="hint">— ${note}</span></li>`)}</ul>`.value })
+}
+
 function settingsPane(d: ShellData & SettingsData): string {
   const missing = d.providers.filter((p) => !p.configured).length
   // ‏المالكُ وحدَه يرى أقسامَ الإعدادات التي للمالك (D-272)؛ والجلسةُ القديمةُ بلا دورٍ للمالك
@@ -1538,6 +1542,9 @@ function settingsPane(d: ShellData & SettingsData): string {
             : ''}${d.slide.missing.includes('account') ? '<span class="mono">CF_AI_ACCOUNT_ID</span> في متغيّرات Worker.' : ''}</p>
         </details>`}
   </div>
+  ${/* ‏«المصادر والقواعد» (D-388): حزمةُ المحتوى والاستيراداتُ وقواعدُ الجدولة خرجت من الرافدة ومن أفعال الخطّة إلى هنا —
+      ‏ضبطٌ يُفتح نادرًا، وبابُه الثاني بطاقةُ «من GitHub» في «منشورات جديدة» */''}
+  ${sourcesRulesCard()}
 </div>
 ${ownerView ? `<div data-sub id="security-all">
 <div id="security">
@@ -1789,15 +1796,14 @@ export function panelPage(view: PaneView): string {
     // ‏وتغييراتُ الحزمة التي تنتظر قرارك — يدُ المالك كالمسوّدات
     package: d.packageNav?.awaiting ?? 0,
   }
-  // ‏«حزمة المحتوى» لمنظّمةٍ ربطت حزمةً، وللمالك دائمًا: منه تُربط الحزمةُ أوّلَ مرّة
-  const shown = d.packageNav?.linked === true || (d.org ?? OWNER_ORG) === OWNER_ORG ? ['package'] : []
+  // ‏و«حزمة المحتوى» من الإعدادات ومن «من GitHub» (D-388)، لا من الرافدة
 
   const body = `
 <a class="skip" href="#main">تخطّي إلى المحتوى</a>
 <div class="app">
 
 ${/* ‏وفي صفحة لوح مستقلّ (D-211) روابط الرئيسيّة والمنشورات مسارات إلى «/panel»، ولوحُها معلَّم */''}
-${railHtml({ inPanel: only === null, counts, shown, env: d.env, scope, status: state, ...(only === null ? {} : { active: only }) })}
+${railHtml({ inPanel: only === null, counts, env: d.env, scope, status: state, ...(only === null ? {} : { active: only }) })}
 
 <div class="main">
 <header class="topbar">

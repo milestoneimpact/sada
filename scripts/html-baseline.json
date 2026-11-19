@@ -78,7 +78,6 @@
   "routes/ui/tasksView.ts": 3,
   "routes/ui/teamView.ts": 7,
   "routes/ui/time.ts": 3,
-  "routes/ui/timelineView.ts": 36,
   "routes/ui/tokens.ts": 5,
   "routes/ui/when.ts": 7,
   "routes/verify.ts": 1

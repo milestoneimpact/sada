@@ -50,6 +50,11 @@ describe('«منشورات جديدة» (D-387)', () => {
     expect(html).toContain('<h1>منشورات جديدة</h1>')
     expect(html.match(/class="card nw-way"/g)).toHaveLength(3)
     for (const t of ['يكتبها المساعد', 'من ملفّ', 'من GitHub']) expect(html).toContain('<h2 class="nw-t">' + t + '</h2>')
+    // ‏وتحت زرّ «من GitHub» رابطا الضبط (D-388): الاستيراداتُ وقواعدُ الجدولة — وهما في الإعدادات «المصادر والقواعد»
+    const github = html.slice(html.indexOf('id="nw-github"'), html.indexOf('</li>', html.indexOf('id="nw-github"')))
+    expect(github).toContain('href="/panel/plan/imports">الاستيرادات</a>')
+    expect(github).toContain('href="/panel/plan-rules">قواعد الجدولة</a>')
+    expect(html.slice(0, html.indexOf('id="nw-github"'))).not.toContain('/panel/plan-rules')
     expect(html).toContain('href="/panel/plan/new"')
     expect(html).toContain('href="/panel/plan/import"')
     expect(html).toContain('href="/panel/package"')

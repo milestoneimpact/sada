@@ -17,7 +17,6 @@ import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
-import { planFollowScreen } from '../ui/planFollowView'
 import { postEditScreen } from '../ui/postEditView'
 import { copyToDraft, holdPost, postHistory, restoreEdit, revisePost, type ReviseResult } from '../../lib/plan/revise'
 import { stageOf } from '../../lib/plan/rights'
@@ -460,7 +459,8 @@ plan.post('/panel/plan/approve-all', async (c) => {
   // ‏وبعد اعتماد الخطّة كلِّها من المراجعة تنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)
   // ‏ومن التيّار إليه (D-386)
   if (gate.form.get('back') === 'feed') return c.redirect('/panel/feed', 303)
-  return c.redirect(gate.form.get('back') === 'review' ? (done.failed.length === 0 ? '/panel/plan/follow' : '/panel/plan/review') : '/panel/client', 303)
+  // ‏ومن المراجعة إلى التيّار حين لا فشل (D-388: لا «متابعة»)، وإلى المراجعة حين تعثّر شيء
+  return c.redirect(gate.form.get('back') === 'review' ? (done.failed.length === 0 ? '/panel/feed' : '/panel/plan/review') : '/panel/client', 303)
 })
 
 /**
@@ -719,26 +719,10 @@ const toCard = (form: FormData, anchor = true): Response => {
 }
 
 /**
- * **المتابعة** (الشاشةُ الرابعة: ابنِ ← راجع ← اعتمد ← تابع): ما فشل وما جُدول وما نُشر من الخطّة الحاليّة، بلا تحرير.
+ * **«المتابعة» صارت التيّار** (D-388): كانت الشاشةَ الرابعة (ابنِ ← راجع ← اعتمد ← تابع) تجمع ما جُدول ونُشر من الخطّة، والتيّارُ
+ * يفعله لكلّ المنشورات بموعده ونتيجته. فالمسارُ يحوّل إليه (303) للروابط المحفوظة.
  */
-plan.get('/panel/plan/follow', async (c) => {
-  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
-  if (session === null) return loginResponse(c.env, c.req.raw)
-  const org = activeOrg(session.record)
-  const current = await latestPlan(c.env.DB, org)
-  if (current === null) return c.redirect('/panel/plan/new', 303)
-  const [model, zone, flash] = await Promise.all([
-    reviewModel(c.env.DB, org, current),
-    ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
-    takeFlash(c.env, c.req.raw),
-  ])
-  const body = planFollowScreen(model, zone ?? null) +
-    (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
-  return page((nonce) =>
-    soloPage('صدى — متابعةُ الخطّة', { href: '/panel/plan/review', label: 'المراجعة', at: '/panel/plan/follow' }, body, nonce,
-      '', buildCommands({ onPanel: false }), soloNav('plan')),
-  )
-})
+plan.get('/panel/plan/follow', (c) => c.redirect('/panel/feed', 303))
 
 /**
  * **«ألغِ الخطّة»**: تصير الخطّةُ مستبدَلة (`superseded`) فلا تفتحها «الخطّة» بعدها، وتُرفض مسوّداتُها التي لم تُجدوَل.
@@ -1028,8 +1012,9 @@ plan.get('/panel/plan/month', async (c) => {
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
   })
-  return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel#posts', label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
-    '', buildCommands({ onPanel: false }), soloNav('posts')))
+  // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
+  return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
+    '', buildCommands({ onPanel: false }), soloNav('plan')))
 })
 
 /** **سجلُّ الاستيرادات** (D-383 · المرحلة ٨): كلُّ `import_job` بحاله وبصمته وشهره وما غيّر، وزرُّ «إعادة الفحص» إلى شهره. */
@@ -1456,16 +1441,15 @@ plan.get('/panel/plan/build.json', async (c) => {
 })
 
 /**
- * **«الخطّة» وجهةٌ واحدة** (D-289 · D-327): بلا خطّةٍ «خطّة جديدة»، وما سواها شاشةُ الخطّة نفسُها — فيها الشهرُ والأسبوعُ والاعتماد.
- * كانت المثبَّتةُ تفتح «العرض»، وهو للقراءة بلا زرّ اعتماد: فمن فتح خطّتَه لم يجد ما يعتمد به. و«العرض» زرٌّ فيها للطباعة.
+ * **«الخطّة» غلافُ الورشة** (D-388، بعد D-289 · D-327): المسارُ يحوّل إلى المراجعة `/panel/plan/review` — وهي التي تردّ إلى
+ * «خطّة جديدة» حين لا خطّة. وبناءٌ يجري يفتح شاشتَه (D-332) فلا تُرى خطّةٌ قديمةٌ والجديدةُ تُبنى. والخطّةُ ورشةٌ لا وجهةَ
+ * رافدة: بابُها «ورشة الخطّة» في رأس التيّار و«افتح الخطّة» على ما يُكتب.
  */
 plan.get('/panel/plan', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const current = await latestPlan(c.env.DB, activeOrg(session.record))
-  // ‏وبناءٌ يجري يفتح شاشتَه (D-332): «الخطّة» في الرافدة لا تُري خطّةً قديمةً والجديدةُ تُبنى
   if (running(await readBuild(d1BuildStore(c.env.DB), activeOrg(session.record)), new Date())) return c.redirect('/panel/plan/building', 303)
-  return c.redirect(current === null ? '/panel/plan/new' : '/panel/plan/review', 303)
+  return c.redirect('/panel/plan/review', 303)
 })
 
 /**
@@ -1479,7 +1463,7 @@ plan.get('/panel/plan/post/:id', async (c) => {
   const id = c.req.param('id')
   const row = await c.env.DB.prepare('SELECT id, status, text, scheduled_at, dispatched_at, rev, edited_in_sada FROM posts WHERE id = ? AND org_id = ?')
     .bind(id, org).first<{ id: string; status: string; text: string; scheduled_at: string | null; dispatched_at: string | null; rev: number; edited_in_sada: number }>()
-  if (row === null) return c.redirect('/panel/plan/follow', 303)
+  if (row === null) return c.redirect('/panel/feed', 303)
   const [history, zone, flash, library] = await Promise.all([
     postHistory(c.env.DB, org, id),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
@@ -1491,7 +1475,7 @@ plan.get('/panel/plan/post/:id', async (c) => {
     id: row.id, text: row.text, scheduledAt: row.scheduled_at, rev: row.rev, edited: row.edited_in_sada === 1,
     stage: stageOf(row, new Date()), role: session.record.role ?? 'owner', history, media,
   }, zone ?? null) + (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
-  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/plan/follow', label: 'المتابعة' }, injectCsrf(body, session.record.csrf), nonce,
+  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
     '', buildCommands({ onPanel: false }), soloNav('plan')))
 })
 

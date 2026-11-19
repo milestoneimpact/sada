@@ -22,6 +22,7 @@ import { statusBadge } from './components/badge'
 import { button } from './components/button'
 import { cardClass } from './components/card'
 import { emptyState } from './components/empty'
+import { newPostMenu } from './newMenu'
 import { html, raw, type Html } from './html'
 
 export interface FeedView {
@@ -105,8 +106,9 @@ function action(c: FeedCard, v: FeedView): Html {
       <li>${raw(ICON.comment)}<span class="num">${n(m.comments)}</span><span class="vh"> تعليق</span></li>
       <li>${raw(ICON.share)}<span class="num">${n(m.shares)}</span><span class="vh"> مشاركة</span></li></ul>`
   }
-  // ‏مجدولٌ أو معتمَدٌ بلا موعد: شاشةُ التعديل والسجلّ (D-383 المرحلة ٧)
-  return raw(button({ label: 'افتح', variant: 'primary', size: 'sm', href: '/panel/plan/post/' + encodeURIComponent(c.id) }))
+  // ‏مجدولٌ أو معتمَدٌ بلا موعد: منشورُ الخطّة إلى شاشة التعديل والسجلّ (D-383 المرحلة ٧)، وما سواه إلى بطاقته في لوح
+  // ‏المنشورات (D-388): فيها «انقلها إلى» بضغطةٍ (D-200) والمحرّرُ — واللوحُ خرج من الرافدة، وهذا بابُه
+  return raw(button({ label: 'افتح', variant: 'primary', size: 'sm', href: c.planId !== null ? '/panel/plan/post/' + encodeURIComponent(c.id) : '/panel#d-' + encodeURIComponent(c.id) }))
 }
 
 function badges(c: FeedCard): Html {
@@ -148,13 +150,21 @@ function approveAll(v: FeedView): Html {
 }
 
 /**
- * **بابُ «منشورات جديدة» في الرأس** (D-387): ثانويٌّ بجوار «اعتمد كلّ ما ينتظر»، وأوّليٌّ حين لا شيءَ ينتظر — فأوّليٌّ واحدٌ في
- * الرأس أبدًا (`audit_primary`). وللمحرّر فأعلى (الطرقُ الثلاثةُ كتابة). و«ورشة الخطّة» رابطٌ صغيرٌ حين تكون خطّةٌ قائمة.
+ * **رأسُ التيّار بابُ كلّ شيء** (D-387 · D-388): «منشورات جديدة» ثمّ «منشور جديد ▾» (أبوابُ المنشور الواحد، كانت في لوح
+ * المنشورات وحدَه) ثمّ «اعتمد كلّ ما ينتظر». **وأوّليٌّ واحدٌ أبدًا** (`audit_primary`): الاعتمادُ حين ينتظر شيء، وإلّا
+ * «منشورات جديدة»؛ و«منشور جديد ▾» ثانويٌّ دائمًا. وللمحرّر فأعلى (كلُّها كتابة). وحين تكون خطّةٌ قائمة رابطان صغيران:
+ * «ورشة الخطّة» (المراجعة) و«تقويم الشهر» (شاراتُ الحمل و«اعتمد الشهر») — فالخطّةُ ورشةٌ تُبلَغ من هنا لا وجهةٌ في الرافدة.
  */
 function entry(v: FeedView, approve: string): Html {
   const parts: Html[] = []
-  if (v.model.plan !== null) parts.push(html`<a class="tap" href="/panel/plan/review">ورشة الخطّة</a>`)
-  if (allows(v.role, 'editor')) parts.push(raw(button({ label: 'منشورات جديدة', variant: approve === '' ? 'primary' : 'secondary', href: '/panel/new', icon: ICON.add })))
+  if (v.model.plan !== null) {
+    parts.push(html`<a class="tap" href="/panel/plan/review">ورشة الخطّة</a>`)
+    parts.push(html`<a class="tap" href="/panel/plan/month">تقويم الشهر</a>`)
+  }
+  if (allows(v.role, 'editor')) {
+    parts.push(raw(button({ label: 'منشورات جديدة', variant: approve === '' ? 'primary' : 'secondary', href: '/panel/new', icon: ICON.add })))
+    parts.push(raw(newPostMenu('data-feed-new', 'secondary')))
+  }
   if (approve !== '') parts.push(raw(approve))
   return parts.length === 0 ? html`` : html`<div class="row gap-2 fd-entry">${parts}</div>`
 }
@@ -166,7 +176,7 @@ export function feedScreen(v: FeedView): string {
   const head = pageHead(monthName(today), 'التيّار', lede, entry(v, approveAll(v).value).value)
   const upcoming = m.upcoming.length === 0
     ? emptyState({ title: 'لا شيء ينتظر النشر', html: 'اعتمد مسوّدةً أو ابنِ خطّةً فيظهر هنا ما سيُنشر بموعده.', echo: true,
-        action: button({ label: 'الخطّة', size: 'sm', href: '/panel/plan' }) })
+        action: button({ label: 'منشورات جديدة', size: 'sm', href: '/panel/new' }) })
     : html`<ol class="plain fd-list">${m.upcoming.map((c) => card(c, v))}</ol>`.value
   const past = m.past.length === 0
     ? emptyState({ title: 'لم يُنشر شيءٌ في هذه الأيّام', html: m.window.older === null ? 'ما يُنشر يظهر هنا بنتائجه.' : 'وما قبلها يُفتح من «أقدم».' })

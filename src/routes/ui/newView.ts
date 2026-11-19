@@ -23,6 +23,8 @@ interface Way {
   readonly cost: string
   readonly href: string
   readonly label: string
+  /** روابطُ ضبطٍ صغيرة تحت الزرّ (D-388): الاستيراداتُ وقواعدُ الجدولة من بطاقة GitHub — وفي الإعدادات «المصادر والقواعد». */
+  readonly links?: readonly { readonly href: string; readonly label: string }[]
 }
 
 /** الطرقُ الثلاثة كما تُقرأ — والكلفةُ كما تقولها شاشةُ كلّ طريق (D-006 · D-008)، لا وعدٌ جديد. */
@@ -48,6 +50,7 @@ export function newWays(hasPackage: boolean): readonly Way[] {
       when: 'حين تُدار المادّةُ في مستودع ' + (hasPackage ? '— وحزمتُك مربوطة.' : 'ولم تُربط حزمةٌ بعد.'),
       cost: 'المزامنةُ بلا كلفة؛ وما لا نصَّ له يُكتب بنداءٍ لكلّ منشور.',
       href: '/panel/package', label: hasPackage ? 'زامن الحزمة' : 'اربط الحزمة',
+      links: [{ href: '/panel/plan/imports', label: 'الاستيرادات' }, { href: '/panel/plan-rules', label: 'قواعد الجدولة' }],
     },
   ]
 }
@@ -60,6 +63,7 @@ function way(w: Way): Html {
     <p class="hint m-0">${w.when}</p>
     <p class="nw-cost m-0">${w.cost}</p>
     <div class="row mt-3">${raw(button({ label: w.label, variant: 'primary', href: w.href }))}</div>
+    ${w.links === undefined ? html`` : html`<p class="hint m-0 mt-2">${w.links.map((l, i) => html`${i === 0 ? '' : ' · '}<a class="tap" href="${l.href}">${l.label}</a>`)}</p>`}
   </li>`
 }
 
