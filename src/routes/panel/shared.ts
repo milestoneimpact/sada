@@ -206,6 +206,11 @@ export function toCard(part: 'd' | 's', id: string): Response {
   return POST_ID.test(id) ? back(`${part}-${id}`) : back('posts')
 }
 
+/** وفعلٌ من التيّار (D-386) يعود إلى بطاقته فيه `f-<id>` — والمعرّفُ يُفحَص كما في `toCard`. */
+export function toFeed(id: string): Response {
+  return POST_ID.test(id) ? back('f-' + id) : back('feed')
+}
+
 /** معرّفُ منشورٍ كما يُكتب في العنوان — وما سواه لا يُكتب. */
 export const POST_ID = /^[0-9a-f-]{8,}$/
 

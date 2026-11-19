@@ -234,9 +234,10 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
    */
   it('**مجموعتان وذيل** بترتيب §4.1، و«حزمة المحتوى» اختياريّةٌ بعد «المكتبة»', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'الخطّة', 'المنشورات', 'النتائج', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
-    expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(8)
-    expect(SECTIONS.filter((s) => s.group === 'العمل').map((s) => s.id)).toEqual(['overview', 'plan', 'posts', 'results'])
+      ['الرئيسيّة', 'التيّار', 'الخطّة', 'المنشورات', 'النتائج', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
+    expect(SECTIONS.filter((s) => s.optional !== true)).toHaveLength(9)
+    // ‏و«التيّار» بعد الرئيسيّة (D-386) في العمل لا في شريط الهاتف
+    expect(SECTIONS.filter((s) => s.group === 'العمل').map((s) => s.id)).toEqual(['overview', 'feed', 'plan', 'posts', 'results'])
     expect(SECTIONS.filter((s) => s.group === 'الموارد').map((s) => s.id)).toEqual(['library', 'package', 'accounts', 'tasks'])
     expect(SECTIONS.filter((s) => s.foot === true).map((s) => s.id)).toEqual(['settings'])
     expect(SECTIONS.find((s) => s.id === 'package')).toMatchObject({ group: 'الموارد', page: '/panel/package', optional: true })
@@ -297,7 +298,7 @@ describe('شريط الجوّال — خمسة في اليد: أربع وجها�
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
-    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['/panel/feed', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
     expect(sheet).toContain('بحث وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })

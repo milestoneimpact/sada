@@ -33,11 +33,15 @@ export const MOVED_ANCHORS: Readonly<Record<string, string>> = {
   appearance: PANE_PATH.settings, system: PANE_PATH.settings, machine: PANE_PATH.settings,
   'security-all': PANE_PATH.settings, advanced: PANE_PATH.settings,
   results: PANE_PATH.results, pivot: PANE_PATH.results,
+  // ‏والتيّارُ صفحتُه (D-386)
+  feed: '/panel/feed',
 }
 
 /** وبادئاتُ المعرّفات: بطاقةُ منصّة `ch-…`، وصفُّ مقطع `v-…`. */
 export const MOVED_PREFIXES: readonly (readonly [string, string])[] = [
   ['ch-', PANE_PATH.accounts],
+  // ‏بطاقةُ التيّار `f-<id>` (D-386): فعلٌ من التيّار يعود إلى بطاقته فيه
+  ['f-', '/panel/feed'],
   ['v-', PANE_PATH.library],
 ]
 

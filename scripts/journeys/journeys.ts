@@ -1013,6 +1013,34 @@ const R15: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16]
+/**
+ * ‏**ر-17 · الاعتمادُ من التيّار** (D-386): من الرئيسيّة إلى «التيّار» (على الهاتف من «المزيد»)، ثمّ «اعتمد» على أوّل بطاقةٍ تنتظر —
+ * ‏فتعود الصفحةُ إلى البطاقة نفسِها وهي «مجدولة». البذرةُ بذرةُ ر-13، والنجاحُ من القاعدة (منشورٌ مجدول) ومن الصفحة (بطاقتُه تقول «مجدولة»).
+ */
+const R17: Journey = {
+  id: 'R-17',
+  title: 'الاعتماد من التيّار: «التيّار» ثمّ «اعتمد» على بطاقةٍ تنتظر فتصير مجدولة',
+  plan: { target: '3 = البابُ (ومن «المزيد» على الهاتف) و«اعتمد» على البطاقة (D-386)' },
+  prepare: (stack) => R13.prepare!(stack),
+  async run({ page, m, stack }) {
+    await goSection(page, m, 'التيّار')
+    await page.waitForURL(/\/panel\/feed/)
+    // ‏أوّلُ بطاقةٍ من الخطّة تنتظر: اعتمادُها يجدولها في موعد بندها (D-327)، وما ليس من خطّةٍ يُعتمَد بلا موعد
+    const first = visible(page.locator('li.fd-card[data-status="draft"]:has(form[action="/panel/plan/review/approve"])')).first()
+    const id = (await first.getAttribute('id') ?? '').replace(/^f-/, '')
+    await m.tap(button(first, 'اعتمد'), '«اعتمد» على أوّل بطاقةٍ تنتظر في التيّار')
+    await page.waitForURL(/\/panel\/feed/)
+    const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
+    const card = page.locator(`#f-${id}`)
+    const shown = ((await card.textContent().catch(() => '')) ?? '').includes('مجدولة')
+    const status = await card.getAttribute('data-status').catch(() => null)
+    return {
+      success: queued === 1 && shown && status === 'queued',
+      verified: `مجدولٌ من الخطّة: ${queued} · البطاقةُ في التيّار بحال «${status ?? '—'}» وتقول «مجدولة»: ${shown ? 'نعم' : 'لا'}`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17]
 
 export { Blocked }

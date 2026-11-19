@@ -42,6 +42,8 @@ import { landingBody } from '../src/routes/landing'
 import type { Journey } from '../src/lib/journey'
 import { platformNeeds } from '../src/lib/platform/needs'
 import type { PlatformCounts, TimelineRow } from '../src/lib/platform/timeline'
+import { feedScreen } from '../src/routes/ui/feedView'
+import type { FeedCard, FeedModel } from '../src/lib/feed'
 
 const now = new Date('2026-09-06T09:00:00Z')
 const ago = (h: number): string =>
@@ -685,3 +687,43 @@ writeAudited(
     { id: 'i1', sourceKind: 'csv', sourceRef: 'nov.csv', contentHash: '0d93e1f4b2c8', period: '2026-11', status: 'applied', createdAt: '2026-11-01 08:00:00', summary: '3 مضاف، 2 متغيّر' },
   ], true), 'n', '', buildCommands({ onPanel: false }), soloNav('posts')),
 )
+
+// ‏التيّار (D-386): بطاقاتٌ بكلّ حال — نُشر بمقاييسه، ومجدولٌ، وينتظرُ اعتمادك، ويُكتب الآن، وفشل، وواحدٌ بتحذير «محتوى مكرّر»
+{
+  const zone = 'Asia/Riyadh'
+  const fnow = new Date('2026-11-24T07:00:00Z')
+  const post = (id: string, platform: string, status: string, text: string, at: string | null, over: Partial<FeedCard> = {}): FeedCard => ({
+    id, kind: 'post', platform, status, text, at, local: null, planId: 'pl1', media: null, metrics: null, warning: null, edited: false, ...over,
+  })
+  const feedPreview = fixtureImage(1200, 627, 200)
+  const model: FeedModel = {
+    upcoming: [
+      post('fa1', 'linkedin', 'draft', 'قبل كلّ معلَم ثلاثة أسئلة: ما المخرَج الذي يُرى؟ ومن يملك قرار القبول؟ وما أثر التأخّر؟ ثلاثة أسئلة تختصر اجتماعًا طويلًا في سطرٍ واحد يقرؤه الجميع.', null,
+        { local: { day: '2026-11-25', time: '09:00' }, media: { id: 'fm1', mime: 'image/png', width: 1200, height: 627 } }),
+      post('fa2', 'x', 'draft', 'الاجتماع الطويل لا يصنع اتّفاقًا؛ المراجعة القصيرة على تعريفٍ مكتوب تصنعه.', null,
+        { local: { day: '2026-11-25', time: '20:00' }, warning: { tone: 'warn', label: 'محتوى مكرّر' } }),
+      post('ff1', 'x', 'failed', 'ما لا يُقاس لا يُدار — وما يُقاس خطأً يُدار خطأً. اختر مقياسًا واحدًا لكلّ قرار.', '2026-11-23 17:00:00'),
+      post('fq1', 'linkedin', 'queued', 'القيمةُ لا تُقاس بالمخرجات بل بما تغيّر عند من يستعملها. ثلاثة مؤشّرات نقيس بها أثر كلّ معلَم.', '2026-11-25 06:00:00',
+        { media: { id: 'fm1', mime: 'image/png', width: 1200, height: 627 } }),
+      post('fq2', 'x', 'queued', 'سؤالٌ واحدٌ قبل كلّ قرار: ماذا سيتغيّر لو أخّرناه أسبوعًا؟', '2026-11-26 17:00:00'),
+      post('fq3', 'linkedin', 'queued', 'من الاجتماع الطويل إلى المراجعة القصيرة: كيف نقلنا فريقًا من ساعتين أسبوعيًّا إلى عشرين دقيقة.', '2026-11-30 06:00:00', { edited: true }),
+      { id: 'item:2026-12-01|linkedin|07:00', kind: 'item', platform: 'linkedin', status: 'writing', text: 'ثلاثة أسئلة قبل كلّ معلَم', at: null,
+        local: { day: '2026-12-01', time: '07:00' }, planId: 'pl1', media: null, metrics: null, warning: null, edited: false },
+    ],
+    past: [
+      post('fp1', 'linkedin', 'published', 'الحوكمة ليست لجنةً تجتمع؛ هي قرارٌ يُعرف من يملكه قبل أن يُطلب.', '2026-11-20 06:00:04',
+        { metrics: { impressions: 1240, reactions: 38, comments: 6, shares: 4 }, media: { id: 'fm1', mime: 'image/png', width: 1200, height: 627 } }),
+      post('fp2', 'x', 'published', 'المعلَم الذي لا يملك قرارَ قبولٍ ليس معلَمًا؛ هو تاريخٌ في جدول.', '2026-11-17 17:00:02',
+        { metrics: { impressions: 860, reactions: 21, comments: 2, shares: null } }),
+    ],
+    counts: { published: 2, queued: 3, awaiting: 2, writing: 1 },
+    plan: { id: 'pl1', awaiting: 2 },
+    awaitingIds: ['fa1', 'fa2'],
+    window: { from: '2026-09-25', to: '2026-11-24', older: '2026-09-25' },
+  }
+  writeAudited(
+    '/tmp/screen-feed.html',
+    soloPage('صدى — التيّار', { href: '/panel', label: 'الرئيسيّة' }, feedScreen({ model, zone, now: fnow, role: 'owner' }), 'n', '', buildCommands({ onPanel: false }), soloNav('feed')),
+    { 'fm1?w=800': feedPreview },
+  )
+}
