@@ -28,6 +28,7 @@ import { isLinkedInPage, linkStates, listAccounts } from '../../lib/channels'
 import { clock, dayLabel, localParts, validZone, zoneNote } from '../../lib/time/zone'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
+import { sayDecided } from '../../lib/plan/say'
 import { autoImageRoom } from '../../lib/image/auto'
 import { privateReach } from '../../lib/media/uploads'
 import { localToUtc, presetAt } from '../../lib/time/local'
@@ -586,18 +587,11 @@ drafts.post('/panel/drafts/approve-many', async (c) => {
 
   // **والمتعثّرُ يُسمَّى بسببه**: حصيلةٌ تقول «فشل بعضُها» تجعل المالك
   // يعيد الكلَّ — ولا يعرف أيَّها مضى
-  const flash: PanelFlash =
-    result.failed.length === 0
-      ? {
-          kind: 'ok',
-          text: `اعتُمدت ${result.done.length} مسوّدةً كما كُتبت — اختر لكلّ حسابا وموعدا.`,
-        }
-      : {
-          kind: result.done.length === 0 ? 'bad' : 'warn',
-          text:
-            `اعتُمدت ${result.done.length}، وتعثّرت ${result.failed.length}: ` +
-            result.failed.map((f) => f.reason).join(' · '),
-        }
+  // ‏وبجملة D-384 (D-387): العددُ، وما تعذّر بسببه — والمعتمَدُ بلا موعدٍ يُفتح من بطاقته في التيّار
+  const flash: PanelFlash = {
+    kind: result.failed.length === 0 ? 'ok' : result.done.length === 0 ? 'bad' : 'warn',
+    text: sayDecided('اعتُمدت', result.done.length, [], result.failed.map((f) => f.reason)) + (result.done.length === 0 ? '' : ' واختر لكلٍّ حسابًا وموعدًا من بطاقتها.'),
+  }
 
   await record(
     c.env.DB,

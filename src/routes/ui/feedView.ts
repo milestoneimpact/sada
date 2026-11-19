@@ -12,6 +12,7 @@ import { clock, dayKey, dayKeyLabel, dayLabel } from '../../lib/time/zone'
 import { parseSqliteUtc, num } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { mayDo } from '../../lib/plan/rights'
+import { allows } from '../../lib/access'
 import type { Role } from '../../lib/ownerEmail'
 import { EDITED_MARK } from '../../lib/plan/rights'
 import { pageHead } from './parts'
@@ -146,11 +147,23 @@ function approveAll(v: FeedView): Html {
         ${raw(button({ label, variant: 'primary', type: 'submit' }))}</form>`
 }
 
+/**
+ * **بابُ «منشورات جديدة» في الرأس** (D-387): ثانويٌّ بجوار «اعتمد كلّ ما ينتظر»، وأوّليٌّ حين لا شيءَ ينتظر — فأوّليٌّ واحدٌ في
+ * الرأس أبدًا (`audit_primary`). وللمحرّر فأعلى (الطرقُ الثلاثةُ كتابة). و«ورشة الخطّة» رابطٌ صغيرٌ حين تكون خطّةٌ قائمة.
+ */
+function entry(v: FeedView, approve: string): Html {
+  const parts: Html[] = []
+  if (v.model.plan !== null) parts.push(html`<a class="tap" href="/panel/plan/review">ورشة الخطّة</a>`)
+  if (allows(v.role, 'editor')) parts.push(raw(button({ label: 'منشورات جديدة', variant: approve === '' ? 'primary' : 'secondary', href: '/panel/new', icon: ICON.add })))
+  if (approve !== '') parts.push(raw(approve))
+  return parts.length === 0 ? html`` : html`<div class="row gap-2 fd-entry">${parts}</div>`
+}
+
 export function feedScreen(v: FeedView): string {
   const m = v.model
   const today = dayKey(v.now, v.zone)
   const lede = html`<span class="fd-counts"><span><b class="num">${String(m.counts.published)}</b> نُشر</span><span><b class="num">${String(m.counts.queued)}</b> مجدول</span><span><b class="num">${String(m.counts.awaiting)}</b> ينتظر اعتمادك</span><span><b class="num">${String(m.counts.writing)}</b> يُكتب</span></span>`.value
-  const head = pageHead(monthName(today), 'التيّار', lede, approveAll(v).value)
+  const head = pageHead(monthName(today), 'التيّار', lede, entry(v, approveAll(v).value).value)
   const upcoming = m.upcoming.length === 0
     ? emptyState({ title: 'لا شيء ينتظر النشر', html: 'اعتمد مسوّدةً أو ابنِ خطّةً فيظهر هنا ما سيُنشر بموعده.', echo: true,
         action: button({ label: 'الخطّة', size: 'sm', href: '/panel/plan' }) })

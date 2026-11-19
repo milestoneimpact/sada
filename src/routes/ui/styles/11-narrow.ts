@@ -16,6 +16,10 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   .page-head .txt{flex:1 1 auto}
   .page-head .eyebrow{display:none}
   .page-head .aside{flex:none}
+  /* ‏ورأسُ التيّار (D-387) أفعالُه ثلاثة فيلتفّ تحت العنوان لا يفيض عرضًا (فاض فصغّر Chrome الصفحةَ لتسعه) */
+  .page-head:has(.fd-entry){flex-wrap:wrap}
+  .page-head .aside:has(.fd-entry){flex:1 1 100%}
+  .fd-entry{justify-content:flex-start}
   /* ‏ومقطّعُ الحال أضيقُ حشوًا على الهاتف فيلتفّ على سطرين — والهدفُ ‏44 باقٍ */
   #draft-filter .fb-opt{padding-inline:var(--s-1)}
   #draft-filter .fb-opt .count{margin-inline-start:var(--s-0)}

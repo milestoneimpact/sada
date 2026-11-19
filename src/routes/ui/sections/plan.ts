@@ -77,7 +77,10 @@ export function kindChip(kind: PlanKind | undefined): Html {
  * ثلاثٌ منها معطّلة. فصار خطواتٍ في `/panel/plan/new`، وهنا الطريقُ إليها وحدَه.
  */
 function newPlanLink(replacing: boolean): string {
-  return html`<a class="btn ${replacing ? 'btn-secondary' : 'btn-primary'} btn-sm" href="/panel/plan/new">خطّة جديدة</a>`.value
+  // ‏وبلا خطّةٍ البابُ الواحد «منشورات جديدة» (D-387)؛ واستبدالُ خطّةٍ قائمة رابطٌ عميقٌ إلى المعالج كما كان
+  return replacing
+    ? button({ label: 'خطّة جديدة', size: 'sm', href: '/panel/plan/new' })
+    : button({ label: 'منشورات جديدة', variant: 'primary', size: 'sm', href: '/panel/new' })
 }
 
 /**

@@ -577,7 +577,7 @@ describe('عرضُ الخطّة (D-288)', () => {
 })
 
 describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
-  it('حالُها وتقدّمُ اعتمادها وأقربُ منشوراتها، والزرُّ يتبع الحال — وبلا خطّةٍ «ابنِ خطّة»', async () => {
+  it('حالُها وتقدّمُ اعتمادها وأقربُ منشوراتها، والزرُّ يتبع الحال — وبلا خطّةٍ «منشورات جديدة»', async () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
     expect(html).toContain('class="card home-plan"')
@@ -590,7 +590,9 @@ describe('«خطّةُ الشهر» في الرئيسيّة (D-289)', () => {
     expect(html.indexOf('اليوم بالأرقام</h2>')).toBeGreaterThan(html.indexOf('id="ops"'))
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     const none = await (await app.request('/panel', { headers: { Cookie: cookie } }, env)).text()
-    expect(none).toContain('href="/panel/plan/new">ابنِ خطّة</a>')
+    // ‏بابٌ واحد (D-387)
+    expect(none).toContain('href="/panel/new">منشورات جديدة</a>')
+    expect(none).not.toContain('ابنِ خطّة')
   })
 
   it('إذنٌ انتهى: الشريطُ يقوله، والرئيسيّةُ زرٌّ صغيرٌ بجانب التحيّة لا بطاقةٌ حمراء', async () => {

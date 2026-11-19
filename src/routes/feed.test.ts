@@ -81,7 +81,11 @@ describe('التيّار (D-386)', () => {
     expect(html).toContain('action="/panel/plan/approve-all"')
     expect(html).toContain('اعتمد كلّ ما ينتظر (1)')
     // ‏والرافدةُ تعلّم التيّار
-    expect(html).toContain('href="/panel/feed" aria-current="page"')
+    expect(html).toContain('href="/panel/feed" data-bar aria-current="page"')
+    // ‏وبابُ «منشورات جديدة» ثانويٌّ بجوار الاعتماد (D-387)، و«ورشة الخطّة» رابطٌ صغير
+    expect(html).toContain('href="/panel/new"')
+    expect(html).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
+    expect(html).not.toContain('اعتمد فقط')
   })
 
   it('«اعتمد» على بطاقةٍ تنتظر يجدولها في موعد بندها ويعود إلى بطاقتها في التيّار بإشعاره — فتصير مجدولة', async () => {

@@ -43,6 +43,7 @@ import type { Journey } from '../src/lib/journey'
 import { platformNeeds } from '../src/lib/platform/needs'
 import type { PlatformCounts, TimelineRow } from '../src/lib/platform/timeline'
 import { feedScreen } from '../src/routes/ui/feedView'
+import { newScreen } from '../src/routes/ui/newView'
 import type { FeedCard, FeedModel } from '../src/lib/feed'
 
 const now = new Date('2026-09-06T09:00:00Z')
@@ -721,6 +722,11 @@ writeAudited(
     awaitingIds: ['fa1', 'fa2'],
     window: { from: '2026-09-25', to: '2026-11-24', older: '2026-09-25' },
   }
+  // ‏«منشورات جديدة» (D-387): المختارُ بطرقه الثلاث، والحزمةُ مربوطة
+  writeAudited(
+    '/tmp/screen-new.html',
+    soloPage('صدى — منشورات جديدة', { href: '/panel/feed', label: 'التيّار', at: '/panel/new' }, newScreen({ hasPackage: true }), 'n', '', buildCommands({ onPanel: false }), soloNav('feed')),
+  )
   writeAudited(
     '/tmp/screen-feed.html',
     soloPage('صدى — التيّار', { href: '/panel', label: 'الرئيسيّة' }, feedScreen({ model, zone, now: fnow, role: 'owner' }), 'n', '', buildCommands({ onPanel: false }), soloNav('feed')),

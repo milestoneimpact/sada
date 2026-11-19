@@ -126,7 +126,7 @@ function scheduleAndBar(d: DraftRow, input: EditorInput): { readonly section: st
       forms,
       section: sec('الموعد', canSchedule ? `${accountField('ed-form', fit)}${whenField('ed-form', input.zone, input.now, input.peaks)}` : blockLine),
       bar: canSchedule
-        ? `${submit('اعتمد وجدوِل', 'approve-schedule', 'primary')}${submit('اعتمد', 'approve', 'secondary')}<span class="grow"></span>${submit('احفظ', 'save', 'quiet')}`
+        ? `${submit('اعتمد وجدوِل', 'approve-schedule', 'primary')}${submit('اعتمد بلا موعد', 'approve', 'secondary')}<span class="grow"></span>${submit('احفظ', 'save', 'quiet')}`
         : `${submit('اعتمد', 'approve', 'primary')}<span class="grow"></span>${submit('احفظ', 'save', 'quiet')}`,
     }
   }

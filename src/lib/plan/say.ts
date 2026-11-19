@@ -4,7 +4,7 @@
  * الإشعار يقول ما وقع بعدده وكلفته: كم بندًا، وما أُسقط ولماذا، وكم دُفع في كم نداء، وما سيُكتب ويُرسم قبل «ابدأ».
  * و«وحدة» لا «رمز» (D-155)، وصفر مع وحدات ليس مجّانًا بل سعر لم يُضبط (D-008).
  */
-import { counted, NOUNS, money } from '../format'
+import { money } from '../format'
 import { SPAN_LABEL, type PlanSpan } from './prompt'
 import type { PlanOutcome } from './job'
 
@@ -27,9 +27,15 @@ export function sayStarted(n: number, images: boolean, clips: number): string {
     + '، وتظهر في «تنتظر قرارك» خلال دقائق.' + wait + ' ولا يُنشر منها شيءٌ قبل اعتمادك.'
 }
 
-/** «اعتمد الخطّة كاملة»: العدد، وأنّ شيئًا لا يُنشر حتّى يُجدوَل، والمتعثّر بسببه. */
-export function sayApprovedAll(done: number, failed: readonly string[]): string {
-  if (done === 0 && failed.length === 0) return 'لا مسوّدةَ من هذه الخطّة تنتظر قرارك.'
-  if (failed.length === 0) return 'اعتُمدت ' + counted(done, NOUNS.draft) + ' من الخطّة كما كُتبت — ولا يُنشر منها شيءٌ حتّى تضغط «جدول المعتمَد».'
-  return 'اعتُمدت ' + done + '، وتعثّرت ' + failed.length + ': ' + failed.slice(0, 3).join(' · ')
+/**
+ * **جملةُ القرار الواحدة** (D-384 · D-387): ما بُتّ فيه بعدده، وما كان مبتوتًا من قبل فتُرك بحاله («· 2 مجدولة من قبل فتُركت»)،
+ * وما تعذّر بسببه — ولا يُقال «تعذّر» لما كان معتمَدًا أصلًا. تقرؤها الجملةُ من المراجعة، و«اعتمد كلّ ما ينتظر»، والمسوّدات.
+ */
+export function sayDecided(verb: string, done: number, already: readonly string[], failed: readonly string[]): string {
+  if (done === 0 && already.length === 0 && failed.length === 0) return 'لا مسوّدةَ تنتظر قرارك.'
+  const n = new Map<string, number>()
+  for (const w of already) n.set(w, (n.get(w) ?? 0) + 1)
+  const left = n.size === 0 ? '' : ' · ' + [...n].map(([w, k]) => String(k) + ' ' + w).join('، و') + ' من قبل فتُركت'
+  const bad = failed.length === 0 ? '.' : '، وتعذّر ' + String(failed.length) + ': ' + [...new Set(failed)].slice(0, 2).join('، ') + '.'
+  return verb + ' ' + String(done) + left + bad
 }

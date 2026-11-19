@@ -925,4 +925,14 @@ details.card .nt-list{margin-top:var(--s-4)}
 .fd-now::before,.fd-now::after{content:''; flex:1; border-block-start:var(--bd)}
 .fd-older{margin:0; text-align:center}
 .fd-counts{display:flex; gap:var(--s-3); flex-wrap:wrap}
+.fd-entry{align-items:center; flex-wrap:wrap; justify-content:flex-end}
+
+/* ── «منشورات جديدة» (D-387): ثلاثُ بطاقاتٍ كبيرة، بابٌ واحدٌ وزرٌّ واحدٌ في كلٍّ ────────── */
+.nw-ways{display:grid; gap:var(--s-4); grid-template-columns:repeat(auto-fit,minmax(min(100%,16rem),1fr)); margin:0}
+.nw-way{display:flex; flex-direction:column; gap:var(--s-2)}
+.nw-way .row{margin-top:auto}
+.nw-ico{display:inline-flex; width:var(--s-10); height:var(--s-10); align-items:center; justify-content:center; border-radius:var(--r-control); background:var(--surface-2); color:var(--accent)}
+.nw-ico svg{width:var(--icon-md); height:var(--icon-md)}
+.nw-t{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3)}
+.nw-cost{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 `

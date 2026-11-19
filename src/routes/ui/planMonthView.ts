@@ -106,7 +106,7 @@ export function monthScreen(d: MonthScreenData): string {
         <p class="hint m-0">«افتح الإصدار» يعيد المعتمَد مسوّدةً بإصدارٍ جديد، والمجدوَل يُلغى أوّلًا.</p>`
     : html``
   const approve = html`<p class="m-0" role="status"><b>${d.approval}</b></p>${d.canApprove
-    ? html`<form method="POST" action="/panel/plan/month/approve" data-busy="يُعتمد…">${ids}<div class="row">${raw(button({ label: 'اعتمد وجدول', type: 'submit' }))}
+    ? html`<form method="POST" action="/panel/plan/month/approve" data-busy="يُعتمد…">${ids}<div class="row">${raw(button({ label: 'اعتمد الشهر', type: 'submit' }))}
         ${raw(button({ label: 'راجع البنود', href: '/panel/plan/review?id=' + d.planId, variant: 'secondary' }))}</div></form>`
     : d.canRollback === true ? html`` : html`<p class="hint">الاعتماد للناشر فأعلى.</p>`}${rollback}`
   return head + nav + checksStrip(d.checks) + '<div class="mt-3">' + card({ title: 'التقويم', body: monthCalendar(d) }) + '</div>' +

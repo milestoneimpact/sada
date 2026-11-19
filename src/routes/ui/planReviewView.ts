@@ -130,7 +130,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
     }))
   const approve = c.post === null || (status !== 'draft' && status !== 'approved' && status !== 'edited')
     ? html``
-    : html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}">${raw(button({ label: status === 'draft' ? 'اعتمد' : 'جدوِل', variant: 'primary', size: 'sm', type: 'submit', icon: ICON.check }))}</form>`
+    : html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}"><input type="hidden" name="back" value="feed">${raw(button({ label: status === 'draft' ? 'اعتمد' : 'جدوِل', variant: 'primary', size: 'sm', type: 'submit', icon: ICON.check }))}</form>`
   const undo = c.post === null || status !== 'queued'
     ? html``
     : html`<form class="inline" method="POST" action="/panel/plan/review/undo" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}">${raw(button({ label: 'تراجَع', size: 'sm', type: 'submit' }))}</form>`
@@ -353,15 +353,14 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const weekDrafts = visible.filter((c) => c.post !== null && c.post.status === 'draft')
   const allDrafts = m.gaps.pending
   const scope = scopeName(m, shown)
-  const approveWeek = weekDrafts.length === 0 ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/bulk" data-busy="جار الاعتماد…"
+  // ‏زرٌّ واحدٌ في الذيل (D-387): «اعتمد الأسبوع» يعتمد ويجدول في المواعيد، ويعود إلى التيّار (`back=feed`). وكان بجواره
+  // ‏«اعتمد الخطّة كاملة» ثانيًا؛ فصار في رأس التيّار «اعتمد كلّ ما ينتظر» وحدَه
+  const approveWeek = weekDrafts.length === 0 ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/bulk" data-busy="جار الاعتماد…" data-away
       data-confirm="${'اعتمد ' + AR(weekDrafts.length) + (weekDrafts.length === 1 ? ' منشورًا' : ' منشورات') + ' كما كُتبت وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
-      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}">
+      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="feed">
       ${weekDrafts.map((c) => html`<input type="hidden" name="sel" value="${String(c.index)}|${c.key}|${c.post?.id ?? ''}">`)}
       ${raw(button({ label: 'اعتمد ' + scope + ' (' + AR(weekDrafts.length) + ')', variant: 'primary', type: 'submit', name: 'do', value: 'approve', icon: ICON.check }))}</form>`
-  const approveAll = allDrafts <= weekDrafts.length ? html`` : html`<form class="inline" method="POST" action="/panel/plan/approve-all" data-busy="جار الاعتماد…"
-      data-confirm="${'اعتمد ' + AR(allDrafts) + ' منشورًا من الخطّة كلِّها وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
-      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="back" value="review">
-      ${raw(button({ label: 'اعتمد الخطّة كاملة (' + AR(allDrafts) + ')', type: 'submit' }))}</form>`
+  const rest = allDrafts <= weekDrafts.length ? html`` : html`<span class="hint">و${AR(allDrafts - weekDrafts.length)} في أسابيعَ أخرى — من رأس التيّار كلُّها</span>`
   // ‏«أضف منشورًا» (D-336): يومٌ من المعروض، ومنصّةٌ من قنوات الخطّة، وساعةٌ بتوقيت المالك، وجملةٌ تقول ما يقوله — نموذجٌ إلى مساره
   const channels = [...new Set([...m.plan.choices.channels, ...m.cards.map((c) => c.item.platform)])]
   const firstDay = shown === 0 ? m.plan.week : shift(m.plan.week, (shown - 1) * 7)
@@ -396,9 +395,9 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     ${weekTabs(m, shown)}
     ${gapsBar(m)}
     <form method="POST" action="/panel/plan/review/bulk" id="rv-bulk" class="rv-bulk card card-inset">
-      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}">
+      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="feed">
       <span id="rv-n">حدّد بنودًا لفعلٍ واحدٍ عليها</span><span class="grow"></span>
-      <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد المحدَّد</button>
+      <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-away>اعتمد المحدّد</button>
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="delay">أخّرها يومًا</button>
       <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="أزِل البنودَ المحدَّدة من الخطّة؟">أزِلها</button>
     </form>
@@ -406,7 +405,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     ${table}
     ${add}
     ${versions}
-    <div class="rv-foot card"><span class="grow">${AR(settled)} مجدولةً من ${AR(m.cards.length)}${m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : ''}</span>${approveWeek}${approveAll}</div>
+    <div class="rv-foot card"><span class="grow">${AR(settled)} مجدولةً من ${AR(m.cards.length)}${m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : ''}</span>${rest}${approveWeek}</div>
     </div>
     ${/* ‏لوحُ البطاقة (D-330): «<dialog>» أصليّ يحبس التركيزَ ويُغلق بـEsc، يملؤه السكربتُ من `/panel/plan/review/card` */''}
     <dialog class="rv-sheet" id="rv-sheet" aria-labelledby="rv-sh-t"></dialog>`.value
@@ -461,7 +460,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
         <div class="row gap-2">${raw(button({ label: 'انقل الموعد', size: 'sm', type: 'submit' }))}</div></form>`
   const approve = c.post === null || (status !== 'draft' && status !== 'approved' && status !== 'edited')
     ? html``
-    : html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}">${raw(button({ label: status === 'draft' ? 'اعتمد وجدوِل' : 'جدوِل', variant: 'primary', type: 'submit', icon: ICON.check }))}</form>`
+    : html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}"><input type="hidden" name="back" value="feed">${raw(button({ label: status === 'draft' ? 'اعتمد' : 'جدوِل', variant: 'primary', type: 'submit', icon: ICON.check }))}</form>`
   const undo = c.post === null || status !== 'queued'
     ? html``
     : html`<form class="inline" method="POST" action="/panel/plan/review/undo" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}">${raw(button({ label: 'تراجَع عن الاعتماد', type: 'submit' }))}</form>`
@@ -564,23 +563,24 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
   }
   // ‏فعلٌ يقع والسابقُ في الطريق يصطفّ ولا يسقط: سحبٌ بعد «اعتمد» مباشرةً كان يُهمَل بصمت
   var queue=[];
-  function post(url,body,form){
-    if(flying){queue.push([url,body,form]); return;}
+  // ‏و«away» (D-387): «اعتمد الأسبوع» و«اعتمد المحدّد» تهبط في التيّار بعد الردّ، كما تفعل بلا سكربت؛ والبطاقةُ واللوحُ يبقيان في الورشة
+  function post(url,body,form,away){
+    if(flying){queue.push([url,body,form,away]); return;}
     flying=true; if(form)form.setAttribute('aria-busy','true');
     // ‏التحويلُ لا يُتبَع (كأفعال اللوحة، D-207): الخادمُ نفّذ وحوّل — فتُجلب الشاشةُ بـGET منفصل. وما ليس تحويلًا (جلسةٌ انتهت، خطأ) يفتحها كما هي
     fetch(url,{method:'POST',body:body,credentials:'same-origin',redirect:'manual'})
-      .then(function(r){ if(r.type!=='opaqueredirect')throw new Error('away'); return fetch(here(),{credentials:'same-origin'}); })
+      .then(function(r){ if(r.type!=='opaqueredirect')throw new Error('away'); if(away){location.href='/panel/feed'; return new Promise(function(){});} return fetch(here(),{credentials:'same-origin'}); })
       .then(function(r){ if(!r.ok)throw new Error('away'); return r.text(); })
       .then(function(t){ if(!adopt(t,false))throw new Error('shape'); if(openI!==null)return fill(openI,true); })
       .catch(function(){ location.href=here(); })
-      .then(function(){ flying=false; if(form)form.removeAttribute('aria-busy'); var n=queue.shift(); if(n)post(n[0],n[1],n[2]); });
+      .then(function(){ flying=false; if(form)form.removeAttribute('aria-busy'); var n=queue.shift(); if(n)post(n[0],n[1],n[2],n[3]); });
   }
   document.addEventListener('submit',function(e){
     var f=e.target; if(e.defaultPrevented||!f||!f.closest)return;
     if(!(f.closest('#rv-root')||f.closest('#rv-sheet'))||String(f.method).toLowerCase()!=='post')return;
     e.preventDefault();
     var body=new FormData(f), s=e.submitter; if(s&&s.name)body.append(s.name,s.value);
-    post(f.action,body,f);
+    post(f.action,body,f,f.hasAttribute('data-away')||!!(s&&s.hasAttribute('data-away')));
   });
 
   // ‏لوحُ البطاقة
