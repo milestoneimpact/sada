@@ -1247,6 +1247,31 @@ describe('D-317 · إشعاراتُ الأمان خارج القاعدة', () =>
     expect((fresh.match(/دخولٌ جديد إلى حسابك/g) ?? []).length).toBeLessThan((first.match(/دخولٌ جديد إلى حسابك/g) ?? []).length)
   })
 
+  it('D-385 · دخولٌ من جهازٍ دخل منه صاحبُه من قبل لا يُبرَد له، والجهازُ الجديد يُبرَد له', async () => {
+    const { key } = await ownerWithPasskey()
+    const mailer = env['EMAIL'] as FakeMailer
+    const count = (): number => mailText(mailer, OWNER_EMAIL).filter((m) => m.startsWith('صدى — دخولٌ جديد')).length
+    const signIn = async (cookie?: string): Promise<Response> => {
+      const ticket = (await (await app.request('/panel/passkey/challenge', { method: 'POST' }, env)).json()) as { ticket: string; challenge: string }
+      return app.request('/panel/passkey/login', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (iPhone) Safari/605', ...(cookie === undefined ? {} : { Cookie: cookie }) },
+        body: JSON.stringify({ ticket: ticket.ticket, ...(await key.sign({ challenge: ticket.challenge, origin: ORIGIN, rpId: RP_ID, signCount: 20 + count() })) }),
+      }, env)
+    }
+    const before = count()
+    const first = await signIn()
+    expect(first.status).toBe(200)
+    expect(count()).toBe(before + 1)
+    const device = (first.headers.getSetCookie?.() ?? []).find((c) => c.startsWith('__Host-sada_device='))
+    expect(device).toBeDefined()
+    const again = await signIn(device!.split(';')[0])
+    expect(again.status).toBe(200)
+    expect(count()).toBe(before + 1)
+    // ‏والتدقيقُ يبقى لكلّ دخول
+    const audits = db.raw.prepare("SELECT COUNT(*) AS n FROM audit_log WHERE action = 'security.notice' AND detail LIKE 'session.new%'").get() as { n: number }
+    expect(audits.n).toBeGreaterThanOrEqual(2)
+  })
+
   it('عاملٌ أُضيف وأُزيل، ورمزُ استرداد، وإخراجُ الأجهزة: كلٌّ له صفٌّ في القناة وفي التدقيق', async () => {
     const { s, key } = await ownerWithPasskey()
     await enrollTotp(s)

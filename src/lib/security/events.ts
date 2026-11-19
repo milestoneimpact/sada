@@ -23,6 +23,7 @@ import { sendText } from '../mail/send'
 import { OWNER_ORG } from '../tenancy'
 import { fingerprint } from './digest'
 import { isOwnerEmail } from '../ownerEmail'
+import { trustedDevice } from './device'
 
 export type SecurityEventKind = 'session.new' | 'factor.add' | 'factor.remove' | 'recovery.used' | 'sessions.revoke_all'
 
@@ -78,6 +79,10 @@ export async function securityEvent(env: Env, request: Request | undefined, e: S
     console.warn({ job: 'security.event', step: 'outbox', failed: String(error) })
   }
 
+  // ‏١ · البريد — إلى صاحب الحساب وحده. **ودخولٌ من جهازٍ دخل منه صاحبُه من قبل لا يُبرَد له** (D-385، طلبُ المالك):
+  // ‏الكعكةُ الموقَّعة لبريده (`trustedDevice`) تقول إنّه جهازُه، فالبريدُ ضجيجٌ يعلّمه تجاهلَ ما يهمّ. ويبقى التدقيقُ
+  // ‏والقناةُ وإشعارُ اللوحة؛ والجهازُ الجديد يُبرَد له كما كان
+  if (e.kind === 'session.new' && request !== undefined && (await trustedDevice(request, env.ADMIN_TOKEN, e.email).catch(() => null)) !== null) return
   // ‏١ · البريد — إلى صاحب الحساب وحده، ولا يحمل رمزًا ولا رابطًا يفتح شيئًا بلا دخول
   const body = [
     `${what}${detail}.`,
