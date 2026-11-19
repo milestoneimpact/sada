@@ -905,4 +905,24 @@ details.card .nt-list{margin-top:var(--s-4)}
 .pk-foot{display:flex; justify-content:flex-end; padding-top:var(--s-3); border-top:var(--bd)}
 .pk-foot .btn-danger{background:transparent; background-image:none; border-color:transparent; box-shadow:none}
 .pk-prog progress{inline-size:100%; block-size:var(--s-2); accent-color:var(--link)}
+/* ‏التيّار (D-386): عمودٌ واحدٌ بعرض القراءة، وبطاقةٌ لكلّ منشور — رأسٌ وثلاثةُ أسطرٍ وصورةٌ وفعلٌ واحد. وخطُّ «الآن» يفصل ما سيُنشر عمّا نُشر */
+.fd{display:grid; gap:var(--s-5); max-inline-size:44rem; margin-inline:auto}
+.fd-sec{display:grid; gap:var(--s-3)}
+.fd-h{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
+.fd-list{display:grid; gap:var(--s-3); margin:0}
+.fd-card{display:grid; gap:var(--s-3)}
+.fd-head{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+.fd-who{display:grid; min-width:0}
+.fd-when{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-variant-numeric:tabular-nums}
+.fd-st{display:flex; gap:var(--s-1); flex-wrap:wrap; align-items:center}
+.fd-text{margin:0; max-width:var(--measure); overflow-wrap:anywhere; white-space:pre-line; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; line-clamp:3; overflow:hidden}
+.fd-thumb{display:block; inline-size:100%; max-block-size:20rem; block-size:auto; object-fit:cover; border-radius:var(--r-control); background:var(--surface-2)}
+.fd-acts{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
+.fd-metrics{display:flex; gap:var(--s-4); margin:0; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.fd-metrics li{display:inline-flex; align-items:center; gap:var(--s-1)}
+.fd-metrics svg{width:var(--icon-sm); height:var(--icon-sm)}
+.fd-now{display:flex; align-items:center; gap:var(--s-3); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); max-inline-size:44rem; margin-inline:auto; inline-size:100%}
+.fd-now::before,.fd-now::after{content:''; flex:1; border-block-start:var(--bd)}
+.fd-older{margin:0; text-align:center}
+.fd-counts{display:flex; gap:var(--s-3); flex-wrap:wrap}
 `

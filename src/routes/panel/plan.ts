@@ -74,7 +74,7 @@ import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/cli
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
-import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back } from './shared'
+import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, toFeed } from './shared'
 import type { PlanSchedule } from '../../lib/plan/schedule'
 
 export const plan = new Hono<{ Bindings: Env }>()
@@ -458,6 +458,8 @@ plan.post('/panel/plan/approve-all', async (c) => {
     text: sayApprovedAll(done.done, done.failed) + (settled === null ? '' : ' ' + saySettled(settled)),
   })
   // ‏وبعد اعتماد الخطّة كلِّها من المراجعة تنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)
+  // ‏ومن التيّار إليه (D-386)
+  if (gate.form.get('back') === 'feed') return c.redirect('/panel/feed', 303)
   return c.redirect(gate.form.get('back') === 'review' ? (done.failed.length === 0 ? '/panel/plan/follow' : '/panel/plan/review') : '/panel/client', 303)
 })
 
@@ -709,8 +711,9 @@ const weekOf = (form: FormData): string => {
   return /^(?:\d{1,2}|all)$/.test(w) ? '?w=' + w : ''
 }
 
-/** العودةُ إلى البطاقة نفسِها في أسبوعها، لا إلى رأس الصفحة. */
+/** العودةُ إلى البطاقة نفسِها في أسبوعها، لا إلى رأس الصفحة — ومن التيّار (D-386) إلى بطاقته فيه. */
 const toCard = (form: FormData, anchor = true): Response => {
+  if (form.get('back') === 'feed') return toFeed(String(form.get('post') ?? ''))
   const index = form.get('index')
   return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + weekOf(form) + (anchor && index !== null && Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
 }

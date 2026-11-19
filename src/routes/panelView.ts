@@ -1169,7 +1169,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   ${/* ‏**«ما ينتظرك» بعد التحيّة بعرض اللوح** (SPEC-v1 §6.1 · D-381): يرسمها `homeTop`، وصفوفُها من هنا وأدواتُها ثانويّة */''}
   ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
     rows: todo,
-    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
+    // ‏و«افتح التيّار» ثانويٌّ بجوارها (D-386): الصفحةُ الواحدةُ لما سيُنشر وما نُشر
+    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }) + button({ label: 'افتح التيّار', size: 'sm', variant: 'secondary', href: '/panel/feed' }),
   })}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،

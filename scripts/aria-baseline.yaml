@@ -7,6 +7,8 @@
     - text: العمل
     - link "الرئيسيّة":
       - /url: /panel#overview
+    - link "التيّار":
+      - /url: /panel/feed
     - link "الخطّة":
       - /url: /panel/plan
     - link "المنشورات":

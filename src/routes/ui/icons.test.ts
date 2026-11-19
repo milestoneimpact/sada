@@ -57,7 +57,7 @@ describe('مواصفة الأيقونات', () => {
   it('ما يدلّ على جهةٍ ينعكس، وما يدلّ على شيءٍ يثبت — ولا أيقونةَ بلا قرار', () => {
     const MIRRORS = ['external', 'back', 'go', 'send', 'tasks', 'posts'] as const
     const FIXED = [
-      'overview', 'sources', 'channels', 'providers', 'settings', 'report', 'plan', 'package', 'guide', 'add', 'chevron',
+      'overview', 'sources', 'feed', 'channels', 'providers', 'settings', 'report', 'plan', 'package', 'guide', 'add', 'chevron',
       'search', 'account', 'bell', 'more', 'like', 'heart', 'comment', 'repost', 'share', 'bookmark', 'views', 'globe', 'play', 'close', 'check', 'info',
     ] as const
     expect([...MIRRORS, ...FIXED].sort()).toEqual(Object.keys(ICON).sort())

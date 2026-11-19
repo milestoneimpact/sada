@@ -7,6 +7,7 @@ describe('أين تسكن كلّ مرساة (D-211)', () => {
     expect(panelHref('channels')).toBe('/panel/accounts#channels')
     expect(panelHref('ch-linkedin')).toBe('/panel/accounts#ch-linkedin')
     expect(panelHref('v-up1')).toBe('/panel/library#v-up1')
+    expect(panelHref('f-p1')).toBe('/panel/feed#f-p1')
     expect(panelHref('pivot')).toBe('/panel/analysis#pivot')
     expect(panelHref('d-123')).toBe('/panel#d-123')
     expect(panelHref('posts')).toBe('/panel#posts')

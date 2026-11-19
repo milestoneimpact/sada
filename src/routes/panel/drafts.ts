@@ -36,7 +36,7 @@ import { spreadScreen } from '../ui/spreadView'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
 import {
-  deciderOf, page, loginResponse, setFlash, guardPost, reachNow, back, toCard, POST_ID, BOARD,
+  deciderOf, page, loginResponse, setFlash, guardPost, reachNow, back, toCard, toFeed, POST_ID, BOARD,
   finalizeLater,
 } from './shared'
 
@@ -470,6 +470,8 @@ drafts.post('/panel/drafts/decide', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
+  // ‏ومن التيّار (D-386) إلى بطاقته فيه
+  if (form.get('back') === 'feed') return toFeed(id)
   /*
    * ‏ومن المحرّر (D-198): المردودةُ والمعتمَدةُ بلا موعدٍ إلى المحرّر نفسِه (موعدُها فيه)، والمجدولةُ
    * ‏والمرفوضةُ إلى بطاقتها في القائمة. ومن البطاقة كما كان: المعتمَدةُ إلى شريط جدولتها.
@@ -607,7 +609,8 @@ drafts.post('/panel/drafts/approve-many', async (c) => {
     c.req.raw,
   )
   await setFlash(c.env, c.req.raw, flash)
-  return back('posts')
+  // ‏ومن التيّار (D-386) إليه
+  return back(gate.form.get('back') === 'feed' ? 'feed' : 'posts')
 })
 
 /**
@@ -1007,10 +1010,13 @@ drafts.post('/panel/drafts/requeue', async (c) => {
   const to = backTo(gate.form.get('return'), '')
   const card = result.ok && (await onBoard(c.env.DB, activeOrg(gate.session.record), id))
   // ‏ورحلةُ المنشور لا تقرأ الإشعار: لا يُكتب لها فيظهر بعدها في غير موضعه — وحالُه فيها «معتمَد»
-  if (result.ok && !card && to === '') return toJourney(id)
+  // ‏ومن التيّار (D-386) إلى بطاقته فيه، بإشعاره
+  const fromFeed = gate.form.get('back') === 'feed'
+  if (result.ok && !card && to === '' && !fromFeed) return toJourney(id)
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: 'عاد معتمَدًا بنصّه كما هو — اختر له موعدًا جديدًا.' }
     : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
+  if (fromFeed) return toFeed(id)
   if (card) return toCard('s', id)
   if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return toCard('d', id)
