@@ -677,6 +677,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏النجاحُ معاينةٌ فارغة في Console الخاصّ بـ D1، لا في حقائق «ما عليك»
     done: () => null,
   },
+  {
+    code: 'M-64',
+    title: 'امنح رمز GitHub إذن الكتابة لملفّ حال الخطّة (بعد D-390)',
+    ifLeft: 'لا يُكتب plans/YYYY-MM.status.json في المستودع، وتقول بطاقةُ الحزمة «يلزم إذن الكتابة»؛ النشرُ والمزامنةُ كما هما. تأجيلٌ لا خطر.',
+    unblocks: 'capability',
+    // ‏النجاحُ ملفٌّ في المستودع وسطرُ «آخر كتابة» في بطاقة الحزمة، لا في حقائق «ما عليك»
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

@@ -4,6 +4,7 @@
  */
 import type { PackageMediaRow, PackageSource } from '../../lib/package/sync'
 import { pageHead } from './parts'
+import { taskDoc } from '../../lib/owner'
 import { card } from './components/card'
 import { statusBadge } from './components/badge'
 import { button } from './components/button'
@@ -33,7 +34,27 @@ export interface PackageScreen {
   readonly transfer?: { readonly total: number; readonly done: number }
   /** منطقةُ المتصفّح (D-378)، و`null` يعني الرياض. */
   readonly zone?: string | null
+  /** ملفُّ حال الخطّة في المستودع (D-390): أشهرُه وآخرُ كتابةٍ وعطلُها، و`needsWrite` حين الرمزُ للقراءة وحدها. */
+  readonly repoStatus?: { readonly needsWrite: boolean; readonly rows: readonly { readonly period: string; readonly written: string | null; readonly tried?: string | null; readonly error: string | null; readonly dirty: boolean }[] }
 }
+
+/**
+ * ‏«ملفُّ الحال في المستودع» (D-390): ما كتبته صدى في `plans/YYYY-MM.status.json`، و«يلزم إذن الكتابة» برابط ضبط الرمز
+ * ‏حين ردّ GitHub بأنّ الرمزَ للقراءة. والقالبُ الشهريّ ينزَّل من هنا كذلك.
+ */
+function repoStatusCard(r: NonNullable<PackageScreen['repoStatus']>): string {
+  const warn = r.needsWrite ? html`<p class="m-0">${raw(statusBadge('warn', '!', 'يلزم إذن الكتابة'))} رمزُ GitHub للقراءة وحدها، فلا تكتب صدى ملفَّ الحال.
+    امنحه <b>Contents: Read and write</b> على هذا المستودع — <a class="tap" href="${taskDoc('M-64')}">خطواتُه (M-64)</a> ·
+    <a class="tap" href="https://github.com/settings/personal-access-tokens" rel="noopener noreferrer" target="_blank">إعداد الرمز في GitHub</a>. النشرُ لا يتأثّر.</p>` : html``
+  const rows = r.rows.length === 0 ? html`<p class="hint m-0">لم يُكتب ملفُّ حالٍ بعد — يُكتب في الدورة التالية بعد أوّل استيرادٍ لشهر.</p>`
+    : html`<ul class="plain stack m-0">${r.rows.map((x) => html`<li><bdi dir="ltr">plans/${x.period}.status.json</bdi> <span class="hint">— ${x.written === null ? 'لم يُكتب' : 'آخر كتابة ' + x.written + ' UTC'}${x.dirty ? ' · تغيّر وينتظر الكتابة' : ''}${x.error !== null && x.tried != null ? ' · آخر محاولة ' + x.tried + ' UTC' : ''}${x.error === null ? '' : ' · ' + x.error}</span></li>`)}</ul>`
+  return card({ id: 'repo-status', title: 'ملفّ الحال في المستودع', level: 2, body: html`${warn}${rows}
+    <p class="hint m-0">${raw(TEMPLATE_LINKS)}</p>`.value })
+}
+
+/** روابطُ قالب الشهر القادم (D-390) في بطاقة الحزمة. */
+const TEMPLATE_LINKS = '<a class="tap" href="/panel/plan/month-template?f=md" download>نزّل قالب الشهر القادم</a> · '
+  + '<a class="tap" href="/panel/plan/month-template?f=csv" download>CSV</a> · <a class="tap" href="/panel/plan/month-template?f=readme" download>README</a>'
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
 const label = { dark: 'داكن', light: 'فاتح' } as const
@@ -177,5 +198,5 @@ export function packageScreen(m: PackageScreen): string {
     <p class="hint m-0">قراءتان مجّانيّتان: المستودع ثمّ الفرع.</p>
     <div class="pk-foot">${acts[3]}</div>`.value }))
   const probe = m.probe === undefined ? html`` : raw(probeCard(m.probe))
-  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? [], m.zone ?? null))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
+  return html`${raw(head)}<div class="stack">${flash}${probe}${hook}${token}${actions}${s === null ? '' : raw(revisionsCard(m.revisions ?? [], m.missing ?? [], m.zone ?? null))}${s === null || m.repoStatus === undefined ? '' : raw(repoStatusCard(m.repoStatus))}${s === null ? '' : raw(settingsCard(s))}${raw(connectForm(s))}${itemCards(m.media)}</div>`.value
 }

@@ -9,7 +9,8 @@ import { atomically, type Db } from '../tokens'
 import { isTimeout } from '../net/timeout'
 import { commitInfo, GitHubError, listTree, rawFile, type RepoRef } from './github'
 import { classifyPath } from './classify'
-import { mergeMonthPlans, planFiles, readPackagePlan, type PackagePlan } from './plan'
+import { mergeMonthPlans, planFiles, planFromTemplate, readPackagePlan, type PackagePlan } from './plan'
+import { isTemplatePath } from '../plan/template'
 import { landInMonthPlans } from './month'
 import { copyVersion, mergeCopies } from './copy'
 import { diffSnapshots, entryKey, snapshot, type Change, type Snapshot, type SnapshotEntry } from './diff'
@@ -122,7 +123,9 @@ export async function revisePackage(deps: ReviseDeps, source: PackageSource, com
     // ‏كلُّ ملفٍّ في 01-plan يُقرأ، والشهرُ من تواريخه، و`vN` يحسم داخل الشهر وحده
     const read: { path: string; plan: PackagePlan }[] = []
     for (const path of planFiles(files.map((f) => f.path))) {
-      read.push({ path, plan: await readPackagePlan(new Uint8Array(await (await rawFile(repo, full(path), commit, deps.fetchImpl)).arrayBuffer())) })
+      const res = await rawFile(repo, full(path), commit, deps.fetchImpl)
+      // ‏قالبُ الشهر نصٌّ (D-390)، وخطّةُ 01-plan xlsx
+      read.push({ path, plan: isTemplatePath(path) ? planFromTemplate(await res.text(), path) : await readPackagePlan(new Uint8Array(await res.arrayBuffer())) })
     }
     const months = mergeMonthPlans(read)
     const plan = months.plan

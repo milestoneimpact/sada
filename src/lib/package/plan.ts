@@ -11,6 +11,7 @@ import { parseCsvRecords } from '../plan/import'
 import { widenPlan } from '../plan/widen'
 import { readGuidelines, type PlanRules } from '../plan/guidelines'
 import { excelDate, excelTime, readXlsx, type Sheet } from './xlsx'
+import { issueText, readTemplate, TEMPLATE_HEADER, templatePeriod } from '../plan/template'
 
 export interface PlanEntry {
   readonly item: string
@@ -20,6 +21,8 @@ export interface PlanEntry {
   readonly idea: string
   readonly format: string
   readonly mediaHint: string
+  /** النصُّ الجاهز من قالب `plans/YYYY-MM` (D-390) — وخطّةُ xlsx بلا نصّ (نصُّها من 02-copy). */
+  readonly text?: string
 }
 
 export interface PackagePlan {
@@ -35,11 +38,13 @@ const quote = (v: string): string => (/[",\n\r]/.test(v) ? '"' + v.replace(/"/g,
 export const toCsv = (rows: readonly (readonly string[])[]): string => rows.map((r) => r.map(quote).join(',')).join('\n')
 
 /** رقمُ النسخة في الاسم («…-v3.xlsx» ← 3)، و0 لما لا رقم له. */
-export const planVersion = (p: string): number => Number(/-v(\d+)\.xlsx$/i.exec(p)?.[1] ?? 0)
+/** وقالبُ `plans/YYYY-MM` (D-390) يغلب xlsx شهرِه، و`.md` يغلب `.csv`: هو الصيغةُ القياسيّة التي قرّرها المالك. */
+export const planVersion = (p: string): number =>
+  /^plans\/[^/]+\.md$/i.test(p) ? 1_000_001 : /^plans\/[^/]+\.csv$/i.test(p) ? 1_000_000 : Number(/-v(\d+)\.xlsx$/i.exec(p)?.[1] ?? 0)
 
-/** كلُّ ملفّات الخطّة في `01-plan/`، الأعلى نسخةً أوّلًا. */
+/** كلُّ ملفّات الخطّة في `01-plan/` وقوالبُ `plans/YYYY-MM.(md|csv)`، الأعلى نسخةً أوّلًا. */
 export function planFiles(paths: readonly string[]): string[] {
-  return paths.filter((p) => /^01-plan\/[^/]+\.xlsx$/i.test(p)).sort((a, b) => planVersion(b) - planVersion(a) || a.localeCompare(b))
+  return paths.filter((p) => /^01-plan\/[^/]+\.xlsx$/i.test(p) || templatePeriod(p) !== null).sort((a, b) => planVersion(b) - planVersion(a) || a.localeCompare(b))
 }
 
 /** شهرُ الصفّ «YYYY-MM» من تاريخه، و`null` لصفٍّ بلا تاريخٍ مفهوم. */
@@ -144,4 +149,22 @@ export async function readPackagePlan(bytes: Uint8Array): Promise<PackagePlan> {
   } catch (e) {
     return { entries: [], rules: null, days: 0, columns: [], problems: [e instanceof Error ? e.message : 'تعذّرت قراءة ملفّ الخطّة'] }
   }
+}
+
+/**
+ * القالبُ خطّةَ حزمة: مفتاحُ البند `dDD` (والثاني لليوم والمنصّة نفسَيهما `dDD-2`) لا رقمَ مادّة، فلا يُطابَق بوسيطة مادّةٍ أخرى،
+ * والنصُّ من العمود نفسِه (يغلبه نصُّ 02-copy إن وُجد بالمفتاح نفسِه، ولن يوجد). والأخطاءُ مشكلاتُ الخطّة بسطرها وعمودها.
+ */
+export function planFromTemplate(text: string, path: string): PackagePlan {
+  const format = /\.csv$/i.test(path) ? 'csv' : 'md'
+  const read = readTemplate(text, format, templatePeriod(path))
+  const count = new Map<string, number>()
+  const entries: PlanEntry[] = read.rows.map((r) => {
+    const base = 'd' + r.day.slice(8, 10)
+    const n = (count.get(base + r.platform) ?? 0) + 1
+    count.set(base + r.platform, n)
+    return { item: n === 1 ? base : `${base}-${n}`, platform: r.platform, date: r.day, time: r.time, idea: r.note, format: '', mediaHint: r.media, text: r.text }
+  })
+  const name = path.split('/').pop() ?? path
+  return { entries, rules: null, days: new Set(entries.map((e) => e.date)).size, columns: [...TEMPLATE_HEADER], problems: read.issues.map((i) => `${name}: ${issueText(i)}`) }
 }

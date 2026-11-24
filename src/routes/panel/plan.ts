@@ -67,6 +67,7 @@ import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
 import { ownerZone, storedZone } from '../../lib/time/ownerZone'
+import { renderTemplate, templateReadme } from '../../lib/plan/template'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
 import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/clientReview'
@@ -549,6 +550,23 @@ plan.get('/panel/plan-import/template.csv', async (c) => {
       'Cache-Control': 'no-store',
     },
   })
+})
+
+/**
+ * ‏**قالبُ الشهر القادم** (D-390): `plans/YYYY-MM.md` (أو `.csv` أو README الصيغة) معبّأً بأيّام الشهر وأوقاتٍ مقترحة بتوقيت
+ * ‏المالك — يُدفع إلى المستودع فتقرؤه الحزمة، أو يُرفع في «من ملفّ». و`?p=YYYY-MM` لشهرٍ بعينه.
+ */
+plan.get('/panel/plan/month-template', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const asked = c.req.query('p')
+  const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
+  const period = isPeriod(asked) ? asked : nextPeriod(localDay(localParts(new Date(), zone ?? DEFAULT_ZONE)).slice(0, 7))
+  const f = c.req.query('f')
+  const [body, type, name] = f === 'readme' ? [templateReadme(), 'text/markdown; charset=utf-8', 'README.md']
+    : f === 'csv' ? [renderTemplate(period, 'csv'), 'text/csv; charset=utf-8', period + '.csv']
+    : [renderTemplate(period, 'md'), 'text/markdown; charset=utf-8', period + '.md']
+  return new Response(body, { headers: { 'Content-Type': type, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' } })
 })
 
 plan.post('/panel/plan-import', async (c) => {

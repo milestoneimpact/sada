@@ -37,6 +37,7 @@ import { PLAN_CHANNELS, spanDays, type PlanItem, type PlanPlatform, type PlanSpa
 import { cleanConverted, type ToMarkdown } from '../sources/ingest'
 import { readGuidelines, type PlanRules } from './guidelines'
 import { isThread } from '../draft/thread'
+import { issueText, looksMarkdown, markdownToCsv, readTemplate } from './template'
 
 export const SEAT_EXTENSIONS: readonly string[] = ['csv', 'xlsx', 'xls', 'ods', 'pdf', 'docx', 'odt', 'txt', 'md']
 const SHEETS = new Set(['xlsx', 'xls', 'ods'])
@@ -93,6 +94,20 @@ export function rowsFromModel(text: string): { date: string; time: string; platf
   }
 }
 
+/**
+ * جدولٌ بلا كلفة — وإن كان قالبَ الشهر (العمودُ الأوّل «اليوم»، D-390) يُتحقّق منه أوّلًا، **وأخطاؤه بسطرها وعمودها** تُردّ
+ * قبل المعاينة: «السطر 9، العمود «الساعة»: «25:00» ليست ساعة».
+ */
+function templateGate(csv: string): TableOutcome {
+  const first = parseCsvRecords(csv)[0]?.cells[0]?.trim() ?? ''
+  if (first !== 'اليوم') return { kind: 'table', csv, cost: 0, via: 'csv' }
+  const read = readTemplate(csv, 'csv')
+  if (read.issues.length === 0) return { kind: 'table', csv, cost: 0, via: 'csv' }
+  const shown = read.issues.slice(0, 8).map(issueText)
+  const more = read.issues.length - shown.length
+  return { kind: 'error', reason: 'في القالب ما يُصلح قبل القراءة — ' + shown.join(' · ') + (more > 0 ? ` · و${more} غيرها` : '') }
+}
+
 /** أيُّ صيغةٍ إلى جدولٍ واحد. */
 export async function toTable(
   deps: { readonly db: Db; readonly writer: BriefDeps; readonly toMarkdown?: ToMarkdown | undefined },
@@ -104,18 +119,21 @@ export async function toTable(
   if ('pasted' in input) {
     prose = input.pasted.trim()
     if (prose === '') return { kind: 'error', reason: 'لم يصل نصّ — الصق خطّتك ثمّ اقرأها.' }
+    if (looksMarkdown(prose)) return templateGate(markdownToCsv(prose))
   } else {
     const ext = input.name.toLowerCase().split('.').pop() ?? ''
     if (!SEAT_EXTENSIONS.includes(ext)) return { kind: 'error', reason: `الصيغة .${ext} لا تُقرأ — المقبول: ${SEAT_EXTENSIONS.join(' · ')}.` }
     if (ext === 'csv') {
       try {
-        return { kind: 'table', csv: new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(input.bytes), cost: 0, via: 'csv' }
+        return templateGate(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(input.bytes))
       } catch {
         return { kind: 'error', reason: 'الملفّ ليس UTF-8 — احفظه من Excel بصيغة «CSV UTF-8» أو ارفعه xlsx كما هو.' }
       }
     }
     if (ext === 'txt' || ext === 'md') {
       prose = new TextDecoder().decode(input.bytes)
+      // ‏جدولُ markdown (قالبُ الشهر، D-390) يُقرأ بلا نموذجٍ ولا كلفة، بأرقام سطوره
+      if (looksMarkdown(prose)) return templateGate(markdownToCsv(prose))
     } else {
       if (deps.toMarkdown === undefined) return { kind: 'error', reason: 'قارئُ المستندات (Workers AI) غير مربوط في هذه البيئة — ارفع CSV أو الصق النصّ.' }
       const out = await deps.toMarkdown({ name: input.name, blob: new Blob([new Uint8Array(input.bytes)]) })

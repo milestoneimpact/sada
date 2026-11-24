@@ -34,6 +34,7 @@ const KNOWN = {
   SCAN_CRON: '3 3 * * *',
   METRICS_CRON: '7 * * * *',
   REPORT_CRON: '14 4 * * 1',
+  QUARTER_CRON: '*/15 * * * *',
 } as const
 
 const SOURCE = readFileSync(new URL('../index.ts', import.meta.url), 'utf8')

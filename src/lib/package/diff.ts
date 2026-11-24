@@ -71,7 +71,7 @@ export function snapshot(i: SnapshotInput): Snapshot {
     const { ref: media, note } = packageMediaFor(i.picks, e.item, e.platform, hint ?? i.variants[e.platform] ?? null)
     entries.push({
       item: e.item, platform: e.platform, date: e.date, time: e.time, format: e.format, idea: e.idea,
-      text: piece === null || piece.text === '' ? null : piece.text, media, mediaName: media === null ? null : nameOf.get(media) ?? null,
+      text: piece !== null && piece.text !== '' ? piece.text : e.text !== undefined && e.text !== '' ? e.text : null, media, mediaName: media === null ? null : nameOf.get(media) ?? null,
       // ‏‏وسببُ الغلاف البديل يُعرض مع مشكلات الصفّ (D-374)
       problems: [...(piece?.problems ?? []), ...(note === null ? [] : [`الوسيطة: ${note}`])],
     })
