@@ -53,6 +53,18 @@ export interface FeedCard {
   /** أوّلُ ما وجده الفحصُ على هذا البند: ممنوعٌ أحمر، وتحذيرٌ كهرمانيّ. */
   readonly warning: { readonly tone: 'warn' | 'bad'; readonly label: string } | null
   readonly edited: boolean
+  /**
+   * ‏**التصحيح** (D-391): `of` الأصلُ لمنشورٍ تصحيحيّ (ردٌّ أو بديل)، و`by` أحدثُ ما صحّحه لأصل، و`deleted` حذفه صدى من X،
+   * ‏و`retry` تصحيحُ «احذف وأعد النشر» حُذف أصلُه ولم يُنشر بديلُه — فيُعرض «أعد المحاولة» بلا حذفٍ ثانٍ.
+   */
+  readonly correction: {
+    readonly corrected: boolean
+    readonly kind: 'reply' | 'replace' | null
+    readonly of: string | null
+    readonly by: string | null
+    readonly deleted: boolean
+    readonly retry: string | null
+  } | null
 }
 
 export interface FeedCounts {
@@ -90,6 +102,12 @@ interface PostRow {
   created_at: string
   edited_in_sada: number | null
   published_at: string | null
+  corrects_post_id?: string | null
+  correction_kind?: 'reply' | 'replace' | null
+  corrected_at?: string | null
+  platform_deleted_at?: string | null
+  corrected_by?: string | null
+  retry_correction?: string | null
 }
 
 /** يومٌ محلّيٌّ `YYYY-MM-DD` قبل `day` بـ`n` يومًا — حسابٌ على التقويم لا على اللحظة. */
@@ -134,6 +152,16 @@ function warningOf(findings: readonly Finding[], key: string): FeedCard['warning
   return { tone: first.severity === 'block' ? 'bad' : 'warn', label: RULE_LABEL[first.rule] }
 }
 
+/** حالُ التصحيح من صفّ المنشور (D-391) — `null` لما لا تصحيحَ فيه. */
+function correctionOf(r: PostRow): FeedCard['correction'] {
+  const of = r.corrects_post_id ?? null
+  const corrected = (r.corrected_at ?? null) !== null
+  const deleted = (r.platform_deleted_at ?? null) !== null
+  const retry = r.retry_correction ?? null
+  if (of === null && !corrected && !deleted && retry === null) return null
+  return { corrected, kind: r.correction_kind ?? null, of, by: r.corrected_by ?? null, deleted, retry }
+}
+
 export async function feedModel(db: Db, org: string, zone: string | null, now: Date, before: string | null = null): Promise<FeedModel> {
   const today = dayKey(now, zone)
   // ‏النافذةُ: ستّون يومًا تنتهي بـ`before` (مفتوحةً عنده) أو باليوم
@@ -142,10 +170,13 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
 
   const [upcomingRows, pastRows, plan, rules] = await Promise.all([
     db.prepare(`SELECT id, platform, text, status, scheduled_at, plan_id, created_at, edited_in_sada, NULL AS published_at FROM posts
-                 WHERE org_id = ? AND status IN ('draft', 'approved', 'edited', 'queued', 'failed') ORDER BY created_at DESC LIMIT ${LIMIT}`)
+                 WHERE org_id = ? AND status IN ('draft', 'approved', 'edited', 'queued', 'failed') AND corrects_post_id IS NULL ORDER BY created_at DESC LIMIT ${LIMIT}`)
       .bind(org).all<PostRow>().then((r) => r.results).catch(() => []),
     db.prepare(`SELECT p.id, p.platform, p.text, p.status, p.scheduled_at, p.plan_id, p.created_at, p.edited_in_sada,
-                       coalesce((SELECT max(t.at) FROM publish_attempts t WHERE t.post_id = p.id AND t.org_id = p.org_id AND t.status = 'succeeded'), p.scheduled_at) AS published_at
+                       coalesce((SELECT max(t.at) FROM publish_attempts t WHERE t.post_id = p.id AND t.org_id = p.org_id AND t.status = 'succeeded'), p.scheduled_at) AS published_at,
+                       p.corrects_post_id, p.correction_kind, p.corrected_at, p.platform_deleted_at,
+                       (SELECT c.id FROM posts c WHERE c.corrects_post_id = p.id AND c.org_id = p.org_id AND c.status = 'published' ORDER BY c.created_at DESC LIMIT 1) AS corrected_by,
+                       (SELECT k.id FROM post_corrections k WHERE k.post_id = p.id AND k.org_id = p.org_id AND k.kind = 'replace' AND k.status = 'deleted' ORDER BY k.created_at DESC LIMIT 1) AS retry_correction
                   FROM posts p WHERE p.org_id = ? AND p.status = 'published' ORDER BY published_at DESC LIMIT ${LIMIT * 2}`)
       .bind(org).all<PostRow>().then((r) => r.results).catch(() => []),
     latestPlan(db, org).catch(() => null),
@@ -164,7 +195,7 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
       if (c.post === null) {
         items.push({
           id: 'item:' + c.key, kind: 'item', platform: c.item.platform, status: 'writing', text: c.item.angle,
-          at: null, local: { day: c.item.day, time: c.item.time }, planId: plan.id, media: null, metrics: null, warning: w, edited: false,
+          at: null, local: { day: c.item.day, time: c.item.time }, planId: plan.id, media: null, metrics: null, warning: w, edited: false, correction: null,
         })
       } else {
         if (w !== null) warnings.set(c.post.id, w)
@@ -197,6 +228,7 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
       planId: r.plan_id, media: media.get(r.id) ?? null,
       metrics: m === null ? null : { impressions: m.impressions, reactions: m.reactions, comments: m.comments, shares: m.shares },
       warning: warnings.get(r.id) ?? null, edited: r.edited_in_sada === 1,
+      correction: correctionOf(r),
     }
   }
   const upcoming = [...upcomingRows.map((r) => toCard(r, r.status === 'queued' || r.status === 'failed' ? r.scheduled_at : null)), ...items]

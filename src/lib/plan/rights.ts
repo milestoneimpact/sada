@@ -28,6 +28,8 @@ export type EditAction =
   | 'restore'
   | 'approve'
   | 'import'
+  /** «صحّح المنشور» (D-391): تعديلٌ على LinkedIn، أو ردٌّ تصحيحيّ أو «احذف وأعد النشر» على X — للمنشور وحده */
+  | 'correct'
 
 export const STAGE_LABEL: Readonly<Record<EditStage, string>> = {
   draft: 'مسوّدة الخطّة',
@@ -58,6 +60,7 @@ const YES: Verdict = { ok: true }
 /** جدولُ المراحل: ما يُعدَّل في كلّ مرحلة. */
 function stageAllows(stage: EditStage, action: EditAction): Verdict {
   if (action === 'copy') return stage === 'posted' ? YES : NO('النسخ مسوّدةً للمنشور وحده، وما سواه يُعدَّل في مكانه.')
+  if (action === 'correct') return stage === 'posted' ? YES : NO('التصحيحُ للمنشور الذي نُشر وحده، وما سواه يُعدَّل في مكانه.')
   if (action === 'pause') return stage === 'scheduled' || stage === 'frozen' ? YES : NO('لا يُوقف إلّا ما جُدوِل.')
   if (stage === 'posted') return NO('منشورٌ لا يُعدَّل. انسخه مسوّدةً وعدّل النسخة.')
   if (stage === 'frozen') return NO('بقي أقلّ من 15 دقيقة على النشر: أوقفه أو أجّله، ولا تعديل للنصّ.')
@@ -71,6 +74,7 @@ const ROLE_NEED: Readonly<Record<EditAction, Role>> = {
   add_remove: 'editor',
   restore: 'editor',
   copy: 'editor',
+  correct: 'editor',
   pause: 'publisher',
   approve: 'publisher',
   import: 'admin',

@@ -669,7 +669,7 @@ writeAudited(
   const zone = 'Asia/Riyadh'
   const fnow = new Date('2026-11-24T07:00:00Z')
   const post = (id: string, platform: string, status: string, text: string, at: string | null, over: Partial<FeedCard> = {}): FeedCard => ({
-    id, kind: 'post', platform, status, text, at, local: null, planId: 'pl1', media: null, metrics: null, warning: null, edited: false, ...over,
+    id, kind: 'post', platform, status, text, at, local: null, planId: 'pl1', media: null, metrics: null, warning: null, edited: false, correction: null, ...over,
   })
   const feedPreview = fixtureImage(1200, 627, 200)
   const model: FeedModel = {
@@ -684,7 +684,7 @@ writeAudited(
       post('fq2', 'x', 'queued', 'سؤالٌ واحدٌ قبل كلّ قرار: ماذا سيتغيّر لو أخّرناه أسبوعًا؟', '2026-11-26 17:00:00'),
       post('fq3', 'linkedin', 'queued', 'من الاجتماع الطويل إلى المراجعة القصيرة: كيف نقلنا فريقًا من ساعتين أسبوعيًّا إلى عشرين دقيقة.', '2026-11-30 06:00:00', { edited: true }),
       { id: 'item:2026-12-01|linkedin|07:00', kind: 'item', platform: 'linkedin', status: 'writing', text: 'ثلاثة أسئلة قبل كلّ معلَم', at: null,
-        local: { day: '2026-12-01', time: '07:00' }, planId: 'pl1', media: null, metrics: null, warning: null, edited: false },
+        local: { day: '2026-12-01', time: '07:00' }, planId: 'pl1', media: null, metrics: null, warning: null, edited: false, correction: null },
     ],
     past: [
       post('fp1', 'linkedin', 'published', 'الحوكمة ليست لجنةً تجتمع؛ هي قرارٌ يُعرف من يملكه قبل أن يُطلب.', '2026-11-20 06:00:04',

@@ -27,6 +27,8 @@ import { currentPhase, gatesOf, readGateFacts } from '../../lib/gates'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { notFoundResponse } from '../errors'
 import { record } from '../../lib/audit'
+import { mayDo } from '../../lib/plan/rights'
+import { html } from '../ui/html'
 import { page, loginResponse, setFlash, takeFlash, guardPost, ownerFacts } from './shared'
 
 export const reports = new Hono<{ Bindings: Env }>()
@@ -161,7 +163,11 @@ reports.get('/panel/journey/:id', async (c) => {
   const journey = await readJourney(c.env.DB, activeOrg(session.record), c.req.param('id'))
   if (journey === null) return notFoundResponse(c.req.raw, 'لا منشور بهذا المعرّف')
 
-  const body = journeyBody(journey, new Date())
+  // ‏«صحّح المنشور» (D-391) في صفحة المنشور كما في التيّار: للمحرّر فأعلى، على منشور LinkedIn أو X
+  const fix = journey.status === 'published' && (journey.platform === 'linkedin' || journey.platform === 'x')
+    && mayDo(session.record.role ?? 'owner', 'correct', 'posted').ok
+    ? html`<p class="fd-fix"><a class="tap" href="/panel/posts/${journey.postId}/correct">صحّح المنشور</a></p>`.value : ''
+  const body = journeyBody(journey, new Date()) + fix
   return page((nonce) =>
     soloPage('صدى — رحلة منشور', { href: '/panel#posts', label: 'المنشورات' },
       injectCsrf(body, session.record.csrf), nonce, '',
