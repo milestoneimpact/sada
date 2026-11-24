@@ -38,12 +38,16 @@ export interface PlatformCounts {
   readonly nextAt: string | null
 }
 
+import type { MonthFacts } from './plan/month'
+
 export interface JourneyCounts {
   readonly perPlatform: Readonly<Record<string, PlatformCounts>>
   /** ما نُشر في السبعة الأيّام الأخيرة — من المحاولات الناجحة. */
   readonly publishedWeek: number
   /** ما له خطّةٌ من الأشهر المسؤول عنها (D-383 · المرحلة ٨)، في جملة الأسبوع نفسِها فلا يثقل اللوح. */
   readonly planned?: readonly string[]
+  /** حقائقُ شهرٍ واحد (`factsFor`) لبطاقة «خطّة الشهر القادم» (D-389)، في الجملة نفسِها تحت سقف اللوح (D-280). */
+  readonly facts?: MonthFacts
 }
 
 export const NO_COUNTS: JourneyCounts = { perPlatform: {}, publishedWeek: 0 }
@@ -59,7 +63,7 @@ const WEEK_MS = 7 * 86_400_000
  * و`approved` يجمع `approved` و`edited`: سؤالٌ واحدٌ عند المالك (D-062).
  * وجدولٌ لم يُرحَّل يُقرأ صفرًا: الرئيسيّةُ تُفتح خاليةً ولا تسقط.
  */
-export async function journeyCounts(db: Db, org: string, now: Date, periods: readonly string[] = []): Promise<JourneyCounts> {
+export async function journeyCounts(db: Db, org: string, now: Date, periods: readonly string[] = [], factsFor: string | null = null): Promise<JourneyCounts> {
   try {
     const since = new Date(now.getTime() - WEEK_MS).toISOString().slice(0, 19).replace('T', ' ')
     /*
@@ -95,14 +99,21 @@ export async function journeyCounts(db: Db, org: string, now: Date, periods: rea
       .prepare(
         `SELECT COUNT(DISTINCT pa.post_id) AS n,
                 (SELECT group_concat(period) FROM plans WHERE org_id = ? AND status <> 'superseded'
-                   AND period IN (SELECT value FROM json_each(?))) AS planned
+                   AND period IN (SELECT value FROM json_each(?))) AS planned,
+                (SELECT json_object('locked', pl.locked_at,
+                    'items', (SELECT COUNT(*) FROM plan_items i WHERE i.org_id = pl.org_id AND i.plan_id = pl.id),
+                    'approved', (SELECT COUNT(*) FROM posts x WHERE x.org_id = pl.org_id AND x.plan_id = pl.id AND x.status = 'approved'),
+                    'queued', (SELECT COUNT(*) FROM posts x WHERE x.org_id = pl.org_id AND x.plan_id = pl.id AND x.status = 'queued'),
+                    'published', (SELECT COUNT(*) FROM posts x WHERE x.org_id = pl.org_id AND x.plan_id = pl.id AND x.status = 'published'),
+                    'failed', (SELECT COUNT(*) FROM posts x WHERE x.org_id = pl.org_id AND x.plan_id = pl.id AND x.status = 'failed'))
+                   FROM plans pl WHERE pl.org_id = ? AND pl.period = ? AND pl.status <> 'superseded' ORDER BY pl.created_at DESC LIMIT 1) AS facts
            FROM publish_attempts pa JOIN posts p ON p.id = pa.post_id
           WHERE p.org_id = ? AND pa.status = 'succeeded' AND pa.at >= ?`,
       )
-      .bind(org, JSON.stringify(periods), org, since)
-      .first<{ n: number; planned: string | null }>()
+      .bind(org, JSON.stringify(periods), org, factsFor ?? '', org, since)
+      .first<{ n: number; planned: string | null; facts: string | null }>()
     const planned = week?.planned === null || week?.planned === undefined ? [] : week.planned.split(',')
-    return { perPlatform, publishedWeek: week?.n ?? 0, planned }
+    return { perPlatform, publishedWeek: week?.n ?? 0, planned, ...(factsFor === null ? {} : { facts: factsOf(factsFor, week?.facts ?? null) }) }
   } catch {
     return NO_COUNTS
   }
@@ -534,4 +545,17 @@ export function firstRun(f: HomeFacts): FirstRun | null {
   ]
   const current = steps.findIndex((s) => !s.done)
   return current < 0 ? null : { steps, current }
+}
+
+/** حقائقُ الشهر من `json_object` الجملة (D-389) — وما لا خطّةَ له «لم تبدأ». */
+function factsOf(period: string, raw: string | null): MonthFacts {
+  const none: MonthFacts = { period, hasPlan: false, reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0 }
+  if (raw === null) return none
+  try {
+    const j = JSON.parse(raw) as Record<string, unknown>
+    const n = (k: string): number => Number(j[k] ?? 0)
+    return { period, hasPlan: true, reviewed: j['locked'] !== null && j['locked'] !== undefined, items: n('items'), approved: n('approved'), queued: n('queued'), published: n('published'), failed: n('failed') }
+  } catch {
+    return none
+  }
 }

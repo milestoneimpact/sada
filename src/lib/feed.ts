@@ -72,6 +72,49 @@ export interface FeedModel {
   readonly awaitingIds: readonly string[]
   /** نافذةُ «ما نُشر»: أوّلُ يومٍ فيها، وآخرُه، ويومٌ يُفتح به ما قبلها إن بقي شيء. */
   readonly window: { readonly from: string; readonly to: string; readonly older: string | null }
+  /**
+   * الشهرُ المختار «YYYY-MM» بتوقيت المالك (D-389): الأعدادُ والتقويمُ له دائمًا. و`explicit` حين جاء بـ`?m=`: فالبطاقتان
+   * أيضًا له وحدَه (ما نُشر فيه كلُّه لا نافذةُ الستّين). وبلا `?m=` يبقى التيّارُ تيّارًا كما في D-386.
+   */
+  readonly period?: string
+  readonly explicit?: boolean
+}
+
+/** **مرشِّحاتُ رحلة الشهر** (D-389) — خمسٌ بأسمائها في العنوان، وكلٌّ حالاتُه من `posts` (ومعناها من `postStatus`، D-340). */
+export const FEED_FILTERS = ['pending', 'approved', 'queued', 'published', 'failed'] as const
+export type FeedFilter = (typeof FEED_FILTERS)[number]
+
+export const FILTER_STATUSES: Readonly<Record<FeedFilter, readonly string[]>> = {
+  pending: ['draft'], approved: ['approved', 'edited'], queued: ['queued'], published: ['published'], failed: ['failed'],
+}
+
+export function isFeedFilter(v: unknown): v is FeedFilter {
+  return typeof v === 'string' && (FEED_FILTERS as readonly string[]).includes(v)
+}
+
+export function matchesFilter(c: Pick<FeedCard, 'status'>, f: FeedFilter | null): boolean {
+  return f === null || FILTER_STATUSES[f].includes(c.status)
+}
+
+/** يومُ البطاقة المحلّيّ «YYYY-MM-DD»، و`null` لما لا موعدَ له. */
+export function cardDay(c: Pick<FeedCard, 'at' | 'local'>, zone: string | null): string | null {
+  const k = sortKey(c, zone)
+  return k === '' ? null : k.slice(0, 10)
+}
+
+/** شهرُ البطاقة: شهرُ يومها، وما لا موعدَ له في شهر اليوم — يحتاج يدًا الآن. */
+export function cardMonth(c: Pick<FeedCard, 'at' | 'local'>, zone: string | null, today: string): string {
+  return (cardDay(c, zone) ?? today).slice(0, 7)
+}
+
+/** أعدادُ رحلة الشهر الخمسة من البطاقات — قبل أيّ مرشِّح، فالعددُ يقول ما وراء الرابط. */
+export function monthTally(cards: readonly FeedCard[], zone: string | null, today: string, period: string): Readonly<Record<FeedFilter, number>> {
+  const out: Record<FeedFilter, number> = { pending: 0, approved: 0, queued: 0, published: 0, failed: 0 }
+  for (const c of cards) {
+    if (c.kind !== 'post' || cardMonth(c, zone, today) !== period) continue
+    for (const f of FEED_FILTERS) if (FILTER_STATUSES[f].includes(c.status)) out[f]++
+  }
+  return out
 }
 
 /** ستّون يومًا من «ما نُشر» في الصفحة. */
@@ -134,8 +177,9 @@ function warningOf(findings: readonly Finding[], key: string): FeedCard['warning
   return { tone: first.severity === 'block' ? 'bad' : 'warn', label: RULE_LABEL[first.rule] }
 }
 
-export async function feedModel(db: Db, org: string, zone: string | null, now: Date, before: string | null = null): Promise<FeedModel> {
+export async function feedModel(db: Db, org: string, zone: string | null, now: Date, before: string | null = null, month: string | null = null): Promise<FeedModel> {
   const today = dayKey(now, zone)
+  const period = month ?? today.slice(0, 7)
   // ‏النافذةُ: ستّون يومًا تنتهي بـ`before` (مفتوحةً عنده) أو باليوم
   const to = before ?? today
   const from = daysBefore(to, PAST_DAYS)
@@ -174,15 +218,20 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
   }
 
   const upcomingIds = upcomingRows.map((r) => r.id)
-  const inWindow = pastRows.filter((r) => {
+  const pubDay = (r: PostRow): string | null => {
     const d = r.published_at === null ? null : parseSqliteUtc(r.published_at)
-    if (d === null) return false
-    const k = dayKey(d, zone)
+    return d === null ? null : dayKey(d, zone)
+  }
+  // ‏شهرٌ مختار (D-389): ما نُشر فيه كلُّه، ولا «أقدم»؛ وإلّا نافذةُ الستّين (D-386)
+  const inWindow = pastRows.filter((r) => {
+    const k = pubDay(r)
+    if (k === null) return false
+    if (month !== null) return k.startsWith(month)
     return k >= from && (before === null ? true : k < before)
   })
-  const olderRow = pastRows.find((r) => {
-    const d = r.published_at === null ? null : parseSqliteUtc(r.published_at)
-    return d !== null && dayKey(d, zone) < from
+  const olderRow = month !== null ? undefined : pastRows.find((r) => {
+    const k = pubDay(r)
+    return k !== null && k < from
   })
   const [media, metrics] = await Promise.all([
     mediaOf(db, org, [...upcomingIds, ...inWindow.map((r) => r.id)]),
@@ -200,6 +249,7 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
     }
   }
   const upcoming = [...upcomingRows.map((r) => toCard(r, r.status === 'queued' || r.status === 'failed' ? r.scheduled_at : null)), ...items]
+    .filter((c) => month === null || cardMonth(c, zone, today) === month)
     .sort((a, b) => {
       const ka = sortKey(a, zone)
       const kb = sortKey(b, zone)
@@ -210,11 +260,10 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
   const past = inWindow.map((r) => toCard(r, r.published_at)).sort((a, b) => (b.at ?? '').localeCompare(a.at ?? ''))
 
   const awaitingIds = upcomingRows.filter((r) => r.status === 'draft').map((r) => r.id)
-  const month = today.slice(0, 7)
   return {
     upcoming, past,
     counts: {
-      published: pastRows.filter((r) => r.published_at !== null && dayKey(parseSqliteUtc(r.published_at) ?? now, zone).startsWith(month)).length,
+      published: pastRows.filter((r) => r.published_at !== null && dayKey(parseSqliteUtc(r.published_at) ?? now, zone).startsWith(period)).length,
       queued: upcomingRows.filter((r) => r.status === 'queued').length,
       awaiting: awaitingIds.length,
       writing: items.length,
@@ -222,5 +271,6 @@ export async function feedModel(db: Db, org: string, zone: string | null, now: D
     plan: plan === null ? null : { id: plan.id, awaiting: upcomingRows.filter((r) => r.status === 'draft' && r.plan_id === plan.id).length },
     awaitingIds,
     window: { from, to, older: olderRow === undefined ? null : from },
+    period, explicit: month !== null,
   }
 }

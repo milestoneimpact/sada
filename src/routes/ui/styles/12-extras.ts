@@ -924,7 +924,25 @@ details.card .nt-list{margin-top:var(--s-4)}
 .fd-now{display:flex; align-items:center; gap:var(--s-3); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); max-inline-size:44rem; margin-inline:auto; inline-size:100%}
 .fd-now::before,.fd-now::after{content:''; flex:1; border-block-start:var(--bd)}
 .fd-older{margin:0; text-align:center}
-.fd-counts{display:flex; gap:var(--s-3); flex-wrap:wrap}
+/* ‏رحلةُ الشهر وتقويمُ النقاط (D-389): الشريطان من «tabs»، والتقويمُ سبعةُ أعمدةٍ بأهداف لمسٍ ‏44px تسع ‏360 بلا فيض */
+.fd-top{display:grid; gap:var(--s-2)}
+.fd-top .tab-bar{margin-bottom:0}
+.fd-wk,.fd-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-0); margin:0}
+.fd-wk span{text-align:center; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+.fd-day{display:flex; flex-direction:column; align-items:center; gap:var(--s-0); min-block-size:var(--tap); padding-block:var(--s-1);
+  border-radius:var(--r-control); color:var(--ink-2); text-decoration:none; font-size:var(--t-small); line-height:var(--lh-small)}
+a.fd-day{color:var(--ink); background:var(--surface-2)}
+@media(hover:hover){a.fd-day:hover{background:var(--selected)}}
+.fd-cal [data-today] .fd-day{box-shadow:inset 0 0 0 var(--stroke) var(--ink)}
+.fd-dots{display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-0)}
+.fd-dot{display:inline-flex}
+.fd-dot svg{width:var(--icon-xs); height:var(--icon-xs); display:block}
+.fd-dot.ok{color:var(--ok)}
+.fd-dot.warn{color:var(--warn)}
+.fd-dot.bad{color:var(--bad)}
+.fd-dot.pending{color:var(--ink-2)}
+.fd-dot.idle{color:var(--idle)}
+.fd-more{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .fd-entry{align-items:center; flex-wrap:wrap; justify-content:flex-end}
 
 /* ── «منشورات جديدة» (D-387): ثلاثُ بطاقاتٍ كبيرة، بابٌ واحدٌ وزرٌّ واحدٌ في كلٍّ ────────── */

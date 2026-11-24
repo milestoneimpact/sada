@@ -122,6 +122,45 @@ export function monthJourney(f: MonthFacts, today: string): MonthJourney {
   return { period: f.period, reached, counts, alerts }
 }
 
+/**
+ * **حالُ الشهر في كلمة** (D-389): لم تبدأ · مستوردة · مراجَعة · معتمدة · مجدولة — من `plans.period` و`plan_items` وحالِ
+ * منشورات الخطّة (`monthFacts`). والأعلى يغلب: شهرٌ جُدول كلُّ بنده «مجدولة» ولو لم يُقفَل.
+ */
+export type PlanStage = 'none' | 'imported' | 'reviewed' | 'approved' | 'scheduled'
+
+export const PLAN_STAGE_SAY: Readonly<Record<PlanStage, string>> = {
+  none: 'لم تبدأ', imported: 'مستوردة', reviewed: 'مراجَعة', approved: 'معتمدة', scheduled: 'مجدولة',
+}
+
+export function planStage(f: MonthFacts): PlanStage {
+  if (!f.hasPlan) return 'none'
+  const scheduled = f.queued + f.published + f.failed
+  if (f.items > 0 && scheduled >= f.items) return 'scheduled'
+  if (f.items > 0 && f.approved + scheduled >= f.items) return 'approved'
+  return f.reviewed ? 'reviewed' : 'imported'
+}
+
+/** **المسارُ الرباعيّ** (D-389): المصدرُ ← الفحصُ ← الاعتمادُ ← التيّار. */
+export const PATH_STEPS = ['المصدر', 'الفحص', 'الاعتماد', 'التيّار'] as const
+
+/** الخطوةُ الحاليّة في المسار (0 إلى 3)، و4 حين تمّ كلُّه (جُدول الشهر فهو في التيّار يمضي وحدَه). */
+export function pathAt(stage: PlanStage): number {
+  return { none: 0, imported: 1, reviewed: 2, approved: 3, scheduled: 4 }[stage]
+}
+
+/** الخطوةُ التالية زرًّا واحدًا بحال الشهر. */
+export function stageNext(stage: PlanStage, period: string): { readonly href: string; readonly label: string } {
+  switch (stage) {
+    case 'none': return { href: '/panel/new', label: 'ابدأ خطّة الشهر' }
+    case 'imported': return { href: '/panel/plan/month?p=' + period, label: 'افحص الخطّة' }
+    case 'reviewed': return { href: '/panel/plan/month?p=' + period, label: 'اعتمد الشهر' }
+    default: return { href: '/panel/feed?m=' + period, label: 'افتح الشهر في التيّار' }
+  }
+}
+
+/** بطاقةُ «خطّة الشهر القادم» تظهر من هذا اليوم في الشهر بتوقيت المالك. */
+export const NEXT_MONTH_FROM_DAY = 20
+
 export interface ImportRow {
   readonly id: string
   readonly sourceKind: string
