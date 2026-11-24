@@ -5,7 +5,10 @@
  * كلُّها قوالبُ خالصة: ما تعرضه يُحسب في `lib/plan/month.ts` و`planChecks`، وشريطُ التحذيرات وأزرارُ «وزّع» و«أزِح»
  * و«ادمج» هي `checksStrip` نفسُها لا نسخةٌ منها. وبلا سكربتٍ يعمل كلُّ شيء: كلُّ زرٍّ نموذج.
  */
-import { LOAD_SAY, STATION_SAY, STATIONS, loadLevel, monthGrid, type DiffRow, type ImportRow, type MonthJourney } from '../../lib/plan/month'
+import {
+  LOAD_SAY, NEXT_MONTH_FROM_DAY, PATH_STEPS, PLAN_STAGE_SAY, STATION_SAY, STATIONS, loadLevel, monthGrid, pathAt, planStage, stageNext,
+  type DiffRow, type ImportRow, type MonthFacts, type MonthJourney,
+} from '../../lib/plan/month'
 
 export type { DiffRow, ImportRow }
 import { checksStrip, type ChecksView } from './checksView'
@@ -14,6 +17,7 @@ import { button } from './components/button'
 import { card } from './components/card'
 import { html, raw } from './html'
 import { pageHead } from './parts'
+import { ICON } from './icons'
 
 const SOURCE_SAY: Readonly<Record<string, string>> = { github: 'GitHub', csv: 'ملفّ CSV', text: 'نصّ ملصوق', wizard: 'المعالج' }
 const STATUS_TONE: Readonly<Record<string, 'ok' | 'warn' | 'bad' | 'pending' | 'idle'>> = {
@@ -74,6 +78,8 @@ export interface MonthScreenData {
   readonly canRollback?: boolean
   readonly prev: string
   readonly next: string
+  /** خطوةُ الشهر في المسار الرباعيّ (`pathAt`، D-389) — تُرسم تحت الرأس. */
+  readonly path?: number
 }
 
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -92,11 +98,12 @@ export function monthCalendar(d: Pick<MonthScreenData, 'period' | 'perDay' | 'da
 
 export function monthScreen(d: MonthScreenData): string {
   const head = pageHead('الخطّة', 'شهر ' + d.period, 'كلّ يوم بشارة حمله، والتحذيرات فوقه، والفرق قبل الاعتماد.')
+  const path = d.path === undefined ? '' : '<div class="mb-3">' + pathSteps(d.path) + '</div>'
   const nav = html`<div class="row gap-2">${raw(button({ label: '‹ ' + d.prev, href: '/panel/plan/month?p=' + d.prev, size: 'sm', variant: 'quiet' }))}
     ${raw(button({ label: d.next + ' ›', href: '/panel/plan/month?p=' + d.next, size: 'sm', variant: 'quiet' }))}
     ${raw(button({ label: 'الاستيرادات', href: '/panel/plan/imports', size: 'sm', variant: 'secondary' }))}</div>`.value
   if (d.planId === null) {
-    return head + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ادفع ملفّ ${d.period} إلى 01-plan، أو ابدأ خطّة جديدة.</p>
+    return head + path + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ادفع ملفّ ${d.period} إلى 01-plan، أو ابدأ خطّة جديدة.</p>
       <div class="row">${raw(button({ label: 'خطّة جديدة', href: '/panel/plan/new' }))}</div>`.value })
   }
   const ids = html`<input type="hidden" name="id" value="${d.planId}"><input type="hidden" name="p" value="${d.period}">`
@@ -109,7 +116,7 @@ export function monthScreen(d: MonthScreenData): string {
     ? html`<form method="POST" action="/panel/plan/month/approve" data-busy="يُعتمد…">${ids}<div class="row">${raw(button({ label: 'اعتمد الشهر', type: 'submit' }))}
         ${raw(button({ label: 'راجع البنود', href: '/panel/plan/review?id=' + d.planId, variant: 'secondary' }))}</div></form>`
     : d.canRollback === true ? html`` : html`<p class="hint">الاعتماد للناشر فأعلى.</p>`}${rollback}`
-  return head + nav + checksStrip(d.checks) + '<div class="mt-3">' + card({ title: 'التقويم', body: monthCalendar(d) }) + '</div>' +
+  return head + path + nav + checksStrip(d.checks) + '<div class="mt-3">' + card({ title: 'التقويم', body: monthCalendar(d) }) + '</div>' +
     (d.diff.length === 0 ? '' : '<div class="mt-3">' + diffCard(d.diff) + '</div>') +
     '<div class="mt-3">' + card({ title: 'الاعتماد', body: approve.value }) + '</div>'
 }
@@ -124,4 +131,30 @@ export function monthJourneyCard(months: readonly MonthJourney[]): string {
         return raw(statusBadge(done ? 'ok' : 'idle', String(m.counts[s]), STATION_SAY[s]))
       })}</div>`)}`
   return card({ title: 'رحلة الشهرين', body: body.value })
+}
+
+/**
+ * **المسارُ الرباعيّ مؤشّرَ خطوات** (D-389): المصدرُ ← الفحصُ ← الاعتمادُ ← التيّار، شاراتٌ من `statusBadge` على سطرٍ يلتفّ —
+ * ما تمّ أخضرُ بـ«✓»، والحاليّةُ كهرمانيّةٌ بـ`aria-current="step"`، وما بعدها محايد. لا نمطَ جديد.
+ */
+export function pathSteps(at: number): string {
+  return html`<ol class="plain row gap-2 pm-path" aria-label="مسار الخطّة">${PATH_STEPS.map((label, i) => {
+    const [tone, g] = i < at ? (['ok', '✓'] as const) : i === at ? (['warn', '◍'] as const) : (['idle', '○'] as const)
+    return html`<li${i === at ? raw(' aria-current="step"') : ''}>${i === 0 ? '' : raw('<span class="arw" aria-hidden="true">' + ICON.go + '</span> ')}${raw(statusBadge(tone, g, label))}</li>`
+  })}</ol>`.value
+}
+
+/**
+ * **بطاقةُ «خطّةُ الشهر القادم»** في الرئيسيّة (D-389): تظهر من يوم ‏20 بتوقيت المالك وتغيب قبله — حالُ الشهر في كلمة،
+ * والمسارُ الرباعيّ، وزرٌّ واحدٌ للخطوة التالية. `today` يومُ المالك «YYYY-MM-DD».
+ */
+export function nextMonthCard(f: MonthFacts, today: string): string {
+  if (Number(today.slice(8, 10)) < NEXT_MONTH_FROM_DAY) return ''
+  const stage = planStage(f)
+  const go = stageNext(stage, f.period)
+  const tone = stage === 'scheduled' ? 'ok' : stage === 'none' ? 'idle' : 'warn'
+  const body = html`<div class="row gap-2"><span class="mono">${f.period}</span>${raw(statusBadge(tone, stage === 'scheduled' ? '✓' : stage === 'none' ? '○' : '◍', PLAN_STAGE_SAY[stage]))}</div>
+    <div class="mt-3">${raw(pathSteps(pathAt(stage)))}</div>
+    <div class="row gap-2 mt-3">${raw(button({ label: go.label, href: go.href, variant: 'secondary' }))}</div>`
+  return '<div class="mt-3">' + card({ id: 'next-month', title: 'خطّةُ الشهر القادم', titleId: 'nm-t', attrs: 'role="region" aria-labelledby="nm-t"', body: body.value }) + '</div>'
 }

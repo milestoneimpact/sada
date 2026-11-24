@@ -56,7 +56,7 @@ import { approvePlan, ideaOf, latestPlan, planForId, planForPeriod, planSpan, pl
 import { approvePlanVersion, reopenVersion, unscheduleMonth } from '../../lib/plan/approve'
 import { attachToPost, listLibrary } from '../../lib/library'
 import { rejectMedia } from '../../lib/image/job'
-import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
+import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, pathAt, planStage, prevPeriod } from '../../lib/plan/month'
 import { itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
 import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
@@ -1029,6 +1029,8 @@ plan.get('/panel/plan/month', async (c) => {
     canApprove: canFix && stored?.status === 'draft',
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
+    // ‏المسارُ الرباعيّ لشهر الشاشة (D-389): من حقائق الشهرين إن كان أحدَهما، وإلّا يُقرأ
+    path: pathAt(planStage(period === current ? facts[0] : period === nextPeriod(current) ? facts[1] : await monthFacts(c.env.DB, org, period))),
   })
   // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
   return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,

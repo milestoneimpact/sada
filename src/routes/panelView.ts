@@ -56,6 +56,8 @@ import type { TodayItem } from '../lib/today'
 import { driveFileUrl } from '../lib/drive/sync'
 import { LOGOS } from './ui/logos'
 import { activityCard, homeTop, planCard } from './ui/sections/home'
+import { nextMonthCard } from './ui/planMonthView'
+import type { MonthFacts } from '../lib/plan/month'
 import { newPostMenu } from './ui/newMenu'
 import { deskQueue } from './ui/sections/desk'
 import { menu, menuItem } from './ui/components/menu'
@@ -480,6 +482,8 @@ export interface PanelData {
   readonly journey: JourneyCounts
   /** تنبيهاتُ رحلة الشهرين (D-383 · المرحلة ٨): نشرٌ فشل، أو شهرٌ يقترب بلا خطّة. والغائبُ لا تنبيه. */
   readonly monthAlerts?: readonly string[]
+  /** حقائقُ الشهر القادم ويومُ المالك — لبطاقة «خطّة الشهر القادم» من يوم 20 (D-389). والغائبُ لا بطاقة. */
+  readonly nextMonth?: { readonly facts: MonthFacts; readonly today: string }
   /** مقاطعُ المالك المرفوعة (D-180) — أحدثُها أوّلًا. */
   readonly uploads: readonly UploadRow[]
   /** نصوصٌ كُتبت لمقاطع لم تُنشأ منشوراتُها كلُّها بعد (KV، D-190) — مفتاحُها معرّفُ المقطع. */
@@ -525,7 +529,7 @@ export type ShellData = Pick<PanelData,
 
 /** «نظرة عامّة»: الرحلةُ و«ما ينتظرك» والبطاقاتُ (`TileSource`) و«الكلفة وما وقع». */
 export type OverviewData = Pick<PanelData,
-  'sources' | 'media' | 'journey' | 'monthAlerts' | 'openSuggestions' | 'draftBlocker' | 'factors' | 'providers' | 'routing'
+  'sources' | 'media' | 'journey' | 'monthAlerts' | 'nextMonth' | 'openSuggestions' | 'draftBlocker' | 'factors' | 'providers' | 'routing'
   | 'dashboardTiles' | 'series' | 'spendBy' | 'spendMonth' | 'today' | 'autoEnqueue' | 'slide' | 'analysisCap'
   | 'spendCap' | 'usedAnalyses' | 'usedSpend' | 'targets' | 'outbox' | 'alertWebhook' | 'planReady'>
 
@@ -1156,7 +1160,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
   ${/* ‏**«ما ينتظرك» بعد التحيّة بعرض اللوح** (SPEC-v1 §6.1 · D-381): يرسمها `homeTop`، وصفوفُها من هنا وأدواتُها ثانويّة */''}
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), (d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null)) +
+    (d.nextMonth === undefined ? '' : nextMonthCard(d.nextMonth.facts, d.nextMonth.today)), homeNew(), {
     rows: todo,
     // ‏و«افتح التيّار» ثانويٌّ بجوارها (D-386): الصفحةُ الواحدةُ لما سيُنشر وما نُشر
     tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }) + button({ label: 'افتح التيّار', size: 'sm', variant: 'secondary', href: '/panel/feed' }),
