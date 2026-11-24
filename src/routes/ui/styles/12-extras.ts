@@ -928,7 +928,9 @@ details.card .nt-list{margin-top:var(--s-4)}
 /* ‏رحلةُ الشهر وتقويمُ النقاط (D-389): الشريطان من «tabs»، والتقويمُ سبعةُ أعمدةٍ بأهداف لمسٍ ‏44px تسع ‏360 بلا فيض */
 .fd-top{display:grid; gap:var(--s-2)}
 .fd-top .tab-bar{margin-bottom:0}
-.fd-wk,.fd-cal{display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:var(--s-0); margin:0}
+/* ‏كلُّ عمودٍ ‏44px على الأقلّ (هدفُ لمس)، وما لا يسعه الهاتفُ الضيّقُ (‏320–390) يُمرَّر أفقيًّا داخل الغلاف لا في الصفحة */
+.fd-calw{overflow-x:auto; display:grid; gap:var(--s-0)}
+.fd-wk,.fd-cal{display:grid; grid-template-columns:repeat(7,minmax(var(--tap),1fr)); gap:var(--s-0); margin:0}
 .fd-wk span{text-align:center; font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
 .fd-day{display:flex; flex-direction:column; align-items:center; gap:var(--s-0); min-block-size:var(--tap); padding-block:var(--s-1);
   border-radius:var(--r-control); color:var(--ink-2); text-decoration:none; font-size:var(--t-small); line-height:var(--lh-small)}

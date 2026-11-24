@@ -267,7 +267,7 @@ function dotCalendar(cards: readonly FeedCard[], v: FeedView, today: string, per
   })
   const head = ['ح', 'ن', 'ث', 'ر', 'خ', 'ج', 'س'].map((d) => html`<span>${d}</span>`)
   return html`<section class="fd-sec" aria-labelledby="fd-cal-h"><h2 id="fd-cal-h" class="fd-h">أيّامُ ${monthName(period)}</h2>
-    <div class="fd-wk" aria-hidden="true">${head}</div><ol class="plain fd-cal">${cells}</ol></section>`.value
+    <div class="fd-calw"><div class="fd-wk" aria-hidden="true">${head}</div><ol class="plain fd-cal">${cells}</ol></div></section>`.value
 }
 
 export function feedScreen(v: FeedView): string {
