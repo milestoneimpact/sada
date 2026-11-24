@@ -639,7 +639,7 @@ writeAudited(
       monthJourney({ period: '2026-11', hasPlan: true, reviewed: true, items: 32, approved: 3, queued: 18, published: 7, failed: 1 }, '2026-11-24'),
       monthJourney({ period: '2026-12', hasPlan: false, reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0 }, '2026-11-24'),
     ]) + '<div class="mt-3"></div>' + monthScreen({
-      period: '2026-11', planId: 'pl1', dailyCap: 5, prev: '2026-10', next: '2026-12', canApprove: true,
+      period: '2026-11', planId: 'pl1', dailyCap: 5, prev: '2026-10', next: '2026-12', canApprove: true, path: 2,
       perDay: { '2026-11-02': 2, '2026-11-03': 5, '2026-11-04': 1, '2026-11-09': 3, '2026-11-10': 6, '2026-11-16': 2, '2026-11-17': 4, '2026-11-23': 2, '2026-11-24': 5, '2026-11-30': 2 },
       checks: { planId: 'pl1', canFix: true, findings: [
         { rule: 'daily_total', severity: 'warn', keys: ['k1', 'k2'], day: '2026-11-10', fix: 'spread', message: '6 منشورات في 2026-11-10، والسقف 5.' },
@@ -696,6 +696,7 @@ writeAudited(
     plan: { id: 'pl1', awaiting: 2 },
     awaitingIds: ['fa1', 'fa2'],
     window: { from: '2026-09-25', to: '2026-11-24', older: '2026-09-25' },
+    period: '2026-11', explicit: false,
   }
   // ‏«منشورات جديدة» (D-387): المختارُ بطرقه الثلاث، والحزمةُ مربوطة
   writeAudited(

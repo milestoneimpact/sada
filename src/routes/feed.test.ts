@@ -55,7 +55,7 @@ describe('التيّار (D-386)', () => {
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain('<h1>التيّار</h1>')
-    expect(html).toContain('ينتظر اعتمادك')
+    expect(html).toContain('ينتظر الاعتماد')
     // ‏الحالاتُ من مصدرها الواحد (D-340)، والبندُ الذي لم يُكتب «يُكتب الآن»
     for (const s of ['تنتظر قرارك', 'مجدولة', 'نُشرت', 'فشل النشر', 'يُكتب الآن', 'بندٌ لم يُكتب بعد']) expect(html).toContain(s)
     // ‏ترتيبُ القسمين وخطُّ الآن بينهما
@@ -217,5 +217,71 @@ describe('رأس التيّار بحالاته (D-388)', () => {
     expect(await to('/panel/timeline')).toEqual([301, '/panel/feed'])
     expect(await to('/panel/plan/follow')).toEqual([303, '/panel/feed'])
     expect(await to('/panel/plan')).toEqual([303, '/panel/plan/review'])
+  })
+})
+
+/**
+ * ‏**رحلةُ الشهر وتقويمُه ومبدِّلُه** (D-389): خمسةُ أعدادٍ كلٌّ رابطُ مرشِّح بلا سكربت والنشطُ معلَّم، و«الكلّ» يزيله؛
+ * ‏والشهرُ بـ`?m=` يحصر الأعدادَ والتقويمَ والبطاقات؛ واليومُ رابطٌ إلى بطاقته؛ وما لمنظّمةٍ أخرى لا يُرى.
+ */
+describe('رحلة الشهر في التيّار (D-389)', () => {
+  const bar = (html: string): string => html.slice(html.indexOf('id="fd-journey"'), html.indexOf('</nav>', html.indexOf('id="fd-journey"')))
+
+  it('خمسةُ أعدادٍ روابطُ مرشِّح، و«الكلّ» معلَّمٌ بلا مرشِّح، و?s=failed يحصر البطاقات ويعلِّم «تعثّر»', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
+    const b = bar(html)
+    for (const [s, label] of [['pending', 'ينتظر الاعتماد'], ['approved', 'معتمَد'], ['queued', 'مجدول'], ['published', 'نُشر'], ['failed', 'تعثّر']] as const) {
+      expect(b).toContain(`href="/panel/feed?s=${s}"`)
+      expect(b).toContain(label)
+    }
+    expect(b).toMatch(/<a class="tab-item" href="\/panel\/feed" aria-current="page"><span>الكلّ<\/span>/)
+    const f = await (await app.request('/panel/feed?s=failed', { headers: { Cookie: cookie } }, env)).text()
+    expect(bar(f)).toContain('href="/panel/feed?s=failed" aria-current="page"')
+    expect(bar(f)).not.toMatch(/href="\/panel\/feed" aria-current/)
+    expect(f).toContain('id="f-p4"')
+    expect(f).not.toContain('id="f-p3"')
+    expect(f).not.toContain('id="f-0a1b2c3d-0001-4000-8000-000000000001"')
+    expect(f).not.toContain('بندٌ لم يُكتب بعد')
+    // ‏والمرشِّحُ الفاسدُ يُهمَل
+    const bad = await (await app.request('/panel/feed?s=nope', { headers: { Cookie: cookie } }, env)).text()
+    expect(bar(bad)).toMatch(/href="\/panel\/feed" aria-current="page"/)
+    expect(bad).toContain('id="f-p3"')
+  })
+
+  it('?m= يحصر الأعدادَ والتقويمَ والبطاقاتِ في الشهر، واليومُ رابطٌ إلى بطاقته، و«الشهر القادم» في المبدِّل', async () => {
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/feed?m=2099-01', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('يناير 2099')
+    expect(html).toContain('id="f-p2"')
+    expect(html).toContain('بندٌ لم يُكتب بعد')
+    expect(html).not.toContain('id="f-p3"')
+    expect(html).not.toContain('id="f-p4"')
+    // ‏مجدولٌ واحدٌ في يناير 2099، والمرشِّحُ يحفظ الشهر
+    expect(bar(html)).toMatch(/href="\/panel\/feed\?m=2099-01&amp;s=queued"><span>مجدول<\/span><span class="count[^"]*"[^>]*>1</)
+    // ‏والخامسُ من يناير رابطٌ إلى بطاقته، والرابعُ (مسوّدةُ البند الأوّل) إلى بطاقتها
+    expect(html).toContain('href="/panel/feed?m=2099-01#f-p2"')
+    expect(html).toContain('href="/panel/feed?m=2099-01#f-0a1b2c3d-0001-4000-8000-000000000001"')
+    // ‏ونقطةُ المجدول بنغمته من `postStatus`
+    expect(html).toContain('class="fd-dot ok"')
+    // ‏والمبدِّل: «هذا الشهر» بلا ?m و«الشهر القادم» بعد شهر اليوم
+    const now = new Date()
+    const next = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1)).toISOString().slice(0, 7)
+    const home = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
+    expect(home).toMatch(/href="\/panel\/feed" aria-current="page"><span>هذا الشهر<\/span>/)
+    expect(home).toContain(`href="/panel/feed?m=${next}"`)
+    const n = await (await app.request('/panel/feed?m=' + next, { headers: { Cookie: cookie } }, env)).text()
+    expect(n).toMatch(new RegExp(`href="/panel/feed\\?m=${next}" aria-current="page"><span>الشهر القادم</span>`))
+    // ‏وشهرٌ فاسدٌ يُهمَل
+    expect((await app.request('/panel/feed?m=2099-13', { headers: { Cookie: cookie } }, env)).status).toBe(200)
+  })
+
+  it('ما لمنظّمةٍ أخرى لا يُعدّ ولا يُرسم في التقويم ولا البطاقات (org_id)', async () => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, account_id, scheduled_at, approved_by, approved_at, created_at, org_id) VALUES
+      ('o9', 'x', 'text', '${TEXT} لغيرنا', 'queued', 'ko9', 'a1', '2099-01-07 06:00:00', 'owner', datetime('now'), '2026-01-01 15:00:00', 'org_other')`)
+    const { cookie } = await session()
+    const html = await (await app.request('/panel/feed?m=2099-01', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).not.toContain('f-o9')
+    expect(bar(html)).toMatch(/s=queued"><span>مجدول<\/span><span class="count[^"]*"[^>]*>1</)
   })
 })

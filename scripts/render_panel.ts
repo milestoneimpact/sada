@@ -401,6 +401,8 @@ const data: PanelData = {
   baseUrl: 'https://sada2.basserh.com',
   // ما زادته القراراتُ الأخيرة — **ويُرسَم ليُقاس**
   openSuggestions: 2,      // D-058
+  // ‏«خطّة الشهر القادم» (D-389): مراجَعةٌ لم تُعتمد بعد — تُرسم لتُقاس
+  nextMonth: { facts: { period: '2026-10', hasPlan: true, reviewed: true, items: 30, approved: 4, queued: 0, published: 0, failed: 0 }, today: '2026-09-25' },
   // ‏عدُّ الرحلة (D-177): مسوّداتٌ تنتظر، ومعتمَدٌ بلا موعد، ومجدولٌ على LinkedIn، وفشلٌ على X
   journey: {
     perPlatform: {

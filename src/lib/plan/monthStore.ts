@@ -68,3 +68,4 @@ export async function monthFacts(db: Db, org: string, period: string): Promise<M
     approved: by('approved'), queued: by('queued'), published: by('published'), failed: by('failed'),
   }
 }
+

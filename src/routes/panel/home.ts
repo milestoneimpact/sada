@@ -69,7 +69,7 @@ import {
 } from './shared'
 import { SCAN_BEAT_SQL, SCAN_MANUAL_SQL, scanTime, stillInFolder } from '../../lib/privacy/trash'
 
-import { localDay, monthJourney, nextPeriod } from '../../lib/plan/month'
+import { NEXT_MONTH_FROM_DAY, localDay, monthJourney, nextPeriod } from '../../lib/plan/month'
 import { localParts } from '../../lib/time/zone'
 
 export const home = new Hono<{ Bindings: Env }>()
@@ -619,18 +619,22 @@ async function overviewData(load: Load): Promise<OverviewData> {
     load.pivotFacts(),
     load.audit(),
     // ‏والرحلةُ تُعدّ من القاعدة كلِّها لا من الستّين الأخيرة — استعلامان مجمَّعان (D-177)
-    journeyCounts(c.env.DB, org, now, [today.slice(0, 7), nextPeriod(today.slice(0, 7))]),
+    journeyCounts(c.env.DB, org, now, [today.slice(0, 7), nextPeriod(today.slice(0, 7))],
+      Number(today.slice(8, 10)) >= NEXT_MONTH_FROM_DAY ? nextPeriod(today.slice(0, 7)) : null),
     // عددٌ على رابط التقرير — والمالكُ لا يفتح شاشةً ليكتشف أنّ فيها ما ينتظره
     openSuggestions(c.env.DB, org),
     load.factors(),
   ])
   const monthAlerts = twoMonthAlerts(journey.planned, today)
+  // ‏«خطّة الشهر القادم» من يوم 20 بتوقيت المالك (D-389): حقائقُه في جملة الرحلة نفسِها، وقبل 20 لا تُطلب
+  const nextMonth = journey.facts === undefined ? undefined : { facts: journey.facts, today }
   const { slide, mediaReady } = readiness(load, p)
   return {
     sources,
     media,
     journey,
     monthAlerts,
+    ...(nextMonth === undefined ? {} : { nextMonth }),
     openSuggestions: open.length,
     // ‏حاجزُ الكتابة بحكم النداء نفسِه، ومنطقةُ المالك لساعة انفتاح السقف (ر-10)
     draftBlocker: blockerFor('draft', allowance.settings, allowance.usage),
