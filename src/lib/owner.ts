@@ -685,6 +685,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏النجاحُ ملفٌّ في المستودع وسطرُ «آخر كتابة» في بطاقة الحزمة، لا في حقائق «ما عليك»
     done: () => null,
   },
+  {
+    code: 'M-66',
+    title: 'طبِّق ترحيل 0066 وجرِّب «صحّح المنشور» على staging (بعد D-391)',
+    ifLeft: 'شيفرةٌ تُنشر قبل الترحيل تكسر صفحة التيّار (خطر)؛ وبلا تجربةٍ حيّة يقع أوّلُ فشلٍ على منشورٍ حقيقيّ (تأجيل).',
+    unblocks: 'capability',
+    // ‏النجاحُ تعديلٌ وردٌّ ظاهران على المنصّتين، لا في حقائق «ما عليك»
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {

@@ -17,6 +17,7 @@ import { session } from './panel/session'
 import { channels } from './panel/channels'
 import { plan } from './panel/plan'
 import { feed } from './panel/feed'
+import { correct } from './panel/correct'
 import { newEntry } from './panel/new'
 import { sources } from './panel/sources'
 import { media } from './panel/media'
@@ -48,6 +49,7 @@ panel.route('/', session)
 panel.route('/', channels)
 panel.route('/', plan)
 panel.route('/', feed)
+panel.route('/', correct)
 panel.route('/', newEntry)
 panel.route('/', sources)
 panel.route('/', media)

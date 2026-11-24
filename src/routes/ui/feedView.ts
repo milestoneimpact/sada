@@ -97,25 +97,56 @@ function action(c: FeedCard, v: FeedView): Html {
       : html`<a class="tap" href="/panel/journey/${c.id}">افتح</a>`
   }
   if (c.status === 'published') {
+    const fix = correctAction(c, v)
     const m = c.metrics
-    if (m === null) return html`<a class="tap" href="/panel/journey/${c.id}">النتائج</a>`
+    if (m === null) return html`<a class="tap" href="/panel/journey/${c.id}">النتائج</a>${fix}`
     const n = (x: number | null): string => (x === null ? '—' : num(x))
     return html`<ul class="fd-metrics plain" aria-label="النتائج">
       <li>${raw(ICON.views)}<span class="num">${n(m.impressions)}</span><span class="vh"> ظهور</span></li>
       <li>${raw(ICON.heart)}<span class="num">${n(m.reactions)}</span><span class="vh"> تفاعل</span></li>
       <li>${raw(ICON.comment)}<span class="num">${n(m.comments)}</span><span class="vh"> تعليق</span></li>
-      <li>${raw(ICON.share)}<span class="num">${n(m.shares)}</span><span class="vh"> مشاركة</span></li></ul>`
+      <li>${raw(ICON.share)}<span class="num">${n(m.shares)}</span><span class="vh"> مشاركة</span></li></ul>${fix}`
   }
   // ‏مجدولٌ أو معتمَدٌ بلا موعد: منشورُ الخطّة إلى شاشة التعديل والسجلّ (D-383 المرحلة ٧)، وما سواه إلى بطاقته في لوح
   // ‏المنشورات (D-388): فيها «انقلها إلى» بضغطةٍ (D-200) والمحرّرُ — واللوحُ خرج من الرافدة، وهذا بابُه
   return raw(button({ label: 'افتح', variant: 'primary', size: 'sm', href: c.planId !== null ? '/panel/plan/post/' + encodeURIComponent(c.id) : '/panel#d-' + encodeURIComponent(c.id) }))
 }
 
+/**
+ * ‏**«صحّح المنشور»** (D-391) للمحرّر فأعلى على منشور LinkedIn أو X (`mayDo('correct')`)، رابطًا إلى صفحة التصحيح بلا سكربت.
+ * ‏وما حذفه صدى ولم يُنشر بديلُه: «أعد المحاولة» ينشر البديلَ وحده بلا حذفٍ ثانٍ.
+ */
+function correctAction(c: FeedCard, v: FeedView): Html {
+  if (!mayDo(v.role, 'correct', 'posted').ok) return html``
+  const k = c.correction
+  if (k !== null && k.retry !== null) {
+    return html`<form class="inline" method="POST" action="/panel/posts/${c.id}/correct/retry" data-busy="جار…">
+      <input type="hidden" name="correction" value="${k.retry}">
+      ${raw(button({ label: 'أعد المحاولة', variant: 'primary', size: 'sm', type: 'submit' }))}</form>`
+  }
+  if (k !== null && (k.deleted || k.of !== null)) return html``
+  if (c.platform !== 'linkedin' && c.platform !== 'x') return html``
+  return html`<a class="tap" href="/panel/posts/${c.id}/correct">صحّح المنشور</a>`
+}
+
+/** شارةُ التصحيح ورابطُ الأصل أو البديل (D-391). */
+function correctionLine(c: FeedCard): Html {
+  const k = c.correction
+  if (k === null) return html``
+  if (k.of !== null) {
+    return html`<p class="fd-fix">${k.kind === 'replace' ? 'بديلٌ لمنشورٍ حُذف' : 'ردٌّ تصحيحيّ'} · <a class="tap" href="/panel/journey/${k.of}">الأصل</a></p>`
+  }
+  if (k.retry !== null) return html`<p class="fd-fix">حُذف من X ولم يُنشر البديلُ بعد.</p>`
+  const to = k.by === null ? html`` : html` · <a class="tap" href="/panel/journey/${k.by}">${k.deleted ? 'البديل' : 'التصحيح'}</a>`
+  return html`<p class="fd-fix">${k.deleted ? 'حُذف من X وأُعيد نشرُه' : 'صُحّح'}${to}</p>`
+}
+
 function badges(c: FeedCard): Html {
   const face = c.kind === 'item' ? { tone: 'pending' as const, glyph: '○', label: 'يُكتب الآن' } : postStatus(c.status)
   return html`${raw(statusBadge(face.tone, face.glyph, face.label))}${
     c.warning === null ? '' : raw(statusBadge(c.warning.tone, c.warning.tone === 'bad' ? '×' : '!', c.warning.label))}${
-    c.edited ? raw(statusBadge('warn', '!', EDITED_MARK)) : ''}`
+    c.edited ? raw(statusBadge('warn', '!', EDITED_MARK)) : ''}${
+    c.correction !== null && (c.correction.corrected || c.correction.deleted) ? raw(statusBadge('warn', '!', 'صُحّح')) : ''}`
 }
 
 function card(c: FeedCard, v: FeedView): Html {
@@ -129,7 +160,7 @@ function card(c: FeedCard, v: FeedView): Html {
       <span class="fd-st">${badges(c)}</span>
     </div>
     <p class="fd-text">${excerpt(c.text)}</p>
-    ${thumb(c)}
+    ${thumb(c)}${correctionLine(c)}
     <div class="fd-acts">${action(c, v)}</div>
   </li>`
 }

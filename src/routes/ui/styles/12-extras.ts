@@ -924,6 +924,7 @@ details.card .nt-list{margin-top:var(--s-4)}
 .fd-now{display:flex; align-items:center; gap:var(--s-3); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); max-inline-size:44rem; margin-inline:auto; inline-size:100%}
 .fd-now::before,.fd-now::after{content:''; flex:1; border-block-start:var(--bd)}
 .fd-older{margin:0; text-align:center}
+.fd-fix{margin:0; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .fd-counts{display:flex; gap:var(--s-3); flex-wrap:wrap}
 .fd-entry{align-items:center; flex-wrap:wrap; justify-content:flex-end}
 
