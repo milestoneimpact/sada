@@ -64,6 +64,7 @@ import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
 import { runPlanBuild, type PlanBuildMessage } from './routes/panel/plan'
 import type { PackageSyncMessage } from './routes/panel/package'
 import { readSource, sourceById, syncPackage, tokenFor } from './lib/package/sync'
+import { flushRepoStatus } from './lib/package/statusFile'
 import { providerKey } from './routes/panel/channels'
 import { dailyChecks } from './lib/ai/health'
 
@@ -981,6 +982,29 @@ async function packageTick(env: Env, job: PackageSyncMessage['packageSync'] & { 
 }
 
 /** ‏الفحصُ الاحتياطيّ الساعيّ (D-366): ETag على الفرع، و304 لا يكتب شيئًا — فلا يفوت دفعٌ ضاع إشعارُه. */
+/** جدولُ الطابور ربعُ الساعيّ — ومنه كتابةُ ملفّ حال الخطّة (D-390). */
+const QUARTER_CRON = '*/15 * * * *'
+
+/**
+ * ملفُّ حال الخطّة في المستودع (D-390) — **بعد النشر لا قبله، ولا يرمي**: عطلُ GitHub يُسجَّل في `repo_status_sync` ولا يمسّ
+ * طابورًا ولا منشورًا. والكتابةُ مجمَّعة: الحالُ الذي لم يتغيّر لا يُكتب، وما تغيّر يُكتب مرّةً كلّ `MIN_GAP_MINUTES` على الأكثر.
+ */
+async function repoStatusTick(env: Env): Promise<void> {
+  try {
+    const source = await readSource(env.DB, OWNER_ORG)
+    if (source === null) return
+    const token = await tokenFor(source, env.TOKEN_ENC_KEY, env.GITHUB_CONTENT_TOKEN)
+    if (token === null) return
+    const out = await flushRepoStatus({
+      db: env.DB, org: source.org, root: source.root, now: new Date(),
+      repo: { owner: source.owner, repo: source.repo, branch: source.branch, token },
+    })
+    if (out.written.length + out.failed.length > 0) console.log({ job: 'repo-status', written: out.written, failed: out.failed, waiting: out.waiting })
+  } catch (error) {
+    console.warn({ job: 'repo-status', failed: error instanceof Error ? error.message : 'unexpected_error' })
+  }
+}
+
 async function packageHourly(env: Env): Promise<void> {
   const source = await readSource(env.DB, OWNER_ORG)
   if (source === null) return
@@ -1237,6 +1261,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
   await renewTick(env)
   await dispatchTick(env)
   await uploadsTick(env)
+  if (controller.cron === QUARTER_CRON) await repoStatusTick(env)
   if (controller.cron === SCAN_CRON) {
     await scanTick(env)
     // ‏قبل التنبيهات: فمفتاحٌ سقط الليلةَ يصل تنبيهُه في الدورة نفسِها

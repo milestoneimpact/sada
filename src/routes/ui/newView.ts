@@ -50,7 +50,8 @@ export function newWays(hasPackage: boolean): readonly Way[] {
       when: 'حين تُدار المادّةُ في مستودع ' + (hasPackage ? '— وحزمتُك مربوطة.' : 'ولم تُربط حزمةٌ بعد.'),
       cost: 'المزامنةُ بلا كلفة؛ وما لا نصَّ له يُكتب بنداءٍ لكلّ منشور.',
       href: '/panel/package', label: hasPackage ? 'زامن الحزمة' : 'اربط الحزمة',
-      links: [{ href: '/panel/plan/imports', label: 'الاستيرادات' }, { href: '/panel/plan-rules', label: 'قواعد الجدولة' }],
+      links: [{ href: '/panel/plan/month-template?f=md', label: 'نزّل قالب الشهر القادم' }, { href: '/panel/plan/month-template?f=readme', label: 'README القالب' },
+        { href: '/panel/plan/imports', label: 'الاستيرادات' }, { href: '/panel/plan-rules', label: 'قواعد الجدولة' }],
     },
   ]
 }

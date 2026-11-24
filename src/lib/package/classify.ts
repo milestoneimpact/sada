@@ -4,6 +4,7 @@
  * الحزمةُ مجلّداتٌ مرقّمة: ‎01-plan الخطّة، و‎02-copy النصوص، و‎03-scripts السيناريوهات، و‎04-media المقاطعُ والأغلفة. وما سواها
  * (‎04-media/engine والصوتُ والهويّةُ والأدوات والدليل) أدواتُ صنعٍ لا مادّةٌ للنشر، فيُتجاهل ولا يُنزَّل.
  */
+import { isTemplatePath } from '../plan/template'
 
 export type FileRole = 'media' | 'cover' | 'plan' | 'copy' | 'script' | 'ignored'
 export type PackageVariant = 'dark' | 'light'
@@ -45,6 +46,8 @@ export function classifyPath(rel: string): Classified {
   if (parts.length < 2) return IGNORED
   const top = parts[0]!
   const name = parts[parts.length - 1]!
+  // ‏وقالبُ الشهر `plans/YYYY-MM.(md|csv)` خطّةٌ كذلك (D-390) — وملفُّ حاله `.status.json` تكتبه صدى فلا يُقرأ
+  if (isTemplatePath(rel)) return { ...IGNORED, role: 'plan' }
   if (top === '01-plan' && parts.length === 2 && /\.xlsx$/i.test(name)) return { ...IGNORED, role: 'plan', version: versionOf(name) }
   if (top === '02-copy' && parts.length === 2 && /\.md$/i.test(name)) return { ...IGNORED, role: 'copy', version: versionOf(name) }
   if (top === '03-scripts' && parts.length === 2 && /\.md$/i.test(name)) {
@@ -70,6 +73,7 @@ export function classifyPath(rel: string): Classified {
 export function mimeOf(path: string): string {
   if (/\.mp4$/i.test(path)) return 'video/mp4'
   if (/\.png$/i.test(path)) return 'image/png'
+  if (/\.csv$/i.test(path)) return 'text/csv; charset=utf-8'
   if (/\.xlsx$/i.test(path)) return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
   return 'text/markdown; charset=utf-8'
 }

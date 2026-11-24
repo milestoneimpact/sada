@@ -54,7 +54,7 @@ const PLATFORM_NAMES: Readonly<Record<string, PlanPlatform>> = {
 /** أعمدةُ الملفّ — والعنوانُ بالعربيّة أو بالإنجليزيّة. */
 type Column = 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone' | 'item' | 'media' | 'format'
 const COLUMNS: Readonly<Record<string, Column>> = {
-  date: 'date', 'التاريخ': 'date', day: 'date',
+  date: 'date', 'التاريخ': 'date', day: 'date', 'اليوم': 'date',
   time: 'time', 'الوقت': 'time', 'الساعة': 'time',
   platform: 'platform', 'المنصة': 'platform', 'المنصّة': 'platform',
   text: 'text', caption: 'text', 'النص': 'text', 'النصّ': 'text', 'نص المنشور': 'text', 'نصّ المنشور': 'text',

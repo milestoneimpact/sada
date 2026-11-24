@@ -4,6 +4,7 @@
  * الويب هوك يتحقّق من التوقيع على الجسم الخامّ قبل أيّ قراءة، ثمّ يضع رسالةً في الطابور ويردّ 202 فورًا — والمزامنةُ في الطابور.
  * **والعنوانُ من `PUBLIC_BASE_URL` لا من ثابت**: الإنتاجُ وstaging لا يختلطان.
  */
+import { needsWrite, readSyncRows } from '../../lib/package/statusFile'
 import { Hono } from 'hono'
 import type { Env } from '../../env'
 import { activeOrg } from '../../lib/tenancy'
@@ -97,9 +98,11 @@ pkg.get('/panel/package', async (c) => {
       .bind(org).first<{ total: number; done: number }>().catch(() => null)])
   // ‏الناقصُ ما لا نصَّ له **ولا مسوّدةَ كُتبت له** — فلا يُعرض الزرُّ نفسُه بعد الكتابة
   const missing = await missingCopy(c.env.DB, org, snap)
+  const sync = await readSyncRows(c.env.DB, org)
   return render(c.env, session.record.csrf, {
     source, media, revisions, missing: missing.map((e) => e.item + ' · ' + e.platform), transfer: moved ?? { total: 0, done: 0 }, tokenReady: tokenReadyFor(org, source, c.env.GITHUB_CONTENT_TOKEN),
     flash: flash === null ? null : { tone: flash.kind, text: flash.text },
+    repoStatus: { needsWrite: needsWrite(sync), rows: sync.slice(0, 4).map((r) => ({ period: r.period, written: r.last_written_at, tried: r.last_attempt_at, error: r.last_error, dirty: r.dirty === 1 })) },
   }, c.req.raw)
 })
 

@@ -1,5 +1,6 @@
 /**
- * عميلُ GitHub للقراءة وحدها (D-366) — **نداءاتٌ مجّانيّة، ولا كتابةَ إلى المستودع أبدًا**.
+ * عميلُ GitHub للقراءة (D-366) — **نداءاتٌ مجّانيّة، ولا كتابةَ إلى المستودع إلّا ملفَّ الحال** `plans/YYYY-MM.status.json`
+ * (D-390 · `putFile`)، وبإذن Contents: write إن منحه المالك؛ وبلاه يبقى كلُّ ما هنا قراءة.
  *
  * ثلاثُ قراءات: رأسُ الفرع بـ ETag (و304 لا يكلّف شيئًا)، والشجرةُ كلُّها مرّةً واحدة (وإن عادت مقطوعةً `truncated` تُمشى مجلّدًا
  * مجلّدًا من الجذر)، والملفُّ الخامُ جسمًا يُبثّ ولا يُجمع في الذاكرة. **والمهلةُ على كلّ نداءٍ ولو جاء `fetchImpl` من المنادي**. **والرمزُ في الترويسة وحدها**: لا يدخل رسالةَ خطأٍ ولا سجلًّا.
@@ -146,4 +147,55 @@ export async function commitInfo(r: RepoRef, sha: string, fetchImpl: typeof fetc
   const parent = body.parents?.[0]?.sha
   const message = body.commit?.message
   return { sha, parent: typeof parent === 'string' ? parent : null, message: typeof message === 'string' ? message.split('\n')[0]!.slice(0, 200) : '' }
+}
+
+export type PutResult =
+  | { readonly kind: 'written'; readonly sha: string }
+  /** الإذنُ للقراءة وحدها (403/404 على الكتابة) — لا يُعاد حتّى يتغيّر الإذن. */
+  | { readonly kind: 'needs_write'; readonly reason: string }
+  | { readonly kind: 'failed'; readonly reason: string }
+
+/** بايتاتُ UTF-8 بـ base64 كما تطلبها Contents API — على دفعاتٍ فلا يفيض مكدّسُ `fromCharCode`. */
+export function base64Utf8(text: string): string {
+  const bytes = new TextEncoder().encode(text)
+  let bin = ''
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000))
+  return btoa(bin)
+}
+
+/** بصمةُ الملفّ الحاليّة في الفرع (لـ PUT) — و`null` إن لم يوجد. */
+async function currentSha(r: RepoRef, p: string, call: typeof fetch): Promise<string | null> {
+  const res = await call(`${repoPath(r)}/contents/${p}?ref=${seg(r.branch)}`, { headers: headers(r.token) })
+  if (!res.ok) return null
+  const body = (await res.json().catch(() => ({}))) as { sha?: unknown }
+  return typeof body.sha === 'string' ? body.sha : null
+}
+
+/**
+ * يكتب ملفًّا واحدًا بـ Contents API (`PUT` مع `sha`) — **لا يرمي أبدًا**: النتيجةُ نوعُها وسببُها بلا رمز.
+ * و`sha` القديمُ إن لم يطابق (409/422، عدّل أحدٌ الملفّ) يُقرأ الحاليُّ ويُعاد مرّةً واحدة.
+ */
+export async function putFile(
+  r: RepoRef, path: string, content: string, message: string, sha: string | null, fetchImpl: typeof fetch = withTimeout(fetch, 20_000),
+): Promise<PutResult> {
+  const call = withTimeout(fetchImpl, 20_000)
+  const p = path.split('/').map(seg).join('/')
+  const send = (s: string | null): Promise<Response> => call(`${repoPath(r)}/contents/${p}`, {
+    method: 'PUT', headers: { ...headers(r.token), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message, content: base64Utf8(content), branch: r.branch, ...(s === null ? {} : { sha: s }) }),
+  })
+  try {
+    let res = await send(sha)
+    if (res.status === 409 || res.status === 422 || (res.status === 404 && sha !== null)) res = await send(await currentSha(r, p, call))
+    if (res.ok) {
+      const body = (await res.json().catch(() => ({}))) as { content?: { sha?: unknown } }
+      const out = body.content?.sha
+      return typeof out === 'string' ? { kind: 'written', sha: out } : { kind: 'failed', reason: 'GitHub قبل الكتابة بلا بصمة' }
+    }
+    const f = failure(res)
+    if (f.status === 403 || f.status === 404) return { kind: 'needs_write', reason: `GitHub ردّ ${f.status}: الرمز بلا إذن Contents: write على المستودع` }
+    return { kind: 'failed', reason: f.message }
+  } catch (e) {
+    return { kind: 'failed', reason: e instanceof GitHubError ? e.message : 'تعذّر الوصول إلى GitHub' }
+  }
 }
