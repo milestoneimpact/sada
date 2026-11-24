@@ -944,6 +944,8 @@ a.fd-day{color:var(--ink); background:var(--surface-2)}
 .fd-dot.pending{color:var(--ink-2)}
 .fd-dot.idle{color:var(--idle)}
 .fd-more{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2)}
+/* ‏مسارُ الخطّة الرباعيّ (D-389): ‏ol بلا هامش المتصفّح ‏17px الذي يخرج عن السلّم */
+.pm-path{margin:0; padding:0; list-style:none}
 .fd-entry{align-items:center; flex-wrap:wrap; justify-content:flex-end}
 
 /* ── «منشورات جديدة» (D-387): ثلاثُ بطاقاتٍ كبيرة، بابٌ واحدٌ وزرٌّ واحدٌ في كلٍّ ────────── */

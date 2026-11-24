@@ -138,7 +138,7 @@ export function monthJourneyCard(months: readonly MonthJourney[]): string {
  * ما تمّ أخضرُ بـ«✓»، والحاليّةُ كهرمانيّةٌ بـ`aria-current="step"`، وما بعدها محايد. لا نمطَ جديد.
  */
 export function pathSteps(at: number): string {
-  return html`<ol class="plain row gap-2" aria-label="مسار الخطّة">${PATH_STEPS.map((label, i) => {
+  return html`<ol class="plain row gap-2 pm-path" aria-label="مسار الخطّة">${PATH_STEPS.map((label, i) => {
     const [tone, g] = i < at ? (['ok', '✓'] as const) : i === at ? (['warn', '◍'] as const) : (['idle', '○'] as const)
     return html`<li${i === at ? raw(' aria-current="step"') : ''}>${i === 0 ? '' : raw('<span class="arw" aria-hidden="true">' + ICON.go + '</span> ')}${raw(statusBadge(tone, g, label))}</li>`
   })}</ol>`.value
