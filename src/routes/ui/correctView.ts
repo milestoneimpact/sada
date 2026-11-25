@@ -23,6 +23,10 @@ export interface CorrectScreen {
   readonly blocked: string | null
   readonly key: string
   readonly max: number
+  /** سقفُ البديل — لسلسلة X أطول من تغريدة (D-396). */
+  readonly replaceMax?: number
+  /** عددُ تغريدات السلسلة المنشورة، أو غائبٌ لغير السلسلة. */
+  readonly tweets?: number
   readonly flash: { readonly tone: 'ok' | 'warn' | 'bad'; readonly text: string } | null
 }
 
@@ -51,7 +55,11 @@ export function correctScreen(m: CorrectScreen): string {
     ? 'X لا يعدّل تغريدةً من الواجهة. ردٌّ تصحيحيّ تحتها يبقي إعجاباتها وردودها، وهو الأسلم.'
     : 'يُعدَّل النصُّ في مكانه على LinkedIn وتبقى التفاعلات، ويُحفظ النصُّ السابق هنا.')
   const flash = m.flash === null ? '' : noticeText(m.flash.tone, m.flash.text)
-  const current = card({ title: 'المنشورُ الآن', level: 2, body: html`<p class="m-0" dir="auto">${m.text}</p>`.value })
+  const thread = m.tweets !== undefined && m.tweets > 1
+  const current = card({
+    title: 'المنشورُ الآن', level: 2,
+    body: html`<p class="m-0" dir="auto">${m.text}</p>${thread ? html`<p class="m-0">سلسلةٌ من ${String(m.tweets)} تغريدات: الردُّ تحت آخرها، والحذفُ يحذفها كلَّها ثمّ ينشر البديلَ سلسلة (افصل تغريداته بسطر ---).</p>` : html``}`.value,
+  })
   let forms = ''
   if (m.blocked !== null) {
     forms = card({ title: 'لا يُصحَّح', level: 2, body: html`<p class="m-0">${m.blocked}</p>`.value })
@@ -75,7 +83,7 @@ export function correctScreen(m: CorrectScreen): string {
       desc: 'تضيع الإعجاباتُ والردودُ ويتغيّر الرابط. تراه في خطوةٍ ثانية قبل أن يقع.',
       body: html`<form method="POST" action="/panel/posts/${m.id}/correct/review" class="stack">
         <input type="hidden" name="key" value="${m.key}">
-        ${raw(textField('fix-replace', 'النصُّ البديل', m.text, m.max))}
+        ${raw(textField('fix-replace', 'النصُّ البديل', m.text, m.replaceMax ?? m.max))}
         <div class="row">${raw(button({ label: 'راجع الحذف وإعادة النشر', variant: 'secondary', type: 'submit' }))}</div></form>`.value,
     })
   }
@@ -88,6 +96,8 @@ export interface ReplaceConfirm {
   readonly oldText: string
   readonly text: string
   readonly key: string
+  /** عددُ تغريدات السلسلة التي تُحذف، أو غائب. */
+  readonly tweets?: number
 }
 
 /** الخطوةُ الثانية لـ«احذف وأعد النشر» — تحذيرٌ صريح بلا سكربت (نمطُ D-382). */
@@ -96,7 +106,7 @@ export function replaceConfirmScreen(m: ReplaceConfirm): string {
   const warn = card({
     variant: 'alert', tone: 'warn', title: 'قبل أن تؤكّد', level: 2,
     body: html`<ul class="plain">
-      <li>تُحذف التغريدةُ الأصليّة من X نهائيًّا.</li>
+      <li>${m.tweets !== undefined && m.tweets > 1 ? html`تُحذف تغريداتُ السلسلة الـ${String(m.tweets)} كلُّها من X نهائيًّا، واحدةً واحدة.` : html`تُحذف التغريدةُ الأصليّة من X نهائيًّا.`}</li>
       <li>تضيع إعجاباتُها وردودُها وإعاداتُ نشرها، ولا تنتقل إلى البديل.</li>
       <li>يتغيّر الرابط: كلُّ من حفظ الرابطَ القديم أو شاركه يجده محذوفًا.</li>
       <li>تُنشر تغريدةٌ جديدة بالنصّ أدناه، وتُحتسب كلفتُها كأيّ منشور.</li>
