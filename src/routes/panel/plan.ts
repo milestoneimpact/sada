@@ -40,7 +40,8 @@ import {
 import { mediaLine, planImportExpired, planImportScreen } from '../ui/planImportView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
 import { taskReadyAlone } from './home'
-import { allows } from '../../lib/access'
+import { allows, SPEND_LOCKED, SPEND_ROLE } from '../../lib/access'
+import { seatedIdeaPosts } from '../../lib/plan/seatedWrite'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
@@ -715,7 +716,7 @@ plan.get('/panel/plan/review', async (c) => {
   // ‏بوّابةُ الفحص (D-383 · المرحلة ٥): التعارضُ والازدحامُ قبل الاعتماد، والإصلاحُ بضغطة لمن يجدول
   const checked = planChecks(await reviewCheckInput(c.env.DB, org, model, await storedZone(c.env.DB), new Date()), await readRules(c.env.DB, org))
   const strip = checksStrip({ findings: checked, planId: current.id, w: c.req.query('w') ?? '', canFix: allows(session.record.role ?? 'owner', 'publisher') })
-  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
+  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts, seatedIdeas: (await seatedIdeaPosts(c.env.DB, org, current.id)).length }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
@@ -787,6 +788,35 @@ plan.post('/panel/plan/review/redraft', async (c) => {
   await setFlash(c.env, c.req.raw, items.length === 0
     ? { kind: 'ok', text: 'لا بندَ تعذّرت كتابتُه الآن.' }
     : { kind: 'ok', text: 'أُعيدت كتابةُ ' + String(items.length) + ' — تظهر في مكانها حين تُكتب.' })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+/**
+ * **«اكتب المسكَّن من أفكاره»** (D-393): مسوّداتُ «ابنِ كما هي» نصُّها فكرتُها؛ يرسل لكلٍّ رسالةَ كتابةٍ تكتبها في مكانها بقواعد
+ * منصّتها من ورقة «الإرشادات» المحفوظة مع الخطّة. نداءٌ مدفوعٌ لكلّ بند، **لمن يعتمد** (`SPEND_PATHS`، D-318) ويُسأل الدورُ هنا
+ * أيضًا، والعددُ على الزرّ قبل الضغط (D-006)، والدفترُ والسقوفُ في `writeOnce` (D-008).
+ */
+plan.post('/panel/plan/review/write-seated', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  if (!allows(gate.session.record.role ?? 'owner', SPEND_ROLE)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: SPEND_LOCKED })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const id = String(gate.form.get('id') ?? '')
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'صارت للخطّة نسخةٌ أحدث — افتح المراجعة من جديد.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const ids = await seatedIdeaPosts(c.env.DB, org, id)
+  const msgs = ids.map((postId) => ({ body: { seatedWrite: { org, postId, planId: id } } }))
+  for (let at = 0; at < msgs.length; at += 100) await c.env.GENERATE_QUEUE.sendBatch(msgs.slice(at, at + 100))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.write_seated', target: id, detail: String(ids.length) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, ids.length === 0
+    ? { kind: 'ok', text: 'لا مسوّدةَ نصُّها فكرتُها في هذه الخطّة.' }
+    : { kind: 'ok', text: 'تُكتب ' + String(ids.length) + ' من أفكارها بقواعد كلّ منصّة — تتبدّل نصوصُها في مكانها كلّما كُتبت.' })
   return c.redirect('/panel/plan/review', 303)
 })
 

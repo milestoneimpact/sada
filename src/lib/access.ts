@@ -107,9 +107,9 @@ export function stepUpSecretFields(path: string, form: { get(name: string): unkn
 /**
  * **الأفعالُ المدفوعة** (D-318) — كلٌّ منها نداءٌ إلى خدمة كتابةٍ أو صور يُسجَّل في `cost_ledger`. والمحرّرُ يعدّل المسوّدةَ
  * القائمة مجّانًا (`/panel/drafts/decide` بـ«احفظ») ويكتب نصوصَ المقطع بيده، ولا يبدأ واحدًا من هذه — ولا يُنشئ مسوّدةَ نصٍّ
- * من الصفر حتّى يُبنى «اكتب بنفسك» (D-324).
+ * من الصفر حتّى يُبنى «اكتب بنفسك» (D-324). و«اكتب المسكَّن من أفكاره» (D-393) منها: لكلّ بندٍ نداء.
  */
-const SPEND_PATHS = /^\/panel\/(plan\/generate|drafts\/(write|idea)|media\/(generate|regenerate|animate)|uploads\/[^/]+\/captions)$/
+const SPEND_PATHS = /^\/panel\/(plan\/(?:generate|review\/write-seated)|drafts\/(write|idea)|media\/(generate|regenerate|animate)|uploads\/[^/]+\/captions)$/
 
 /** أدنى دورٍ يبدأ فعلًا مدفوعًا (D-318). */
 export const SPEND_ROLE: Role = 'publisher'
