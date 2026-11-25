@@ -81,3 +81,47 @@ export function packageMediaFor(
 export function packageRefFor(picks: readonly PackagePick[], itemNo: string, platform: string, variant: PackageVariant | null): string | null {
   return packageMediaFor(picks, itemNo, platform, variant).ref
 }
+
+const MEDIA_PATH = /\.(?:mp4|mov|m4v|webm|png|jpe?g|webp|gif)$/i
+const normPath = (s: string): string => s.trim().replace(/\\/g, '/').replace(/^(?:\.\/|\/)+/, '').toLowerCase()
+
+/**
+ * **مطابقةُ التلميح بالمسار** (D-394): صفُّ الخطّة أو القالب يكتب في «الملف» مسارَ صورةٍ أو مقطعٍ من الحزمة، فيُربط ذلك الملفُّ
+ * بعينه. المسارُ كاملًا (من جذر الحزمة أو المستودع)، أو آخرُه (`06/06-dark-v2.mp4`)، أو اسمُ الملفّ وحدَه إن لم يحمله غيرُ ملفٍّ واحد. وما ليس مسارَ وسيطةٍ
+ * («داكن»، «فيديو») أو لا يطابق شيئًا يعيد `null` فيبقى رقمُ المادّة احتياطًا.
+ */
+export function packageFileByPath(picks: readonly PackagePick[], hint: string): { readonly pick: PackagePick; readonly file: PackageFile } | null {
+  const want = normPath(hint)
+  if (want === '' || !MEDIA_PATH.test(want)) return null
+  const all = picks.flatMap((pick) => [pick.video, pick.cover, ...pick.superseded]
+    .filter((f): f is PackageFile => f !== null).map((file) => ({ pick, file })))
+  const exact = all.find((x) => normPath(x.file.path) === want) ?? all.find((x) => normPath(x.file.path).endsWith('/' + want))
+    // ‏ومسارٌ من جذر المستودع (`social-media/04-media/…`) يطابق مسارَ الحزمة تحت جذرها
+    ?? all.find((x) => want.endsWith('/' + normPath(x.file.path)))
+  if (exact !== undefined) return exact
+  const base = want.split('/').pop() ?? want
+  const named = all.filter((x) => (normPath(x.file.path).split('/').pop() ?? '') === base)
+  return named.length === 1 ? named[0]! : null
+}
+
+/**
+ * وسيطةُ صفٍّ من الخطّة: **المسارُ أوّلًا** (D-394) ثمّ رقمُ المادّة (D-366). والمقطعُ المسمّى بمساره يُنشر حيث تنشر صدى المقاطع،
+ * وإلّا فغلافُ مادّته بسببٍ مكتوب، كما في `packageMediaFor`.
+ */
+export function planMediaFor(
+  picks: readonly PackagePick[], itemNo: string | null, platform: string, hint: string, variant: PackageVariant | null,
+): { readonly ref: string | null; readonly note: string | null; readonly byPath: boolean } {
+  const hit = packageFileByPath(picks, hint)
+  if (hit !== null) {
+    const name = hit.file.path.split('/').pop() ?? hit.file.path
+    const ref = (f: PackageFile | null): string | null => (f === null || f.r2Key === null ? null : 'g:' + f.blobSha)
+    if (hit.file.r2Key === null) return { ref: null, note: `«${name}» لم يُنقل من الحزمة بعد — زامنها`, byPath: true }
+    if (hit.file.role === 'cover' || isVideoPlatform(platform)) return { ref: ref(hit.file), note: null, byPath: true }
+    const misfit = isVideoTarget(platform) ? videoMisfit(platform, hit.file.size) : 'المنصّةُ لا تنشر المقاطع'
+    if (misfit === null) return { ref: ref(hit.file), note: null, byPath: true }
+    const cover = ref(hit.pick.cover)
+    return { ref: cover, note: `${misfit} — ${cover === null ? 'ولا غلاف بديل' : 'أُلحق الغلافُ بدلَه'}`, byPath: true }
+  }
+  if (itemNo === null) return { ref: null, note: null, byPath: false }
+  return { ...packageMediaFor(picks, itemNo, platform, variant), byPath: false }
+}

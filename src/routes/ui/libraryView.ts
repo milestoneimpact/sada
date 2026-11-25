@@ -37,6 +37,8 @@ export interface LibraryData {
   readonly fav?: boolean
   /** مجلّدُ وسائط المالك في Drive (D-363) — اسمُه وعددُ ما فيه. */
   readonly driveMedia?: { readonly folder: string; readonly count: number }
+  /** «من حزمتك» (D-394): وسائطُ الحزمة المعتمدة، تُعرض أوّلًا في وجه الاختيار وحدَه. */
+  readonly packageAssets?: readonly Asset[]
 }
 
 /**
@@ -115,6 +117,20 @@ function tile(a: Asset, d: LibraryData): string {
   </article>`
 }
 
+/**
+ * **«من حزمتك» أوّلًا** (D-394): في وجه الاختيار — لبند الخطّة أو لمنشورها — وسائطُ حزمة المحتوى قبل كلّ مجلّد، فما في المستودع
+ * يُختار بلا بحث. وفي التصفّح لا يُعرض (الحزمةُ في `/panel/package`). ومنشورٌ مكتوب يختار صورةً وحدها كما في بلاطاته.
+ */
+function fromPackage(d: LibraryData): string {
+  const forPost = d.pickPost !== undefined && d.pickPost !== null
+  if (d.pick === null && !forPost) return ''
+  const list = (d.packageAssets ?? []).filter((a) => !forPost || a.kind === 'image')
+  if (list.length === 0) return ''
+  return html`<section class="mt-4 mb-4" id="from-package" aria-label="من حزمتك">
+    <h2 class="lib-h">من حزمتك <span class="count">${list.length}</span></h2>
+    <div class="lib-grid">${raw(list.map((a) => tile(a, d)).join(''))}</div></section>`.value
+}
+
 export function libraryScreen(d: LibraryData): string {
   // ‏البحثُ والمفضّلة أوّلًا (D-347)، ثمّ النوعُ والمنشأ — والمفضّلةُ تتقدّم في مجلّدها
   const shown = searchAssets(d.assets, d.q ?? '', d.fav === true)
@@ -154,6 +170,7 @@ export function libraryScreen(d: LibraryData): string {
   }))}
   <div class="row gap-2 mb-3 lib-chips" role="group" aria-label="النوع">${chips(d, KIND_LABEL, d.kind, 'kind', (v) => d.assets.filter((a) => v === null || a.kind === v).length)}</div>
   <div class="row gap-2 mb-4 lib-chips" role="group" aria-label="المنشأ">${chips(d, ORIGIN_LABEL, d.origin, 'origin', (v) => d.assets.filter((a) => v === null || a.origin === v).length)}</div>
+  ${fromPackage(d)}
   ${assetSearch(d.q ?? '', d.fav === true, keep)}
   ${upload}
   ${d.driveMedia === undefined ? '' : driveMediaCard(d.driveMedia)}

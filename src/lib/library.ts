@@ -103,6 +103,22 @@ export async function listLibrary(db: Db, org: string, limit = 300): Promise<Ass
   return all.sort((a, b) => b.at.localeCompare(a.at))
 }
 
+/**
+ * **وسائطُ الحزمة أصولًا** (D-394) لمنتقي المكتبة: المعتمدُ وحده وما نُقل إلى R2، بمرجع `g:<sha>` الذي يربطه `attachStatement`،
+ * مرتّبًا بالمادّة ثمّ اللون ثمّ الصورة قبل المقطع. ودالّةٌ نقيّة: الصفوفُ من `readPackageMedia`.
+ */
+export function packageAssets(rows: readonly {
+  readonly blobSha: string; readonly itemNo: string | null; readonly variant: string | null; readonly kind: 'video' | 'image'
+  readonly path: string; readonly bytes: number; readonly r2Key: string | null; readonly isCurrent: boolean
+}[]): Asset[] {
+  return rows.filter((r) => r.isCurrent && r.r2Key !== null)
+    .sort((a, b) => (a.itemNo ?? '~').localeCompare(b.itemNo ?? '~') || (a.variant ?? '').localeCompare(b.variant ?? '') || a.kind.localeCompare(b.kind))
+    .map((r): Asset => ({
+      ref: 'g:' + r.blobSha, origin: 'upload', kind: r.kind, name: r.path.split('/').pop() ?? r.path,
+      mime: r.kind === 'video' ? 'video/mp4' : /\.jpe?g$/i.test(r.path) ? 'image/jpeg' : /\.webp$/i.test(r.path) ? 'image/webp' : 'image/png', bytes: r.bytes, at: '', preview: `/panel/assets/raw/g:${encodeURIComponent(r.blobSha)}`, drive: null,
+    }))
+}
+
 /** أكثرُ ما يحمله أصلٌ من وسوم، وأطولُ وسم — قليلةٌ تُقرأ على البلاطة. */
 export const MAX_TAGS = 8
 const MAX_TAG_LENGTH = 24
