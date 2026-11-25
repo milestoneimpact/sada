@@ -343,7 +343,7 @@ export interface GenerateOptions {
 }
 
 /** مقاسُ التوليد لـ FLUX.2 — دون ميغابكسلٍ واحد فيبقى بسعر الميغابكسل الأوّل، وبنسبة المنصّة. */
-const GEN_SIZE: Readonly<Record<Platform, { width: number; height: number }>> = {
+export const GEN_SIZE: Readonly<Record<Platform, { width: number; height: number }>> = {
   linkedin: { width: 1344, height: 704 },
   x: { width: 1344, height: 768 },
   tiktok: { width: 768, height: 1344 },

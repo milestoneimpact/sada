@@ -24,6 +24,8 @@ export interface PreviewData {
   readonly rules?: PlanRules | null
   /** رقمُ السطر ← سطرُ وسيطته من مكتبة Drive (D-363، `mediaLine`) — HTML مهرَّبٌ من قبل. */
   readonly media?: Readonly<Record<string, string>>
+  /** تقديرُ الزرّين بالدولار قبل الضغط (D-395، `buildEstimateLine`) — نصٌّ خامٌّ يُهرَّب هنا. */
+  readonly estimate?: { readonly write: string; readonly seat: string | null }
 }
 
 const SHOWN = 60
@@ -62,6 +64,7 @@ export function planPreviewScreen(d: PreviewData): string {
   const act = html`<form method="POST" action="/panel/plan/import/confirm" class="stack">
     <input type="hidden" name="k" value="${d.key}">
     <p class="hint m-0">${cost}«اكتب» يكتب كلَّ منشورٍ من فكرته بقواعد منصّته: ${counted(rows.length, NOUNS.post)}، نداءٌ مدفوعٌ لكلٍّ في الدفتر وتحت سقفك اليوميّ. و«ابنِ كما هي» يضع النصوصَ كما في ملفّك بلا كلفة. ولا يُجدوَل شيءٌ قبل أن تعتمد.</p>
+    ${d.estimate === undefined ? html`` : html`<p class="hint m-0"><strong>«اكتب»</strong>: ${d.estimate.write}${d.estimate.seat === null ? html`` : html` <strong>«ابنِ كما هي»</strong> مع الصور: ${d.estimate.seat}`} من أسعار المزوّدين المضبوطة نفسِها التي يكتب بها الدفتر.</p>`}
     <div class="row gap-2">${raw(button({ label: 'اكتب الخطّة من أفكارها', type: 'submit', variant: 'primary', name: 'write', value: '1' }))}
       ${raw(button({ label: 'ابنِ كما هي', type: 'submit', variant: 'secondary', name: 'write', value: '0' }))}
       ${raw(button({ label: 'ارفع غيره', href: '/panel/plan/import', variant: 'quiet' }))}</div></form>`

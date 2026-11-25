@@ -45,6 +45,8 @@ import { seatedIdeaPosts } from '../../lib/plan/seatedWrite'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
+import { buildEstimateLine, estimateBuild } from '../../lib/buildCost'
+import { planBuildCalls } from '../../lib/buildCostInputs'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
 import { asImageChoice, asImageStyle, asSpan, asTimes, imageFor, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanChoices, type PlanPlatform } from '../../lib/plan/prompt'
@@ -1333,7 +1335,15 @@ plan.get('/panel/plan/import/preview', async (c) => {
   const facts = await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date())
   const media: Record<string, string> = {}
   for (const r of readPlan(p.csv, facts).rows) { const line = mediaLine(r); if (line !== '') media[String(r.line)] = line }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media })
+  // ‏وتقديرُ الزرّين بالدولار قبل الضغط (D-395): كلُّ نداءٍ بسعره من الجدول الذي يكتب به الدفتر، وما لا سعرَ له يُقال
+  const rows = readPlan(p.csv, facts).rows
+  const room = p.imageStyle === null ? 0 : await autoImageRoom(c.env.DB, activeOrg(session.record), true)
+  const used = await neuronsUsedToday(c.env.DB)
+  const lineFor = async (write: boolean): Promise<string> => buildEstimateLine(estimateBuild(await planBuildCalls(c.env.DB, activeOrg(session.record), {
+    platforms: rows.map((r) => r.platform), write, imageStyle: p.imageStyle, imageRoom: room,
+  }), used))
+  const estimate = { write: await lineFor(true), seat: p.imageStyle === null ? null : await lineFor(false) }
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),
