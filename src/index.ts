@@ -58,6 +58,7 @@ import { auth } from './routes/auth'
 import { notFoundResponse, serverErrorResponse } from './routes/errors'
 import { draftFromIdea, draftPost } from './lib/draft/job'
 import { generateForPost, resumeWaiting } from './lib/image/job'
+import { compareKlein, kleinLedgerRows, parseCheckQuery, type KleinCheck } from './lib/image/priceCheck'
 import { attachStatement } from './lib/library'
 import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
@@ -185,7 +186,15 @@ app.get('/admin/ready', async (c) => {
   } catch {
     keys = 'unreadable'
   }
-  return c.json({ ...detail, version: servedVersion(c.env), keys }, detail.ready ? 200 : 503)
+  // ‏وسعرُ klein 9B المقيس (D-398): الدفترُ بالجدول، وباللوحة إن مرّر المالكُ عددها — قراءةٌ لا تُسقط الجاهزيّة
+  const q = parseCheckQuery(c.req.query('day'), c.req.query('klein_dashboard_neurons'), new Date().toISOString().slice(0, 10))
+  let imagePrice: KleinCheck | 'unreadable' = 'unreadable'
+  try {
+    imagePrice = compareKlein(q.day, await kleinLedgerRows(c.env.DB, q.day), q.dashboard)
+  } catch {
+    imagePrice = 'unreadable'
+  }
+  return c.json({ ...detail, version: servedVersion(c.env), keys, image_price: imagePrice }, detail.ready ? 200 : 503)
 })
 
 async function readinessDetail(env: Env): Promise<{
