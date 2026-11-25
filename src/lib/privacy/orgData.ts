@@ -35,7 +35,7 @@ export const EXPORT_FRESH_HOURS = 24
  */
 const OWNED = [
   'post_corrections', 'publish_attempts', 'metrics', 'media_claims', 'promotion_suggestions', 'media', 'posts',
-  'review_verdicts', 'review_links', 'plan_edits', 'plan_items', 'plan_versions', 'import_jobs', 'plans', 'schedule_rules', 'content_items', 'analysis_claims', 'sources',
+  'review_verdicts', 'review_links', 'plan_edits', 'plan_items', 'plan_versions', 'import_jobs', 'plans', 'schedule_rules', 'plan_platform_flags', 'content_items', 'analysis_claims', 'sources',
   'token_alerts', 'tokens', 'accounts', 'uploads', 'asset_marks', 'library_files', 'drive_media', 'drive_media_folder',
   'repo_status_sync', 'package_changes', 'package_revisions', 'package_media', 'package_files', 'package_sources',
   'reports', 'settings', 'provider_checks', 'providers', 'task_routes', 'oauth_apps', 'alert_outbox', 'notice_reads', 'web_vitals',
@@ -44,7 +44,7 @@ const OWNED = [
 
 /** ما يُصدَّر — بترتيبٍ يقرؤه إنسان: العميلُ ثمّ عمله ثمّ أثرُه. */
 const EXPORTED = [
-  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_items', 'plan_versions', 'plan_edits', 'import_jobs', 'schedule_rules', 'review_links', 'review_verdicts', 'posts', 'post_corrections', 'repo_status_sync', 'publish_attempts',
+  'brands', 'briefs', 'settings', 'accounts', 'sources', 'content_items', 'plans', 'plan_items', 'plan_versions', 'plan_edits', 'import_jobs', 'schedule_rules', 'plan_platform_flags', 'review_links', 'review_verdicts', 'posts', 'post_corrections', 'repo_status_sync', 'publish_attempts',
   'metrics', 'media', 'promotion_suggestions', 'uploads', 'library_files', 'asset_marks', 'drive_media', 'drive_media_folder', 'package_sources', 'package_files', 'package_media', 'package_revisions', 'package_changes', 'reports', 'token_alerts', 'providers', 'task_routes',
   'cost_ledger', 'audit_log',
 ] as const

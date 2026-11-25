@@ -10,6 +10,7 @@
  * والعتباتُ من `schedule_rules` (0061)، وغيابُ الصفّ يعني `DEFAULT_RULES` كما كُتبت في الترحيل.
  */
 import { platformLabel } from '../oauth/providers'
+import { mediaProblem, type MediaKind } from './platforms'
 
 export interface ScheduleRules {
   /** سقفُ كلّ منصّةٍ في اليوم، وما لم يُذكر بلا سقف. */
@@ -48,6 +49,8 @@ export interface CheckItem {
   /** بصمةُ النصّ أو المادّة (مصدرُها ورقمُها) — بها يُكشف المكرَّر من مصدرين. */
   readonly contentKey?: string | null
   readonly mediaMissing?: boolean
+  /** نوعُ وسيطه إن عُرف (D-399): Instagram يحتاج صورةً أو مقطعًا، وTikTok مقطعًا. وغيابُه «لا يُعرف» فلا يُحكم. */
+  readonly media?: MediaKind | null
   readonly kind?: string | null
   /** حالُ منشوره إن كان: ما نُشر أو جُدول لا يُحرَّك آليًّا. */
   readonly status?: string | null
@@ -249,8 +252,9 @@ export function planChecks(input: CheckInput, rules: ScheduleRules = DEFAULT_RUL
     if (i.text === null || i.text.trim() === '') {
       out.push({ rule: 'no_text', severity: 'block', keys: [i.key], platform: i.platform, fix: 'edit', message: 'لا نصّ لهذا البند بعد' })
     }
-    if (i.mediaMissing === true) {
-      out.push({ rule: 'no_media', severity: 'block', keys: [i.key], platform: i.platform, fix: 'upload', message: 'وسيطه لم يُرفع بعد' })
+    const need = mediaProblem(i.platform, i.media)
+    if (i.mediaMissing === true || need !== null) {
+      out.push({ rule: 'no_media', severity: 'block', keys: [i.key], platform: i.platform, fix: 'upload', message: need ?? 'وسيطه لم يُرفع بعد' })
     }
     const fits = i.kind == null ? undefined : FORMAT_FITS[i.kind]
     if (fits !== undefined && !fits.includes(i.platform)) {
