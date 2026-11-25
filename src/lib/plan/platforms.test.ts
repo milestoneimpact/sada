@@ -7,6 +7,7 @@ import { readPlan, rowKey, type PlanFacts } from './import'
 import { changeStatements, packageKey } from '../package/apply'
 import type { Change, SnapshotEntry } from '../package/diff'
 import type { Db } from '../tokens'
+import { cardMedia } from './checkStore'
 import { planNewScreen, type PlanNewData } from '../../routes/ui/planNewView'
 
 const FOUR = ['linkedin', 'x', 'instagram', 'tiktok'] as const
@@ -116,5 +117,20 @@ describe('خطّةٌ بأربع منصّات', () => {
     expect(new Set(keys).size).toBe(4)
     expect(inserts.map((b) => b[2])).toEqual([...FOUR])
     expect(inserts.every((b) => b[6] === 'org-a')).toBe(true)
+  })
+})
+
+describe('مراجعة D-399: بطاقةُ الخطّة تحمل نوعَ وسيطها', () => {
+  const check = (platform: string, c: { post: unknown; mediaMime?: string | null }) => planChecks({ planId: 'p', activePlatforms: [...FOUR], others: [], now: { day: '2026-12-01', minutes: 0 },
+    items: [{ key: 'k', platform, at: { day: '2026-12-02', minutes: 600 }, text: 'نصّ', ...cardMedia(c) }] }).some((f) => f.rule === 'no_media')
+  it('TikTok بمسوّدةٍ بصورةٍ أو بلا وسيطٍ ممنوع، وبمقطعٍ يمرّ', () => {
+    expect(check('tiktok', { post: { id: 'x' }, mediaMime: 'image/png' })).toBe(true)
+    expect(check('tiktok', { post: { id: 'x' }, mediaMime: null })).toBe(true)
+    expect(check('tiktok', { post: { id: 'x' }, mediaMime: 'video/mp4' })).toBe(false)
+    expect(check('instagram', { post: { id: 'x' }, mediaMime: null })).toBe(true)
+  })
+  it('البندُ الذي لم يُكتب لا يُمنع', () => {
+    expect(cardMedia({ post: null, mediaMime: null })).toEqual({})
+    expect(check('tiktok', { post: null })).toBe(false)
   })
 })
