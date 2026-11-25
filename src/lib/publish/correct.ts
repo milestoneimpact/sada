@@ -38,6 +38,7 @@ import { littleText } from './littleText'
 import { publishX, PublishError } from './platforms'
 import { publishXThread } from './xThread'
 import { isTimeout, withTimeout } from '../net/timeout'
+import { changedRows } from '../dbResult'
 
 export type CorrectionKind = 'edit' | 'reply' | 'replace'
 
@@ -90,6 +91,8 @@ export const SAY = {
   notPublished: 'التصحيحُ للمنشور الذي نُشر وحده.',
   platform: 'التصحيحُ لـ LinkedIn وX وحدهما الآن.',
   thread: 'لم تُحفَظ معرّفاتُ تغريدات هذه السلسلة في سجلّ النشر، فلا يُعرف ما يُردّ عليه أو يُحذف. صحّحها على X بيدك.',
+  partlyDeleted: 'حُذف بعضُ هذه السلسلة من X في «احذف وأعد النشر» لم يكتمل، فآخرُ تغريدةٍ قد لا تكون هناك — أكمل «احذف وأعد النشر» بدل الردّ.',
+  replaceBusy: 'تصحيحٌ آخرُ يحذف هذا المنشورَ ويعيد نشره الآن — انتظر نتيجتَه في التيّار. لم يُرسَل شيء.',
   threadReply: 'الردُّ التصحيحيّ تغريدةٌ واحدة — احذف سطرَ «---».',
   page: 'معرّفُ صفحة LinkedIn في الحساب ليس رقمَ منظّمة، فلا يُبنى urn:li:organization — أعد ربط الصفحة من «الحسابات».',
   pageScope: 'إذنُ صفحة LinkedIn لا يشمل w_organization_social، فلا يُعدَّل منشورُها. أعد ربط الصفحة من «الحسابات» بحساب مديرٍ لها بعد أن يُفتح Community Management API لتطبيقك (M-03). لم يُرسَل شيء.',
@@ -275,6 +278,8 @@ export async function correctPost(deps: CorrectDeps, org: string, input: Correct
   const bad = validate(original, input)
   if (bad !== null) return { ok: false, reason: bad }
   const text = input.text.trim()
+  // ‏حذفٌ لم يكتمل: الردُّ على تغريدةٍ قد حُذفت يُدفع ولا يقع — يُردّ قبل الحجز والدفتر
+  if (input.kind === 'reply' && (await deletedBefore(deps.db, org, original.id)).size > 0) return { ok: false, reason: SAY.partlyDeleted }
 
   const held = await reserve(deps.db, original, input, text)
   if ('existing' in held) {
@@ -297,6 +302,16 @@ export async function correctPost(deps: CorrectDeps, org: string, input: Correct
     return r
   }
   // ‏«احذف وأعد النشر»: كلُّ تغريدةٍ تُحذف وحدها، في الدفتر قبل إرسالها، ومن الآخر إلى الأوّل — وما حُذف من قبل لا يُحذف ثانيةً
+  // ‏الحجزُ قبل أوّل DELETE (0068): تصحيحان متزامنان لا يحذفان معًا ولا يدفعان البديلَ مرّتين
+  const claim = await deps.db
+    .prepare(`UPDATE posts SET replace_claim = ? WHERE id = ? AND org_id = ? AND (replace_claim IS NULL OR replace_claim = ?
+                OR replace_claim IN (SELECT id FROM post_corrections WHERE org_id = ? AND post_id = ? AND status = 'failed'))`)
+    .bind(cid, original.id, org, cid, org, original.id)
+    .run()
+  if (!changedRows(claim)) {
+    await setCorrection(deps.db, cid, org, 'failed', { error: SAY.replaceBusy })
+    return { ok: false, reason: SAY.replaceBusy, correctionId: cid }
+  }
   const gone = await deletedBefore(deps.db, org, original.id)
   const total = original.remote_ids.length
   for (const tweetId of [...original.remote_ids].reverse()) {
@@ -326,8 +341,13 @@ export async function correctPost(deps: CorrectDeps, org: string, input: Correct
       const body = (await res.json().catch(() => ({}))) as { data?: { deleted?: unknown } }
       if (body.data?.deleted !== true) return failed('ردّت X بلا «deleted: true» — لم يُحذف الأصل، ولم يُنشر البديل.')
     }
+    try {
+      await markDeleted(deps.db, org, cid, tweetId)
+    } catch {
+      // ‏حُذفت ولم تُسجَّل: التصحيحُ التالي يحذفها ثانيةً فيلقى ‏404 فيعدّها محذوفةً بلا ضرر
+      return failed(`حُذفت التغريدة ${tweetId} من X ولم يُسجَّل حذفُها في صدى — لم يُنشر البديل؛ أعد التصحيح.`)
+    }
     gone.add(tweetId)
-    await markDeleted(deps.db, org, cid, tweetId)
   }
   await deps.db.prepare(`UPDATE posts SET platform_deleted_at = datetime('now'), corrected_at = datetime('now') WHERE id = ? AND org_id = ?`).bind(original.id, org).run()
   await setCorrection(deps.db, cid, org, 'deleted')
@@ -483,8 +503,17 @@ async function publishLinked(
   } catch (error) {
     const status = error instanceof PublishError ? error.status : 0
     const detail = error instanceof Error ? error.message : String(error)
-    const unconfirmed = !(error instanceof PublishError) || status >= 500
-    const why = (kind === 'replace' ? 'حُذف الأصلُ ولم يُنشر البديل: ' : '') + platformSay('x', status, isTimeout(error) ? 'timeout' : detail.slice(0, 160))
+    /*
+     * ‏السلسلةُ تُصنَّف ببادئة رسالتها كما في الناشر (D-324): `thread_unconfirmed:` أُرسلت تغريدةٌ ولم يُعرَف جوابُها فتبقى `sent`
+     * ‏ولا تُعاد حتّى يُسوّيها المالك؛ وما عداها من `PublishError` (`pre_send:` و4xx) لم يُرسَل منه شيءٌ معلَّق، فالإعادةُ تكمل.
+     */
+    const unconfirmed = asThread
+      ? !(error instanceof PublishError) || detail.startsWith('thread_unconfirmed:')
+      : !(error instanceof PublishError) || status >= 500
+    const prefix = kind === 'replace' ? 'حُذف الأصلُ ولم يُنشر البديل: ' : ''
+    const why = asThread
+      ? prefix + detail.replace(/^(x|pre_send|thread_unconfirmed):\s*/, '').slice(0, 240) + (unconfirmed ? ' — قل ما وجدت على بطاقة البديل في التيّار.' : '')
+      : prefix + platformSay('x', status, isTimeout(error) ? 'timeout' : detail.slice(0, 160))
     // ‏ما لم يُعرَف جوابُه يبقى `sent`: لا يُعاد حتّى يتحقّق المالك (D-269)
     if (!unconfirmed) {
       await db.prepare(`UPDATE publish_attempts SET status = 'failed', response_json = ? WHERE id = ? AND org_id = ?`)

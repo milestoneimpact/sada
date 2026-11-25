@@ -162,3 +162,71 @@ describe('صفحة LinkedIn', () => {
     expect(db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get()).toEqual({ n: 0 })
   })
 })
+
+describe('مراجعة D-396', () => {
+  const replace = (f: typeof fetch, id: string) =>
+    correctPost(deps(f), 'org_owner', { postId: id, kind: 'replace', text: 'بديلٌ\n---\nثانٍ', key: k(), confirmed: true, by: null })
+
+  it('pre_send في السلسلة: المحاولةُ فاشلةٌ لا معلّقة، و«أعد المحاولة» تنشر', async () => {
+    const id = await seedThread()
+    db.raw.exec(`CREATE TRIGGER no_ledger BEFORE INSERT ON cost_ledger WHEN NEW.operation <> 'delete_post:price_unverified' BEGIN SELECT RAISE(ABORT, 'ledger down'); END`)
+    const first = net([gone, gone, gone])
+    const r = await replace(first.f, id)
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.retry).toBe(true)
+    expect(first.calls.filter((c) => c.method === 'POST')).toHaveLength(0)
+    db.raw.exec('DROP TRIGGER no_ledger')
+    const second = net([ok('61'), ok('62')])
+    const again = await retryReplacement(deps(second.f), 'org_owner', r.correctionId!)
+    expect(again.ok).toBe(true)
+    expect(second.calls).toHaveLength(2)
+  })
+
+  it('thread_unconfirmed: تبقى معلّقة، ولا زرَّ إعادةٍ يدور، والإعادةُ لا ترسل', async () => {
+    const id = await seedThread()
+    const first = net([gone, gone, gone, { status: 500, json: { detail: 'boom' } }])
+    const r = await replace(first.f, id)
+    expect(r.ok).toBe(false)
+    if (r.ok) return
+    expect(r.retry).toBe(false)
+    expect(r.reason).toContain('قل ما وجدت')
+    const att = db.raw.prepare(`SELECT a.status FROM publish_attempts a JOIN posts p ON p.id = a.post_id WHERE p.corrects_post_id = ?`).get(id) as { status: string }
+    expect(att.status).toBe('sent')
+    const second = net([])
+    expect((await retryReplacement(deps(second.f), 'org_owner', r.correctionId!)).ok).toBe(false)
+    expect(second.calls).toHaveLength(0)
+  })
+
+  it('حذفٌ لم يكتمل: الردُّ يُردّ بلا نداء ولا قيد', async () => {
+    const id = await seedThread()
+    await replace(net([gone, { status: 403, json: { detail: 'no' } }]).f, id)
+    const before = (db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }).n
+    const { f, calls } = net([])
+    const r = await correctPost(deps(f), 'org_owner', { postId: id, kind: 'reply', text: 'تصحيح', key: k(), by: null })
+    expect(r).toEqual({ ok: false, reason: SAY.partlyDeleted })
+    expect(calls).toHaveLength(0)
+    expect((db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get() as { n: number }).n).toBe(before)
+  })
+
+  it('تصحيحٌ آخر يحذف الآن: الثاني يُردّ قبل أيّ حذف', async () => {
+    const id = await seedThread()
+    db.raw.prepare(`INSERT INTO post_corrections (id, org_id, post_id, kind, status, idempotency_key, old_text, new_text) VALUES ('c-other', 'org_owner', ?, 'replace', 'sent', ?, 'x', 'y')`).run(id, k())
+    db.raw.prepare(`UPDATE posts SET replace_claim = 'c-other' WHERE id = ?`).run(id)
+    const { f, calls } = net([])
+    const r = await replace(f, id)
+    expect(r).toMatchObject({ ok: false, reason: SAY.replaceBusy })
+    expect(calls).toHaveLength(0)
+  })
+
+  it('حُذفت ولم يُسجَّل حذفُها: فشلٌ مقول بلا رمي، والتصحيحُ failed', async () => {
+    const id = await seedThread()
+    db.raw.exec(`CREATE TRIGGER no_mark BEFORE UPDATE ON post_corrections WHEN NEW.deleted_ids IS NOT NULL BEGIN SELECT RAISE(ABORT, 'disk'); END`)
+    const { f, calls } = net([gone])
+    const r = await replace(f, id)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.reason).toContain('لم يُسجَّل حذفُها')
+    expect(calls).toHaveLength(1)
+    expect((db.raw.prepare('SELECT status FROM post_corrections WHERE post_id = ?').get(id) as { status: string }).status).toBe('failed')
+  })
+})
