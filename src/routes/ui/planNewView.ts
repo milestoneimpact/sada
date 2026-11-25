@@ -19,7 +19,8 @@
  *
  * ## ثلاثُ قواعد باقية
  *
- * - **المربوطُ وحدَه يُرى**، ومن `PLAN_NOW` وحدَه (LinkedIn وX بقرار المالك).
+ * - **المربوطُ وحدَه يُرى**، ومن `PLAN_NOW` وحدَه (LinkedIn وX بقرار المالك)، وInstagram وTikTok خلف بوّابة (D-399):
+ *   تدخلان بالربط أو بعلم `plan_platform_flags`، وبدونهما يُقال ما يفتحه الربط.
  * - **الإيقاعُ يُختار لا يُكتب.**
  * - **زرٌّ واحدٌ للبناء**، والعددُ والكلفةُ فوقه قبل الضغط (D-006 · D-008)، ولا يُنشر شيءٌ بعده.
  */
@@ -41,9 +42,10 @@ import { button } from './components/button'
 import { field } from './components/field'
 import { card } from './components/card'
 import { BP } from './tokens'
+import { GATED_UNLOCKS, PLAN_BASE, PLAN_GATED, planNowFor } from '../../lib/plan/platforms'
 
 /** ما يُخطَّط له اليوم بقرار المالك — ومنه يُرى المربوطُ وحدَه. */
-export const PLAN_NOW: readonly PlanPlatform[] = ['linkedin', 'x']
+export const PLAN_NOW: readonly PlanPlatform[] = PLAN_BASE
 
 /** المدى الذي يُعرَض: أسبوعٌ وأسبوعان وشهرٌ وشهران (D-327: «أسبوعيّةٌ وشهريّةٌ أو حتّى شهران» بطلب المالك). */
 const SPANS = [
@@ -109,6 +111,8 @@ export interface PlanNewData {
   readonly canAdd?: boolean
   /** حزمةُ محتوى مربوطة؟ فيظهر طريقُ «من حزمتك في GitHub» (D-377). */
   readonly hasPackage?: boolean
+  /** أعلامُ المنصّات المبوَّبة المفتوحة للمنظّمة (D-399 · `plan_platform_flags`). */
+  readonly flagged?: readonly string[]
 }
 
 const AR = num
@@ -166,16 +170,21 @@ function channelCard(p: PlanPlatform, perWeek: number): Html {
 }
 
 function channelStep(d: PlanNewData, shown: readonly PlanPlatform[]): Html {
-  const missing = PLAN_NOW.filter((p) => !shown.includes(p))
+  const now = planNowFor(d.linked, d.flagged)
+  const missing = now.filter((p) => !shown.includes(p))
+  // ‏والمبوَّبةُ خارج الخطّة يُقال ما يفتحه ربطُها (D-399)، لا تُخفى صامتة
+  const locked = PLAN_GATED.filter((p) => !now.includes(p))
+  const unlocks = locked.length === 0 ? html`` : html`<p class="hint m-0">${locked.map((p) => GATED_UNLOCKS[p] ?? '').join('، و')} — <a href="${panelHref('channels')}">القنوات</a>.</p>`
   const body = shown.length === 0
     ? html`<div class="wz-empty"><p class="m-0">لا منصّة مربوطة بعد — الخطّةُ تُبنى لما يُنشر عليه فعلًا.</p>
         <a class="btn btn-secondary btn-sm" href="${panelHref('channels')}">اربط LinkedIn أو X</a></div>`
     : html`${shown.map((p) => channelCard(p, d.perWeek))}${missing.length === 0
         ? ''
         : html`<p class="hint m-0">${missing.map((p) => platformLabel(p)).join(' و')} غير مربوطة — <a href="${panelHref('channels')}">اربطها</a> لتظهر هنا.</p>`}`
+  const all = html`${body}${unlocks}`
   return html`<section class="wz-step" data-step="2" aria-labelledby="wz-t2">
     ${stepHead(2, 'على أيّ منصّة، وكم مرّة، ومتى؟', 'المربوط وحدَه يظهر، ولكلّ منصّة إيقاعُها وأوقاتُها وصورتُها.')}
-    <div class="stack">${body}</div>
+    <div class="stack">${all}</div>
   </section>`
 }
 
@@ -271,7 +280,7 @@ function summaryText(count: number, d: PlanNewData, image: boolean): string {
 
 export function planNewScreen(d: PlanNewData): string {
   const start = weekStart(d.now)
-  const shown = PLAN_NOW.filter((p) => d.linked.includes(p))
+  const shown = planNowFor(d.linked, d.flagged).filter((p) => d.linked.includes(p))
   const preset = PACES.some((x) => x.n === d.perWeek) ? d.perWeek : Math.max(1, d.perWeek)
   const count = shown.length * preset * 4
   const canBuild = blocker(d, shown) === null

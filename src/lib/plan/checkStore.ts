@@ -62,6 +62,13 @@ async function activePlatforms(db: Db, org: string): Promise<string[]> {
     .all<{ platform: string }>().then((r) => r.results.map((x) => x.platform)).catch(() => [])
 }
 
+/** نوعُ وسيط البطاقة من `mediaMime` — لما كُتبت مسوّدتُه وحدَه؛ وما لم يُكتب لا يُحكم عليه (مراجعة D-399). */
+export function cardMedia(c: { readonly post: unknown; readonly mediaMime?: string | null }): { media?: 'image' | 'video' | 'none' } {
+  if (c.post === null) return {}
+  const m = c.mediaMime ?? null
+  return { media: m === null ? 'none' : m.startsWith('video/') ? 'video' : 'image' }
+}
+
 /** مُدخَلُ الفحص لخطّة المراجعة: البطاقةُ بندٌ، وساعتُه بتوقيت المالك (D-383 · المرحلة ١). */
 export async function reviewCheckInput(db: Db, org: string, model: ReviewModel, zone: string | null, now: Date): Promise<CheckInput> {
   const items: CheckItem[] = model.cards.map((c) => ({
@@ -71,6 +78,8 @@ export async function reviewCheckInput(db: Db, org: string, model: ReviewModel, 
     // ‏ما لم تُكتب مسوّدتُه يُكتب قبل الجدولة — فالزاويةُ نصُّه في الفحص، ولا يُمنع لأنّه لم يُكتب بعد
     text: c.post?.text ?? c.item.angle,
     mediaMissing: c.gaps.includes('no_image'),
+    // ‏ونوعُ الوسيط لما كُتبت مسوّدتُه (مراجعة D-399): TikTok بلا مقطعٍ وInstagram بلا وسيطٍ يُمنعان قبل الجدولة
+    ...cardMedia(c),
     kind: c.item.kind ?? null,
     status: c.post?.status ?? null,
     contentKey: c.post === null ? 'none:' + c.key : 't:' + c.post.text.replace(/\s+/g, ' ').trim(),
@@ -97,6 +106,8 @@ export async function packageCheckInput(db: Db, org: string, rows: readonly (Sna
     text: r.text ?? r.idea,
     contentKey: 'item:' + r.item,
     mediaMissing: r.shown?.kind === 'none',
+    // ‏ونوعُه لمنصّةٍ تحتاج وسيطًا (D-399): صفُّ Instagram بلا صورةٍ أو صفُّ TikTok بلا مقطعٍ يُمنع
+    ...(r.shown === undefined ? {} : { media: r.shown.kind === 'video' ? 'video' as const : r.shown.kind === 'none' ? 'none' as const : 'image' as const }),
     kind: /سلسلة|thread/i.test(r.format) ? 'thread' : null,
   }))
   const days = [...new Set(items.flatMap((i) => (i.at === null ? [] : [i.at.day])))]

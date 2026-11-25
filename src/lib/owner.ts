@@ -709,6 +709,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏النجاحُ `image_price.status = measured` في `/admin/ready`، وعددُ اللوحة لا يُخزَّن فلا يُعرَف من هنا
     done: () => null,
   },
+  {
+    code: 'M-69',
+    title: 'طبِّق ترحيل 0069 وجرِّب خطّةً بأربع منصّاتٍ على staging بعد ربط Instagram وTikTok (بعد D-399)',
+    ifLeft: 'بلا ترحيلٍ تبقى المنصّتان خارج الخطّة إلّا بالربط ولا ينكسر شيء؛ وبلا تجربةٍ حيّة يقع أوّلُ نشرٍ على Instagram أو TikTok من خطّةٍ على حسابٍ حقيقيّ. تأجيلٌ لا خطر.',
+    unblocks: 'capability',
+    // ‏النجاحُ منشورٌ ظاهرٌ على كلّ منصّةٍ من الأربع، لا في حقائق «ما عليك»
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {
