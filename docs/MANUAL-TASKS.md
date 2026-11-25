@@ -3145,3 +3145,25 @@ YouTube يردّ Cloudflare فسترى الرفضَ بسببه أوّلَ مرّ
 **٥ · ماذا لو فشل.** `no_images`: الصورةُ لم تُكتب بـ klein — اقرأ `SELECT operation, units, at FROM cost_ledger WHERE operation LIKE 'image:%klein%' ORDER BY at DESC LIMIT 5` في D1 ← `sada-staging`. `gap`: أرسل إليّ `image_price` كاملًا ولقطةً من رقم اللوحة — لا الرمز. `unreadable`: أرسل سطر الخطأ من سجلّ Worker.
 
 **٦ · ما يقع إن تُرك.** سعرُ klein يبقى غيرَ متحقَّق: الدفترُ يكتب الصيغةَ الموثّقة، وأيُّ تغييرٍ صامتٍ في أسعار Cloudflare لا يُرى حتّى الفاتورة. تأجيلٌ لا خطرٌ مباشر — الحصّةُ المجّانيّة وإذنُ الدفع فوقها يحرسان الإنفاق.
+
+<a name="m-69"></a>
+
+## M-69 · طبِّق ترحيل 0069 وجرِّب خطّةً بأربع منصّاتٍ على staging بعد ربط Instagram وTikTok (بعد D-399)
+
+**١ · ما هو.** على `sada2.basserh.com`: طبِّق ترحيل `0069_plan_platform_flags.sql` على D1 ← `sada-staging`، ثمّ اربط حسابَي Instagram وTikTok (M-14 · M-24)، وابنِ خطّةً فيها LinkedIn وX وInstagram وTikTok، واعتمد بندًا من كلٍّ منها حتّى يُنشر.
+
+**٢ · لماذا الآن.** D-399 يُدخل Instagram وTikTok `PLAN_NOW` بالربط أو بالعلم، و`readPlanFlags` يقرأ `plan_platform_flags`؛ **الترحيلُ قبل الدالّة**. والاختبارُ يثبت التسكينَ والفحص بلا شبكة، ولا يثبت أنّ المحوّلين ينشران من خطّةٍ مثبَّتة — وهذا شرطُ إغلاق البند ٧ في ROADMAP-3.
+
+**٣ · الخطوات.**
+
+1. `npx wrangler d1 migrations apply sada-staging --remote` — وفي القائمة `0069_plan_platform_flags.sql`.
+2. انشر الشيفرة على staging.
+3. أتمم M-14 (Instagram) وM-24 (TikTok) إن لم تتمّا: في `https://sada2.basserh.com/panel` ← **القنوات** ← **اربط** لكلٍّ منهما، حتّى تقول بطاقتُه «نشط».
+4. افتح **خطّة جديدة** ← الخطوة ٢ «المنصّات»: يجب أن ترى أربعَ بطاقات. (ولتجربة العلم بلا ربط: `npx wrangler d1 execute sada-staging --remote --command "INSERT INTO plan_platform_flags (org_id, platform, enabled, updated_by) VALUES ('<org>', 'tiktok', 1, 'owner')"`.)
+5. ابنِ الخطّة، وفي المراجعة أضف صورةً لبند Instagram ومقطعًا لبند TikTok، ثمّ اعتمد بندًا من كلّ منصّة بموعدٍ بعد ربع ساعة.
+
+**٤ · ما يعني النجاح.** بندُ Instagram بلا وسيطٍ يظهر في شريط الفحص «وسيط ناقص» ولا يُجدوَل؛ وبعد الموعد منشورٌ ظاهرٌ على كلّ منصّةٍ من الأربع، و`SELECT platform, idempotency_key FROM posts WHERE plan_id = '<plan>'` يعطي مفتاحًا مختلفًا لكلّ منصّة، و`SELECT operation FROM cost_ledger ORDER BY at DESC LIMIT 10` فيه سطرٌ لكلّ نشرٍ مدفوع.
+
+**٥ · ماذا لو فشل.** لا تظهر بطاقةُ Instagram أو TikTok: اقرأ `SELECT platform, status FROM accounts WHERE org_id = '<org>'` — الحسابُ يجب أن يكون `active`. خطأ `no such table: plan_platform_flags` في سجلّ Worker: الترحيلُ لم يُطبَّق. فشلُ النشر: أرسل إليّ `last_error` من `posts` للبند وسطرَ السجلّ — لا رمزًا ولا سرًّا.
+
+**٦ · ما يقع إن تُرك.** بلا ترحيلٍ يقرأ `readPlanFlags` «لا علم» فلا ينكسر شيء، وتبقى المنصّتان خارج الخطّة إلّا بالربط؛ وبلا تجربةٍ حيّة يقع أوّلُ نشرٍ على Instagram أو TikTok من خطّةٍ على حسابٍ حقيقيّ. تأجيلٌ لا خطر.

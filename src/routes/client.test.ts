@@ -326,14 +326,16 @@ describe('الخطّةُ محورَ المنصّة (D-282)', () => {
     expect(screen).not.toContain('value="tiktok"')
   })
 
-  it('«خطّة جديدة» (D-283): المربوطُ من LinkedIn وX وحدَه، والإيقاعُ مستوياتٌ تُختار، والزرُّ لا يظهر قبل أن يكتمل ما يلزم', async () => {
+  it('«خطّة جديدة» (D-283 · D-399): المربوطُ وحدَه، وTikTok المربوطةُ تدخل الخطّة، والإيقاعُ مستوياتٌ تُختار، والزرُّ لا يظهر قبل أن يكتمل ما يلزم', async () => {
     db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES
       ('a1', 'linkedin', 'member', 'e1', 'عمر', 'active'), ('a2', 'tiktok', 'member', 'e2', 'عمر', 'active')`)
     const { cookie } = await session()
     const screen = await (await app.request('/panel/plan/new', { headers: { Cookie: cookie } }, env)).text()
     expect(screen).toContain('name="channel" value="linkedin" checked')
-    // ‏TikTok مربوطةٌ لكنّها ليست في خطّة اليوم، وX غيرُ مربوطة فتُذكَر برابطها لا بخانةٍ معطّلة
-    expect(screen).not.toContain('value="tiktok"')
+    // ‏TikTok مربوطةٌ فتدخل الخطّة (D-399)، وInstagram غيرُ مربوطة فيُقال ما يفتحه ربطُها، وX غيرُ مربوطة فتُذكَر برابطها لا بخانةٍ معطّلة
+    expect(screen).toContain('name="channel" value="tiktok" checked')
+    expect(screen).not.toContain('value="instagram"')
+    expect(screen).toContain('اربط Instagram لتُضاف إلى خطّتك')
     expect(screen).not.toContain('name="channel" value="x"')
     expect(screen).toContain('X غير مربوطة')
     for (const n of ['2', '3', '5', 'custom']) expect(screen).toContain(`name="cadence_linkedin" value="${n}"`)

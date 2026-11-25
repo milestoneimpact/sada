@@ -97,6 +97,8 @@ export async function packageCheckInput(db: Db, org: string, rows: readonly (Sna
     text: r.text ?? r.idea,
     contentKey: 'item:' + r.item,
     mediaMissing: r.shown?.kind === 'none',
+    // ‏ونوعُه لمنصّةٍ تحتاج وسيطًا (D-399): صفُّ Instagram بلا صورةٍ أو صفُّ TikTok بلا مقطعٍ يُمنع
+    ...(r.shown === undefined ? {} : { media: r.shown.kind === 'video' ? 'video' as const : r.shown.kind === 'none' ? 'none' as const : 'image' as const }),
     kind: /سلسلة|thread/i.test(r.format) ? 'thread' : null,
   }))
   const days = [...new Set(items.flatMap((i) => (i.at === null ? [] : [i.at.day])))]

@@ -69,6 +69,7 @@ import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
+import { readPlanFlags } from '../../lib/plan/platforms'
 import { ownerZone, storedZone } from '../../lib/time/ownerZone'
 import { renderTemplate, templateReadme } from '../../lib/plan/template'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
@@ -252,6 +253,8 @@ plan.get('/panel/plan/new', async (c) => {
     taskReadyAlone(c, 'plan'),
   ])
   const used = await neuronsUsedToday(c.env.DB)
+  // ‏Instagram وTikTok خلف بوّابة (D-399): ما فُتح علمُه للمنظّمة يدخل الخطّة
+  const flagged = await readPlanFlags(c.env.DB, org)
   // ‏وما قيل بعد إضافة مصدرٍ بلا سكربت يُرى هنا حيث عاد المالك (D-327)، لا في أوّل صفحةٍ يفتحها بعدها
   const flash = await takeFlash(c.env, c.req.raw)
   const body = (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' }))) + planNewScreen({
@@ -276,6 +279,7 @@ plan.get('/panel/plan/new', async (c) => {
     // ‏إضافةُ مصدرٍ تحليلٌ مدفوع: للمدير فأعلى كزرّ «حلّل» (D-272)
     canAdd: allows(session.record.role ?? 'owner', 'admin'),
     hasPackage: pkgSource !== null,
+    flagged,
   })
   return page((nonce) =>
     soloPage('صدى — خطّة جديدة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/new' }, injectCsrf(body, session.record.csrf), nonce,
