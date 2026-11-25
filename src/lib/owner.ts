@@ -701,6 +701,14 @@ export const OWNER_TASKS: readonly OwnerTask[] = [
     // ‏النجاحُ ردٌّ تحت آخر تغريدة وسلسلةٌ بديلة ظاهرةٌ على X، لا في حقائق «ما عليك»
     done: () => null,
   },
+  {
+    code: 'M-68',
+    title: 'ولِّد صورةً نهائيّةً بـ klein 9B على staging وقارِن الدفترَ بلوحة Workers AI (بعد D-398)',
+    ifLeft: 'سعرُ klein يبقى غيرَ متحقَّق، وتغييرٌ صامتٌ في أسعار Cloudflare لا يُرى حتّى الفاتورة. تأجيلٌ لا خطر.',
+    unblocks: 'capability',
+    // ‏النجاحُ `image_price.status = measured` في `/admin/ready`، وعددُ اللوحة لا يُخزَّن فلا يُعرَف من هنا
+    done: () => null,
+  },
 ]
 
 export interface OwnerRow extends Omit<OwnerTask, 'go' | 'goLabel'> {
