@@ -420,11 +420,13 @@ export async function draftFromIdea(
 export async function draftSeatedFromIdea(deps: DraftDeps, postId: string, rules = ''): Promise<DraftOutcome> {
   const org = deps.org ?? 'org_owner'
   const row = await deps.db
-    .prepare('SELECT id, platform, text, type, status, model FROM posts WHERE id = ? AND org_id = ?')
+    .prepare('SELECT id, platform, text, type, status, model, coalesce(edited_in_sada, 0) AS edited FROM posts WHERE id = ? AND org_id = ?')
     .bind(postId, org)
-    .first<{ id: string; platform: string; text: string; type: string; status: string; model: string | null }>()
+    .first<{ id: string; platform: string; text: string; type: string; status: string; model: string | null; edited: number }>()
   if (row === null) return { kind: 'failed', reason: 'لا مسوّدةَ بهذا المعرّف', retryable: false }
   if (row.model !== 'owner') return { kind: 'already', postId }
+  // ‏ما عدّله المالكُ بعد أن وُضع في الطابور نصُّه لا فكرة: لا يُكتب فوقه ولا يُدفع له (مراجعة D-393)
+  if (row.edited !== 0) return { kind: 'already', postId }
   if (row.status !== 'draft') return { kind: 'failed', reason: 'لم تعد مسوّدة — اعتُمدت أو رُفضت', retryable: false }
   const spec = (PLATFORMS as Readonly<Record<string, PlatformSpec>>)[row.platform]
   if (spec === undefined) return { kind: 'failed', reason: `منصّةٌ لا يُكتب لها «${row.platform}»`, retryable: false }
@@ -434,7 +436,20 @@ export async function draftSeatedFromIdea(deps: DraftDeps, postId: string, rules
   const problem = ideaProblem(idea)
   if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
 
-  const out = await writeOnce(deps, {
+  // ‏حجزٌ قبل النداء (D-004): رسالتان للمنشور نفسِه في وقتٍ واحد لا تدفعان مرّتين؛ الأولى تحجز والثانية «already»
+  const claim = await deps.db
+    .prepare(`UPDATE posts SET model = 'owner:writing' WHERE id = ? AND org_id = ? AND status = 'draft' AND model = 'owner'
+               AND coalesce(edited_in_sada, 0) = 0 AND text = ?`)
+    .bind(postId, org, row.text)
+    .run() as { meta?: { changes?: number }; changes?: number } | null
+  if ((claim?.meta?.changes ?? claim?.changes ?? 0) !== 1) return { kind: 'already', postId }
+  const release = () => deps.db
+    .prepare(`UPDATE posts SET model = 'owner' WHERE id = ? AND org_id = ? AND model = 'owner:writing'`)
+    .bind(postId, org).run()
+
+  let out: Awaited<ReturnType<typeof writeOnce>>
+  try {
+    out = await writeOnce(deps, {
     org,
     system: systemPrompt(spec, 'idea', [voiceSection(await readBrief(deps.db, org)), rules].filter((x) => x !== '').join('\n\n'), thread),
     user: ideaPrompt(idea, thread),
@@ -442,18 +457,19 @@ export async function draftSeatedFromIdea(deps: DraftDeps, postId: string, rules
     operation: `draft:${platform}`,
     refId: 'post:' + postId,
   })
-  if (out.kind !== 'written') return out
+  } catch (e) { await release(); throw e }
+  if (out.kind !== 'written') { await release(); return out }
   const draft = readDraft(out.text, spec, thread)
-  if (!draft.ok) return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost }
+  if (!draft.ok) { await release(); return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost } }
 
   const done = await deps.db
     .prepare(`UPDATE posts SET text = ?, type = ?, model = ?, cost_usd = coalesce(cost_usd, 0) + ?, rationale = ?, has_url = ?
-               WHERE id = ? AND org_id = ? AND status = 'draft' AND model = 'owner' AND text = ?`)
+               WHERE id = ? AND org_id = ? AND status = 'draft' AND model = 'owner:writing' AND coalesce(edited_in_sada, 0) = 0 AND text = ?`)
     .bind(draft.draft.text, isThread(platform, draft.draft.text) ? 'thread' : 'text', out.model, out.cost, draft.draft.rationale,
       containsUrl(draft.draft.text) ? 1 : 0, postId, org, row.text)
-    .run() as { meta?: { changes?: number } } | null
+    .run() as { meta?: { changes?: number }; changes?: number } | null
   // ‏والنداءُ في الدفتر وإن غلبه تعديلُ المالك: سجلٌّ أقلُّ من الحقيقة أسوأ
-  if ((done?.meta?.changes ?? 1) === 0) return { kind: 'already', postId }
+  if ((done?.meta?.changes ?? done?.changes ?? 1) === 0) { await release(); return { kind: 'already', postId } }
   return { kind: 'drafted', postId, platform, length: draft.draft.text.length, cost: out.cost }
 }
 

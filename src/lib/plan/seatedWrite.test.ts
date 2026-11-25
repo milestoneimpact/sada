@@ -121,6 +121,26 @@ describe('البندُ المسكَّن يُكتب من فكرته بالقوا�
     expect(db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get()).toEqual({ n: 1 })
     expect(await seatedIdeaPosts(db, 'org_owner', seated.planId!)).toEqual([])
   })
+  it('ما عدّله المالكُ بعد الطابور لا يُكتب فوقه، والرسالتان معًا تدفعان مرّةً (مراجعة D-393)', async () => {
+    const table = await toTable({ db, writer: { db, encKey: '', workerSecrets: {} } }, { name: 'خطة.xlsx', bytes: BOOK })
+    if (table.kind !== 'table') throw new Error('لا جدول')
+    const seated = await seatPlan(db, 'org_owner', table.csv, facts(), new Map(), null, table.rules ?? null)
+    const [postId] = await seatedIdeaPosts(db, 'org_owner', seated.planId!)
+    sent = []
+    const deps = { db, encKey: '', workerSecrets: { ANTHROPIC_API_KEY: 'sk-test' }, fetchImpl: net('ن'.repeat(300)), org: 'org_owner' }
+
+    db.raw.prepare("UPDATE posts SET text = 'نصُّ المالك', edited_in_sada = 1 WHERE id = ?").run(postId!)
+    expect(await writeSeatedPost(deps, postId!)).toEqual({ kind: 'already', postId })
+    expect(sent).toHaveLength(0)
+    expect(db.raw.prepare('SELECT text, model FROM posts WHERE id = ?').get(postId!)).toEqual({ text: 'نصُّ المالك', model: 'owner' })
+
+    db.raw.prepare("UPDATE posts SET text = ?, edited_in_sada = 0 WHERE id = ?").run(IDEA, postId!)
+    const both = await Promise.all([writeSeatedPost(deps, postId!), writeSeatedPost(deps, postId!)])
+    expect(both.map((o) => o.kind).sort()).toEqual(['already', 'drafted'])
+    expect(sent).toHaveLength(1)
+    expect(db.raw.prepare('SELECT count(*) AS n FROM cost_ledger').get()).toEqual({ n: 1 })
+  })
+
   it('الإنفاقُ لمن يعتمد (D-318): المحرّرُ لا يبدأ الكتابة', () => {
     expect(requiredRole('POST', '/panel/plan/review/write-seated')).toBe('publisher')
   })
