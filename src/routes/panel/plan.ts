@@ -40,10 +40,13 @@ import {
 import { mediaLine, planImportExpired, planImportScreen } from '../ui/planImportView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
 import { taskReadyAlone } from './home'
-import { allows } from '../../lib/access'
+import { allows, SPEND_LOCKED, SPEND_ROLE } from '../../lib/access'
+import { seatedIdeaPosts } from '../../lib/plan/seatedWrite'
 import { counted, NOUNS, money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { estimateLine, estimatePlan, unitCosts } from '../../lib/estimate'
+import { buildEstimateLine, estimateBuild } from '../../lib/buildCost'
+import { planBuildCalls } from '../../lib/buildCostInputs'
 import { readBrief } from '../../lib/brief'
 import { IDEA_MAX } from '../../lib/draft/job'
 import { asImageChoice, asImageStyle, asSpan, asTimes, imageFor, weekStart, CLIP_CHANNELS, isPlanPlatform, type Cadence, type PlanChoices, type PlanPlatform } from '../../lib/plan/prompt'
@@ -715,7 +718,7 @@ plan.get('/panel/plan/review', async (c) => {
   // ‏بوّابةُ الفحص (D-383 · المرحلة ٥): التعارضُ والازدحامُ قبل الاعتماد، والإصلاحُ بضغطة لمن يجدول
   const checked = planChecks(await reviewCheckInput(c.env.DB, org, model, await storedZone(c.env.DB), new Date()), await readRules(c.env.DB, org))
   const strip = checksStrip({ findings: checked, planId: current.id, w: c.req.query('w') ?? '', canFix: allows(session.record.role ?? 'owner', 'publisher') })
-  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts }) +
+  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts, seatedIdeas: (await seatedIdeaPosts(c.env.DB, org, current.id)).length }) +
     (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
@@ -787,6 +790,35 @@ plan.post('/panel/plan/review/redraft', async (c) => {
   await setFlash(c.env, c.req.raw, items.length === 0
     ? { kind: 'ok', text: 'لا بندَ تعذّرت كتابتُه الآن.' }
     : { kind: 'ok', text: 'أُعيدت كتابةُ ' + String(items.length) + ' — تظهر في مكانها حين تُكتب.' })
+  return c.redirect('/panel/plan/review', 303)
+})
+
+/**
+ * **«اكتب المسكَّن من أفكاره»** (D-393): مسوّداتُ «ابنِ كما هي» نصُّها فكرتُها؛ يرسل لكلٍّ رسالةَ كتابةٍ تكتبها في مكانها بقواعد
+ * منصّتها من ورقة «الإرشادات» المحفوظة مع الخطّة. نداءٌ مدفوعٌ لكلّ بند، **لمن يعتمد** (`SPEND_PATHS`، D-318) ويُسأل الدورُ هنا
+ * أيضًا، والعددُ على الزرّ قبل الضغط (D-006)، والدفترُ والسقوفُ في `writeOnce` (D-008).
+ */
+plan.post('/panel/plan/review/write-seated', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  if (!allows(gate.session.record.role ?? 'owner', SPEND_ROLE)) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: SPEND_LOCKED })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const id = String(gate.form.get('id') ?? '')
+  const current = await latestPlan(c.env.DB, org)
+  if (current === null || current.id !== id) {
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'صارت للخطّة نسخةٌ أحدث — افتح المراجعة من جديد.' })
+    return c.redirect('/panel/plan/review', 303)
+  }
+  const ids = await seatedIdeaPosts(c.env.DB, org, id)
+  const msgs = ids.map((postId) => ({ body: { seatedWrite: { org, postId, planId: id } } }))
+  for (let at = 0; at < msgs.length; at += 100) await c.env.GENERATE_QUEUE.sendBatch(msgs.slice(at, at + 100))
+  await record(c.env.DB, { actor: 'panel', action: 'plan.review.write_seated', target: id, detail: String(ids.length) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, ids.length === 0
+    ? { kind: 'ok', text: 'لا مسوّدةَ نصُّها فكرتُها في هذه الخطّة.' }
+    : { kind: 'ok', text: 'تُكتب ' + String(ids.length) + ' من أفكارها بقواعد كلّ منصّة — تتبدّل نصوصُها في مكانها كلّما كُتبت.' })
   return c.redirect('/panel/plan/review', 303)
 })
 
@@ -1303,7 +1335,15 @@ plan.get('/panel/plan/import/preview', async (c) => {
   const facts = await planFacts(c.env, activeOrg(session.record), c.req.header('Cookie') ?? null, new Date())
   const media: Record<string, string> = {}
   for (const r of readPlan(p.csv, facts).rows) { const line = mediaLine(r); if (line !== '') media[String(r.line)] = line }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media })
+  // ‏وتقديرُ الزرّين بالدولار قبل الضغط (D-395): كلُّ نداءٍ بسعره من الجدول الذي يكتب به الدفتر، وما لا سعرَ له يُقال
+  const rows = readPlan(p.csv, facts).rows
+  const room = p.imageStyle === null ? 0 : await autoImageRoom(c.env.DB, activeOrg(session.record), true)
+  const used = await neuronsUsedToday(c.env.DB)
+  const lineFor = async (write: boolean): Promise<string> => buildEstimateLine(estimateBuild(await planBuildCalls(c.env.DB, activeOrg(session.record), {
+    platforms: rows.map((r) => r.platform), write, imageStyle: p.imageStyle, imageRoom: room,
+  }), used))
+  const estimate = { write: await lineFor(true), seat: p.imageStyle === null ? null : await lineFor(false) }
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),

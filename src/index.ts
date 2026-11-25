@@ -63,6 +63,7 @@ import { autoImageRoom } from './lib/image/auto'
 import { CLIP_CHANNELS, type PlanPlatform } from './lib/plan/prompt'
 import { runPlanBuild, type PlanBuildMessage } from './routes/panel/plan'
 import type { PackageSyncMessage } from './routes/panel/package'
+import { writeSeatedPost, type SeatedWriteMessage } from './lib/plan/seatedWrite'
 import { readSource, sourceById, syncPackage, tokenFor } from './lib/package/sync'
 import { flushRepoStatus } from './lib/package/statusFile'
 import { providerKey } from './routes/panel/channels'
@@ -572,10 +573,25 @@ async function planDraft(message: QueueMessage<PlanDraftMessage>, env: Env): Pro
   }
 }
 
-async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage | PlanBuildMessage | PackageSyncMessage>, env: Env): Promise<void> {
+/**
+ * ‏**بندٌ مسكَّنٌ يُكتب من فكرته في مكانه** (D-393): بقواعد خطّته، وبحرّاس `writeOnce` ودفترها. والعابرُ يُعاد ثلاثًا، وما سواه يُقَرّ.
+ */
+async function seatedWrite(message: QueueMessage<SeatedWriteMessage>, env: Env): Promise<void> {
+  const { org, postId } = message.body.seatedWrite
+  const outcome = await writeSeatedPost({ db: env.DB, encKey: env.TOKEN_ENC_KEY, workerSecrets: env as unknown as Record<string, string | undefined>, org }, postId)
+  console.info({ job: 'seated-write', post: postId, kind: outcome.kind })
+  if (outcome.kind === 'failed' && outcome.retryable && message.attempts < 3) return retryLater(message, outcome.kind)
+  message.ack()
+}
+
+async function analyzeQueue(batch: MessageBatch<AnalyzeMessage | PlanDraftMessage | PlanBuildMessage | PackageSyncMessage | SeatedWriteMessage>, env: Env): Promise<void> {
   for (const message of batch.messages) {
     // ‏كلُّ رسالةٍ في `try` وحدَها (D-320): عطلٌ يُرمى يُعاد بتباعد ولا يُسقط الدفعة
     await guarded(message, 'analyze', async (m) => {
+      if ('seatedWrite' in m.body) {
+        await seatedWrite(m as QueueMessage<SeatedWriteMessage>, env)
+        return
+      }
       if ('draft' in m.body) {
         await planDraft(m as QueueMessage<PlanDraftMessage>, env)
         return

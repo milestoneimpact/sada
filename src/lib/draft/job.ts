@@ -406,6 +406,73 @@ export async function draftFromIdea(
   })
 }
 
+// ── بندُ خطّةٍ مسكَّنٌ يُكتب من فكرته (D-393) ─────────────────────────────
+
+/**
+ * ‏**مسوّدةُ بندٍ مسكَّن تُكتب من فكرتها في مكانها** (D-393). «ابنِ كما هي» يسكّن كلَّ صفٍّ مسوّدةً نصُّها الفكرة
+ * ‏(`model = 'owner'`، بلا نداء)؛ وهذا يكتبها منشورًا بالموجّه نفسِه الذي يكتب به «اكتب من فكرتك» (`systemPrompt` و`ideaPrompt`)
+ * ‏وبقواعد منصّتها من ورقة الإرشادات، **ويحدّث المسوّدةَ نفسَها** فلا يتغيّر مفتاحُها (D-004) ولا بندُها ولا موعدُها.
+ *
+ * ‏والحرّاسُ حرّاسُ `writeOnce`: الإيقافُ والسقفان وسقفُ المزوّد قبل النداء، **وصفُّ `cost_ledger` قبل أن يُعدّ ناجحًا** (D-008).
+ * ‏وما كُتب من قبل (`model` غيرُ `owner`) أو عُدّل أو لم يعد مسوّدةً لا يُنادى له. والتحديثُ مشروطٌ بالنصّ القديم: تعديلُ المالك بين
+ * ‏النداء والكتابة يغلب.
+ */
+export async function draftSeatedFromIdea(deps: DraftDeps, postId: string, rules = ''): Promise<DraftOutcome> {
+  const org = deps.org ?? 'org_owner'
+  const row = await deps.db
+    .prepare('SELECT id, platform, text, type, status, model, coalesce(edited_in_sada, 0) AS edited FROM posts WHERE id = ? AND org_id = ?')
+    .bind(postId, org)
+    .first<{ id: string; platform: string; text: string; type: string; status: string; model: string | null; edited: number }>()
+  if (row === null) return { kind: 'failed', reason: 'لا مسوّدةَ بهذا المعرّف', retryable: false }
+  if (row.model !== 'owner') return { kind: 'already', postId }
+  // ‏ما عدّله المالكُ بعد أن وُضع في الطابور نصُّه لا فكرة: لا يُكتب فوقه ولا يُدفع له (مراجعة D-393)
+  if (row.edited !== 0) return { kind: 'already', postId }
+  if (row.status !== 'draft') return { kind: 'failed', reason: 'لم تعد مسوّدة — اعتُمدت أو رُفضت', retryable: false }
+  const spec = (PLATFORMS as Readonly<Record<string, PlatformSpec>>)[row.platform]
+  if (spec === undefined) return { kind: 'failed', reason: `منصّةٌ لا يُكتب لها «${row.platform}»`, retryable: false }
+  const platform = row.platform as Platform
+  const thread = row.type === 'thread' && platform === 'x'
+  const idea = normalizeIdea(row.text)
+  const problem = ideaProblem(idea)
+  if (problem !== null) return { kind: 'failed', reason: problem, retryable: false }
+
+  // ‏حجزٌ قبل النداء (D-004): رسالتان للمنشور نفسِه في وقتٍ واحد لا تدفعان مرّتين؛ الأولى تحجز والثانية «already»
+  const claim = await deps.db
+    .prepare(`UPDATE posts SET model = 'owner:writing' WHERE id = ? AND org_id = ? AND status = 'draft' AND model = 'owner'
+               AND coalesce(edited_in_sada, 0) = 0 AND text = ?`)
+    .bind(postId, org, row.text)
+    .run() as { meta?: { changes?: number }; changes?: number } | null
+  if ((claim?.meta?.changes ?? claim?.changes ?? 0) !== 1) return { kind: 'already', postId }
+  const release = () => deps.db
+    .prepare(`UPDATE posts SET model = 'owner' WHERE id = ? AND org_id = ? AND model = 'owner:writing'`)
+    .bind(postId, org).run()
+
+  let out: Awaited<ReturnType<typeof writeOnce>>
+  try {
+    out = await writeOnce(deps, {
+    org,
+    system: systemPrompt(spec, 'idea', [voiceSection(await readBrief(deps.db, org)), rules].filter((x) => x !== '').join('\n\n'), thread),
+    user: ideaPrompt(idea, thread),
+    schema: DRAFT_SCHEMA,
+    operation: `draft:${platform}`,
+    refId: 'post:' + postId,
+  })
+  } catch (e) { await release(); throw e }
+  if (out.kind !== 'written') { await release(); return out }
+  const draft = readDraft(out.text, spec, thread)
+  if (!draft.ok) { await release(); return { kind: 'failed', reason: draft.reason, retryable: true, cost: out.cost } }
+
+  const done = await deps.db
+    .prepare(`UPDATE posts SET text = ?, type = ?, model = ?, cost_usd = coalesce(cost_usd, 0) + ?, rationale = ?, has_url = ?
+               WHERE id = ? AND org_id = ? AND status = 'draft' AND model = 'owner:writing' AND coalesce(edited_in_sada, 0) = 0 AND text = ?`)
+    .bind(draft.draft.text, isThread(platform, draft.draft.text) ? 'thread' : 'text', out.model, out.cost, draft.draft.rationale,
+      containsUrl(draft.draft.text) ? 1 : 0, postId, org, row.text)
+    .run() as { meta?: { changes?: number }; changes?: number } | null
+  // ‏والنداءُ في الدفتر وإن غلبه تعديلُ المالك: سجلٌّ أقلُّ من الحقيقة أسوأ
+  if ((done?.meta?.changes ?? done?.changes ?? 1) === 0) { await release(); return { kind: 'already', postId } }
+  return { kind: 'drafted', postId, platform, length: draft.draft.text.length, cost: out.cost }
+}
+
 // ── «بنفسي» — نصُّ المالك كما كتبه (D-324) ─────────────────────────────
 
 /** المنصّاتُ التي يُكتب لها بنفسك — المكتوبةُ وحدَها، كما في «من فكرة»: نصُّ المقطع له صفُّ المقطع. */

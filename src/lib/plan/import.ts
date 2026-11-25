@@ -21,7 +21,7 @@ import { attachStatement } from '../library'
 import { readRules } from './checkStore'
 import { arrangeSlots, HELD_SAY, type SlotIn } from './scheduler'
 import { itemNumber, matchMedia, variantOf, type LibraryMedia, type MediaMatch } from '../drive/media'
-import { packageMediaFor, type PackagePick } from '../package/pick'
+import { planMediaFor, type PackagePick } from '../package/pick'
 import { captionProblem, isVideoPlatform, readyUpload, uploadMediaRow, videoChecks, type UploadRow, type VideoPlatform } from '../media/uploads'
 
 /** أكبرُ ملفٍّ يُقرأ، وأكثرُ صفوفٍ تُستورَد مرّة — خطّةُ شهرٍ كثيفةٍ دونهما. */
@@ -391,9 +391,10 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
   const picks = facts.package ?? []
   const withPkg = (r: PlanRow): PlanRow => {
     const item = itemNumber(r.item)
-    if (picks.length === 0 || item === null || r.platform === null) return r
+    if (picks.length === 0 || r.platform === null) return r
     // ‏والسببُ إن سقط المقطعُ إلى الغلاف أو إلى لا شيء يُرى في مراجعة الخطّة، كما في «ما تغيّر في حزمتك» (diff.ts)
-    const { ref, note } = packageMediaFor(picks, item, r.platform, variantOf(r.mediaHint))
+    // ‏ومسارُ الملفّ في «الملف» أوّلًا (D-394)، ورقمُ المادّة احتياطًا
+    const { ref, note } = planMediaFor(picks, item, r.platform, r.mediaHint, variantOf(r.mediaHint))
     const withNote = note === null ? r : { ...r, problems: [...r.problems, `الوسيطة: ${note}`] }
     return ref === null ? withNote : { ...withNote, packageRef: ref }
   }

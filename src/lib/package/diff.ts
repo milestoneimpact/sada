@@ -8,7 +8,7 @@
  */
 import { periodOf, type PackagePlan } from './plan'
 import type { CopyRead } from './copy'
-import { packageMediaFor, type PackagePick } from './pick'
+import { planMediaFor, type PackagePick } from './pick'
 import type { PackageVariant } from './classify'
 
 export interface SnapshotEntry {
@@ -59,7 +59,7 @@ export interface SnapshotInput {
 }
 
 export function snapshot(i: SnapshotInput): Snapshot {
-  const nameOf = new Map(i.picks.flatMap((p) => [p.video, p.cover]).filter((f) => f !== null).map((f) => ['g:' + f!.blobSha, f!.path.split('/').pop() ?? f!.path]))
+  const nameOf = new Map(i.picks.flatMap((p) => [p.video, p.cover, ...p.superseded]).filter((f) => f !== null).map((f) => ['g:' + f!.blobSha, f!.path.split('/').pop() ?? f!.path]))
   const seen = new Set<string>()
   const entries: SnapshotEntry[] = []
   for (const e of i.plan.entries) {
@@ -68,7 +68,7 @@ export function snapshot(i: SnapshotInput): Snapshot {
     const c = i.copy.items.get(e.item)
     const piece = e.platform === 'x' ? c?.x ?? null : e.platform === 'linkedin' ? c?.linkedin ?? null : null
     const hint = /داكن|dark/i.test(e.mediaHint) && !/فاتح|light/i.test(e.mediaHint) ? 'dark' : /فاتح|light/i.test(e.mediaHint) && !/داكن|dark/i.test(e.mediaHint) ? 'light' : null
-    const { ref: media, note } = packageMediaFor(i.picks, e.item, e.platform, hint ?? i.variants[e.platform] ?? null)
+    const { ref: media, note } = planMediaFor(i.picks, e.item, e.platform, e.mediaHint, hint ?? i.variants[e.platform] ?? null)
     entries.push({
       item: e.item, platform: e.platform, date: e.date, time: e.time, format: e.format, idea: e.idea,
       text: piece !== null && piece.text !== '' ? piece.text : e.text !== undefined && e.text !== '' ? e.text : null, media, mediaName: media === null ? null : nameOf.get(media) ?? null,

@@ -14,7 +14,7 @@ import { loadSession } from '../../lib/session'
 import { activeOrg } from '../../lib/tenancy'
 import { record } from '../../lib/audit'
 import { mayDo } from '../../lib/plan/rights'
-import { correctable, correctionsOf, correctPost, CORRECT_PER_HOUR, readOriginal, retryReplacement, TEXT_MAX, type CorrectionKind } from '../../lib/publish/correct'
+import { correctable, correctionsOf, correctPost, CORRECT_PER_HOUR, readOriginal, retryReplacement, textMaxFor, type CorrectionKind } from '../../lib/publish/correct'
 import { correctScreen, replaceConfirmScreen } from '../ui/correctView'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { soloNav } from '../ui/rail'
@@ -51,7 +51,8 @@ correct.get('/panel/posts/:id/correct', async (c) => {
   const body = correctScreen({
     id, platform: o.platform, text: o.text, history,
     blocked: !right.ok ? right.reason : !can.ok ? can.reason : null,
-    key: crypto.randomUUID(), max: TEXT_MAX[o.platform as 'linkedin' | 'x'] ?? 280,
+    key: crypto.randomUUID(), max: textMaxFor(o, o.platform === 'x' ? 'reply' : 'edit'), replaceMax: textMaxFor(o, 'replace'),
+    ...(o.type === 'thread' ? { tweets: o.remote_ids.length } : {}),
     flash: flash === null ? null : { tone: flash.kind, text: flash.text },
   })
   return screen(body, session.record.csrf)
@@ -72,7 +73,7 @@ correct.post('/panel/posts/:id/correct/review', async (c) => {
   }
   const text = String(gate.form.get('text') ?? '').trim()
   const key = String(gate.form.get('key') ?? '')
-  return screen(replaceConfirmScreen({ id, oldText: o.text, text, key }), gate.session.record.csrf)
+  return screen(replaceConfirmScreen({ id, oldText: o.text, text, key, ...(o.type === 'thread' ? { tweets: o.remote_ids.length } : {}) }), gate.session.record.csrf)
 })
 
 correct.post('/panel/posts/:id/correct', async (c) => {

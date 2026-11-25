@@ -59,6 +59,8 @@ export interface ReviewView {
   readonly authors?: Readonly<Record<string, string>>
   /** رابطُ العميل النافذ لهذه الخطّة (D-353): عددُه وأبعدُ انتهاء — والرمزُ لا يُعاد عرضُه. */
   readonly share?: { readonly count: number; readonly until: string | null }
+  /** مسوّداتٌ سُكّنت «كما هي» ونصُّها فكرتُها بعد (D-393) — عددُها على زرّ «اكتبها من أفكارها». */
+  readonly seatedIdeas?: number
   /** رأيُ العميل في كلّ بندٍ ببصمته (D-353). */
   readonly verdicts?: ReadonlyMap<string, { readonly verdict: 'approve' | 'changes'; readonly note: string }>
 }
@@ -318,6 +320,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
         : failed.length > 0
         ? 'تعذّرت كتابةُ ' + AR(failed.length) + ': ' + failed[0]!.failed!
         : AR(settled) + ' من ' + AR(m.cards.length) + ' مجدولةٌ أو منشورة' + (m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : '')}</span>
+      ${(view.seatedIdeas ?? 0) > 0 && maySpend() ? html`<form class="inline" method="POST" action="/panel/plan/review/write-seated" data-busy="تُكتب…"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'اكتبها من أفكارها بقواعد الإرشادات (' + AR(view.seatedIdeas ?? 0) + ' نداءً مدفوعًا)', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}
       ${inFlight === 0 && failed.length > 0 ? html`<form class="inline" method="POST" action="/panel/plan/review/redraft"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'أعد كتابة ما تعذّر (' + AR(failed.length) + ')', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}</div>`
   const visible = [...m.cards]
     .filter((c) => shown === 0 || weekOfDay(m.plan.week, c.item.day) === shown)

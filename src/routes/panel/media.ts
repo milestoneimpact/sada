@@ -24,7 +24,8 @@ import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
 import { editPlanItem } from '../../lib/plan/edit'
 import { thumbFor, thumbWidth } from '../../lib/media/thumb'
-import { addLibraryFile, attachToPost, markAsset, libraryProblem, listLibrary, rawObject } from '../../lib/library'
+import { addLibraryFile, attachToPost, markAsset, libraryProblem, listLibrary, packageAssets, rawObject } from '../../lib/library'
+import { readPackageMedia } from '../../lib/package/sync'
 import { libraryScreen } from '../ui/libraryView'
 import { mediaFolderName, readDriveMedia, scanDriveMedia, setMediaFolderName } from '../../lib/drive/media'
 import { captionIssues, captionsFor, readCaptions, saveCaptions } from '../../lib/media/captions'
@@ -48,6 +49,7 @@ media.get('/panel/assets', async (c) => {
   const origin = c.req.query('origin')
   const plan = c.req.query('plan') ?? ''
   const index = Number(c.req.query('index'))
+  const picking = (/^[A-Za-z0-9_-]{1,80}$/.test(plan) || POST_ID.test(c.req.query('post') ?? '')) && Number.isInteger(index) && index >= 0
   const body = libraryScreen({
     zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     assets: await listLibrary(c.env.DB, org),
@@ -58,6 +60,8 @@ media.get('/panel/assets', async (c) => {
     pickPost: POST_ID.test(c.req.query('post') ?? '') && Number.isInteger(index) && index >= 0
       ? { post: c.req.query('post')!, index, w: /^(?:\d{1,2}|all)$/.test(c.req.query('w') ?? '') ? c.req.query('w')! : '' }
       : null,
+    // ‏«من حزمتك» أوّلًا في وجه الاختيار (D-394): وسائطُ الحزمة المعتمدةُ لبند الخطّة أو منشورها
+    ...(picking ? { packageAssets: packageAssets(await readPackageMedia(c.env.DB, org)) } : {}),
     flash: await takeFlash(c.env, c.req.raw),
     q: (c.req.query('q') ?? '').slice(0, 80),
     fav: c.req.query('fav') === '1',

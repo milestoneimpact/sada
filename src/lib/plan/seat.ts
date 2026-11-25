@@ -10,7 +10,8 @@
  * | الصيغة | كيف تصير جدولًا | الكلفة |
  * |---|---|---|
  * | CSV | كما هي | لا شيء |
- * | Excel (xlsx · xls · ods) | `toMarkdown` ثمّ جدولُه سطرًا سطرًا | لا شيء |
+ * | Excel xlsx | `readXlsx` أصيلًا: ورقةُ الخطّة جدولًا، وورقةُ «الإرشادات» قواعدَ (D-393) | لا شيء |
+ * | Excel (xls · ods) | `toMarkdown` ثمّ جدولُه سطرًا سطرًا | لا شيء |
  * | PDF · Word · نصّ | `toMarkdown` للنصّ، **ثمّ نموذجُ الكتابة يستخرج الصفوف** | نداءٌ واحدٌ في الدفتر (D-008) |
  *
  * والنموذجُ **يستخرج ولا يخترع**: النصُّ كما كُتب، والتاريخُ إن ذُكر، وما لم يُذكر يبقى فارغًا.
@@ -38,6 +39,7 @@ import { cleanConverted, type ToMarkdown } from '../sources/ingest'
 import { readGuidelines, type PlanRules } from './guidelines'
 import { isThread } from '../draft/thread'
 import { issueText, looksMarkdown, markdownToCsv, readTemplate } from './template'
+import { excelDate, excelTime, readXlsx, type Sheet } from '../package/xlsx'
 
 export const SEAT_EXTENSIONS: readonly string[] = ['csv', 'xlsx', 'xls', 'ods', 'pdf', 'docx', 'odt', 'txt', 'md']
 const SHEETS = new Set(['xlsx', 'xls', 'ods'])
@@ -108,6 +110,33 @@ function templateGate(csv: string): TableOutcome {
   return { kind: 'error', reason: 'في القالب ما يُصلح قبل القراءة — ' + shown.join(' · ') + (more > 0 ? ` · و${more} غيرها` : '') }
 }
 
+const PLAN_SHEET = /خطة|خطّة|plan/i
+const GUIDE_SHEET = /الإرشادات|الارشادات|إرشادات|ارشادات|guidelines/i
+const DATE_COL = /^(التاريخ|date|day|اليوم)$/i
+const TIME_COL = /(^|[:：]\s*)(الوقت|الساعة|time)$/i
+
+/**
+ * **المصنَّفُ بأوراقه** (D-393) — يُقرأ أصيلًا بقارئ الحزمة (`readXlsx`، D-368) بلا Workers AI ولا كلفة. ورقةُ الخطّة باسمها
+ * («خطة الشهر») وإلّا أوّلُ ورقةٍ ليست إرشادات، **وورقةُ «الإرشادات» باسمها** وإلّا أوّلُ ورقةٍ أخرى يقرؤها `readGuidelines`؛
+ * وقواعدُها تُحمل مع الجدول فتُحفظ في خطّتها (`choices_json.rules`). والتاريخُ التسلسليُّ والوقتُ الكسريّ يُحوَّلان قبل القراءة.
+ * و`null` لمصنَّفٍ بلا ورقة خطّة: يعود المسارُ إلى `toMarkdown` كما كان.
+ */
+export function sheetsTable(sheets: readonly Sheet[]): TableOutcome | null {
+  const plan = sheets.find((s) => PLAN_SHEET.test(s.name) && !GUIDE_SHEET.test(s.name)) ?? sheets.find((s) => !GUIDE_SHEET.test(s.name))
+  if (plan === undefined) return null
+  const rows = plan.rows.filter((r) => r.some((v) => v.trim() !== ''))
+  if (rows.length < 2) return { kind: 'error', reason: 'لا جدولَ في ورقة الخطّة «' + plan.name + '» — أهي فارغة؟' }
+  const head = rows[0]!.map((h) => h.trim())
+  const fixed = rows.map((r, i) => i === 0 ? r : r.map((v, c) => DATE_COL.test(head[c] ?? '') ? excelDate(v) : TIME_COL.test(head[c] ?? '') ? excelTime(v) : v))
+  const csv = fixed.map((r) => r.map(cell).join(',')).join('\n')
+  const others = sheets.filter((s) => s !== plan)
+  const ordered = [...others.filter((s) => GUIDE_SHEET.test(s.name)), ...others.filter((s) => !GUIDE_SHEET.test(s.name))]
+  const rules = ordered.map((s) => readGuidelines(s.rows.map((r) => r.map(cell).join(',')).join('\n'))).find((r) => r !== null) ?? null
+  const gated = templateGate(csv)
+  if (gated.kind === 'error') return gated
+  return { kind: 'table', csv, cost: 0, via: 'sheet', ...(rules === null ? {} : { rules }) }
+}
+
 /** أيُّ صيغةٍ إلى جدولٍ واحد. */
 export async function toTable(
   deps: { readonly db: Db; readonly writer: BriefDeps; readonly toMarkdown?: ToMarkdown | undefined },
@@ -135,6 +164,11 @@ export async function toTable(
       // ‏جدولُ markdown (قالبُ الشهر، D-390) يُقرأ بلا نموذجٍ ولا كلفة، بأرقام سطوره
       if (looksMarkdown(prose)) return templateGate(markdownToCsv(prose))
     } else {
+      // ‏‏xlsx بأوراقه كلِّها أصيلًا (D-393): الخطّةُ والإرشادات، بلا قارئ مستنداتٍ ولا كلفة
+      if (ext === 'xlsx') {
+        const native = await readXlsx(input.bytes).then(sheetsTable, () => null)
+        if (native !== null) return native
+      }
       if (deps.toMarkdown === undefined) return { kind: 'error', reason: 'قارئُ المستندات (Workers AI) غير مربوط في هذه البيئة — ارفع CSV أو الصق النصّ.' }
       const out = await deps.toMarkdown({ name: input.name, blob: new Blob([new Uint8Array(input.bytes)]) })
       const one = Array.isArray(out) ? out[0] : out
