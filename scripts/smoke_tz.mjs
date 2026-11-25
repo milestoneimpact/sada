@@ -1,7 +1,7 @@
 /**
  * **فحصٌ حيٌّ لـ D-378 على staging** — منطقةُ المتصفّح تصل الخادمَ من أوّل تحميل.
  *
- * يقول D-378 إنّ سطرًا في `THEME_BOOT` (داخل `<head>` بـ`nonce`) يكتب `sada_tz` قبل `u.js`. وهذا الفحصُ يسأل
+ * قال D-378 إنّ سطرًا في `THEME_BOOT` يكتب `sada_tz` قبل `u.js`، والكعكةُ تُكتب من `u.js` وحده (D-392): سطرُ الرأس يُبلَّغ ولا يُسقط، وإن وُجد فبنونس. وهذا الفحصُ يسأل
  * الصفحاتِ العامّة على `sada2.basserh.com` وحده (لا الإنتاج) ثلاثةَ أسئلة، كلٌّ بجوابه:
  *
  * ١ · **سطرُ الرأس**: سكربتٌ في `<head>` نونسُه هو نونسُ رأس CSP، وفيه `sada_tz`.
@@ -88,7 +88,7 @@ async function main(base) {
     }
     const nonce = cspNonce(res.headers.get('content-security-policy'))
     const { found, nonced } = headTzLine(await res.text(), nonce)
-    say(found && nonced, `${path}: سطرُ \`${TZ_COOKIE}\` في <head> ${found ? (nonced ? 'بنونس CSP' : 'بلا نونس CSP') : 'غائب'} (نونس CSP: ${nonce === null ? 'غائب' : 'حاضر'})`)
+    say(found ? nonced : null, `${path}: سطرُ \`${TZ_COOKIE}\` في <head> ${found ? (nonced ? 'بنونس CSP' : 'بلا نونس CSP') : 'غائب'} (نونس CSP: ${nonce === null ? 'غائب' : 'حاضر'})`)
   }
 
   let chromium

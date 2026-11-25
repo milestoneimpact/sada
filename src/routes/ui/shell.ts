@@ -195,7 +195,6 @@ if(z==='large')document.documentElement.dataset.size=z;
 var mo=localStorage.getItem('sada-motion');
 if(mo==='reduced')document.documentElement.dataset.motion=mo;
 if(localStorage.getItem('sada-rail')==='mini')document.documentElement.dataset.rail='mini';}catch(e){}
-try{var tz=Intl.DateTimeFormat().resolvedOptions().timeZone||'';if(tz!=='')document.cookie='sada_tz='+encodeURIComponent(tz)+'; Path=/panel; SameSite=Strict; Max-Age=86400'+(location.protocol==='https:'?'; Secure':'');}catch(e){}
 if(typeof window!=='undefined'&&window.addEventListener){['pagereveal','pageswap'].forEach(function(n){window.addEventListener(n,function(e){var t=e.viewTransition;if(!t)return;
 var no=function(){};[t.ready,t.finished,t.updateCallbackDone].forEach(function(p){if(p&&p.catch)p.catch(no);});});});
 window.addEventListener('unhandledrejection',function(e){var r=e.reason;
