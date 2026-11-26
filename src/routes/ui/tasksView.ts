@@ -220,13 +220,13 @@ function vitalsCard(v: VitalsSummary | null | undefined, rejects?: number): stri
   }
   const cell = (m: Metric, d: (typeof DEVICES)[number]): string => {
     const x = v.byMetric[m][d]
-    if (x.p75 === null) return html`<td><span class="ago">لم تُقَس</span></td>`.value
+    if (x.p75 === null) return html`<td data-label="${DEVICE_LABEL[d]}"><span class="ago">لم تُقَس</span></td>`.value
     const mark = x.rating === null ? null : RATING_MARK[x.rating]
-    return html`<td><b>${formatVital(m, x.p75)}</b> ${mark === null
+    return html`<td data-label="${DEVICE_LABEL[d]}"><b>${formatVital(m, x.p75)}</b> ${mark === null
       ? html`<span class="ago">${x.n} من ${MIN_SAMPLES}</span>`
       : raw(statusBadge(mark.cls, '●', mark.label))}</td>`.value
   }
-  const rows = METRICS.map((m) => html`<tr><td>${METRIC_LABEL[m]}</td>${raw(DEVICES.map((d) => cell(m, d)).join(''))}<td>${formatVital(m, THRESHOLDS[m][0])}</td></tr>`)
+  const rows = METRICS.map((m) => html`<tr><td>${METRIC_LABEL[m]}</td>${raw(DEVICES.map((d) => cell(m, d)).join(''))}<td data-label="الحدّ">${formatVital(m, THRESHOLDS[m][0])}</td></tr>`)
   const slow = v.slowest === null ? '' : html`<p class="hint m-0 mt-2">أبطأُ صفحةٍ على الهاتف: <code>${v.slowest.page}</code> (${formatVital('LCP', v.slowest.p75)}).</p>`
   return html`<div class="card mb-3">
     <div class="card-head"><h2>سرعةُ اللوحة عندك</h2><div class="grow"></div>

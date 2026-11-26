@@ -1112,7 +1112,7 @@ plan.get('/panel/plan/month', async (c) => {
     canApprove: canFix && stored?.status === 'draft',
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
-    cal: { q: calQ, items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
+    cal: { q: calQ, canWrite: allows(session.record.role ?? 'owner', 'editor'), items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
   })
   // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
   return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
