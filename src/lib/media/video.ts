@@ -23,10 +23,10 @@
  * يشير إلى بايتاتٍ لا وجودَ لها **يكذب**، وبايتاتٌ لا يشير إليها صفٌّ
  * تبقى يتيمةً ولا تضرّ.
  */
-import { recordCost } from '../cost'
 import { routeFor } from '../ai/routes'
 import { CLAIM_UNAVAILABLE, claimGeneration, releaseClaim } from './claim'
 import { blockerReason, checkAllowance, videoCapFor } from '../limits'
+import { claimVideoSpend, releaseVideoSpend, videoBudgetReason } from './videoBudget'
 import { signMediaToken, mediaUrl } from './link'
 import {
   AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
@@ -305,20 +305,29 @@ export async function animateForPost(
   const route = await routeFor(deps.db, 'video').catch(() => null)
   const model = route?.model ?? VIDEO_MODELS.fromImage
 
-  // ٦ — الكلفةُ تُسجَّل قبل أن يُعدّ النداءُ ناجحا (D-008).
-  //
-  // **ولا يُخترَع سعر.** سعرُ الفيديو عند Cloudflare يُقرأ من لوحة
-  // الحساب ولم يُقرأ بعد، فيُسجَّل صفرٌ **موسومٌ** — ودفترٌ فيه صفرٌ
-  // يقول «لم يُسعَّر» أصدقُ من رقمٍ يُظنّ حقيقةً وهو تخمين
-  await recordCost(deps.db, {
-    provider: 'cloudflare',
-    // **والدفترُ يسجّل ما نُودي به فعلا**: اسمٌ ثابتٌ في الدفتر
-    // ونموذجٌ متغيّرٌ في النداء يجعل الكلفةَ تُنسَب إلى غير صاحبها
+  /*
+   * ٦ — الكلفةُ تُسجَّل قبل أن يُعدّ النداءُ ناجحا (D-008)، **وتُحجز بها ميزانيّةُ الشهر** (D-414).
+   *
+   * صفُّ الدفتر هو الحجز: جملةٌ شرطيّةٌ واحدةٌ لا تكتبه إلّا إن اتّسعت ميزانيّةُ هذا العميل — فطلبان
+   * متزامنان لا يمرّان معًا على آخر ما بقي. والسعرُ **تقديرُ المالك** (`video_clip_usd`) لا سعرٌ مقروء،
+   * فيبقى الوسمُ `price_unverified`. **والدفترُ يسجّل ما نُودي به فعلا**: النموذجُ في اسم العمليّة.
+   */
+  const mine = allowance.org?.settings ?? allowance.settings
+  const scope = mine.monthlyVideoCapUsd === allowance.settings.monthlyVideoCapUsd ? 'global' : 'org'
+  const spend = await claimVideoSpend(deps.db, {
+    org,
+    cap: mine.monthlyVideoCapUsd,
+    clip: allowance.settings.videoClipUsd,
     operation: `video:${model}:price_unverified`,
-    units: 1,
-    unitCost: 0,
     refId: postId,
-  })
+  }).catch(() => null)
+  if (spend === null || spend.kind === 'cap') {
+    // ‏‏ولا يبقى حجزُ التوليد على منشورٍ لم يُنفَق عليه شيء
+    await releaseClaim(deps.db, org, key)
+    return spend === null
+      ? { kind: 'failed', reason: CLAIM_UNAVAILABLE, retryable: true }
+      : { kind: 'blocked', reason: videoBudgetReason(spend.budget, scope) }
+  }
 
   let url: string
   try {
@@ -329,7 +338,8 @@ export async function animateForPost(
     )
     url = out.url
   } catch (error) {
-    // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة**
+    // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — ومالُ نداءٍ ردّه المزوّدُ يعود إلى الميزانيّة (D-414)
+    await releaseVideoSpend(deps.db, org, spend.ledgerId)
     await releaseClaim(deps.db, org, key)
     return {
       kind: 'failed',

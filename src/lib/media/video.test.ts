@@ -248,11 +248,12 @@ describe('الحجز قبل الإنفاق (D-068)', () => {
 
 describe('الدفتر', () => {
   /**
-   * **ولا يُخترَع سعر.** سعرُ الفيديو يُقرأ من لوحة Cloudflare ولم
-   * يُقرأ بعد، فيُسجَّل صفرٌ **موسوم** — ودفترٌ يقول «لم يُسعَّر» أصدقُ
-   * من رقمٍ يُظنّ حقيقةً وهو تخمين.
+   * **ولا يُخترَع سعر.** سعرُ الفيديو لم يُقرأ من لوحة Cloudflare، فيُسجَّل
+   * **تقديرُ المالك** (`video_clip_usd`، D-414) موسومًا `price_unverified` —
+   * رقمٌ مصدرُه قرارٌ مكتوبٌ يُحجز به، لا تخمينٌ من الشيفرة.
    */
-  it('يُسجّل صفرا موسوما لا رقما مخمَّنا', async () => {
+  it('يُسجّل تقديرَ المالك موسومًا لا سعرًا مقروءًا', async () => {
+    await writeSetting(db, 'video_clip_usd', '0.75', 'omar')
     seedPost()
     seedMedia({ id: 'img', mime: 'image/png' })
     await animateForPost(deps(ai(OK_VIDEO)), 'p1')
@@ -262,7 +263,7 @@ describe('الدفتر', () => {
       .get() as { provider: string; operation: string; total: number }
     expect(row.provider).toBe('cloudflare')
     expect(row.operation).toContain('price_unverified')
-    expect(row.total).toBe(0)
+    expect(row.total).toBe(0.75)
   })
 
   /** التكلفةُ قبل النجاح (D-008): نداءٌ وقع يُحسَب ولو فشل بعده. */

@@ -16,6 +16,7 @@ import { dailySpend, spendByProvider, spendRows, spendThisMonth, spendTodayFor }
 import { cfAccountId, cfAccountOf } from '../../lib/ai/cloudflare'
 import { imageProviderGate, imageSecretName, slideGate, type SlideGate } from '../../lib/image/gate'
 import { imageReadiness, infographicReadiness, routeDot, videoReadiness, type MediaReady } from '../../lib/media/readiness'
+import { videoBudget } from '../../lib/media/videoBudget'
 import { analyzeSource } from '../../lib/analyze/job'
 import { getDraft, listDrafts, type DraftRow } from '../../lib/draft/store'
 import { journeyCounts } from '../../lib/home'
@@ -498,6 +499,9 @@ function readiness(load: Load, p: ProviderLoad): { readonly slide: SlideGate; re
       // ‏وحكمُ المقطع من قراءة الحارس نفسِها بسؤاله هو (D-169)
       blocker: blockerFor('video', allowance.settings, allowance.usage),
       clips: videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap),
+      // ‏‏وميزانيّةُ الشهر للمنظّمة النشطة: سقفُها الفعّالُ بتقدير المالك للمقطع (D-414)
+      budget: videoBudget((allowance.org?.settings ?? allowance.settings).monthlyVideoCapUsd, allowance.videoMonth ?? 0,
+        allowance.settings.videoClipUsd),
     }),
   }
   return { slide, mediaReady }
@@ -833,6 +837,9 @@ async function settingsData(load: Load): Promise<SettingsData> {
     usedSpend: Number.isFinite(allowance.usage.spend) ? allowance.usage.spend : 0,
     videoCap: s.dailyVideoCap,
     usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
+    videoMonthCap: s.monthlyVideoCapUsd,
+    videoClip: s.videoClipUsd,
+    usedVideoMonth: Number.isFinite(allowance.videoMonth) ? allowance.videoMonth ?? 0 : 0,
     promoCap: s.weeklyPromoCapUsd,
     autoEnqueue: s.autoEnqueue,
     autoImage: s.autoImage,

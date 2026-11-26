@@ -158,6 +158,7 @@ export async function dailySpend(db: Db, days = 14): Promise<DailySpend[]> {
 }
 
 /** إنفاق مزوّدٍ واحد اليوم — لسقفه الخاصّ. */
+// والمقاطعُ خارجه: ميزانيّتُها الشهريّةُ تحرسها، وتقديرُها لا يوقف صورَ المزوّد نفسِه (D-414)
 export async function spendTodayFor(db: Db, provider: string): Promise<number> {
   try {
     const row = await db
@@ -165,7 +166,8 @@ export async function spendTodayFor(db: Db, provider: string): Promise<number> {
         `SELECT coalesce(sum(total), 0) AS total
            FROM cost_ledger
           -- سقفُ المزوّد عامّ لكلّ المنظّمات: المزوّدون إعدادٌ عامّ
-          WHERE org_id IN (SELECT id FROM orgs) AND provider = ? AND at >= date('now')`,
+          WHERE org_id IN (SELECT id FROM orgs) AND provider = ? AND at >= date('now')
+            AND operation NOT LIKE 'video:%'`,
       )
       .bind(provider)
       .first<{ total: number }>()

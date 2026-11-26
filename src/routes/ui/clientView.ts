@@ -52,8 +52,8 @@ export interface ClientData {
   readonly options?: { readonly approvalRequired: boolean; readonly reportMail: boolean }
   readonly limits?: {
     readonly ownerOrg: boolean
-    readonly global: { readonly spend: number; readonly image: number; readonly video: number; readonly analysis: number }
-    readonly mine: { readonly spend?: number; readonly image?: number; readonly video?: number; readonly analysis?: number }
+    readonly global: { readonly spend: number; readonly image: number; readonly video: number; readonly analysis: number; readonly videoMonth: number }
+    readonly mine: { readonly spend?: number; readonly image?: number; readonly video?: number; readonly analysis?: number; readonly videoMonth?: number }
     readonly spentToday: number
   }
 }
@@ -224,7 +224,7 @@ function limitsCard(l: NonNullable<ClientData['limits']>): string {
   if (l.ownerOrg) {
     return html`<div class="card mt-4" id="limits"><h2>الحدود</h2>
       <p class="hint m-0">هذه منظّمةُ المالك، وحدودُها هي <b>العامّة</b> على الكلّ: ${money(l.global.spend)} في اليوم،
-        و${l.global.image} صورة، و${l.global.video} مقطع، و${l.global.analysis} تحليلًا. تُعدَّل من
+        و${l.global.image} صورة، و${l.global.video} مقطع، و${money(l.global.videoMonth)} للمقاطع في الشهر، و${l.global.analysis} تحليلًا. تُعدَّل من
         <a href="/panel/settings#limits">الإنفاق والحدود</a>. وعميلٌ آخر يكتب لنفسه سقفًا دونها من صفحته.</p>
     </div>`.value
   }
@@ -239,6 +239,7 @@ function limitsCard(l: NonNullable<ClientData['limits']>): string {
         ${raw(num('cl-spend', 'daily_spend_cap_usd', 'سقف الإنفاق في اليوم (دولار)', l.mine.spend, money(l.global.spend), 'min="0" max="100" step="0.5"'))}
         ${raw(num('cl-image', 'daily_image_cap', 'سقف الصور في اليوم', l.mine.image, String(l.global.image), 'min="0" max="50" step="1"'))}
         ${raw(num('cl-video', 'daily_video_cap', 'سقف المقاطع في اليوم', l.mine.video, String(l.global.video), 'min="0" max="20" step="1"'))}
+        ${raw(num('cl-video-month', 'monthly_video_cap_usd', 'ميزانيّة المقاطع في الشهر (دولار)', l.mine.videoMonth, money(l.global.videoMonth), 'min="0" max="500" step="0.5"'))}
         ${raw(num('cl-analysis', 'daily_analysis_cap', 'سقف التحليل في اليوم', l.mine.analysis, String(l.global.analysis), 'min="0" max="500" step="1"'))}
       </div>
       <div class="row gap-2"><button class="btn btn-primary" type="submit">احفظ الحدود</button></div>
