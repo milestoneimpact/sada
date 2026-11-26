@@ -55,6 +55,9 @@ describe('التيّار (D-386)', () => {
     expect(res.status).toBe(200)
     const html = await res.text()
     expect(html).toContain('<h1>التيّار</h1>')
+    // ‏بابُ «منشور جديد» واحدٌ في التيّار: رأسُه يحمله، فلا يُكرَّر في رأس الصفحة (D-420)
+    expect(html.match(/<summary[^>]*>[^]*?منشور جديد/g)?.length ?? 0).toBeLessThanOrEqual(1)
+    expect(html).not.toContain('data-tb-new')
     expect(html).toContain('ينتظر اعتمادك')
     // ‏الحالاتُ من مصدرها الواحد (D-340)، والبندُ الذي لم يُكتب «يُكتب الآن»
     for (const s of ['تنتظر قرارك', 'مجدولة', 'نُشرت', 'فشل النشر', 'يُكتب الآن', 'بندٌ لم يُكتب بعد']) expect(html).toContain(s)

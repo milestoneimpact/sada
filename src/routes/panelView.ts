@@ -1021,8 +1021,9 @@ function libraryTabs(pending: number, videos: number, images: number): string {
  * ‏**«منشور جديد» على الحاسوب أيضًا** (D-216): كان الزرُّ العائم على الهاتف وحدَه، وعلى الحاسوب أربعةُ أزرار بدءٍ داخل
  * ‏«المنشورات» فقط. فصار في الترويسة من كلّ صفحة، بالبدايات الأربع نفسِها، ومساراتُها إلى «/panel» لتصل من أيّ لوح.
  */
-function topNew(): string {
-  return newPostMenu('data-tb-new')
+function topNew(role: Role | undefined): string {
+  // ‏D-420: لا بابَ كتابةٍ لمن لا يكتب
+  return allows(role ?? 'owner', 'editor') ? newPostMenu('data-tb-new') : ''
 }
 
 /**
@@ -1860,7 +1861,7 @@ ${railHtml({ inPanel: only === null, counts, env: d.env, scope, status: state, .
   <div class="ttl">${/* ‏**عنوانٌ واحدٌ في الصفحة** (SPEC-v1 §8 · D-381): هذا صدى رأسِ اللوح يظهر عند التمرير، فلا يُعدّ عنوانًا ثانيًا — والتركيزُ عند التبديل ينتقل إلى h1 اللوح */''}<p id="pane-title" class="pt m-0" aria-hidden="true">${escapeHtml(sectionLabel(only === null ? 'overview' : only))}</p><p id="pane-say" class="vh" aria-live="polite"></p>
     ${d.env === 'production' ? '' : '<div class="crumb">تجريبيّ</div>'}</div>
   <div class="grow"></div>
-  ${topNew()}
+  ${topNew(d.role)}
   ${bell(d.unread ?? 0)}
   ${commandTrigger()}
   ${state}

@@ -17,7 +17,8 @@ import { count } from './components/badge'
 import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { MARK, MOMENT, THEME, below } from './tokens'
-import { ownerViewing } from '../../lib/access'
+import { allows, ownerViewing } from '../../lib/access'
+import type { Role } from '../../lib/ownerEmail'
 import { newPostMenu } from './newMenu'
 
 /**
@@ -297,6 +298,11 @@ export function soloPage(
    * فتُنزَع نسخةُ الذيل، والكثافةُ تبقى فيه.
    */
   rail?: string,
+  /**
+   * دورُ الجلسة (D-420): به وحدَه يُرسم «منشور جديد ▾» في الرأس — لمن يكتب (`editor` فما فوق). **وغيابُه
+   * لا بابَ**: صفحةٌ لم تُمرِّر الدورَ لا تَعِد بكتابةٍ لا يملكها الزائر. والتيّارُ لا يمرّره: رأسُه يحمل البابَ.
+   */
+  role?: Role,
 ): string {
   // ‏الجسدُ والرافدةُ مرسومان في وحداتٍ لم تُحوَّل بعدُ إلى القالب: يُوثَقان عند الحدّ (D-281)
   const inner = html`<main id="main">${raw(back.at === undefined ? '' : familyTabs(back.at))}${raw(body)}</main>`
@@ -304,8 +310,8 @@ export function soloPage(
     title,
     html`<a class="skip" href="#main">تخطّي إلى المحتوى</a>
        ${rail === undefined
-         ? html`${raw(pageTop())}<div class="wrap">${inner}</div>`
-         : html`<div class="app">${raw(rail)}<div class="main">${raw(pageTop())}<div class="wrap">${inner}</div></div></div>`}`.value,
+         ? html`${raw(pageTop(role))}<div class="wrap">${inner}</div>`
+         : html`<div class="app">${raw(rail)}<div class="main">${raw(pageTop(role))}<div class="wrap">${inner}</div></div></div>`}`.value,
     nonce,
     script,
     commands === undefined ? {} : { commands },
@@ -331,11 +337,13 @@ export function bell(unread: number | null): string {
  * حقلٍ ومعه `Ctrl K`، ثمّ الإشعاراتُ والحساب. و«منشور جديد ▾» قبلها (D-419): بابُ الكتابة من كلّ صفحةٍ مفردة. **والعنوانُ `h1` أوّلُ ما في المحتوى تحته**: رأسُ الصفحة
  * (`.page-head`) يحمل معه وصفَه وفعلَه، فنقلُه إلى الشريط يفصل العنوانَ عن فعله.
  */
-export function pageTop(): string {
+export function pageTop(role?: Role): string {
+  // ‏D-420: البابُ لمن يكتب وحدَه، وبـ`data-tb-new` يُخفى دون md كرأس اللوحة (D-216): هناك الزرُّ العائم
+  const door = role !== undefined && allows(role, 'editor') ? newPostMenu('data-tb-new', 'primary') : ''
   // ‏العلامةُ والرمزُ ثابتان في الشيفرة، وزرُّ الأوامر والقائمةُ من العُدّة: تُوثَق عند الحدّ (D-281)
   return html`<header class="topbar page-top">
     <a class="home glyph tb" href="/panel" aria-label="صدى — الرئيسيّة">${raw(GLYPH_SVG)}</a>
-    <span class="grow"></span>${raw(newPostMenu('', 'primary'))}${raw(commandTrigger())}${raw(bell(null))}${raw(accountMenu())}
+    <span class="grow"></span>${raw(door)}${raw(commandTrigger())}${raw(bell(null))}${raw(accountMenu())}
   </header>`.value
 }
 

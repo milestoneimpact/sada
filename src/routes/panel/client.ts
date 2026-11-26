@@ -205,7 +205,7 @@ client.get('/panel/client/report', async (c) => {
   return page((nonce) =>
     soloPage(`صدى — تقرير ${report.month}`, { href: '/panel/client', label: 'رحلة العميل' },
       injectCsrf(monthlyScreen(report, orgRow?.name ?? 'منظّمتي', flash), session.record.csrf), nonce, MONTHLY_SCRIPT,
-      buildCommands({ onPanel: false }), soloNav('results')),
+      buildCommands({ onPanel: false }), soloNav('results'), session.record.role ?? 'owner'),
   )
 })
 
