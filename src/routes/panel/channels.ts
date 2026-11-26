@@ -5,6 +5,7 @@
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
+import { pageApp } from '../../lib/linkedinPage'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
 import { listModels, type ModelList } from '../../lib/ai/models'
 import { cfAccountId } from '../../lib/ai/cloudflare'
@@ -405,6 +406,8 @@ channels.get('/panel/channels/:platform', async (c) => {
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
+    // ‏وسرّا تطبيق الصفحة (D-417): اسمٌ يُسأل عن وجوده، لا قيمة
+    pageApp: pageApp(c.env as unknown as Record<string, unknown>) !== null,
     // ‏ويومُ المالك من كعكة متصفّحه، لا من إعدادٍ يُخزَّن (D-173)
     zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     // ‏ووميضُ الفعل يُقرأ حيث عاد المالك، لا في لوحٍ لم يفتحه

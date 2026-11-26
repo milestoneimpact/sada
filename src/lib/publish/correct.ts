@@ -76,14 +76,9 @@ export interface Original {
   readonly remote_ids: readonly string[]
 }
 
-/** نطاقُ التعديل والنشر باسم صفحةٍ على LinkedIn (Community Management API). */
-export const LINKEDIN_ORG_SCOPE = 'w_organization_social'
-
-/** مؤلّفُ منشور الحساب على LinkedIn: الصفحةُ `urn:li:organization:`، والشخصُ `urn:li:person:` (D-080). */
-export function linkedInAuthor(o: Pick<Original, 'account_kind' | 'external_id'>): string | null {
-  if (o.account_kind === 'org') return /^\d{1,20}$/.test(o.external_id) ? `urn:li:organization:${o.external_id}` : null
-  return o.external_id === '' ? null : `urn:li:person:${o.external_id}`
-}
+// ‏النطاقُ والمؤلّفُ في موضعهما الواحد مع سائق الصفحة (D-417)
+export { LINKEDIN_ORG_SCOPE, linkedInAuthor } from '../linkedinPage'
+import { LINKEDIN_ORG_SCOPE, linkedInAuthor } from '../linkedinPage'
 
 /** الرسائلُ بالعربيّة لكلّ فشل — موضعٌ واحد تقرؤه الشاشةُ والاختبار. */
 export const SAY = {

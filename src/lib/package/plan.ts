@@ -159,7 +159,10 @@ export function planFromTemplate(text: string, path: string): PackagePlan {
   const format = /\.csv$/i.test(path) ? 'csv' : 'md'
   const read = readTemplate(text, format, templatePeriod(path))
   const count = new Map<string, number>()
-  const entries: PlanEntry[] = read.rows.map((r) => {
+  // ‏ومسارُ الحزمة يبني بنودَه على المنصّة وحدها: سطرُ `linkedin-page` يصير بندَ LinkedIn هنا، والصفحةُ تُختار في الجدولة
+  // ‏أو بـ«من ملفّ» حيث يُقرأ السطرُ بحسابه (D-417)
+  const entries: PlanEntry[] = read.rows.map((row) => {
+    const r = row.platform === 'linkedin-page' ? { ...row, platform: 'linkedin' as const } : row
     const base = 'd' + r.day.slice(8, 10)
     const n = (count.get(base + r.platform) ?? 0) + 1
     count.set(base + r.platform, n)

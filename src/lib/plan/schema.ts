@@ -22,13 +22,14 @@ export const PLAN_SCHEMA = {
     properties: {
       day: { type: 'string', pattern: '^\\d{4}-\\d{2}-\\d{2}$', description: 'اليوم YYYY-MM-DD' },
       time: { type: 'string', pattern: '^([01]\\d|2[0-3]):[0-5]\\d$', description: 'الساعة HH:MM بتوقيت المالك' },
-      platform: { enum: ['linkedin', 'x'], description: 'المنصة' },
+      platform: { enum: ['linkedin', 'linkedin-page', 'x'], description: 'المنصة — linkedin-page لصفحة الشركة' },
       text: { type: 'string', minLength: 1, description: 'النص كما يُنشر؛ في X سطر --- يفصل تغريدات السلسلة' },
       media: { type: 'string', description: 'مسار الصورة أو المقطع (اختياريّ)' },
       note: { type: 'string', description: 'ملاحظة لا تُنشر' },
     },
     allOf: [
       { if: { properties: { platform: { const: 'linkedin' } } }, then: { properties: { text: { maxLength: TEXT_LIMIT.linkedin } } } },
+      { if: { properties: { platform: { const: 'linkedin-page' } } }, then: { properties: { text: { maxLength: TEXT_LIMIT['linkedin-page'] } } } },
     ],
   },
 } as const

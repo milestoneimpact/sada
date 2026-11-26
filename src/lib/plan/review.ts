@@ -34,7 +34,7 @@ export interface ReviewCard {
   readonly index: number
   readonly key: string
   readonly item: PlanItem
-  readonly post: { readonly id: string; readonly text: string; readonly status: string; readonly scheduledAt: string | null; readonly edited?: boolean } | null
+  readonly post: { readonly id: string; readonly text: string; readonly status: string; readonly scheduledAt: string | null; readonly edited?: boolean; readonly page?: string } | null
   readonly mediaId: string | null
   /** نوعُ الوسيط — للمعاينة بشكل المنصّة (D-288). */
   readonly mediaMime?: string | null
@@ -86,10 +86,13 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   const [meta, posts, media, versions, failures] = await Promise.all([
     db.prepare('SELECT version, locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org)
       .first<{ version: number; locked_at: string | null }>().catch(() => null),
-    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key, edited_in_sada FROM posts
+    // ‏واسمُ الصفحة إن جُدول المنشورُ على صفحة LinkedIn (D-417): البطاقةُ تقول «LinkedIn · صفحة …» لا «LinkedIn»
+    db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key, edited_in_sada,
+                       (SELECT a.display_name FROM accounts a WHERE a.id = posts.account_id AND a.kind = 'org' AND a.platform = 'linkedin') AS page_name
+                  FROM posts
                  WHERE org_id = ? AND plan_id = ? AND status <> 'rejected' ORDER BY created_at`)
       .bind(org, plan.id)
-      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string; edited_in_sada?: number }>()
+      .all<{ id: string; platform: string; text: string; status: string; scheduled_at: string | null; source_id: string | null; source_refs: string | null; idempotency_key: string; edited_in_sada?: number; page_name?: string | null }>()
       .then((r) => r.results).catch(() => []),
     db.prepare(`SELECT m.id, m.post_id, m.mime, m.width, m.height FROM media m JOIN posts p ON p.id = m.post_id AND p.org_id = m.org_id
                  WHERE m.org_id = ? AND p.plan_id = ? AND m.status = 'ready' ORDER BY m.created_at DESC`)
@@ -123,7 +126,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
     return {
       index, key: itemKey(item), item, mediaId, mediaMime: mediaId === null ? null : mimeOf.get(mediaId) ?? null, gaps,
       mediaWidth: mediaId === null ? null : dimsOf.get(mediaId)?.width ?? null, mediaHeight: mediaId === null ? null : dimsOf.get(mediaId)?.height ?? null,
-      post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at, edited: row.edited_in_sada === 1 },
+      post: row === null ? null : { id: row.id, text: row.text, status: row.status, scheduledAt: row.scheduled_at, edited: row.edited_in_sada === 1, ...(typeof row.page_name === 'string' ? { page: row.page_name } : {}) },
       ...(row === null && failures.has(draftRef(item.id, item.sourceId, item.platform)) ? { failed: failures.get(draftRef(item.id, item.sourceId, item.platform))! } : {}),
     }
   })

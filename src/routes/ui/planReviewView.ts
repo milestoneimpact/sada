@@ -113,12 +113,18 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
       <form class="inline" method="POST" action="/panel/media/reject">${back}<input type="hidden" name="id" value="${c.mediaId}">${raw(button({ label: 'بدون صورة', size: 'sm', type: 'submit' }))}</form></div>`
 }
 
+/** ‏اسمُ وجهة البطاقة (D-417): صفحةُ LinkedIn باسمها «LinkedIn · صفحة …»، وما عداها اسمُ منصّته. */
+export function cardLabel(c: Pick<ReviewCard, 'item' | 'post'>): string {
+  if (c.post?.page !== undefined) return 'LinkedIn · صفحة ' + (c.post.page)
+  return platformLabel(c.item.platform as never)
+}
+
 function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewView, w: string): Html {
   const planId = m.plan.id
   const local = c.item.time
   const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
   const hidden = html`<input type="hidden" name="id" value="${planId}"><input type="hidden" name="index" value="${String(c.index)}"><input type="hidden" name="key" value="${c.key}"><input type="hidden" name="w" value="${w}">`
-  const label = platformLabel(c.item.platform as never)
+  const label = cardLabel(c)
   const status = c.post?.status ?? ''
   // ‏والموعدُ الذي جُدولت إليه يُقال في الشارة: قد يكون أرجحَ ساعات المنصّة لا ساعةَ البند
   const when = status === 'queued' && c.post?.scheduledAt !== null && c.post?.scheduledAt !== undefined ? stamp(c.post.scheduledAt, zone).slice(5, 16) : ''
@@ -139,7 +145,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
   return html`<article class="card rv" id="c-${String(c.index)}" data-gaps="${c.gaps.join(' ')}">
     <header class="rv-h">
       <label class="rv-sel"><input type="checkbox" name="sel" form="rv-bulk" value="${String(c.index)}|${c.key}|${c.post?.id ?? ''}" aria-label="حدّد بند ${label} ${local}"></label>
-      <span class="pf-logo rv-pf" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
+      <span class="pf-logo rv-pf" data-pf="${c.post?.page !== undefined ? 'linkedin-page' : c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
       <b>${label}</b><bdi class="mono">${local}</bdi>
       <span class="grow"></span>
       <span class="st ${st.tone}">${st.text}</span>${when === '' ? html`` : html`<bdi class="mono">${when}</bdi>`}
@@ -430,7 +436,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
   const order = [...m.cards].sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))
   const at = order.findIndex((x) => x.index === c.index)
   const prev = order[at - 1], next = order[at + 1]
-  const label = platformLabel(c.item.platform as never)
+  const label = cardLabel(c)
   const status = c.post?.status ?? ''
   const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(status)
   // ‏البندُ بتوقيت المالك كما هو (D-384)
@@ -488,7 +494,7 @@ export function planSheet(m: ReviewModel, index: number, zone: string | null, vi
         c.post !== null && (status === 'queued' || status === 'published') ? html`${srcName === undefined ? '' : ' · '}<a href="/panel/journey/${c.post.id}">رحلةُ المنشور</a>` : html``}</p>`
   return html`<div class="rv-sh" data-index="${String(c.index)}">
     <header class="rv-sh-h">
-      <span class="pf-logo rv-pf" data-pf="${c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
+      <span class="pf-logo rv-pf" data-pf="${c.post?.page !== undefined ? 'linkedin-page' : c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
       <h2 class="rv-sh-t" id="rv-sh-t">${label} · ${dayLabel(localDay)}</h2>
       <span class="st ${st.tone}">${st.text}</span>
       <span class="grow"></span>

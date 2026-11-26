@@ -12,7 +12,8 @@
  */
 import { PLATFORM_LABEL } from '../oauth/providers'
 import { atomically, type Db, type DbStatement } from '../tokens'
-import { isLinkedInPage, type LinkedAccount } from '../channels'
+import { isLinkedInPage, isPublishablePage, type LinkedAccount } from '../channels'
+import { PAGE_SAY } from '../linkedinPage'
 import { isThread, longestTweet, THREAD_MAX, tweetsOf } from '../draft/thread'
 import { FALLBACK_ZONE, localParts, validZone } from '../time/zone'
 import { localToUtc } from '../time/local'
@@ -50,6 +51,12 @@ const PLATFORM_NAMES: Readonly<Record<string, PlanPlatform>> = {
   tiktok: 'tiktok', 'تيك توك': 'tiktok', 'تيكتوك': 'tiktok',
   instagram: 'instagram', 'إنستغرام': 'instagram', 'انستغرام': 'instagram', 'انستقرام': 'instagram', 'إنستقرام': 'instagram',
 }
+
+/**
+ * ‏**صفحةُ LinkedIn وجهةٌ في الملفّ** (D-417): `linkedin-page` — والمنصّةُ `linkedin`، والحسابُ صفحةٌ تنشر باسمها.
+ * ‏ويُقبل `linkedin:page` و«صفحة لينكدإن» لمن كتبها كذلك.
+ */
+export const PAGE_NAMES: ReadonlySet<string> = new Set(['linkedin-page', 'linkedin:page', 'linkedin page', 'صفحة لينكدإن', 'صفحة linkedin'])
 
 /** أعمدةُ الملفّ — والعنوانُ بالعربيّة أو بالإنجليزيّة. */
 type Column = 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone' | 'item' | 'media' | 'format'
@@ -197,6 +204,8 @@ export interface PlanRow {
   /** رقمُ السطر في الملفّ (العنوانُ ‏1) — ليجده المالكُ في جدوله. */
   readonly line: number
   readonly platform: PlanPlatform | null
+  /** ‏السطرُ لصفحة LinkedIn (`linkedin-page`، D-417). */
+  readonly page?: boolean
   readonly platformRaw: string
   readonly date: string
   readonly time: string
@@ -302,7 +311,8 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
   const rows = body.map(({ cells: r, line }): PlanRow => {
     const problems: string[] = []
     const platformRaw = cell(r, 'platform')
-    const platform = PLATFORM_NAMES[norm(platformRaw)] ?? null
+    const page = PAGE_NAMES.has(norm(platformRaw))
+    const platform = page ? 'linkedin' : PLATFORM_NAMES[norm(platformRaw)] ?? null
     const date = cell(r, 'date')
     const time = cell(r, 'time')
     const text = cell(r, 'text')
@@ -356,9 +366,14 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
 
     // ‏الحسابُ: أوّلُ حسابٍ نشطٍ على المنصّة — وبلا حسابٍ لا موعد. وصفحةُ الشركة على
     // LinkedIn لا تُختار (D-087): النشرُ باسمها لم يُبنَ، فمنشورُها يُردّ ساعةَ النشر
+    // ‏وسطرُ `linkedin-page` لصفحةٍ تنشر باسمها وحدها (D-417) — لا يسقط إلى الحساب الشخصيّ
     const account = platform === null ? undefined
-      : facts.accounts.find((a) => a.platform === platform && a.status === 'active' && !isLinkedInPage(a))
-    if (platform !== null && account === undefined) {
+      : page
+        ? facts.accounts.find((a) => a.status === 'active' && isPublishablePage(a))
+        : facts.accounts.find((a) => a.platform === platform && a.status === 'active' && !isLinkedInPage(a))
+    if (page && account === undefined) {
+      problems.push(`لا صفحة LinkedIn مربوطة تنشر باسمها — ${PAGE_SAY.pending}`)
+    } else if (platform !== null && account === undefined) {
       problems.push(facts.accounts.some((a) => a.platform === platform && a.status === 'active' && isLinkedInPage(a))
         ? 'المتّصل على LinkedIn صفحة شركة — والنشر باسمها لم يُبن بعد؛ اربط حسابَك الشخصيّ'
         : `لا حساب متّصلًا على ${LABEL[platform]} — اربطه أوّلًا`)
@@ -374,12 +389,13 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
       }
     }
 
-    const dupKey = [platform, whenUtc, norm(text), norm(video)].join('|')
+    const dupKey = [page ? 'linkedin-page' : platform, whenUtc, norm(text), norm(video)].join('|')
     const first = seen.get(dupKey)
     if (first !== undefined) problems.push(`مكرّر للسطر ${first}`)
     else seen.set(dupKey, line)
 
     return {
+      ...(page ? { page: true } : {}),
       line, platform, platformRaw, date, time, zone, zoneCell: zoneRaw, text, video, whenUtc,
       understoodUtc: at === null ? null : at.toISOString().slice(0, 16), local: when?.local ?? null,
       accountId: account?.id ?? null, accountName: account?.displayName ?? null, uploadId,
@@ -413,7 +429,8 @@ export async function rowKey(row: PlanRow): Promise<string> {
   // ‏هي صيغةُ المفتاح قبلها، فما اعتُمد من قبل يبقى مفتاحُه
   const pad = (s: string): string => s.trim().replace(/(^|[-:])(\d)(?=$|[-:])/g, '$10$2')
   const [day, clock] = row.local === null ? [pad(row.date), pad(row.time)] : row.local.split(' ')
-  const raw = [row.platform, day, clock, row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
+  // ‏وصفحةُ LinkedIn مفتاحُها غيرُ مفتاح الحساب الشخصيّ (D-417): النصُّ نفسُه في الموعد نفسِه منشوران
+  const raw = [row.page === true ? 'linkedin-page' : row.platform, day, clock, row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   return `plan:${[...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
 }

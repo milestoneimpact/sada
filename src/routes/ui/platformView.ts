@@ -61,6 +61,7 @@ import { button } from './components/button'
 import { card } from './components/card'
 import { dialog } from './components/dialog'
 import { REVOKE_PAGE } from '../../lib/oauth/disconnect'
+import { PAGE_CALLBACK_PATH, PAGE_SAY } from '../../lib/linkedinPage'
 import { taskHref } from '../../lib/owner'
 
 /** ما يلزم لعرض وسيطٍ — لا صفُّ القاعدة كاملا. */
@@ -115,6 +116,8 @@ export interface PlatformScreenData {
    * صندوق التطبيق، وتقول البطاقةُ ذلك بدل «للعامّة».
    */
   readonly reachNoScope?: boolean
+  /** ‏أضُبط سرّا تطبيق صفحة LinkedIn الثاني؟ (D-417) — لـ LinkedIn وحدها، وغيابُه «لا». */
+  readonly pageApp?: boolean
   /** نبضُ القناة لهذا العميل (D-263) — يغيب لمنصّةٍ لا تُقاس. */
   readonly pulse?: Pulse
 }
@@ -949,10 +952,34 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
     ${state === 'linked' && unsignedAccounts(d.view).length === 0
       ? `<div class="acct-more"><a class="btn btn-secondary" href="/oauth/${escapeHtml(spec.id)}/start">اربط حسابا آخر</a></div>`
       : ''}
+    ${spec.id === 'linkedin' ? pageConnectCard(d.pageApp === true, d.baseUrl, accounts) : ''}
     ${(spec.id === 'youtube' || spec.id === 'tiktok') && d.reachPublic !== undefined
       ? reachCard(spec.id, d.reachPublic, d.reachNoScope === true)
       : ''}
     ${setup === '' ? '' : `<h3 class="sec" id="setup">ضبط التطبيق ودليلُه</h3>\n${setup}`}`
+}
+
+/**
+ * ‏**صفحةُ LinkedIn — وجهةٌ ثانيةٌ بتطبيقٍ ثانٍ** (D-417 · M-03). بلا سرّيه حالٌ تُقال بالعربيّة لا زرٌّ يفشل،
+ * ‏وبهما «اربط صفحة LinkedIn» ومعه عنوانُ العودة كما يُلصق في بوّابة المطوّر.
+ */
+export function pageConnectCard(ready: boolean, base: string, accounts: readonly { readonly kind: string; readonly displayName: string; readonly pagePublish?: boolean }[]): string {
+  const pages = accounts.filter((a) => a.kind === 'org')
+  const callback = base.replace(/\/+$/, '') + PAGE_CALLBACK_PATH
+  const body = html`${ready
+      ? html`<p class="hint">يُنشَر باسم الصفحة بتطبيق «SADA Pages» (Community Management API). كلُّ صفحةٍ تختارها يُنشَر عليها وحدها: «LinkedIn · صفحة …» بجانب «LinkedIn · حسابي».</p>
+        ${pages.length === 0 ? '' : html`<ul class="plain stack">${pages.map((p) => html`<li>LinkedIn · صفحة <bdi>${p.displayName}</bdi> — ${p.pagePublish === true ? 'تنشر' : 'إذنُها بلا w_organization_social، أعد ربطها'}</li>`)}</ul>`}
+        <div class="row mt-3">${raw(button({ label: 'اربط صفحة LinkedIn', variant: 'primary', href: '/oauth/linkedin-page/start' }))}</div>`
+      : html`<p class="hint"><b>${PAGE_SAY.pending}.</b> وحتّى تصل الموافقة يبقى النشرُ من حسابك الشخصيّ كما هو. وبعدها: سرّا LINKEDIN_ORG_CLIENT_ID وLINKEDIN_ORG_CLIENT_SECRET في أسرار Worker، ثمّ «اربط صفحة LinkedIn» هنا.</p>
+        <div class="row mt-3">${raw(button({ label: 'ما عليك (M-03)', href: taskHref('M-03') }))}</div>`}
+    <details class="setup mt-2"><summary>عنوانُ العودة للتطبيق الثاني</summary>
+      <p class="hint"><span class="mono" dir="ltr">${callback}</span></p></details>`.value
+  return card({
+    id: 'linkedin-page',
+    title: 'صفحة LinkedIn',
+    action: ready ? statusBadge('ok', '●', 'التطبيق الثاني مضبوط') : statusBadge('warn', '!', 'بانتظار الموافقة'),
+    body,
+  })
 }
 
 // ── الصفحة ────────────────────────────────────────────────────────────

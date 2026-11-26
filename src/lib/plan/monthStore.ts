@@ -75,7 +75,12 @@ export async function monthFacts(db: Db, org: string, period: string): Promise<M
 
 /** بنودُ التقويم الموحّد (D-410): كلُّ بندٍ بموعده ومنصّته وحال منشوره، والمرفوضُ لا يُعدّ. */
 export async function calendarItems(db: Db, org: string, planId: string): Promise<CalItem[]> {
-  const r = await db.prepare(`SELECT i.id, i.platform, i.due_local, substr(coalesce(i.copy, i.angle, ''), 1, 60) AS title, i.copy,
+  // ‏وبندٌ جُدول منشورُه على صفحة LinkedIn يُعرض وجهتَه (D-417): «LinkedIn · صفحة» لا «LinkedIn»
+  const r = await db.prepare(`SELECT i.id,
+                                     CASE WHEN i.platform = 'linkedin' AND EXISTS (SELECT 1 FROM posts p JOIN accounts a ON a.id = p.account_id
+                                            WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' AND a.kind = 'org')
+                                          THEN 'linkedin-page' ELSE i.platform END AS platform,
+                                     i.due_local, substr(coalesce(i.copy, i.angle, ''), 1, 60) AS title, i.copy,
                                      (SELECT p.text FROM posts p WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' ORDER BY p.id LIMIT 1) AS post_text,
                                      (SELECT p.status FROM posts p WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' ORDER BY p.id LIMIT 1) AS post_status
                                 FROM plan_items i WHERE i.org_id = ? AND i.plan_id = ? AND i.due_local IS NOT NULL ORDER BY i.due_local, i.item_key`).bind(org, planId)

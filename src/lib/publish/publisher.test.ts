@@ -1114,12 +1114,51 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
  * `org`، فكان كلُّ رفعٍ إليها يُردّ بسببٍ يخصّ صفحاتِ LinkedIn.
  */
 describe('حساب الصفحة', () => {
-  it('صفحة LinkedIn تُردّ قبل الإرسال بسببها', async () => {
-    const post = await seedPost({ platform: 'linkedin', kind: 'org' })
-    const outcome = await publishPost(deps(fakeFetch({})), { postId: post })
+  /** ‏صفحةٌ رقمُها 12345 وإذنُها من التطبيق الثاني (D-417) — أو بنطاقات الشخص حين `scopes` يُمرَّر. */
+  async function seedPage(scopes = 'w_organization_social r_organization_social', externalId = '12345'): Promise<string> {
+    const accountId = await upsertAccount(db, 'org_owner', { platform: 'linkedin', kind: 'org', externalId, displayName: 'صدى للنشر' })
+    await saveTokens(db, KEY, accountId, { ...LIVE_TOKENS, scopes })
+    db.raw.prepare(
+      `INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status, idempotency_key, approved_by, approved_at)
+       VALUES ('p-page', ?, 'linkedin', 'text', 'نص الصفحة', '2026-09-08T09:00:00Z', 'queued', 'draft:src:linkedin:p-page', 'omar', '2026-09-07T10:00:00Z')`,
+    ).run(accountId)
+    return 'p-page'
+  }
+
+  it('صفحة LinkedIn بإذنها تُنشَر باسمها: urn:li:organization في الجسم، ومفتاحُها مسجّل (D-417)', async () => {
+    const post = await seedPage()
+    let author = ''
+    const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+      expect(input.toString()).toBe(LINKEDIN.postUrl)
+      author = (JSON.parse(String(init?.body)) as { author: string }).author
+      return new Response('{}', { status: 201, headers: { 'x-restli-id': 'urn:li:share:77' } })
+    }
+    const outcome = await publishPost(deps(impl as unknown as typeof fetch), { postId: post })
+    expect(outcome).toEqual({ kind: 'published', platformPostId: 'urn:li:share:77' })
+    expect(author).toBe('urn:li:organization:12345')
+    const attempt = db.raw.prepare('SELECT idempotency_key, status FROM publish_attempts WHERE post_id = ?').get(post) as { idempotency_key: string; status: string }
+    expect(attempt).toEqual({ idempotency_key: 'draft:src:linkedin:p-page', status: 'succeeded' })
+    // ‏ونشرُ LinkedIn بلا ثمن (`estimatePostCost`) فلا صفَّ في الدفتر — كالحساب الشخصيّ تمامًا (D-008 حيث يُدفع)
+    const cost = db.raw.prepare("SELECT COUNT(*) AS n FROM cost_ledger WHERE ref_id = ?").get(post) as { n: number }
+    expect(cost.n).toBe(0)
+  })
+
+  it('وصفحةٌ بلا w_organization_social تُردّ قبل الإرسال بسببٍ عربيٍّ يُقرأ', async () => {
+    const post = await seedPage(scopeSet('linkedin').join(' '))
+    const f = fakeFetch({})
+    const outcome = await publishPost(deps(f), { postId: post })
+    expect(outcome).toMatchObject({ kind: 'failed', retryable: false })
+    expect(f.calls).toHaveLength(0)
+    const row = db.raw.prepare('SELECT response_json FROM publish_attempts WHERE post_id = ?').get(post) as { response_json: string }
+    expect(row.response_json).toContain('لا يشمل w_organization_social')
+  })
+
+  it('ومعرّفُ صفحةٍ ليس رقمًا يُردّ ولا يُرسَل', async () => {
+    const post = await seedPage(undefined, 'not-a-number')
+    const f = fakeFetch({})
+    const outcome = await publishPost(deps(f), { postId: post })
     expect(outcome.kind).toBe('failed')
-    const row = db.raw.prepare("SELECT response_json FROM publish_attempts WHERE post_id = ?").get(post) as { response_json: string }
-    expect(row.response_json).toContain('حساب صفحة')
+    expect(f.calls).toHaveLength(0)
   })
 
   it('وحساب من نوع org على منصّة أخرى لا يُردّ بسبب LinkedIn', async () => {
