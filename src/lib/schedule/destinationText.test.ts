@@ -73,4 +73,19 @@ describe('نصٌّ لكلّ وجهة', () => {
     expect(out).toContain('حتّى 3000 حرف')
     expect(out).not.toContain('name="text:acc_1"')
   })
+  it('مراجعة D-426: نصٌّ آخرُ بعد سقوط الأصل يحلّ محلَّ النسخة القديمة، فلا منشوران على الحساب', async () => {
+    const { db, me, page } = await seed()
+    const first = await scheduleDestinations(db, 'p1', ['acc_missing', page], '2026-10-05T09:00', NOW, 'org_owner', 0, new Map([[page, 'نصٌّ أ']]))
+    expect(first.map((o) => o.result.ok)).toEqual([false, true])
+    await scheduleDestinations(db, 'p1', [me, page], '2026-10-05T09:00', NOW, 'org_owner', 0, new Map([[page, 'نصٌّ ب']]))
+    const pageRows = rows(db).filter((r) => r.account_id === page)
+    expect(pageRows.map((r) => r.text)).toEqual(['نصٌّ ب'])
+  })
+
+  it('مراجعة D-426: لا `maxlength` في حقل الوجهة — الخادمُ يعدّ المحارف', () => {
+    expect(destinationsField([
+      { id: 'a1', label: 'حسابي', platform: 'linkedin' },
+      { id: 'a2', label: 'صفحة', platform: 'linkedin', page: true },
+    ] as never, null, 'd'))!.not.toContain('maxlength')
+  })
 })

@@ -1049,7 +1049,7 @@ export function destinationsField(fit: readonly Target[], form: string | null, i
 
 /**
  * ‏**نصٌّ لهذه الوجهة** (D-426): طيّةٌ بحقلٍ عاديٍّ `text:<الحساب>` يعمل بلا JS، فارغُه نصُّ الأصل. وحدُّ المنصّة ظاهرٌ تحته
- * ‏و`maxlength` يمسكه في المتصفّح، والخادمُ يردّ ما زاد. والوجهةُ الأولى نصُّها النصُّ الرئيس.
+ * ‏والخادمُ وحده يردّ ما زاد بعدّ المحارف (لا `maxlength`: يعدّ وحداتِ UTF-16 فيمنع ما يقبله الخادم — مراجعة D-426). والوجهةُ الأولى نصُّها النصُّ الرئيس.
  */
 function ownText(t: Target, form: string | null, id: string): string {
   const limit = destinationLimit(t.page === true ? 'linkedin-page' : t.platform)
@@ -1057,7 +1057,7 @@ function ownText(t: Target, form: string | null, id: string): string {
     id,
     label: 'النصُّ لهذا الحساب',
     hint: html`فارغًا يُنشَر النصُّ نفسُه${limit === null ? '' : html` · حتّى ${String(limit)} حرف`}`.value,
-    control: html`<textarea name="text:${t.id}" rows="4"${form === null ? '' : html` form="${form}"`}${raw(limit === null ? "" : " maxlength=\"" + String(limit) + "\" data-limit=\"" + String(limit) + "\"")}></textarea>`.value,
+    control: html`<textarea name="text:${t.id}" rows="4"${form === null ? '' : html` form="${form}"`}${raw(limit === null ? "" : " data-limit=\"" + String(limit) + "\"")}></textarea>`.value,
   }))}</details>`.value
 }
 

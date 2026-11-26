@@ -52,6 +52,20 @@ export async function cloneForDestination(db: Db, postId: string, accountId: str
   const twin = await db.prepare('SELECT id FROM posts WHERE idempotency_key = ? AND org_id = ?').bind(key, org).first<{ id: string }>()
   if (twin !== null) return { id: twin.id, created: false }
   if (post.status !== 'approved' && post.status !== 'edited') return { reason: `حالتُه «${post.status}» — والجدولة للمعتمَد وحده` }
+  // ‏**نسخةٌ واحدةٌ في الطابور لكلّ حساب** (مراجعة D-426، D-004): نصٌّ جديدٌ لحسابٍ له نسخةٌ بنصٍّ آخر ما زالت في الطابور
+  // ‏لم تُرسَل يحلّ محلَّها — وإلّا نُشر على الحساب مرّتين ودُفع طلبان. وما أُرسل أو نُشر لا يُمسّ.
+  const base = destinationKeyOf(post.idempotency_key, accountId)
+  const { results: stale } = await db
+    .prepare(
+      `SELECT id FROM posts WHERE org_id = ? AND (idempotency_key = ? OR substr(idempotency_key, 1, ?) = ?)
+          AND status = 'queued' AND dispatched_at IS NULL`,
+    )
+    .bind(org, base, base.length + 3, base + ':t:')
+    .all<{ id: string }>()
+  for (const r of stale) {
+    await db.prepare('DELETE FROM media WHERE post_id = ? AND org_id = ?').bind(r.id, org).run()
+    await db.prepare("DELETE FROM posts WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL").bind(r.id, org).run()
+  }
   const id = crypto.randomUUID()
   await db
     .prepare(
