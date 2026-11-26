@@ -10,6 +10,7 @@ import { fakeDb, fakeFetch, fakeKv, type FakeDb } from '../test/fakes'
 import { app } from '../index'
 import { emailLogin } from '../test/emailLogin'
 import { bindingCookieName } from '../lib/oauth/state'
+import { allows, requiredRole } from '../lib/access'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const ADMIN_TOKEN = 'admin-token-for-oauth-tests-0123456789'
@@ -125,5 +126,69 @@ describe('صفحة LinkedIn بالتطبيق الثاني', () => {
     expect(back.status).toBe(400)
     expect(await back.text()).toContain('بلا w_organization_social')
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM accounts').get() as { n: number }).n).toBe(0)
+  })
+
+  /** يبدأ الدورةَ بكعكة `cookie` ويعود بصفحتين، ويعيد رابطَ الاختيار. */
+  async function startAndReturn(cookie: string): Promise<string> {
+    const start = await app.request('/oauth/linkedin-page/start', { headers: { Cookie: cookie } }, env)
+    expect(start.status).toBe(302)
+    const state = new URL(start.headers.get('location')!).searchParams.get('state')!
+    const binding = (start.headers.get('Set-Cookie') ?? '').split(';')[0]!
+    globalThis.fetch = fakeFetch({
+      [LINKEDIN.tokenUrl]: { json: { access_token: 'page-access-secret', refresh_token: 'r', expires_in: 5_184_000, scope: 'w_organization_social,r_organization_social' } },
+      [ACLS]: { json: { elements: [{ organization: 'urn:li:organization:111', role: 'ADMINISTRATOR', state: 'APPROVED' }] } },
+      'https://api.linkedin.com/rest/organizations/111': { json: { localizedName: 'بصيرة' } },
+    })
+    const back = await app.request(`/oauth/linkedin-page/callback?code=c&state=${encodeURIComponent(state)}`, { headers: { Cookie: binding } }, env)
+    expect(back.status).toBe(200)
+    return /href="(\/panel\/linkedin-pages\?pick=[^"]+)"/.exec(await back.text())![1]!.replace(/&amp;/g, '&')
+  }
+
+  async function member(email: string, role: 'admin' | 'editor'): Promise<string> {
+    db.raw.prepare("INSERT INTO members (email, role, orgs, invited_by) VALUES (?, ?, '*', 'owner')").run(email, role)
+    const r = await emailLogin(app, env, { email })
+    return (r.headers.get('Set-Cookie') ?? '').split(';')[0]!
+  }
+
+  async function submit(cookie: string, pickHref: string): Promise<Response> {
+    const screen = await app.request(pickHref, { headers: { Cookie: cookie } }, env)
+    const text = await screen.text()
+    const csrf = /name="_csrf" value="([^"]+)"/.exec(text)?.[1] ?? 'x'
+    const pick = new URL('https://h' + pickHref).searchParams.get('pick')!
+    const form = new URLSearchParams({ _csrf: csrf, pick })
+    form.append('org', '111')
+    return app.request('/panel/linkedin-pages/pick', {
+      method: 'POST', body: form, headers: { Cookie: cookie, 'Content-Type': 'application/x-www-form-urlencoded', Origin: 'https://sada2.basserh.com' },
+    }, env)
+  }
+
+  const pages = (): number => (db.raw.prepare("SELECT COUNT(*) AS n FROM accounts WHERE kind = 'org'").get() as { n: number }).n
+
+  it('والمديرُ الذي بدأ الربطَ يُكمله: يختار صفحتَه فتُحفظ (D-430)', async () => {
+    const admin = await member('sara@example.com', 'admin')
+    const saved = await submit(admin, await startAndReturn(admin))
+    expect(saved.status).toBe(303)
+    expect(pages()).toBe(1)
+  })
+
+  it('والمحرّرُ لا يختار — ولو حمل رابطَ الاختيار', async () => {
+    const editor = await member('ed@example.com', 'editor')
+    const owner = await session()
+    const href = await startAndReturn(owner)
+    expect(requiredRole('POST', '/panel/linkedin-pages/pick')).toBe('admin')
+    expect(allows('editor', 'admin')).toBe(false)
+    const r = await submit(editor, href)
+    expect(r.status).toBe(303)
+    expect(pages()).toBe(0)
+  })
+
+  it('والاختيارُ لمن بدأ وحده: مديرٌ آخرُ في المنظّمة نفسِها لا يفتحه', async () => {
+    const owner = await session()
+    const href = await startAndReturn(owner)
+    const admin = await member('sara@example.com', 'admin')
+    // ‏شاشةُ الاختيار نفسُها تردّه إلى الإعداد، والحفظُ لا يمضي
+    expect((await app.request(href, { headers: { Cookie: admin } }, env)).headers.get('location')).toBe('/panel/channels/linkedin?tab=setup')
+    await submit(admin, href)
+    expect(pages()).toBe(0)
   })
 })
