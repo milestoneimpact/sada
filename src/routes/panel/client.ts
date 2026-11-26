@@ -120,12 +120,13 @@ client.get('/panel/client', async (c) => {
     options,
     limits: {
       ownerOrg: org === OWNER_ORG,
-      global: { spend: both.global.dailySpendCapUsd, image: both.global.dailyImageCap, video: both.global.dailyVideoCap, analysis: both.global.dailyAnalysisCap },
+      global: { spend: both.global.dailySpendCapUsd, image: both.global.dailyImageCap, video: both.global.dailyVideoCap, analysis: both.global.dailyAnalysisCap, videoMonth: both.global.monthlyVideoCapUsd },
       mine: {
         ...(both.overridden.has('daily_spend_cap_usd') ? { spend: both.effective.dailySpendCapUsd } : {}),
         ...(both.overridden.has('daily_image_cap') ? { image: both.effective.dailyImageCap } : {}),
         ...(both.overridden.has('daily_video_cap') ? { video: both.effective.dailyVideoCap } : {}),
         ...(both.overridden.has('daily_analysis_cap') ? { analysis: both.effective.dailyAnalysisCap } : {}),
+        ...(both.overridden.has('monthly_video_cap_usd') ? { videoMonth: both.effective.monthlyVideoCapUsd } : {}),
       },
       spentToday: spentToday?.t ?? 0,
     },

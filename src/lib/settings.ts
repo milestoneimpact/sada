@@ -61,6 +61,13 @@ export interface Settings {
    */
   readonly dailyVideoCap: number
   /**
+   * ميزانيّةُ المقاطع في الشهر بالدولار، لكلّ عميل (D-414) — تُحجز قبل النداء وتُعاد إن ردّه المزوّد.
+   * والعامُّ افتراضٌ لكلّ عميلٍ لم يكتب لنفسه، لا مجموعٌ عليهم.
+   */
+  readonly monthlyVideoCapUsd: number
+  /** تقديرُ المالك لكلفة المقطع الواحد (D-414) — يُكتب في الدفتر ويُحجز به، حتّى يُقرأ السعرُ من اللوحة (M-16). */
+  readonly videoClipUsd: number
+  /**
    * أيُنشَر المقطعُ على YouTube وTikTok للعامّة؟ (D-190)
    *
    * **وافتراضُهما خاصّ**: Google تقفل ما يُرفع من مشروعٍ لم يُجَز على `private` مهما
@@ -99,6 +106,9 @@ export const DEFAULTS: Settings = {
    * بسعرٍ مجهول — حدٌّ معروفٌ يرفعه المالكُ بيده إن احتاج.
    */
   dailyVideoCap: 2,
+  // ‏عشرةُ دولاراتٍ في الشهر بتقديرِ نصفِ دولارٍ للمقطع: عشرون مقطعًا، فوق حاجة D-007 (أربعة) — ويرفعها المالكُ بيده
+  monthlyVideoCapUsd: 10,
+  videoClipUsd: 0.5,
   // ‏خاصّان حتّى يُجازا — والقلبُ قرارُ المالك بعد الإجازة لا قبلها (D-190)
   youtubePublic: false,
   tiktokPublic: false,
@@ -118,6 +128,9 @@ export const LIMITS = {
   weeklyPromoCapUsd: { min: 0, max: 500 },
   // ‏وعشرون حدٌّ لخطأ الإصبع لا للحاجة: عشرةُ أضعاف الافتراض بسعرٍ لم يُقرأ
   dailyVideoCap: { min: 0, max: 20 },
+  monthlyVideoCapUsd: { min: 0, max: 500 },
+  // ‏ولا صفر: تقديرٌ صفريٌّ يجعل الميزانيّةَ لا تُبلَغ أبدًا، وهي علّةُ D-168 نفسُها
+  videoClipUsd: { min: 0.05, max: 20 },
   dailyImageCap: { min: 0, max: 50 },
 } as const
 
@@ -139,6 +152,8 @@ export const SETTING_KEYS = [
   'auto_enqueue',
   'weekly_promo_cap_usd',
   'daily_video_cap',
+  'monthly_video_cap_usd',
+  'video_clip_usd',
   'image_overlay',
   'alert_webhook',
   'dashboard_tiles',
@@ -165,6 +180,8 @@ export const SETTING_LABEL: Readonly<Record<SettingKey, string>> = {
   auto_enqueue: 'الإدراج الآليّ',
   weekly_promo_cap_usd: 'سقف الترويج الأسبوعيّ',
   daily_video_cap: 'سقف المقاطع اليوميّ',
+  monthly_video_cap_usd: 'ميزانيّة المقاطع الشهريّة',
+  video_clip_usd: 'تقدير كلفة المقطع',
   image_overlay: 'تركيب النصّ على الصورة',
   alert_webhook: 'قناة التنبيهات',
   dashboard_tiles: 'بطاقات اللوح',
@@ -211,7 +228,7 @@ function wholeClips(raw: string | undefined): number {
  * مفاتيحُ السقوف التي تقبل قيمةً **لكلّ عميل** (D-295) — لا غير. الإيقافُ والمزوّدون والإدراجُ الآليّ
  * والقناةُ والبطاقات عامّةٌ بطبعها (D-277)، فصفٌّ لها في غير منظّمة المالك لا يُكتب ولا يُقرأ.
  */
-export const ORG_KEYS = ['daily_spend_cap_usd', 'daily_image_cap', 'daily_video_cap', 'daily_analysis_cap'] as const
+export const ORG_KEYS = ['daily_spend_cap_usd', 'daily_image_cap', 'daily_video_cap', 'daily_analysis_cap', 'monthly_video_cap_usd'] as const
 export type OrgKey = (typeof ORG_KEYS)[number]
 export function isOrgKey(key: string): key is OrgKey {
   return (ORG_KEYS as readonly string[]).includes(key)
@@ -275,6 +292,8 @@ function fromMap(map: ReadonlyMap<string, string>): Settings {
     ),
     // ‏وغيابُ الصفّ يعود إلى الافتراض المحافظ لا إلى اللانهاية — ولا ترحيلَ له
     dailyVideoCap: wholeClips(map.get('daily_video_cap')),
+    monthlyVideoCapUsd: toNumber(map.get('monthly_video_cap_usd'), DEFAULTS.monthlyVideoCapUsd, 'monthlyVideoCapUsd'),
+    videoClipUsd: toNumber(map.get('video_clip_usd'), DEFAULTS.videoClipUsd, 'videoClipUsd'),
     // ‏بالمطابقة الحرفيّة كمفاتيح الخطر: غيابٌ أو فسادٌ يعني «خاصّ» (D-190)
     youtubePublic: map.get('youtube_public') === 'true',
     tiktokPublic: map.get('tiktok_public') === 'true',
@@ -323,6 +342,10 @@ export async function writeSetting(
     stored = normalizeTiles(raw)
   } else if (key === 'weekly_promo_cap_usd') {
     stored = String(toNumber(raw, DEFAULTS.weeklyPromoCapUsd, 'weeklyPromoCapUsd'))
+  } else if (key === 'monthly_video_cap_usd') {
+    stored = String(toNumber(raw, DEFAULTS.monthlyVideoCapUsd, 'monthlyVideoCapUsd'))
+  } else if (key === 'video_clip_usd') {
+    stored = String(toNumber(raw, DEFAULTS.videoClipUsd, 'videoClipUsd'))
   } else if (key === 'daily_image_cap') {
     stored = String(Math.floor(toNumber(raw, DEFAULTS.dailyImageCap, 'dailyImageCap')))
   } else if (key === 'daily_video_cap') {

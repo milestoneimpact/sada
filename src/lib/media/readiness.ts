@@ -31,8 +31,10 @@ import type { RungState } from '../platform/readiness'
 import type { ImageRefusal, SlideGate } from '../image/gate'
 import type { VideoFace } from './video'
 import { taskHref } from '../owner'
+import { money } from '../format'
+import type { VideoBudget } from './videoBudget'
 
-export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips' | 'browser' | 'writer'
+export type DotKey = 'limits' | 'provider' | 'overlay' | 'key' | 'clips' | 'budget' | 'browser' | 'writer'
 
 export interface Dot {
   readonly key: DotKey
@@ -243,6 +245,14 @@ function clipsDot(gate: VideoCapGate): Dot {
   return { key: 'clips', title, state: 'failed', note: blockerNote(gate.blocker, ''), action: LIMITS }
 }
 
+/** نقطةُ «الميزانيّة» (D-414): كم بقي من مال المقاطع هذا الشهر، وتسقط حين لا يتّسع لمقطعٍ آخر. */
+function budgetDot(b: VideoBudget): Dot {
+  const title = 'الميزانيّة'
+  const left = `بقي ${money(b.remaining)} من ${money(b.cap)} هذا الشهر`
+  if (b.fits) return { key: 'budget', title, state: 'done', note: left }
+  return { key: 'budget', title, state: 'failed', note: b.cap === 0 ? 'ميزانيّة المقاطع صفر بقرارك' : 'بلغت ميزانيّة المقاطع الشهريّة', action: LIMITS }
+}
+
 /**
  * سطرُ «حرّكها فيديو» — بترتيب `animateForPost`: الوجهُ ثمّ الحدودُ ثمّ المقاطع.
  *
@@ -257,6 +267,9 @@ export function videoReadiness(i: {
   readonly blocker: Blocker | null
   /** حكمُ `videoCapGate` كما قُرئ للّوح — لا يُعاد هنا. */
   readonly clips: VideoCapGate
+  /** ميزانيّةُ الشهر بالمال (D-414) — حكمُ `videoBudget` نفسُه الذي تحجز به `claimVideoSpend`. */
+  readonly budget?: VideoBudget
 }): MediaLine {
-  return lineOf([keyDot(i.face), limitsDot(i.blocker), clipsDot(i.clips)])
+  return lineOf([keyDot(i.face), limitsDot(i.blocker), clipsDot(i.clips),
+    ...(i.budget === undefined ? [] : [budgetDot(i.budget)])])
 }

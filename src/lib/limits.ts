@@ -49,6 +49,8 @@ export interface Allowance {
    * **والسقفُ العامُّ يبقى فوق الكلّ**: يُفحَص أوّلًا على المجموع، ثمّ سقفُ العميل على ما أنفقه هو.
    */
   readonly org?: { readonly settings: Settings; readonly usage: DailyUsage }
+  /** ما أُنفق على مقاطع هذه المنظّمة منذ أوّل الشهر (D-414) — للّوح؛ والحجزُ يعيد الحسابَ في جملته. */
+  readonly videoMonth?: number
 }
 
 export interface DailyUsage {
@@ -85,7 +87,7 @@ export async function usageToday(db: Db, org?: string): Promise<DailyUsage> {
 }
 
 /** استهلاكُ اليوم عامًّا ولمنظّمةٍ بعينها — **في الجملة نفسِها** (D-295)، فلا يفترق رقمان. */
-export async function usageTodayBoth(db: Db, org: string): Promise<{ readonly all: DailyUsage; readonly mine: DailyUsage }> {
+export async function usageTodayBoth(db: Db, org: string): Promise<{ readonly all: DailyUsage; readonly mine: DailyUsage; readonly videoMonth: number }> {
   try {
     /*
      * **والمقاطعُ في الاستعلام نفسِه لا في ثانٍ** (D-168): `checkAllowance`
@@ -98,28 +100,31 @@ export async function usageTodayBoth(db: Db, org: string): Promise<{ readonly al
     const row = await db
       .prepare(
         `SELECT
-           coalesce(sum(CASE WHEN provider = 'anthropic' AND operation LIKE 'analyze:%'
+           coalesce(sum(CASE WHEN at >= date('now') AND provider = 'anthropic' AND operation LIKE 'analyze:%'
                              THEN 1 ELSE 0 END), 0) AS analyses,
-           coalesce(sum(total), 0) AS spend,
-           coalesce(sum(CASE WHEN operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips,
-           coalesce(sum(CASE WHEN org_id = ?1 AND provider = 'anthropic' AND operation LIKE 'analyze:%'
+           coalesce(sum(CASE WHEN at >= date('now') THEN total ELSE 0 END), 0) AS spend,
+           coalesce(sum(CASE WHEN at >= date('now') AND operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS clips,
+           coalesce(sum(CASE WHEN at >= date('now') AND org_id = ?1 AND provider = 'anthropic' AND operation LIKE 'analyze:%'
                              THEN 1 ELSE 0 END), 0) AS my_analyses,
-           coalesce(sum(CASE WHEN org_id = ?1 THEN total ELSE 0 END), 0) AS my_spend,
-           coalesce(sum(CASE WHEN org_id = ?1 AND operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS my_clips
+           coalesce(sum(CASE WHEN at >= date('now') AND org_id = ?1 THEN total ELSE 0 END), 0) AS my_spend,
+           coalesce(sum(CASE WHEN at >= date('now') AND org_id = ?1 AND operation LIKE 'video:%' THEN 1 ELSE 0 END), 0) AS my_clips,
+           -- ‏‏وما أُنفق على مقاطع هذه المنظّمة منذ أوّل الشهر — من القراءة نفسِها لا من جملةٍ ثانية
+           coalesce(sum(CASE WHEN org_id = ?1 AND operation LIKE 'video:%' THEN total ELSE 0 END), 0) AS my_video_month
            FROM cost_ledger
           -- السقفُ العامّ على المنظّمات كلِّها، وسقفُ العميل على صفوفه وحدَها — من القراءة نفسِها
-          WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now')`,
+          WHERE org_id IN (SELECT id FROM orgs) AND at >= strftime('%Y-%m-01 00:00:00', 'now')`,
       )
       .bind(org)
-      .first<{ analyses: number; spend: number; clips: number; my_analyses: number; my_spend: number; my_clips: number }>()
+      .first<{ analyses: number; spend: number; clips: number; my_analyses: number; my_spend: number; my_clips: number; my_video_month: number }>()
     return {
+      videoMonth: row?.my_video_month ?? 0,
       all: { analyses: row?.analyses ?? 0, spend: row?.spend ?? 0, clips: row?.clips ?? 0 },
       mine: { analyses: row?.my_analyses ?? 0, spend: row?.my_spend ?? 0, clips: row?.my_clips ?? 0 },
     }
   } catch {
     // دفترٌ لا يُقرأ لا يُفتح به الباب: يُفترض السقف مستهلَكا
     const spent = { analyses: Number.POSITIVE_INFINITY, spend: Number.POSITIVE_INFINITY, clips: Number.POSITIVE_INFINITY }
-    return { all: spent, mine: spent }
+    return { all: spent, mine: spent, videoMonth: Number.POSITIVE_INFINITY }
   }
 }
 
@@ -246,10 +251,10 @@ export async function checkAllowance(db: Db, duty: Duty, org: string = OWNER_ORG
   const usage = await usageTodayBoth(db, org)
   const settings = both.global
   let blocker = blockerFor(duty, settings, usage.all)
-  if (org === OWNER_ORG) return { allowed: blocker === null, blocker, settings, usage: usage.all }
+  if (org === OWNER_ORG) return { allowed: blocker === null, blocker, settings, usage: usage.all, videoMonth: usage.videoMonth }
   const mine = { settings: both.effective, usage: usage.mine }
   if (blocker === null && both.overridden.size > 0) blocker = blockerFor(duty, mine.settings, mine.usage, 'org')
-  return { allowed: blocker === null, blocker, settings, usage: usage.all, org: mine }
+  return { allowed: blocker === null, blocker, settings, usage: usage.all, org: mine, videoMonth: usage.videoMonth }
 }
 
 /** سببٌ يُقرأ، لا رمزُ خطأ. */
