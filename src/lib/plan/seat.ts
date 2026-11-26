@@ -328,11 +328,17 @@ export async function seatPlan(
   // ‏بنودُ الخطّة القائمة من الملفّ ومنشورُ كلٍّ منها — **والمنشورُ الذي جاوز المسوّدة (اعتُمد أو جُدول أو نُشر) لا يُفصَل
   // ‏عن خطّته ولا يُمسّ نصُّه ولا مفتاحُه (D-004)**: كان الاستبدالُ يُفرغ إشارتَه فيختفي من الشهر والخطّة
   type Old = { id: string; item_key: string; platform: string; due_local: string | null; source_id: string | null; post_id: string | null; status: string | null }
-  const olds: Old[] = existing === null ? [] : (await db
+  const joined: Old[] = existing === null ? [] : (await db
     .prepare(`SELECT i.id, i.item_key, i.platform, i.due_local, i.source_id, p.id AS post_id, p.status FROM plan_items i
                LEFT JOIN posts p ON p.plan_item_id = i.id AND p.org_id = i.org_id AND p.plan_id = i.plan_id
                WHERE i.org_id = ? AND i.plan_id = ? AND i.source_kind <> 'github'`)
     .bind(org, planId).all<Old>()).results
+  // ‏**بندٌ واحدٌ بأبعد منشوراته** (D-405): الوصلُ صفٌّ لكلّ منشور، فبندٌ رُفض منشورُه ثمّ جُدول آخرُ يظهر مرّتين،
+  // ‏وكان «المرفوضُ» أوّلَهما فيمرّ الصفُّ المعدَّل وتُكتب مسوّدةٌ ثانية بجوار المجدول
+  const rank = (s: string | null): number => s === null ? 0 : s === 'rejected' ? 1 : s === 'draft' ? 2 : 3
+  const perItem = new Map<string, Old>()
+  for (const o of joined) { const was = perItem.get(o.id); if (was === undefined || rank(o.status) > rank(was.status)) perItem.set(o.id, o) }
+  const olds = [...perItem.values()]
   const claimed = new Set<string>()
   const keptPosts = new Set<string>()
   let kept = 0
@@ -403,11 +409,15 @@ export async function seatPlan(
   const reusing = new Set(rowsOf.flatMap((x) => x.reuse === undefined ? [] : [x.reuse]))
   const guarded = olds.filter((o) => !reusing.has(o.id) && o.post_id !== null && o.status !== 'draft' && o.status !== 'rejected')
   const oldItems = existing === null ? [] : ((JSON.parse(existing.plan_json) as { items?: PlanItem[] }).items ?? [])
-  const usedRefs = new Set(items.map((i) => i.sourceId))
-  const carried = oldItems.filter((i) => guarded.some((o) => o.source_id === i.sourceId) && !usedRefs.has(i.sourceId))
+  // ‏**المحميُّ يُحمَل بمعرّف بنده لا بسطره** (D-405): `import:<سطر>` يتزحزح إذا حُذف صفٌّ فوقه فيأخذه صفٌّ جديد،
+  // ‏فيُسمّى المحميُّ `import:kept:<معرّف البند>` — ثابتٌ لا يصطدم — ويُحدَّث مرجعُه في بنده ومنشوره
+  const carried = guarded.flatMap((o) => {
+    const was = oldItems.find((i) => i.sourceId === o.source_id && i.platform === o.platform)
+    return was === undefined ? [] : [{ o, item: { ...was, sourceId: 'import:kept:' + o.id } }]
+  })
   const channels = [...new Set(items.map((i) => i.platform))]
   const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }), ...(write ? { importIdeas } : {}) }
-  const planJson = JSON.stringify({ rationale: 'خطّتُك المرفوعة', items: [...items, ...carried] })
+  const planJson = JSON.stringify({ rationale: 'خطّتُك المرفوعة', items: [...items, ...carried.map((c) => c.item)] })
 
   // ‏**إصدارٌ جديد لا حذف** (D-383): `(org_id, week_start, span)` فريد، فخطّةُ المدى نفسِه تُحدَّث في مكانها برقم إصدارٍ أعلى.
   const jobId = crypto.randomUUID()
@@ -434,6 +444,10 @@ export async function seatPlan(
       db.prepare(`DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github' AND id NOT IN (SELECT value FROM json_each(?))
                     AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.plan_item_id = plan_items.id AND p.org_id = plan_items.org_id AND p.plan_id = plan_items.plan_id
                                     AND p.status NOT IN ('draft', 'rejected'))`).bind(org, planId, JSON.stringify([...reusing])),
+      ...carried.flatMap(({ o, item }) => [
+        db.prepare('UPDATE plan_items SET source_id = ? WHERE id = ? AND org_id = ?').bind(item.sourceId, o.id, org),
+        db.prepare('UPDATE posts SET source_refs = ? WHERE id = ? AND org_id = ?').bind(JSON.stringify([item.sourceId]), o.post_id, org),
+      ]),
       // ‏وخطّةُ الحزمة تبقى خطّةَ حزمة، ويُضاف مصدرُ الملفّ إلى مصادرها
       db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL, time_basis = 'local',
                          created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)

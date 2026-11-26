@@ -180,6 +180,43 @@ describe('إعادةُ الاستيراد تحمي الخطّة (D-404)', () => 
     expect((JSON.parse(plan.plan_json) as { items: unknown[] }).items).toHaveLength(3)
   })
 
+  it('حذفُ صفٍّ فوق المجدول لا يُسقطه من الخطّة: يُحمَل بمعرّف بنده لا بسطره (D-405)', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, B, A, C].join('\n'), facts(), new Map(), null)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'queued', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-05 10:00:00' WHERE text = 'الثانية قبل التعديل'").run()
+    // ‏حُذف السطرُ ٢ (المجدول) فصعدت الأولى إلى سطره فأخذت `import:2`
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, C].join('\n'), facts(), new Map(), null)
+    expect(again.planId).toBe(first.planId)
+    const items = (JSON.parse((db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }).plan_json) as { items: { sourceId: string; angle: string }[] }).items
+    expect(items).toHaveLength(3)
+    expect(items.map((i) => i.angle)).toContain('الثانية قبل التعديل')
+    expect(new Set(items.map((i) => i.sourceId)).size).toBe(3)
+    const queued = db.raw.prepare("SELECT p.source_refs, i.source_id FROM posts p JOIN plan_items i ON i.id = p.plan_item_id WHERE p.status = 'queued'").get() as { source_refs: string; source_id: string }
+    const kept = items.find((i) => i.angle === 'الثانية قبل التعديل')!
+    expect(JSON.parse(queued.source_refs)).toEqual([kept.sourceId])
+    expect(queued.source_id).toBe(kept.sourceId)
+    // ‏وإعادةُ الملفّ نفسِه بعد تعديلٍ آخر لا تُسقطه ولا تغيّر اسمه
+    await seatPlan(db, 'org_owner', [HEAD, A.replace('كما هي', 'معدَّلة'), C].join('\n'), facts(), new Map(), null)
+    const items2 = (JSON.parse((db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }).plan_json) as { items: { sourceId: string; angle: string }[] }).items
+    expect(items2).toHaveLength(3)
+    expect(items2.find((i) => i.angle === 'الثانية قبل التعديل')?.sourceId).toBe(kept.sourceId)
+  })
+
+  it('بندٌ رُفض منشورُه ثمّ جُدول آخر: صفُّه المعدَّل لا يُكتب له منشورٌ ثانٍ (D-405)', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, A, B].join('\n'), facts(), new Map(), null)
+    const b = db.raw.prepare("SELECT id, plan_item_id FROM posts WHERE text = 'الثانية قبل التعديل'").get() as { id: string; plan_item_id: string }
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'rejected' WHERE id = ?").run(b.id)
+    // ‏أُعيدت كتابتُه فجُدول؛ والمرفوضُ أُدرج أوّلًا فيأتي أوّلَ الوصل
+    db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, plan_id, org_id, plan_item_id, approved_at, approved_by, account_id, scheduled_at)
+                    VALUES ('regen', 'x', 'text', 'الثانية مُعادة', 'queued', 'k-regen', 'owner', ?, 'org_owner', ?, '2099-01-01 08:00:00', 'owner', 'ax', '2099-01-05 10:00:00')`).run(first.planId, b.plan_item_id)
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل')].join('\n'), facts(), new Map(), null)
+    expect(again.skipped).toEqual([{ line: 3, reason: expect.stringContaining('عدّله من بطاقته') }])
+    const onItem = db.raw.prepare("SELECT id, status FROM posts WHERE plan_item_id = ? AND status <> 'rejected'").all(b.plan_item_id)
+    expect(onItem).toEqual([{ id: 'regen', status: 'queued' }])
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE text = 'الثانية بعد التعديل'").get()).toEqual({ n: 0 })
+  })
+
   it('صورةُ الإصدار السابق تُحفظ قبل كلّ استبدال ولو لم يُثبَّت', async () => {
     await seatPlan(db, 'org_owner', [HEAD, A].join('\n'), facts(), new Map(), null)
     expect(db.raw.prepare('SELECT count(*) AS n FROM plan_versions').get()).toEqual({ n: 0 })
