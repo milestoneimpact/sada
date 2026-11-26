@@ -4,7 +4,7 @@
  * (`OWNER_EMAIL`)، لا إلى عنوانٍ يُكتب في نموذج. فالنصُّ ما في الصفحة وحدَه: أرقامٌ، ولا رمزَ ولا سرَّ ولا رابط.
  *
  * ‏- يدور في المسح اليوميّ: يومٌ تعثّر فيه البريدُ يُعاد في الغد.
- * ‏- الشهرُ يُحجَز قبل الإرسال (`report_mailed_month`) بشرطٍ ذرّيّ، فدورتان معًا لا ترسلانه مرّتين؛ وإرسالٌ لم يتمّ يُعيد الحجز.
+ * ‏- الشهرُ يُحجَز قبل الإرسال (`report_mailed_month`) بشرطٍ ذرّيّ، فدورتان معًا لا ترسلانه مرّتين؛ وإرسالٌ لم يتمّ — أو تقريرٌ تعثّر بناؤه (D-413) — يُعيد الحجز.
  * ‏- عميلٌ يتعثّر لا يوقف غيره.
  */
 import type { Db } from '../tokens'
@@ -29,8 +29,9 @@ export async function mailMonthlyReports(db: Db, mail: MailBinding | undefined, 
     .bind(month).all<{ org_id: string; report_mailed_month: string | null; name: string }>()
   const out: MailedReport[] = []
   for (const row of results) {
+    let claimed: { org_id: string } | null = null
     try {
-      const claimed = await db.prepare(`UPDATE client_options SET report_mailed_month = ?1
+      claimed = await db.prepare(`UPDATE client_options SET report_mailed_month = ?1
           WHERE org_id = ?2 AND report_mail = 1 AND (report_mailed_month IS NULL OR report_mailed_month < ?1) RETURNING org_id`)
         .bind(month, row.org_id).first<{ org_id: string }>()
       if (claimed === null) continue
@@ -45,7 +46,16 @@ export async function mailMonthlyReports(db: Db, mail: MailBinding | undefined, 
         detail: sent.sent ? 'آليّ' : sent.reason, org: row.org_id })
       out.push(sent.sent ? { org: row.org_id, month, sent: true } : { org: row.org_id, month, sent: false, reason: sent.reason })
     } catch (error) {
-      out.push({ org: row.org_id, month, sent: false, reason: error instanceof Error ? error.message.slice(0, 200) : 'تعذّر' })
+      const reason = error instanceof Error ? error.message.slice(0, 200) : 'تعذّر'
+      // تعثّرُ بناء التقرير أو قراءته (D-413) يُعيد الحجزَ كإرسالٍ لم يتمّ، فيُعاد في الغد ويُسجَّل غيرَ مُرسَل.
+      if (claimed !== null) {
+        try {
+          await db.prepare('UPDATE client_options SET report_mailed_month = ? WHERE org_id = ? AND report_mailed_month = ?')
+            .bind(row.report_mailed_month, row.org_id, month).run()
+          await record(db, { actor: 'cron', action: 'report.mail.unsent', target: month, detail: reason, org: row.org_id })
+        } catch { /* القاعدةُ نفسُها متعثّرة: يبقى في سجلّ الدورة */ }
+      }
+      out.push({ org: row.org_id, month, sent: false, reason })
     }
   }
   return out

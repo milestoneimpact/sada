@@ -90,6 +90,23 @@ describe('تقريرُ الشهر إلى البريد آليًّا (D-412)', () 
     const mail = fakeMailer()
     expect(await mailMonthlyReports(db, mail, NOV, null)).toEqual([{ org: 'org_owner', month: '2099-11', sent: true }])
   })
+
+  it('تقريرٌ تعثّر بناؤه يُعيد الحجز ويُسجَّل غيرَ مُرسَل، فيُعاد في الغد (D-413)', async () => {
+    await writeClientOptions(db, 'org_owner', { approvalRequired: false, reportMail: true })
+    const broken = new Proxy(db, { get: (t, k) => k === 'prepare'
+      ? (sql: string) => { if (sql.includes('FROM cost_ledger')) throw new Error('D1 timeout'); return t.prepare(sql) }
+      : Reflect.get(t, k) as unknown }) as FakeDb
+    const mail = fakeMailer()
+    const out = await mailMonthlyReports(broken, mail, NOV, null)
+    expect(out).toEqual([{ org: 'org_owner', month: '2099-11', sent: false, reason: 'D1 timeout' }])
+    expect(mail.sent).toHaveLength(0)
+    const row = db.raw.prepare('SELECT report_mailed_month AS m FROM client_options WHERE org_id = ?').get('org_owner') as { m: string | null }
+    expect(row.m).toBeNull()
+    const audit = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'report.mail.unsent' AND org_id = ?").all('org_owner') as { detail: string }[]
+    expect(audit.map((a) => a.detail)).toEqual(['D1 timeout'])
+    expect(await mailMonthlyReports(db, mail, new Date('2099-12-04T03:03:00Z'), null)).toEqual([{ org: 'org_owner', month: '2099-11', sent: true }])
+    expect(mail.sent).toHaveLength(1)
+  })
 })
 
 describe('بطاقةُ الخيارين في رحلة العميل (D-412)', () => {
