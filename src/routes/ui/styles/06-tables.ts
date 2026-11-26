@@ -4,7 +4,8 @@ import { below } from '../tokens'
 export const TABLES = `/* ══ الجداول ═════════════════════════════════════════════════ */
 .scroll{display:block; overflow-x:auto; margin:0 -var(--s-0); padding:0 var(--s-0)}
 /* الصفُّ نمطُ «ui-regular» والرأسُ لصيقة (D-185 · خطّة التصميم 7.5) */
-table{width:100%; border-collapse:collapse; font-size:var(--t-ui); line-height:var(--lh-ui); min-width:32.5rem}
+table{width:100%; border-collapse:collapse; font-size:var(--t-ui); line-height:var(--lh-ui); min-width:32.5rem;
+  font-variant-numeric:tabular-nums}
 th{text-align:start; color:var(--ink-2); font-size:var(--t-caption); line-height:var(--lh-caption); padding:0 var(--s-2) var(--s-2);
   border-bottom:var(--bd); white-space:nowrap; font-weight:600}
 td{padding:var(--s-3) var(--s-2); border-bottom:var(--bd-soft); vertical-align:top}
@@ -36,6 +37,28 @@ tbody tr:last-child td{border-bottom:0}
 .pv-form{flex-wrap:wrap; align-items:flex-end; gap:var(--s-3)}
 .pv-form .field{flex:1 1 9.5rem; min-width:0}
 .pv-form button{flex:none}
+/* ── هيكلُ القياس وهو يُبنى (D-402) ─────────────────────────────────
+   ‏«اعرض» تنقل الصفحة، وبين الضغطة والجواب يبقى الجدولُ القديمُ بأرقامٍ لم تعُد صادقة.
+   ‏فيلبس هيكلَه **في مكانه وبأبعاده**: كلُّ خليّةٍ شريطٌ داخلها، ولا يتحرّك صفّ.
+   ‏والإشارةُ «aria-busy» يكتبها سكربتُ «data-busy» القائم — لا سكربتَ جديد */
+.pv-card{position:relative}
+#pivot:has(.pv-form[aria-busy="true"]) .pv-card{overflow:clip; cursor:progress}
+#pivot:has(.pv-form[aria-busy="true"]) .pv :is(th,td,a){color:transparent; text-decoration-color:transparent}
+#pivot:has(.pv-form[aria-busy="true"]) .pv :is(th,td){position:relative}
+#pivot:has(.pv-form[aria-busy="true"]) .pv :is(th,td)::before{content:''; position:absolute;
+  inset:calc(50% - var(--s-2)) var(--s-2); border-radius:var(--r-inline); background:var(--surface-3)}
+#pivot:has(.pv-form[aria-busy="true"]) .pv-card .empty{border-radius:var(--r-control); background:var(--surface-2)}
+#pivot:has(.pv-form[aria-busy="true"]) .pv-card .empty>*{visibility:hidden}
+/* ‏والوميضُ انتقالٌ لا موضعُ خلفيّة (يُركَّب ولا يُعاد رسمه)، ويسير مع القراءة: من اليمين، و«--dir» يعكسه */
+#pivot:has(.pv-form[aria-busy="true"]) .pv-card::after{content:''; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--surface) 55%,transparent),transparent);
+  animation:pv-sweep calc(var(--dur-3) * 4) linear infinite}
+@keyframes pv-sweep{from{transform:translateX(calc(var(--dir) * 100%))}
+  to{transform:translateX(calc(var(--dir) * -100%))}}
+/* ‏وتقليلُ الحركة والألوانُ القسريّة: الهيكلُ لونٌ صلبٌ بلا وميض */
+@media(prefers-reduced-motion:reduce){#pivot:has(.pv-form[aria-busy="true"]) .pv-card::after{display:none}}
+@media(forced-colors:active){#pivot:has(.pv-form[aria-busy="true"]) .pv-card::after{display:none}
+  #pivot:has(.pv-form[aria-busy="true"]) .pv :is(th,td)::before{background:GrayText}}
 /* ‏الخطُّ الزمنيّ للمحفظة (D-212): عمودُ أسماءٍ ثابتٌ ومسارٌ تُرسَم فيه الأشرطةُ بنسبٍ منطقيّة.
    ‏والحدّ الأدنى للعرض يحفظ يومًا مقروءًا؛ وما ضاق عنه يُمرَّر داخل إطاره لا الصفحة. */
 .gt-form{flex-wrap:wrap; align-items:flex-end; gap:var(--s-3)}

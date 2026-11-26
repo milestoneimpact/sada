@@ -136,7 +136,7 @@ export function pivotPane(d: PivotView): string {
   <div data-sub id="pivot">
 
   <div class="card">
-    <form class="row pv-form" method="GET" action="/panel/analysis">
+    <form class="row pv-form" method="GET" action="/panel/analysis" data-busy="جار بناء الجدول…">
       ${picker('pv-r', 'rows', 'الصفوف', d.rows, dims)}
       ${picker('pv-c', 'cols', 'الأعمدة', d.cols ?? 'none',
         [{ v: 'none', t: 'بلا أعمدة' }, ...dims])}
@@ -148,7 +148,7 @@ export function pivotPane(d: PivotView): string {
     </form>
   </div>
 
-  <div class="card mt-3">
+  <div class="card mt-3 pv-card">
     <div class="split">
       <h2>${escapeHtml(MEASURE_LABEL[d.measure])} — ${
         escapeHtml(DIMENSION_LABEL[d.rows])}${
