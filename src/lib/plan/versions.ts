@@ -7,7 +7,7 @@
  */
 import type { Db } from '../tokens'
 import type { PlanItem } from './prompt'
-import { diffSnapshots, type Change, type Snapshot, type SnapshotEntry } from '../package/diff'
+import { diffSnapshots, entryKey, entryPeriod, type Change, type Snapshot, type SnapshotEntry } from '../package/diff'
 
 export interface PlanVersion {
   readonly version: number
@@ -51,7 +51,19 @@ export function versionSnapshot(items: readonly PlanItem[]): Snapshot {
   return { entries, copySha: null, planPath: null }
 }
 
-/** الفرقُ من الإصدار `a` إلى `b`. */
+/**
+ * الفرقُ من الإصدار `a` إلى `b`. وقاعدةُ `diffSnapshots` «حُذف لا يعبر الشهر» تلائم دفعاتِ الحزمة الجزئيّة، أمّا الإصدارُ
+ * فصورةٌ كاملة (D-407): فما في `a` وليس في `b` محذوفٌ ولو خلا شهرُه في `b` كلّه — وإلّا قالت الشاشة «متطابقان» وقد حُذف كلُّ شيء.
+ */
 export function diffVersions(a: PlanVersion, b: PlanVersion): Change[] {
-  return diffSnapshots(versionSnapshot(a.items), versionSnapshot(b.items))
+  const before = versionSnapshot(a.items)
+  const after = versionSnapshot(b.items)
+  const out = diffSnapshots(before, after)
+  const kept = new Set(after.entries.map(entryKey))
+  const months = new Set(after.entries.map(entryPeriod))
+  for (const p of before.entries) {
+    if (kept.has(entryKey(p)) || months.has(entryPeriod(p))) continue
+    out.push({ period: entryPeriod(p), item: p.item, platform: p.platform, kind: 'removed', before: p, after: null })
+  }
+  return out.sort((x, y) => (x.period ?? '').localeCompare(y.period ?? '') || x.item.localeCompare(y.item) || x.platform.localeCompare(y.platform) || x.kind.localeCompare(y.kind))
 }

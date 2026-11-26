@@ -23,6 +23,16 @@ describe('فرقُ إصدارين', () => {
     expect(diffVersions(a, a)).toEqual([])
   })
 
+  it('بنودٌ في شهرٍ خلا في الإصدار الأحدث تُعدّ محذوفةً لا «متطابقة» (D-407)', () => {
+    const a = { version: 1, current: false, at: '', items: [item('2099-12-04', '09:00', 'أ'), item('2099-12-05', '13:00', 'ب', 'linkedin')] }
+    const moved = { version: 2, current: true, at: '', items: [item('2100-01-04', '09:00', 'أ')] }
+    const empty = { version: 2, current: true, at: '', items: [] }
+    expect(diffVersions(a, moved).map((c) => c.kind).sort()).toEqual(['added', 'removed', 'removed'])
+    expect(diffVersions(a, empty).map((c) => [c.kind, c.item])).toEqual([['removed', '2099-12-04 09:00'], ['removed', '2099-12-05 13:00']])
+    const screen = versionsScreen({ planId: 'p', versions: [a, empty], a, b: empty, changes: diffVersions(a, empty) })
+    expect(screen).not.toContain('الإصداران متطابقان')
+  })
+
   it('إصداراتُ خطّةٍ مرفوعة مرّتين: الصورةُ والقائم، وخطّةُ منظّمةٍ أخرى لا تُقرأ، والشاشةُ قبلُ وبعدُ متجاوران', async () => {
     const HEAD = 'التاريخ,الوقت,المنصة,النص'
     const first = await seatPlan(db, 'org_owner', [HEAD, '2099-01-04,09:00,LinkedIn,الأولى'].join('\n'), facts(), new Map(), null)
