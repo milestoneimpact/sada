@@ -3830,8 +3830,11 @@ describe('نقاط الجاهزيّة في اللوحة (D-163)', () => {
       .run()
   }
   // ‏والتوجيهُ والمزوّدون في «الإعدادات» (D-211)، ونقاطُ الجاهزيّة في «/panel»
-  const panelHtml = async (): Promise<string> =>
-    everyPane(async (p) => app.request(p, withSession(await login()), env))
+  // ‏دخولٌ واحدٌ للصفحات الخمس كما في المتصفّح (D-424): خمسُ دخولاتٍ متوازيةٌ يُبطل رمزُ كلٍّ منها رمزَ أختها
+  const panelHtml = async (): Promise<string> => {
+    const cookie = await login()
+    return everyPane((p) => app.request(p, withSession(cookie), env))
+  }
   /** صفُّ المهمّة في جدول التوجيه — من اسمها إلى آخر خليّته. */
   const routeRow = (html: string, label: string): string => {
     const at = html.indexOf(`<div class="nm">${label}</div>`)
@@ -4299,7 +4302,8 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
       .bind(crypto.randomUUID(), source, 'خلاصة.', JSON.stringify({ hash: 'md5:a', themes: [] }), 0.8)
       .run()
     await recordCost(db, { provider: 'anthropic', operation: 'draft:x', units: 1, unitCost: 6.06 })
-    const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
+    const cookie = await login()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     const next = html.slice(html.indexOf('<li class="todo-next"'), html.indexOf('</li>', html.indexOf('<li class="todo-next"')))
     expect(next).toContain('href="#c2"')
     expect(next).toContain('⁦6.06$⁩ من ⁦5.00$⁩')
@@ -4312,7 +4316,8 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
   })
 
   it('ورأس «المنشورات» باب واحد يفتح البدايات الأربع إلى بطاقاتها (D-232)', async () => {
-    const html = await (await everyPane(async (p) => app.request(p, withSession(await login()), env)))
+    const cookie = await login()
+    const html = await (await everyPane((p) => app.request(p, withSession(cookie), env)))
     const at = html.indexOf('<section data-pane="posts"')
     const head = html.slice(at, html.indexOf('</details>', html.indexOf('data-head-new', at)))
     expect(head.match(/class="btn btn-primary/g) ?? []).toHaveLength(1)
