@@ -54,7 +54,8 @@ function repoStatusCard(r: NonNullable<PackageScreen['repoStatus']>): string {
 
 /** روابطُ قالب الشهر القادم (D-390) في بطاقة الحزمة. */
 const TEMPLATE_LINKS = '<a class="tap" href="/panel/plan/month-template?f=md" download>نزّل قالب الشهر القادم</a> · '
-  + '<a class="tap" href="/panel/plan/month-template?f=csv" download>CSV</a> · <a class="tap" href="/panel/plan/month-template?f=readme" download>README</a>'
+  + '<a class="tap" href="/panel/plan/month-template?f=csv" download>CSV</a> · <a class="tap" href="/panel/plan/month-template?f=readme" download>README</a> · '
+  + '<a class="tap" href="/panel/plan/month-template?k=week" download>قالب أسبوع</a> · <a class="tap" href="/panel/plan/month-template?k=day" download>قالب يوم</a>'
 
 const short = (sha: string | null): string => (sha === null ? '—' : sha.slice(0, 7))
 const label = { dark: 'داكن', light: 'فاتح' } as const

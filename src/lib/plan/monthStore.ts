@@ -4,15 +4,19 @@
  */
 import type { Db } from '../tokens'
 import type { DiffRow, ImportRow, MonthFacts } from './month'
+import { calReady, calStatus, type CalItem } from './calendar'
 
 export async function readImports(db: Db, org: string, limit = 30): Promise<ImportRow[]> {
-  const r = await db.prepare(`SELECT id, source_kind, source_ref, content_hash, period, status, report_json, created_at FROM import_jobs
-                               WHERE org_id = ? ORDER BY created_at DESC LIMIT ?`).bind(org, limit)
-    .all<{ id: string; source_kind: string; source_ref: string | null; content_hash: string; period: string | null; status: string; report_json: string; created_at: string }>()
+  const r = await db.prepare(`SELECT id, source_kind, source_ref, content_hash, period, status, report_json, created_at, plan_id, seen_count, last_seen_at
+                               FROM import_jobs WHERE org_id = ? ORDER BY COALESCE(last_seen_at, created_at) DESC LIMIT ?`).bind(org, limit)
+    .all<{ id: string; source_kind: string; source_ref: string | null; content_hash: string; period: string | null; status: string; report_json: string; created_at: string;
+           plan_id: string | null; seen_count: number | null; last_seen_at: string | null }>()
     .catch(() => ({ results: [] as never[] }))
   return r.results.map((x) => ({
     id: x.id, sourceKind: x.source_kind, sourceRef: x.source_ref, contentHash: x.content_hash, period: x.period,
     status: x.status, createdAt: x.created_at, summary: reportLine(x.report_json),
+    // ‏وإعادةُ الرفع بلا تغيير (D-406): كم مرّةً بعد الأولى، ومتى آخرُها
+    planId: x.plan_id, reseen: Math.max(0, Number(x.seen_count ?? 1) - 1), lastSeenAt: x.last_seen_at,
   }))
 }
 
@@ -67,4 +71,14 @@ export async function monthFacts(db: Db, org: string, period: string): Promise<M
     period, hasPlan: true, reviewed: plan.locked_at !== null, items: Number(items?.n ?? 0),
     approved: by('approved'), queued: by('queued'), published: by('published'), failed: by('failed'),
   }
+}
+
+/** بنودُ التقويم الموحّد (D-410): كلُّ بندٍ بموعده ومنصّته وحال منشوره، والمرفوضُ لا يُعدّ. */
+export async function calendarItems(db: Db, org: string, planId: string): Promise<CalItem[]> {
+  const r = await db.prepare(`SELECT i.id, i.platform, i.due_local, substr(coalesce(i.copy, i.angle, ''), 1, 60) AS title, i.copy,
+                                     (SELECT p.text FROM posts p WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' ORDER BY p.id LIMIT 1) AS post_text,
+                                     (SELECT p.status FROM posts p WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' ORDER BY p.id LIMIT 1) AS post_status
+                                FROM plan_items i WHERE i.org_id = ? AND i.plan_id = ? AND i.due_local IS NOT NULL ORDER BY i.due_local, i.item_key`).bind(org, planId)
+    .all<{ id: string; platform: string; due_local: string; title: string; copy: string | null; post_text: string | null; post_status: string | null }>().catch(() => ({ results: [] as never[] }))
+  return r.results.map((x) => ({ id: x.id, platform: x.platform, due: x.due_local, title: x.title, status: calStatus(x.post_status), ready: calReady(x.post_status, x.post_text, x.copy) }))
 }

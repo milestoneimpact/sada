@@ -35,6 +35,7 @@ import { estimateMonth, unitCosts } from '../../lib/estimate'
 import { readFacts, whatWorks } from '../../lib/insights/whatWorks'
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
+import { NO_OPTIONS, readClientOptions, writeClientOptions } from '../../lib/clientOptions'
 import { readSpan, page, loginResponse, setFlash, takeFlash, guardPost } from './shared'
 
 export const client = new Hono<{ Bindings: Env }>()
@@ -80,7 +81,7 @@ client.get('/panel/client', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
-  const [orgRow, brief, linkedRows, plan, both, units, spent, facts, spentToday] = await Promise.all([
+  const [orgRow, brief, linkedRows, plan, both, units, spent, facts, spentToday, options] = await Promise.all([
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
     readBrief(c.env.DB, org),
     c.env.DB.prepare("SELECT platform, count(*) AS n FROM accounts WHERE org_id = ? AND status = 'active' GROUP BY platform")
@@ -94,6 +95,7 @@ client.get('/panel/client', async (c) => {
     readFacts(c.env.DB, org, null),
     c.env.DB.prepare("SELECT COALESCE(SUM(total), 0) AS t FROM cost_ledger WHERE org_id = ? AND at >= date('now')")
       .bind(org).first<{ t: number }>().catch(() => null),
+    readClientOptions(c.env.DB, org).catch(() => NO_OPTIONS),
   ])
   const settings = both.effective
   const waiting = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'draft'")
@@ -115,6 +117,7 @@ client.get('/panel/client', async (c) => {
     saved: c.req.query('saved') === '1',
     flash: await takeFlash(c.env, c.req.raw),
     names: plan === null ? {} : await sourceNames(c.env.DB, org, plan.plan.items.map((i) => i.sourceId)),
+    options,
     limits: {
       ownerOrg: org === OWNER_ORG,
       global: { spend: both.global.dailySpendCapUsd, image: both.global.dailyImageCap, video: both.global.dailyVideoCap, analysis: both.global.dailyAnalysisCap },
@@ -156,6 +159,22 @@ client.post('/panel/client/limits', async (c) => {
   await record(c.env.DB, { actor: 'panel', action: 'settings.write', target: 'client_limits', detail: changed.join(' · ') || 'عاد إلى العامّ', org }, c.req.raw)
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: changed.length === 0 ? 'عاد العميلُ إلى الحدود العامّة.' : 'حُفظت حدودُ هذا العميل.' })
   return c.redirect('/panel/client#limits', 303)
+})
+
+/**
+ * **خيارا هذا العميل** (D-412): موافقتُه قبل النشر، وتقريرُ الشهر إلى البريد. مربّعٌ غائبٌ في النموذج مطفأ — فالخياران مطفآن
+ * حتّى يُفتحا صراحةً. للمدير فأعلى (`access.ts`) كالحدود.
+ */
+client.post('/panel/client/options', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const o = { approvalRequired: gate.form.get('approval_required') === '1', reportMail: gate.form.get('report_mail') === '1' }
+  await writeClientOptions(c.env.DB, org, o)
+  await record(c.env.DB, { actor: 'panel', action: 'client.options', target: 'client_options',
+    detail: 'موافقة ' + (o.approvalRequired ? 'مفتوحة' : 'مطفأة') + ' · تقرير ' + (o.reportMail ? 'مفتوح' : 'مطفأ'), org }, c.req.raw)
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'حُفظ خيارا هذا العميل.' })
+  return c.redirect('/panel/client#options', 303)
 })
 
 client.post('/panel/client/brief', async (c) => {

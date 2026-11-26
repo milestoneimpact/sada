@@ -7,9 +7,11 @@ import { statusBadge } from '../ui/components/badge'
 import { awaitingCount, awaitingRevision } from '../../lib/package/revision'
 import { sourceNames } from './client'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
-import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
+import { fillGaps, seatPlan, previewSeat, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { planPreviewScreen } from '../ui/planPreviewView'
+import { versionsScreen } from '../ui/planVersionsView'
+import { diffVersions, readPlanVersions, type PlanVersion } from '../../lib/plan/versions'
 import { widenPlan } from '../../lib/plan/widen'
 import { rulesSection, type PlanRules } from '../../lib/plan/guidelines'
 import type { PlanImageStyle } from '../../lib/plan/prompt'
@@ -25,7 +27,7 @@ import { checksStrip, rulesScreen } from '../ui/checksView'
 import { blockedKeys, hhmm, parseRulesForm, planChecks, planFix, RULE_LABEL, type RuleId } from '../../lib/plan/checks'
 import { readRules, reviewCheckInput, writeRules } from '../../lib/plan/checkStore'
 import { itemKey } from '../../lib/plan/review'
-import { localParts } from '../../lib/time/zone'
+import { dayLabel, localParts } from '../../lib/time/zone'
 import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
@@ -60,7 +62,9 @@ import { approvePlanVersion, reopenVersion, unscheduleMonth } from '../../lib/pl
 import { attachToPost, listLibrary } from '../../lib/library'
 import { rejectMedia } from '../../lib/image/job'
 import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
-import { itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { calendarItems, itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { bulkPick, parseCalQuery, spanPeriods } from '../../lib/plan/calendar'
+import { PLATFORM_IDS } from '../../lib/oauth/providers'
 import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
@@ -69,9 +73,9 @@ import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
-import { readPlanFlags } from '../../lib/plan/platforms'
+import { PLAN_BASE, readPlanFlags } from '../../lib/plan/platforms'
 import { ownerZone, storedZone } from '../../lib/time/ownerZone'
-import { renderTemplate, templateReadme } from '../../lib/plan/template'
+import { addDays, nextSunday, renderTemplate, shortTemplate, templateReadme } from '../../lib/plan/template'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
 import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/clientReview'
@@ -568,9 +572,16 @@ plan.get('/panel/plan/month-template', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   const asked = c.req.query('p')
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const period = isPeriod(asked) ? asked : nextPeriod(localDay(localParts(new Date(), zone ?? DEFAULT_ZONE)).slice(0, 7))
+  const today = localDay(localParts(new Date(), zone ?? DEFAULT_ZONE))
+  const period = isPeriod(asked) ? asked : nextPeriod(today.slice(0, 7))
   const f = c.req.query('f')
+  // ‏قالبا الأسبوع واليوم (D-408): `k=week` من الأحد القادم، و`k=day` للغد — و`d=YYYY-MM-DD` ليومٍ بعينه.
+  const k = c.req.query('k')
+  const d = c.req.query('d')
+  const day = d !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d ? d : null
+  const short = k === 'week' || k === 'day' ? shortTemplate(k, day ?? (k === 'week' ? nextSunday(today) : addDays(today, 1)), f === 'csv' ? 'csv' : 'md') : null
   const [body, type, name] = f === 'readme' ? [templateReadme(), 'text/markdown; charset=utf-8', 'README.md']
+    : short !== null ? [short.body, short.type, short.name]
     : f === 'csv' ? [renderTemplate(period, 'csv'), 'text/csv; charset=utf-8', period + '.csv']
     : [renderTemplate(period, 'md'), 'text/markdown; charset=utf-8', period + '.md']
   return new Response(body, { headers: { 'Content-Type': type, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' } })
@@ -974,12 +985,28 @@ plan.post('/panel/plan/month/approve', async (c) => {
   const [model, rules] = await Promise.all([reviewModel(c.env.DB, org, stored), readRules(c.env.DB, org)])
   const findings = planChecks(await reviewCheckInput(c.env.DB, org, model, zone, now), rules)
   const blocked = blockedKeys(findings)
-  const done = await approvePlanVersion(c.env.DB, org, stored.id, gate.session.record.email ?? 'owner', now)
+  // ‏«اعتمد ما في الفرز» (D-410): البنودُ المنتظرة المطابقة وحدَها، والخطّةُ تبقى مسوّدةً لما بقي
+  let only: string[] | undefined
+  if (String(f.get('scope') ?? '') === 'filter') {
+    const fq = new URLSearchParams()
+    for (const k of ['v', 'p', 'd', 'pf', 'st']) fq.set(k, String(f.get(k) ?? ''))
+    only = bulkPick(await calendarItems(c.env.DB, org, stored.id), parseCalQuery(fq, period + '-01', PLATFORM_IDS))
+    if (only.length === 0) {
+      await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لا بند ينتظر الاعتماد في هذا الفرز.' })
+      return c.redirect(to, 303)
+    }
+  }
+  const done = await approvePlanVersion(c.env.DB, org, stored.id, gate.session.record.email ?? 'owner', now, only)
   if (!done.ok) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.reason })
     return c.redirect(to, 303)
   }
-  if (stored.status === 'draft') await approvePlan(c.env.DB, stored.id, org)
+  // ‏ولا يُقال «اعتُمد» على صفر (D-411): الفرزُ يعدّ ما يُعتمد فعلًا، وهذا حارسُ ما تغيّر بين الفتح والإرسال
+  if (only !== undefined && done.approved + done.created === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم يُعتمد شيء: بنودُ هذا الفرز بلا نصٍّ أو تعثّر نشرُها. افتح اليومَ وراجعها.' })
+    return c.redirect(to, 303)
+  }
+  if (stored.status === 'draft' && only === undefined) await approvePlan(c.env.DB, stored.id, org)
   const fresh = await planForId(c.env.DB, org, stored.id) ?? stored
   const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
   await record(c.env.DB, { actor: 'panel', action: 'plan.month.approve', target: stored.id, detail: 'v' + String(done.version) + ':' + String(settled.scheduled) }, c.req.raw)
@@ -1039,8 +1066,8 @@ plan.get('/panel/plan/month', async (c) => {
   const now = new Date()
   const today = localDay(localParts(now, zone))
   const current = today.slice(0, 7)
-  const q = c.req.query('p')
-  const period = isPeriod(q) ? q : current
+  const calQ = parseCalQuery(new URL(c.req.url).searchParams, today, PLATFORM_IDS)
+  const period = calQ.period
   const canFix = allows(session.record.role ?? 'owner', 'publisher')
   const [stored, rules, diff, facts] = await Promise.all([
     planForPeriod(c.env.DB, org, period), readRules(c.env.DB, org), readDiff(c.env.DB, org, period),
@@ -1054,6 +1081,13 @@ plan.get('/panel/plan/month', async (c) => {
     total = model.cards.length
   }
   const blocked = blockedKeys(findings)
+  // ‏الأسبوعُ العابرُ يقرأ خطّةَ الشهر المجاور لأيّامه (D-411)، عرضًا فقط: الاعتمادُ بالفرز يبقى لخطّة هذا الشهر
+  const own = stored === null ? [] : await calendarItems(c.env.DB, org, stored.id)
+  const others = await Promise.all(spanPeriods(calQ).filter((x) => x !== period).map(async (x) => {
+    const pl = await planForPeriod(c.env.DB, org, x)
+    return pl === null ? [] : (await calendarItems(c.env.DB, org, pl.id)).map((i) => ({ ...i, ready: false }))
+  }))
+  const calItems = [...own, ...others.flat()]
   const firstBlock = findings.find((f) => f.severity === 'block')
   const body = monthJourneyCard(facts.map((f) => monthJourney(f, today))) + '<div class="mt-3"></div>' + monthScreen({
     period, planId: stored?.id ?? null,
@@ -1065,6 +1099,7 @@ plan.get('/panel/plan/month', async (c) => {
     canApprove: canFix && stored?.status === 'draft',
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
+    cal: { q: calQ, items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
   })
   // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
   return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
@@ -1078,6 +1113,21 @@ plan.get('/panel/plan/imports', async (c) => {
   const rows = await readImports(c.env.DB, activeOrg(session.record))
   const body = importsScreen(rows, allows(session.record.role ?? 'owner', 'publisher'))
   return page((nonce) => soloPage('صدى — الاستيرادات', { href: '/panel/plan/month', label: 'الشهر' }, body, nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
+})
+
+/** **«قارن الإصدارات»** (D-406): إصداران من خطّةٍ مرفوعة متجاوران — صورُ `plan_versions` والإصدارُ القائم. */
+plan.get('/panel/plan/versions', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const planId = c.req.query('plan') ?? ''
+  const versions = /^[0-9a-f-]{36}$/.test(planId) ? await readPlanVersions(c.env.DB, activeOrg(session.record), planId) : []
+  if (versions.length === 0) return c.redirect('/panel/plan/imports', 303)
+  const pick = (q: string | undefined, fallback: PlanVersion): PlanVersion => versions.find((v) => String(v.version) === q) ?? fallback
+  const b = pick(c.req.query('b'), versions[versions.length - 1]!)
+  const a = pick(c.req.query('a'), versions[Math.max(0, versions.length - 2)]!)
+  const body = versionsScreen({ planId, versions, a, b, changes: diffVersions(a, b) })
+  return page((nonce) => soloPage('صدى — قارن الإصدارات', { href: '/panel/plan/imports', label: 'الاستيرادات' }, body, nonce,
     '', buildCommands({ onPanel: false }), soloNav('posts')))
 })
 
@@ -1347,7 +1397,10 @@ plan.get('/panel/plan/import/preview', async (c) => {
     platforms: rows.map((r) => r.platform), write, imageStyle: p.imageStyle, imageRoom: room,
   }), used))
   const estimate = { write: await lineFor(true), seat: p.imageStyle === null ? null : await lineFor(false) }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate })
+  // ‏وما سيفعله «ابنِ» بكلّ صفّ (D-406): جديدٌ أو معدَّلٌ أو مجدولٌ أو منشورٌ سابقًا، وما في الخطّة وغاب عن الملفّ
+  const seat = await previewSeat(c.env.DB, activeOrg(session.record), p.csv, facts, p.via === 'model' ? 'text' : 'csv')
+  const importedLabel = seat.importedAt === null ? null : dayLabel(new Date(seat.importedAt.replace(' ', 'T') + 'Z'), facts.zone)
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate, seat: { ...seat, importedLabel } })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),

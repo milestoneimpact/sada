@@ -27,24 +27,25 @@ const LABEL_OF: Readonly<Record<TemplateColumn, string>> = { day: 'اليوم', 
 export const SUGGESTED = { linkedin: '09:00', x: '20:00' } as const
 const WORKDAYS = new Set([0, 1, 2, 3, 4])
 const WEEKDAY = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] as const
-const TEXT_LIMIT = { linkedin: 3000, x: 280 } as const
+export const TEXT_LIMIT = { linkedin: 3000, x: 280 } as const
 
 /** مسارُ قالبٍ في المستودع: `plans/YYYY-MM.md` أو `.csv` — وملفُّ الحالة `.status.json` ليس منها. */
 export const TEMPLATE_PATH = /^plans\/(\d{4}-(0[1-9]|1[0-2]))\.(md|csv)$/i
 export const isTemplatePath = (p: string): boolean => TEMPLATE_PATH.test(p)
 export const templatePeriod = (p: string): string | null => TEMPLATE_PATH.exec(p)?.[1] ?? null
 
+/** دليلُ وكيل بناء الخطّة (D-408). */
+export const GUIDE_URL = 'https://github.com/milestoneimpact/sada/blob/main/docs/PLAN-AGENT-GUIDE.md'
+
 const pad = (n: number): string => String(n).padStart(2, '0')
 
 export interface TemplateRow { readonly day: string; readonly time: string; readonly platform: 'linkedin' | 'x'; readonly text: string; readonly media: string; readonly note: string }
 
-/** صفوفُ الشهر المقترحة: كلُّ يومٍ X مساءً، وأيّامُ العمل LinkedIn صباحًا — والنصُّ فارغٌ يكتبه المالك. */
-export function monthRows(period: string): TemplateRow[] {
-  const [y, m] = period.split('-').map(Number) as [number, number]
-  const days = new Date(Date.UTC(y, m, 0)).getUTCDate()
+/** صفوفُ أيّامٍ بعينها (`YYYY-MM-DD`): X مساءً كلَّ يوم، وLinkedIn صباحَ أيّام العمل — والنصُّ فارغٌ يكتبه المالك. */
+export function dayListRows(days: readonly string[]): TemplateRow[] {
   const out: TemplateRow[] = []
-  for (let d = 1; d <= days; d++) {
-    const day = `${period}-${pad(d)}`
+  for (const day of days) {
+    const [y, m, d] = day.split('-').map(Number) as [number, number, number]
     const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
     if (WORKDAYS.has(wd)) out.push({ day, time: SUGGESTED.linkedin, platform: 'linkedin', text: '', media: '', note: WEEKDAY[wd]! })
     out.push({ day, time: SUGGESTED.x, platform: 'x', text: '', media: '', note: WEEKDAY[wd]! })
@@ -52,15 +53,48 @@ export function monthRows(period: string): TemplateRow[] {
   return out
 }
 
+/** اليومُ بعد `day` بـ`n` أيّام — بالتقويم وحده، بلا منطقة. */
+export function addDays(day: string, n: number): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number]
+  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10)
+}
+
+/** أوّلُ أحدٍ بعد `day` (الأسبوعُ يبدأ الأحد، كأيّام العمل). */
+export function nextSunday(day: string): string {
+  const [y, m, d] = day.split('-').map(Number) as [number, number, number]
+  const wd = new Date(Date.UTC(y, m - 1, d)).getUTCDay()
+  return addDays(day, 7 - wd)
+}
+
+/** صفوفُ الشهر المقترحة: كلُّ يومٍ X مساءً، وأيّامُ العمل LinkedIn صباحًا — والنصُّ فارغٌ يكتبه المالك. */
+export function monthRows(period: string): TemplateRow[] {
+  const [y, m] = period.split('-').map(Number) as [number, number]
+  const days = new Date(Date.UTC(y, m, 0)).getUTCDate()
+  return dayListRows(Array.from({ length: days }, (_, i) => `${period}-${pad(i + 1)}`))
+}
+
+/** قالبُ الأسبوع (D-408): سبعةُ أيّامٍ من `start`. */
+export const weekRows = (start: string): TemplateRow[] => dayListRows(Array.from({ length: 7 }, (_, i) => addDays(start, i)))
+/** قالبُ اليوم (D-408): يومٌ واحد بمنصّتيه. */
+export const dayRows = (day: string): TemplateRow[] => dayListRows([day])
+
+/** قالبُ أسبوعٍ أو يومٍ ملفًّا (D-408): نصُّه ونوعُه واسمُه للتنزيل. */
+export function shortTemplate(kind: 'week' | 'day', start: string, format: 'md' | 'csv'): { body: string; type: string; name: string } {
+  const rows = kind === 'week' ? weekRows(start) : dayRows(start)
+  const title = (kind === 'week' ? 'خطّة أسبوع ' : 'خطّة يوم ') + start
+  const type = format === 'csv' ? 'text/csv; charset=utf-8' : 'text/markdown; charset=utf-8'
+  return { body: renderTemplate(start, format, rows, title), type, name: kind + '-' + start + '.' + format }
+}
+
 const mdCell = (v: string): string => v.replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>')
 const csvCell = (v: string): string => (/[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v)
 const cells = (r: TemplateRow): string[] => [r.day, r.time, r.platform, r.text, r.media, r.note]
 
 /** الملفُّ نفسُه بصيغتيه — والصفوفُ تُمرَّر فيُختبر الذهابُ والإياب. */
-export function renderTemplate(period: string, format: 'md' | 'csv', rows: readonly TemplateRow[] = monthRows(period)): string {
+export function renderTemplate(period: string, format: 'md' | 'csv', rows: readonly TemplateRow[] = monthRows(period), title = `خطّة ${period}`): string {
   if (format === 'csv') return '﻿' + [TEMPLATE_HEADER.join(','), ...rows.map((r) => cells(r).map(csvCell).join(','))].join('\r\n') + '\r\n'
   return [
-    `# خطّة ${period}`,
+    `# ${title}`,
     '',
     'الساعةُ بتوقيتك. اكتب النصَّ في عموده، واترك الصفَّ بلا نصٍّ إن لم تُرده. انظر `plans/README.md`.',
     '',
@@ -90,6 +124,9 @@ export function templateReadme(): string {
     '- الصفُّ بلا نصٍّ يُتخطّى بلا خطأ: القالبُ يأتي بكلّ أيّام الشهر وأنت تملأ ما تريد.',
     '- الخطأ يُقال بالسطر والعمود، مثل: «السطر 9، العمود «الساعة»: «25:00» ليست ساعة».',
     '- لا شيء يُنشر قبل أن تعتمد الشهر في صدى.',
+    '- قالبا الأسبوع واليوم بالأعمدة نفسِها: انسخ كلَّ صفٍّ إلى ملفّ شهر يومه (أسبوعٌ يعبر حدَّ شهرين يُقسَم على ملفّين، وإلّا رُفض صفُّ الشهر الآخر «خارج شهر الملفّ»)، أو ارفعهما في «من ملفّ».',
+    '- افحص الملفّ قبل دفعه: `npm run plan:check -- plans/2026-12.md` في مستودع صدى.',
+    '- من يبني الخطّة آليًّا (وكيلٌ أو نموذج) يتبع دليلَه: ' + GUIDE_URL,
     '',
   ].join('\n')
 }

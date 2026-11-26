@@ -12,6 +12,10 @@ import { card } from './components/card'
 import { button } from './components/button'
 import { html, raw } from './html'
 import type { PlanRules } from '../../lib/plan/guidelines'
+import type { RowTag, SeatPreview } from '../../lib/plan/seat'
+import { statusBadge, type Tone } from './components/badge'
+import { notice } from './components/toast'
+import { PLATFORM_LABEL } from '../../lib/oauth/providers'
 
 export interface PreviewData {
   readonly key: string
@@ -26,6 +30,31 @@ export interface PreviewData {
   readonly media?: Readonly<Record<string, string>>
   /** تقديرُ الزرّين بالدولار قبل الضغط (D-395، `buildEstimateLine`) — نصٌّ خامٌّ يُهرَّب هنا. */
   readonly estimate?: { readonly write: string; readonly seat: string | null }
+  /** ما سيفعله «ابنِ» بكلّ صفّ (D-406، `previewSeat`)، وتاريخُ الاستيراد السابق للملفّ نفسِه نصًّا جاهزًا للعرض. */
+  readonly seat?: SeatPreview & { readonly importedLabel?: string | null }
+}
+
+type Tag = RowTag | 'removed'
+
+/** وسومُ المعاينة (D-406): لونٌ ورمزٌ وكلمةٌ معًا (D-043)، بشارة الحال نفسِها. */
+export const TAG: Readonly<Record<Tag, { readonly tone: Tone | ''; readonly g: string; readonly say: string }>> = {
+  new: { tone: 'ok', g: '◆', say: 'جديد' },
+  modified: { tone: 'warn', g: '✎', say: 'معدَّل' },
+  unchanged: { tone: 'idle', g: '○', say: 'بلا تغيير' },
+  scheduled: { tone: 'pending', g: '◔', say: 'مجدول سابقًا' },
+  published: { tone: '', g: '■', say: 'منشور سابقًا' },
+  removed: { tone: 'bad', g: '✕', say: 'محذوف من الملفّ' },
+}
+const ORDER: readonly Tag[] = ['new', 'modified', 'unchanged', 'scheduled', 'published', 'removed']
+const tagBadge = (t: Tag): string => statusBadge(TAG[t].tone, TAG[t].g, TAG[t].say)
+
+/** شريطُ الخلاصة: عددُ كلّ وسم، وما عددُه صفرٌ لا يُعرض. */
+export function tagBar(seat: SeatPreview): string {
+  const n = (t: Tag): number => t === 'removed' ? seat.removed.length : Object.values(seat.tags).filter((x) => x === t).length
+  const shown = ORDER.filter((t) => n(t) > 0)
+  if (shown.length === 0) return ''
+  return html`<ul class="plain row gap-2" aria-label="ما سيفعله البناء بصفوف ملفّك">${shown.map((t) =>
+    html`<li>${raw(statusBadge(TAG[t].tone, TAG[t].g, TAG[t].say + ' ' + String(n(t))))}</li>`)}</ul>`.value
 }
 
 const SHOWN = 60
@@ -53,13 +82,19 @@ export function planPreviewScreen(d: PreviewData): string {
     <div><dt>الملفّ</dt><dd>${source}</dd></div>
   </dl>`
   const table = html`<div class="pv-scroll"><table class="pv-table">
-    <thead><tr><th>اليوم</th><th>الوقت</th><th>المنصّة</th><th>الفكرة أو النصّ</th><th>المصدر</th></tr></thead>
+    <thead><tr><th>اليوم</th><th>الوقت</th><th>المنصّة</th><th>الفكرة أو النصّ</th><th>المصدر</th>${d.seat === undefined ? '' : html`<th>عند البناء</th>`}</tr></thead>
     <tbody>${rows.slice(0, SHOWN).map(({ cells, line }) => {
       const note = d.filled[String(line)]
       return html`<tr><td dir="ltr">${g(cells, di)}</td><td dir="ltr">${g(cells, ti)}</td><td>${g(cells, pi)}</td>
-        <td>${g(cells, xi).replace(/\s+/g, ' ').slice(0, 140)}${raw(d.media?.[String(line)] ?? '')}</td><td>${note === undefined ? 'من ملفّك' : note}</td></tr>`
+        <td>${g(cells, xi).replace(/\s+/g, ' ').slice(0, 140)}${raw(d.media?.[String(line)] ?? '')}</td><td>${note === undefined ? 'من ملفّك' : note}</td>${d.seat === undefined ? '' : html`<td>${raw(d.seat.tags[String(line)] === undefined ? '—' : tagBadge(d.seat.tags[String(line)]!))}</td>`}</tr>`
     })}</tbody></table></div>
     ${rows.length > SHOWN ? html`<p class="hint m-0">وغيرُها ${counted(rows.length - SHOWN, NOUNS.post)} تظهر في المراجعة.</p>` : html``}`
+  const seat = d.seat
+  const removed = seat === undefined || seat.removed.length === 0 ? html`` : html`<ul class="plain stack">${seat.removed.map((r) => html`<li class="row gap-2">
+      ${raw(tagBadge('removed'))}<span class="chip">${PLATFORM_LABEL[r.platform as keyof typeof PLATFORM_LABEL] ?? r.platform}</span>
+      <bdi dir="ltr">${r.due ?? '—'}</bdi><span class="grow">${r.angle.replace(/\s+/g, ' ').slice(0, 140)}</span>
+      <span class="hint">${r.guarded ? 'يبقى: منشورُه مجدولٌ أو منشور' : 'يُحذف من الخطّة'}</span></li>`)}</ul>`
+  const banner = seat?.importedLabel == null ? '' : notice({ tone: 'warn', g: '◍', html: html`هذا الملفّ استُورد في ${seat.importedLabel} — البناءُ لن يغيّر شيئًا. عدّل الملفّ ثمّ ارفعه، أو راجع خطّتك.`.value })
   const cost = d.cost > 0 ? 'كلّفت القراءةُ $' + d.cost.toFixed(3) + ' في الدفتر. ' : ''
   const act = html`<form method="POST" action="/panel/plan/import/confirm" class="stack">
     <input type="hidden" name="k" value="${d.key}">
@@ -70,10 +105,12 @@ export function planPreviewScreen(d: PreviewData): string {
       ${raw(button({ label: 'ارفع غيره', href: '/panel/plan/import', variant: 'quiet' }))}</div></form>`
   return html`${raw(pageHead('', 'هذا ما فهمته', 'لم يُبنَ شيءٌ بعد. راجع ما قرأتُه من ملفّك، فإن صحّ فابنِ.'))}
     <div class="stack">
-      ${raw(card({ title: 'الخلاصة', level: 2, body: facts.value }))}
+      ${raw(banner)}
+      ${raw(card({ title: 'الخلاصة', level: 2, body: facts.value + (seat === undefined ? '' : tagBar(seat)) }))}
       ${d.rules == null ? html`` : raw(card({ title: 'قواعد الكتابة من ورقة الإرشادات', level: 2, body: html`<div class="pv-rules">${Object.entries(d.rules).map(([p, list]) => html`<section><h3 class="m-0">${p}</h3>
         <dl class="pv-facts">${list.map((r) => html`<div><dt>${r.item}</dt><dd>${r.value}</dd></div>`)}</dl></section>`)}</div>`.value }))}
       ${raw(card({ title: 'الصفوف', level: 2, body: table.value }))}
+      ${seat === undefined || seat.removed.length === 0 ? html`` : raw(card({ title: 'في خطّتك وليس في الملفّ', level: 2, body: removed.value }))}
       ${act}
     </div>`.value
 }

@@ -1,7 +1,7 @@
 /** «عندي خطّة» (D-287): كلُّ صيغةٍ جدول، والناقصُ يُكمَّل ويُقال، والسليمُ يُسكَّن بندًا ومسوّدة، وما يمنعه يُسمّى. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { fillGaps, markdownTables, rowsFromModel, seatPlan, toTable } from './seat'
+import { fillGaps, markdownTables, rowsFromModel, previewSeat, seatPlan, toTable } from './seat'
 import type { PlanFacts } from './import'
 
 let db: FakeDb
@@ -118,7 +118,8 @@ describe('التسكينُ بمهمّة استيرادٍ وإصدار (D-383)', 
     db.raw.prepare("UPDATE plans SET locked_at = datetime('now'), status = 'approved'").run()
     const changed = await seatPlan(db, 'org_owner', CSV + '\n2099-01-07,13:00,X,الثالثة', facts(), new Map(), null, null, false, { kind: 'text' })
     expect(changed.planId).toBe(first.planId)
-    expect(changed.seated).toBe(1)
+    // ‏الصفّان اللذان لم يتغيّرا باقيان في الخطّة بمنشورَيهما (D-404)، والثالثُ جديد
+    expect(changed).toMatchObject({ seated: 3, kept: 2, updated: 0 })
     expect(db.raw.prepare('SELECT count(*) AS n FROM plans').get()).toEqual({ n: 1 })
     expect(db.raw.prepare('SELECT version, status, locked_at, source_kinds FROM plans').get()).toEqual({ version: 2, status: 'draft', locked_at: null, source_kinds: '["text"]' })
     const snap = db.raw.prepare('SELECT version, plan_json, import_job_id FROM plan_versions').all() as { version: number; plan_json: string; import_job_id: string | null }[]
@@ -126,8 +127,149 @@ describe('التسكينُ بمهمّة استيرادٍ وإصدار (D-383)', 
     expect((JSON.parse(snap[0]!.plan_json) as { items: unknown[] }).items).toHaveLength(2)
     expect(snap[0]!.import_job_id).not.toBeNull()
     expect(db.raw.prepare('SELECT count(*) AS n FROM import_jobs').get()).toEqual({ n: 2 })
-    // ‏ومسوّداتُ الإصدار السابق تبقى منشوراتٍ بلا خطّة، كما كانت بعد الحذف
-    expect(db.raw.prepare('SELECT count(*) AS n FROM posts WHERE plan_id IS NULL').get()).toEqual({ n: 2 })
-    expect(db.raw.prepare('SELECT count(*) AS n FROM plan_items').get()).toEqual({ n: 1 })
+    // ‏ولا تُفصَل مسوّداتُ الصفوف الباقية عن خطّتها (D-404) — كانت تُفرَغ إشارتُها فتختفي
+    expect(db.raw.prepare('SELECT count(*) AS n FROM posts WHERE plan_id IS NULL').get()).toEqual({ n: 0 })
+    expect(db.raw.prepare('SELECT count(*) AS n FROM plan_items').get()).toEqual({ n: 3 })
+    expect(db.raw.prepare('SELECT count(*) AS n FROM posts p JOIN plan_items i ON i.id = p.plan_item_id').get()).toEqual({ n: 3 })
+  })
+})
+
+/** ‏**إعادةُ استيراد خطّةٍ معدَّلة تحميها** (D-404): ما لم يتغيّر يبقى، وما عُدّل يُحدَّث، وما جُدول أو نُشر لا يُفصَل ولا يُعاد نشره. */
+describe('إعادةُ الاستيراد تحمي الخطّة (D-404)', () => {
+  const A = '2099-01-04,09:00,LinkedIn,الأولى كما هي'
+  const B = '2099-01-05,13:00,X,الثانية قبل التعديل'
+  const C = '2099-01-06,13:00,X,الثالثة تُجدوَل'
+  const HEAD = 'التاريخ,الوقت,المنصة,النص'
+  const posts = () => db.raw.prepare('SELECT id, text, status, plan_id, plan_item_id, idempotency_key FROM posts ORDER BY text').all() as
+    { id: string; text: string; status: string; plan_id: string | null; plan_item_id: string | null; idempotency_key: string }[]
+
+  it('الصفُّ الذي لم يتغيّر يبقى بندُه ومنشورُه بمعرّفهما، والمعدَّلُ تُحدَّث مسوّدتُه في مكانها', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, A, B].join('\n'), facts(), new Map(), null)
+    const before = posts()
+    const itemsBefore = db.raw.prepare('SELECT id FROM plan_items ORDER BY due_local').all()
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل')].join('\n'), facts(), new Map(), null)
+    expect(again).toMatchObject({ planId: first.planId, seated: 2, kept: 1, updated: 1, skipped: [] })
+    const after = posts()
+    expect(after).toHaveLength(2)
+    expect(after.map((p) => p.id).sort()).toEqual(before.map((p) => p.id).sort())
+    expect(after.every((p) => p.plan_id === first.planId && p.plan_item_id !== null)).toBe(true)
+    expect(after.find((p) => p.text === 'الأولى كما هي')!.idempotency_key).toBe(before.find((p) => p.text === 'الأولى كما هي')!.idempotency_key)
+    const edited = after.find((p) => p.text === 'الثانية بعد التعديل')!
+    expect(edited.idempotency_key).not.toBe(before.find((p) => p.text === 'الثانية قبل التعديل')!.idempotency_key)
+    expect(db.raw.prepare('SELECT id FROM plan_items ORDER BY due_local').all()).toEqual(itemsBefore)
+    expect(db.raw.prepare('SELECT copy FROM plan_items ORDER BY due_local').all()).toEqual([{ copy: 'الأولى كما هي' }, { copy: 'الثانية بعد التعديل' }])
+  })
+
+  it('المجدولُ والمنشورُ يبقيان على خطّتهما ولو غاب صفُّهما أو عُدّل، ولا يُكتب منشورٌ ثانٍ لهما', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, A, B, C].join('\n'), facts(), new Map(), null)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'queued', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-06 10:00:00' WHERE text = 'الثالثة تُجدوَل'").run()
+    db.raw.prepare("UPDATE posts SET status = 'published', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-05 10:00:00' WHERE text = 'الثانية قبل التعديل'").run()
+    const before = posts()
+    // ‏الثانيةُ عُدّل نصُّها، والثالثةُ حُذفت من الملفّ
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل')].join('\n'), facts(), new Map(), null)
+    expect(again.planId).toBe(first.planId)
+    expect(again.skipped).toEqual([{ line: 3, reason: expect.stringContaining('عدّله من بطاقته') }])
+    const after = posts()
+    expect(after).toEqual(before)
+    expect(after.every((p) => p.plan_id === first.planId)).toBe(true)
+    // ‏وبنداهما باقيان فيراهما الشهرُ والخطّة
+    const linked = db.raw.prepare('SELECT count(*) AS n FROM posts p JOIN plan_items i ON i.id = p.plan_item_id WHERE p.status IN (\'queued\', \'published\')').get()
+    expect(linked).toEqual({ n: 2 })
+    const plan = db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }
+    expect((JSON.parse(plan.plan_json) as { items: unknown[] }).items).toHaveLength(3)
+  })
+
+  it('حذفُ صفٍّ فوق المجدول لا يُسقطه من الخطّة: يُحمَل بمعرّف بنده لا بسطره (D-405)', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, B, A, C].join('\n'), facts(), new Map(), null)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'queued', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-05 10:00:00' WHERE text = 'الثانية قبل التعديل'").run()
+    // ‏حُذف السطرُ ٢ (المجدول) فصعدت الأولى إلى سطره فأخذت `import:2`
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, C].join('\n'), facts(), new Map(), null)
+    expect(again.planId).toBe(first.planId)
+    const items = (JSON.parse((db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }).plan_json) as { items: { sourceId: string; angle: string }[] }).items
+    expect(items).toHaveLength(3)
+    expect(items.map((i) => i.angle)).toContain('الثانية قبل التعديل')
+    expect(new Set(items.map((i) => i.sourceId)).size).toBe(3)
+    const queued = db.raw.prepare("SELECT p.source_refs, i.source_id FROM posts p JOIN plan_items i ON i.id = p.plan_item_id WHERE p.status = 'queued'").get() as { source_refs: string; source_id: string }
+    const kept = items.find((i) => i.angle === 'الثانية قبل التعديل')!
+    expect(JSON.parse(queued.source_refs)).toEqual([kept.sourceId])
+    expect(queued.source_id).toBe(kept.sourceId)
+    // ‏وإعادةُ الملفّ نفسِه بعد تعديلٍ آخر لا تُسقطه ولا تغيّر اسمه
+    await seatPlan(db, 'org_owner', [HEAD, A.replace('كما هي', 'معدَّلة'), C].join('\n'), facts(), new Map(), null)
+    const items2 = (JSON.parse((db.raw.prepare('SELECT plan_json FROM plans').get() as { plan_json: string }).plan_json) as { items: { sourceId: string; angle: string }[] }).items
+    expect(items2).toHaveLength(3)
+    expect(items2.find((i) => i.angle === 'الثانية قبل التعديل')?.sourceId).toBe(kept.sourceId)
+  })
+
+  it('بندٌ رُفض منشورُه ثمّ جُدول آخر: صفُّه المعدَّل لا يُكتب له منشورٌ ثانٍ (D-405)', async () => {
+    const first = await seatPlan(db, 'org_owner', [HEAD, A, B].join('\n'), facts(), new Map(), null)
+    const b = db.raw.prepare("SELECT id, plan_item_id FROM posts WHERE text = 'الثانية قبل التعديل'").get() as { id: string; plan_item_id: string }
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'rejected' WHERE id = ?").run(b.id)
+    // ‏أُعيدت كتابتُه فجُدول؛ والمرفوضُ أُدرج أوّلًا فيأتي أوّلَ الوصل
+    db.raw.prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, plan_id, org_id, plan_item_id, approved_at, approved_by, account_id, scheduled_at)
+                    VALUES ('regen', 'x', 'text', 'الثانية مُعادة', 'queued', 'k-regen', 'owner', ?, 'org_owner', ?, '2099-01-01 08:00:00', 'owner', 'ax', '2099-01-05 10:00:00')`).run(first.planId, b.plan_item_id)
+    const again = await seatPlan(db, 'org_owner', [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل')].join('\n'), facts(), new Map(), null)
+    expect(again.skipped).toEqual([{ line: 3, reason: expect.stringContaining('عدّله من بطاقته') }])
+    const onItem = db.raw.prepare("SELECT id, status FROM posts WHERE plan_item_id = ? AND status <> 'rejected'").all(b.plan_item_id)
+    expect(onItem).toEqual([{ id: 'regen', status: 'queued' }])
+    expect(db.raw.prepare("SELECT count(*) AS n FROM posts WHERE text = 'الثانية بعد التعديل'").get()).toEqual({ n: 0 })
+  })
+
+  it('صورةُ الإصدار السابق تُحفظ قبل كلّ استبدال ولو لم يُثبَّت', async () => {
+    await seatPlan(db, 'org_owner', [HEAD, A].join('\n'), facts(), new Map(), null)
+    expect(db.raw.prepare('SELECT count(*) AS n FROM plan_versions').get()).toEqual({ n: 0 })
+    await seatPlan(db, 'org_owner', [HEAD, A, B].join('\n'), facts(), new Map(), null)
+    const snap = db.raw.prepare('SELECT version, plan_json FROM plan_versions').all() as { version: number; plan_json: string }[]
+    expect(snap.map((v) => v.version)).toEqual([1])
+    expect((JSON.parse(snap[0]!.plan_json) as { items: unknown[] }).items).toHaveLength(1)
+  })
+})
+
+/** ‏**معاينةٌ تقول ما سيفعله «ابنِ»** (D-406): كلُّ صفٍّ بوسمه قبل الضغط، وما غاب عن الملفّ، والملفُّ نفسُه بتاريخه. */
+describe('معاينةُ الاستيراد بوسومها (D-406)', () => {
+  const HEAD = 'التاريخ,الوقت,المنصة,النص'
+  const A = '2099-01-04,09:00,LinkedIn,الأولى كما هي'
+  const B = '2099-01-05,13:00,X,الثانية قبل التعديل'
+  const C = '2099-01-06,13:00,X,الثالثة تُجدوَل'
+  const D = '2099-01-07,13:00,X,الرابعة نُشرت'
+  const E = '2099-01-08,13:00,X,الخامسة تُحذف'
+  const count = () => db.raw.prepare('SELECT (SELECT count(*) FROM posts) AS posts, (SELECT count(*) FROM plan_items) AS items, (SELECT count(*) FROM import_jobs) AS jobs').get()
+
+  it('خطّةٌ أولى: كلُّ صفٍّ جديد، ولا شيءَ محذوف ولا تاريخَ سابق — ولا يُكتب شيء', async () => {
+    const out = await previewSeat(db, 'org_owner', [HEAD, A, B].join('\n'), facts())
+    expect(out).toEqual({ tags: { '2': 'new', '3': 'new' }, removed: [], importedAt: null })
+    expect(count()).toEqual({ posts: 0, items: 0, jobs: 0 })
+  })
+
+  it('إعادةٌ معدَّلة: بلا تغيير ومعدَّل ومجدول ومنشور وجديد، والمحذوفُ من الملفّ يُسمّى ومحميُّه يُقال', async () => {
+    await seatPlan(db, 'org_owner', [HEAD, A, B, C, D, E].join('\n'), facts(), new Map(), null)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'queued', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-06 10:00:00' WHERE text = 'الثالثة تُجدوَل'").run()
+    db.raw.prepare("UPDATE posts SET status = 'published', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-07 10:00:00' WHERE text = 'الرابعة نُشرت'").run()
+    const before = count()
+    const F = '2099-01-09,13:00,X,السادسة جديدة'
+    const csv = [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل'), C.replace('تُجدوَل', 'عُدّلت'), D, F].join('\n')
+    const out = await previewSeat(db, 'org_owner', csv, facts())
+    expect(out.tags).toEqual({ '2': 'unchanged', '3': 'modified', '4': 'scheduled', '5': 'published', '6': 'new' })
+    expect(out.removed).toEqual([{ platform: 'x', due: expect.stringContaining('2099-01-08'), angle: 'الخامسة تُحذف', guarded: false }])
+    expect(out.importedAt).toBeNull()
+    expect(count()).toEqual(before)
+    // ‏والوسمُ يصدق: «ابنِ» يُحدِّث المعدَّلَ ويتخطّى المجدول
+    const seated = await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(seated).toMatchObject({ kept: 2, updated: 1 })
+    expect(seated.skipped).toEqual([{ line: 4, reason: expect.stringContaining('عدّله من بطاقته') }])
+  })
+
+  it('الملفُّ نفسُه: تاريخُ استيراده، وإعادةُ رفعه بلا تغيير تُعدّ في السجلّ', async () => {
+    const csv = [HEAD, A, B].join('\n')
+    await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    const out = await previewSeat(db, 'org_owner', csv, facts())
+    expect(out.importedAt).toMatch(/^\d{4}-\d{2}-\d{2} /)
+    expect(Object.values(out.tags)).toEqual(['unchanged', 'unchanged'])
+    expect(await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)).toMatchObject({ unchanged: true })
+    await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(db.raw.prepare('SELECT seen_count, last_seen_at IS NOT NULL AS seen FROM import_jobs').get()).toEqual({ seen_count: 3, seen: 1 })
   })
 })

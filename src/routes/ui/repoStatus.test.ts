@@ -12,6 +12,8 @@ describe('قالبُ الشهر وملفُّ الحال في الواجهة', ()
     const gh = newWays(true).find((w) => w.id === 'github')!
     expect(gh.links?.map((l) => l.label)).toContain('نزّل قالب الشهر القادم')
     expect(gh.links?.map((l) => l.href)).toContain('/panel/plan/month-template?f=readme')
+    // ‏قالبا الأسبوع واليوم بجانب قالب الشهر (D-408)
+    expect(gh.links?.map((l) => l.href)).toEqual(expect.arrayContaining(['/panel/plan/month-template?k=week', '/panel/plan/month-template?k=day']))
   })
 
   it('بطاقةُ الحزمة: «يلزم إذن الكتابة» برابط M-64 وإعداد الرمز حين الرمزُ للقراءة، وبلا تحذيرٍ حين كُتب', async () => {
@@ -24,6 +26,8 @@ describe('قالبُ الشهر وملفُّ الحال في الواجهة', ()
     expect(blocked).toContain('#m-64')
     expect(blocked).toContain('https://github.com/settings/personal-access-tokens')
     expect(blocked).toContain('/panel/plan/month-template?f=md')
+    expect(blocked).toContain('/panel/plan/month-template?k=week')
+    expect(blocked).toContain('/panel/plan/month-template?k=day')
     const fine = packageScreen({ ...base, repoStatus: { needsWrite: false, rows: [{ period: '2026-12', written: '2026-12-02 18:00:00', error: null, dirty: false }] } })
     expect(fine).not.toContain('يلزم إذن الكتابة')
     expect(fine).toContain('plans/2026-12.status.json')

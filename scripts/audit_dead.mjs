@@ -48,6 +48,8 @@ const ALLOWED = new Map([
   // ‏نصفُ صيغة النسخة الذي يقرأ (D-321): الـ Worker يكتب نسخَه ولا يفكّها، ويفكّها تمرينُ الاسترجاع (`scripts/restore_drill.mjs`)
   // ‏من الملفّ نفسِه — فلا تفترق الكتابةُ والقراءة
   ['decodeSnapshot', 'يقرؤه تمرينُ الاسترجاع scripts/restore_drill.mjs، والـ Worker يكتب ولا يفكّ'],
+  // ‏فحصُ ملفّ الخطّة لوكيل بنائها (D-408): ينادِيه `npm run plan:check` (scripts/plan_check.ts) لا الـ Worker
+  ['checkPlanFile', 'ينادِيه scripts/plan_check.ts (npm run plan:check)، ومُختبَرٌ في schema.test.ts'],
 ])
 
 function walk(dir) {
