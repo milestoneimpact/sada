@@ -77,10 +77,15 @@ export const RUNG_MARK: Readonly<Record<RungState, { g: string; cls: Tone; label
  * الجدول المحوريّ وحدَه بلا رأس، فقُرئ ناقصًا بين ألواحٍ لكلٍّ منها اسمٌ
  * وسطرٌ. ونظرةٌ عامّة تُفتَح كلَّ صباحٍ فتحمل السطرَ وحدَه قصدًا.
  */
-export function pageHead(eyebrow: string, title: string, lede: string, aside = '', tip = ''): string {
+/** ‏«id» بطاقة المنشور في «التيّار» ورأسِ صفحته معًا (D-401): «view-transition-name» يأخذ الاسمَ منه (12-motion) فتتحوّل البطاقةُ إلى الرأس. */
+export function vtName(postId: string): string {
+  return 'f-' + postId
+}
+
+export function pageHead(eyebrow: string, title: string, lede: string, aside = '', tip = '', vt = ''): string {
   // ‏و`tip` مساعدةٌ بجانب العنوان (ⓘ · D-381) خارج «h1» — فلا يدخل اسمُها اسمَ الصفحة
   const h1 = '<h1>' + escapeHtml(title) + '</h1>'
-  return `<div class="page-head">
+  return `<div class="page-head"${vt === '' ? '' : ' id="' + escapeHtml(vt) + '"'}>
     <div class="txt">
       ${eyebrow === '' ? '' : '<div class="eyebrow"><span class="ln"></span>' + escapeHtml(eyebrow) + '</div>'}
       ${tip === '' ? h1 : '<div class="ph-row">' + h1 + tip + '</div>'}

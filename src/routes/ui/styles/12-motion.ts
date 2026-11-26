@@ -41,4 +41,24 @@ dialog[open]::backdrop{animation:scrim-in var(--dur-2) var(--ease)}
   .lib-grid>*{transition:box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease)}
   .card.rv:hover,.lib-grid>:hover{box-shadow:var(--sh-2); transform:translateY(calc(-1 * var(--stroke)))}
 }
+/* ── الانتقالُ المشترك والدخولُ من حالٍ ابتدائيّة (D-401) ──────────────
+   البطاقةُ في «التيّار» ورأسُ صفحة منشورها يحملان «id» نفسَه («vtName»)، و«attr(id type(<custom-ident>))» يجعله اسمَ الانتقال
+   (Chromium)، و«auto» يفعل ذلك في Safari: فيتحوّل الصندوقُ من موضعه في القائمة إلى رأس الصفحة بين المستندين — بلا «style»
+   (CSP يمنعه)، ومتصفّحٌ لا يعرفهما يُسقط التصريحَ فيبقى انتقالُ المحتوى القائم. والـ«id» فريدٌ في الصفحة أصلًا، فلا يتكرّر اسم. والعنوانُ «h1» باسمٍ ثابت فيبقى
+   في موضعه ولا يتلاشى مع المحتوى. والمجموعةُ تتحرّك بـtransform وحده (لقطتان تتلاشيان، ولا تخطيط) */
+.fd-card[id^="f-"]:not([id^="f-item-"]),.page-head[id]{view-transition-name:attr(id type(<custom-ident>))}
+@supports (view-transition-name:auto) and (not (view-transition-name:attr(id type(<custom-ident>)))){
+  .fd-card[id^="f-"]:not([id^="f-item-"]),.page-head[id]{view-transition-name:auto}
+}
+.page-head .txt h1{view-transition-name:page-title}
+::view-transition-old(page-title){animation:none; opacity:0}
+::view-transition-new(page-title){animation:none}
+/* ‏الحوارُ وألواحُ «المزيد» والطيُّ المفتوح تدخل من حالٍ ابتدائيّة بـ«@starting-style»: تلاشٍ و‏8px من جهتها. واللوحُ الجانبيّ
+   «.rv-sheet» له مفتاحُه أعلاه فيُستثنى (مالكٌ واحدٌ لكلّ خاصّيّة) */
+dialog[open]:not(.rv-sheet){opacity:1; transform:none; transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
+@starting-style{dialog[open]:not(.rv-sheet){opacity:0; transform:translateY(var(--s-2))}}
+details.more-sheet[open]>.more-panel{opacity:1; transform:none; transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
+@starting-style{details.more-sheet[open]>.more-panel{opacity:0; transform:translateY(var(--s-2))}}
+details[open]:not(.more-sheet):not(.menu):not(.fab)>:not(summary){transition:transform var(--dur-2) var(--ease-out)}
+@starting-style{details[open]:not(.more-sheet):not(.menu):not(.fab)>:not(summary){transform:translateY(calc(-1 * var(--s-1)))}}
 `

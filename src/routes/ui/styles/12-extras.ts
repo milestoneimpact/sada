@@ -565,6 +565,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
   border-radius:var(--r-control); color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); text-decoration:none}
 .rv-cd.is-on{background:var(--selected); color:var(--ink); border:var(--bd-soft)}
 .rv-cd.is-on span{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--accent); font-weight:600}
+/* ‏«اليوم» حلقةٌ من الرموز (D-401) — ‏«aria-current=date» يقوله لقارئ الشاشة، والحلقةُ للعين؛ ظلٌّ داخليٌّ لا حدٌّ فلا يتزحزح التخطيط */
+.rv-cd[aria-current=date]{box-shadow:inset 0 0 0 var(--ring-w) var(--accent)}
 .rv-gaps{margin-bottom:var(--s-4); align-items:center}
 .rv-ok{margin-bottom:var(--s-4); color:var(--ok)}
 .rv-bulk{position:sticky; top:calc(var(--topbar) + var(--s-2)); z-index:6; display:flex; flex-wrap:wrap; align-items:center;

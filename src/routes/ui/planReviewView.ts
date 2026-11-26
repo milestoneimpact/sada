@@ -196,8 +196,11 @@ function shareBox(m: ReviewModel, view: ReviewView): Html {
  * تقويمُ الخطّة: كلُّ يومٍ بشعارات منصّاته وعددِ بنوده. و`hrefOf` يقول إلى أين يذهب اليوم — المراجعةُ إلى أسبوعه، والعرضُ إلى
  * موضعه في الصفحة. **واللونُ لا يقول وحدَه**: ما ينتظر يُكتب في اسم الرابط ويُعلَّم بإطارٍ متقطّع.
  */
-export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day) => '#d-' + day, board?: { readonly zone: string | null; readonly cardHref: (c: ReviewCard) => string }): Html {
+export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day) => '#d-' + day, board?: { readonly zone: string | null; readonly cardHref: (c: ReviewCard) => string }, now: Date = new Date()): Html {
   const start = m.plan.week
+  // ‏«اليوم» بمنطقة المالك (D-401): اللوحةُ تحملها؛ ووثيقةُ الخطّة بلا منطقةٍ فبالاحتياط (الرياض · D-201) كسائر الواجهة
+  const today = todayKey(now, board?.zone ?? null)
+  const cur = (day: string): string => day === today ? ' aria-current="date"' : ''
   const days = spanDays(m.plan.span ?? 'week')
   const byDay = new Map<string, ReviewCard[]>()
   for (const c of m.cards) byDay.set(c.item.day, [...(byDay.get(c.item.day) ?? []), c])
@@ -212,8 +215,8 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
     if (n === 0) {
       // ‏وفي اللوحة: اليومُ الفارغُ هدفُ إفلاتٍ أيضًا (D-330)، فيحمل تاريخَه
       cells.push(board === undefined
-        ? html`<span class="rv-cd" aria-hidden="true"><b>${dayLabel(day, 'short')}</b></span>`
-        : html`<div class="rv-cd is-day" data-day="${day}"><b aria-hidden="true">${dayLabel(day, 'short')}</b></div>`)
+        ? html`<span class="rv-cd"${raw(cur(day) === '' ? ' aria-hidden="true"' : cur(day))}><b>${dayLabel(day, 'short')}</b></span>`
+        : html`<div class="rv-cd is-day" data-day="${day}"${raw(cur(day))}><b aria-hidden="true">${dayLabel(day, 'short')}</b></div>`)
       continue
     }
     const open = cards.filter((c) => c.post === null || waits(c)).length
@@ -221,7 +224,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
     const said = html`<span>${AR(n)}<i class="vh"> ${n === 1 ? 'منشور' : 'منشورات'}${open > 0 ? '، ' + AR(open) + ' تنتظر' : '، كلُّها مجدولة'}</i></span>`
     if (board === undefined) {
       // ‏والاسمُ ممّا يُرى (WCAG 2.5.3): رقمُ اليوم والعددُ نصٌّ ظاهر، وما يشرحهما نصٌّ لقارئ الشاشة بينهما — لا `aria-label` يحجبهما
-      cells.push(html`<a class="rv-cd is-on${open > 0 ? ' is-wait' : ''}" href="${hrefOf(day)}"><b>${dayLabel(day, 'short')}</b>
+      cells.push(html`<a class="rv-cd is-on${open > 0 ? ' is-wait' : ''}" href="${hrefOf(day)}"${raw(cur(day))}><b>${dayLabel(day, 'short')}</b>
       <span class="rv-dots" aria-hidden="true">${platforms.map((p) => html`<span class="pf-logo rv-pf rv-dot" data-pf="${p}">${raw(LOGOS[p] ?? '')}</span>`)}</span>${said}</a>`)
       continue
     }
@@ -229,7 +232,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
      * ‏**لوحةُ الشهر** (D-330): اليومُ بمصغَّرات منشوراته — صورتُها وشعارُ منصّتها وساعتُها وحالُها — لا نقطةٌ وعدد. المصغَّرةُ رابطٌ
      * ‏إلى بطاقتها في أسبوعها (فتعمل بلا سكربت)، والسكربتُ يفتح بها لوحَ البطاقة ويسحبها إلى يومٍ آخر. وما نُشر لا يُسحب.
      */
-    cells.push(html`<div class="rv-cd is-on is-day${open > 0 ? ' is-wait' : ''}" data-day="${day}">
+    cells.push(html`<div class="rv-cd is-on is-day${open > 0 ? ' is-wait' : ''}" data-day="${day}"${raw(cur(day))}>
       <a class="rv-cd-h" href="${hrefOf(day)}"><b>${dayLabel(day, 'short')}</b>${said}</a>
       ${cards.map((c) => {
         const st = c.post === null ? 'writing' : waits(c) ? 'wait' : c.post.status === 'published' ? 'done' : c.post.status === 'failed' ? 'bad' : 'set'
@@ -395,7 +398,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     ${raw(sub)}
     <div class="row gap-2 mb-3 rv-status">${state}<span class="hint">كُتب ${AR(written)} من ${AR(m.cards.length)}</span>${next}<span class="grow"></span>${toggle}${shareBox(m, view)}${planActions(m)}</div>
     ${progress}
-    ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) })}
+    ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) }, view.now)}
     ${weekTabs(m, shown)}
     ${gapsBar(m)}
     <form method="POST" action="/panel/plan/review/bulk" id="rv-bulk" class="rv-bulk card card-inset">

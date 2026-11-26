@@ -319,6 +319,9 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     btns().forEach(function(b){
       b.addEventListener('click',function(){pressed=b;});
     });
+    // ‏والعودةُ من ذاكرة المتصفّح (bfcache) تُرجع النموذجَ «مشغولًا» فيبقى هيكلُ «القياس» فوق الجدول (D-402): يُفكّ
+    window.addEventListener('pageshow',function(e){if(!e.persisted)return; f.removeAttribute('aria-busy');
+      btns().forEach(function(x){x.disabled=false; if(x.hasAttribute('data-busy-on')){['data-busy-on','aria-busy','aria-disabled','aria-label'].forEach(function(a){x.removeAttribute(a);});}});});
     f.addEventListener('submit',function(e){
       // ‏الإرسالُ الثاني يُمنَع بعلَمٍ لا بتعطيل الزرّ المضغوط: زرٌّ يُعطَّل يُسقط
       // ‏التركيزَ إلى body ولا يُقرأ. والنموذجُ يقول «مشغول» ورسالتُه تُعلَن (D-149)
