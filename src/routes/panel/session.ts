@@ -341,7 +341,7 @@ session.post('/panel/sessions/revoke', async (c) => {
 
 /**
  * منظّمةٌ جديدة (D-225) — **من حساب الدخول الحاليّ، وهو حسابُ المشغّل**.
- * تُنشأ ومعها علامتُها الأولى، ولا تُفتح تلقائيًّا: الانتقالُ إليها فعلٌ مستقلّ.
+ * تُنشأ ومعها علامتُها الأولى. ومع «switch=1» (D-418) تصير النشطةَ ويُحوَّل إلى جاهزيّتها، وبدونه تبقى في القائمة.
  */
 session.post('/panel/orgs', async (c) => {
   const gate = await guardPost(c)
@@ -358,6 +358,13 @@ session.post('/panel/orgs', async (c) => {
     return back('orgs')
   }
   await record(c.env.DB, { actor: 'panel', action: 'org.create', target: result.id, org: result.id }, c.req.raw)
+  // ‏«انتقل إليها وابدأ تهيئتها» (D-418): مؤشَّرٌ افتراضًا، فالعميلُ الجديدُ يُفتح على جاهزيّته لا على قائمة المنظّمات
+  if (gate.form.get('switch') === '1') {
+    await setActiveOrg(c.env.KV, gate.session, result.id)
+    const name = String(gate.form.get('name') ?? '').trim()
+    await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُنشئ «' + name + '» — ابدأ بربط حساباته.' })
+    return new Response(null, { status: 303, headers: { Location: '/panel/client#setup' } })
+  }
   await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'أُنشئت المنظّمة. انتقل إليها حين تريد العمل فيها.' })
   return back('orgs')
 })

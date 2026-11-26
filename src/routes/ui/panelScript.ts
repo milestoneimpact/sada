@@ -629,18 +629,52 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     var inp=f.querySelector('input[name="value"]'), btn=f.querySelector('button[type="submit"]');
     if(!inp)return;
     if(btn)btn.hidden=true;
-    var mark=document.createElement('span'); mark.className='ed-saved self-center'; mark.setAttribute('role','status'); f.appendChild(mark);
-    var last=inp.value;
+    var mark=document.createElement('span'); mark.className='ed-saved self-center'; mark.setAttribute('role','status');
+    mark.id=(inp.id||'as')+'-st'; f.appendChild(mark);
+    // ‏والرسالةُ مقروءةٌ مع الحقل (D-418): aria-describedby يضمّ تلميحَه ثمّ حالَ الحفظ، و«خارج المدى» يقول المدى نفسَه
+    var base=inp.getAttribute('aria-describedby')||'';
+    inp.setAttribute('aria-describedby',(base?base+' ':'')+mark.id);
+    var last=inp.value, waiting=false;
+    function range(){return 'بين '+(inp.min||'0')+' و'+(inp.max||'∞')+' بخطوة '+(inp.step||'1');}
+    function bad(on){if(on)inp.setAttribute('aria-invalid','true'); else inp.removeAttribute('aria-invalid');}
     var push=function(){
-      if(inp.value===last||!inp.checkValidity()){if(!inp.checkValidity())mark.textContent='خارج المدى';return;}
+      if(!inp.checkValidity()){
+        bad(true); mark.textContent='خارج المدى: '+range()+'. أُعيدت القيمة المحفوظة.'; inp.value=last; return;
+      }
+      bad(false);
+      if(inp.value===last&&!waiting)return;
+      if(navigator.onLine===false){waiting=true; mark.textContent='لم يُحفظ: لا اتّصال — يُحفظ حين تعود'; return;}
       var body=new FormData(f); body.set('auto','1'); mark.textContent='جار الحفظ…';
       fetch(f.action,{method:'POST',body:body,credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){
+        waiting=false;
         if(j&&j.stored!==undefined){inp.value=j.stored; last=inp.value;}
-        mark.textContent=j&&j.ok?'حُفظ':'لم يُحفظ'+(j&&j.text?': '+j.text:'');
-      }).catch(function(){mark.textContent=navigator.onLine===false?'لم يُحفظ: لا اتّصال':'لم يُحفظ';});
+        if(j&&j.ok){mark.textContent='حُفظ'; return;}
+        bad(true); inp.value=last;
+        mark.textContent='لم يُحفظ'+(j&&j.text?': '+j.text:'')+' — '+range()+'. أُعيدت القيمة المحفوظة.';
+      }).catch(function(){
+        if(navigator.onLine===false){waiting=true; mark.textContent='لم يُحفظ: لا اتّصال — يُحفظ حين تعود'; return;}
+        mark.textContent='لم يُحفظ';
+      });
     };
     inp.addEventListener('change',push);
+    window.addEventListener('online',function(){if(waiting)push();});
     f.addEventListener('submit',function(e){e.preventDefault(); push();});
+  });
+
+  /*
+   * ‏**حذفُ العميل بكتابة اسمه** (D-418): الزرُّ معطَّلٌ وaria-disabled حتّى يطابق المكتوبُ اسمَ الخيار المختار،
+   * ‏والتلميحُ يكتب الاسمَ المطلوب، ويُعاد الفحصُ حين يتبدّل الخيار. والخادمُ يفحص الفحصَ نفسَه.
+   */
+  document.querySelectorAll('form[data-match-confirm]').forEach(function(f){
+    var sel=f.querySelector('select'), t=f.querySelector('input[name="confirm"]'), b=f.querySelector('button[type="submit"]'), nm=f.querySelector('[data-match-name]');
+    if(!sel||!t||!b)return;
+    function want(){var o=sel.options[sel.selectedIndex]; return o?(o.getAttribute('data-name')||''):'';}
+    function check(){
+      var w=want(), ok=w!==''&&t.value.trim()===w;
+      if(nm)nm.textContent=w;
+      b.disabled=!ok; if(ok)b.removeAttribute('aria-disabled'); else b.setAttribute('aria-disabled','true');
+    }
+    t.addEventListener('input',check); sel.addEventListener('change',check); check();
   });
 
   // ظلٌّ على الشريط حين يكون فوقك محتوى. و passive لأنّ المستمعَ لا

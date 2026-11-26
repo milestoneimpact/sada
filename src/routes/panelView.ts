@@ -548,13 +548,18 @@ export type LibraryData = Pick<PanelData,
  * ميزانيّةُ المقاطع الشهريّة (D-414): العامّةُ افتراضٌ لكلّ عميل، وتقديرُ المقطع الذي تُحجز به قبل النداء.
  * وعميلٌ يكتب لنفسه ميزانيّةً من «رحلة العميل».
  */
+/** ‏مدى الحقل مكتوبًا ثابتًا في تلميحه (D-418) — والسكربتُ يقول المدى نفسَه حين يُرفض المكتوب. */
+export function rangeHint(min: number | string, max: number | string, step: number | string): string {
+  return 'بين ' + String(min) + ' و' + String(max) + ' بخطوة ' + String(step)
+}
+
 export function videoBudgetForms(cap: number, clip: number, used: number, activeCap: number = cap): string {
   return html`<hr>
     <p class="hint"><b>وميزانيّة المقاطع بالمال في الشهر</b>: تُحجز كلفةُ المقطع بتقديرك قبل النداء، وتعود إن ردّه المزوّد.
       وهي لكلّ عميلٍ على حدة، وهذه افتراضُهم. <b>وصفر يُغلق التحريك.</b></p>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="monthly_video_cap_usd">
-      ${raw(field({ id: 'c5', label: 'ميزانيّة المقاطع في الشهر (دولار)',
+      ${raw(field({ id: 'c5', label: 'ميزانيّة المقاطع في الشهر (دولار)', hint: rangeHint(0, SETTING_LIMITS.monthlyVideoCapUsd.max, 0.5),
         control: html`<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.monthlyVideoCapUsd.max}" step="0.5" value="${cap}">`.value }))}
       ${raw(button({ label: 'حفظ', variant: 'primary', type: 'submit' }))}
@@ -562,7 +567,7 @@ export function videoBudgetForms(cap: number, clip: number, used: number, active
     </form>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="video_clip_usd">
-      ${raw(field({ id: 'c6', label: 'تقدير كلفة المقطع (دولار)',
+      ${raw(field({ id: 'c6', label: 'تقدير كلفة المقطع (دولار)', hint: rangeHint(SETTING_LIMITS.videoClipUsd.min, SETTING_LIMITS.videoClipUsd.max, 0.05),
         control: html`<input type="number" name="value" min="${SETTING_LIMITS.videoClipUsd.min}"
           max="${SETTING_LIMITS.videoClipUsd.max}" step="0.05" value="${clip}">`.value }))}
       ${raw(button({ label: 'حفظ', variant: 'primary', type: 'submit' }))}
@@ -904,7 +909,8 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
     })
     return `<tr><th scope="row">${escapeHtml(o.name)}</th><td>${ORG_KIND_LABEL[o.kind]}</td><td>${o.brands}</td><td><div class="row acts">${action}${exported}</div></td></tr>`
   }).join('')
-  const kinds = ORG_KINDS.map((k) => `<option value="${k}">${ORG_KIND_LABEL[k]}</option>`).join('')
+  // ‏والنوعُ الافتراضيُّ «وكالة» (D-418): من ينشئ منظّمةً ثانيةً يُنشئ عميلًا، لا «فردًا» آخر
+  const kinds = ORG_KINDS.map((k) => `<option value="${k}"${k === 'agency' ? ' selected' : ''}>${ORG_KIND_LABEL[k]}</option>`).join('')
   /*
    * ‏**حذفُ عميلٍ كلِّه** (D-322) — الفعلُ الوحيدُ في اللوحة الذي لا يُردّ، فيُسأل عنه **بكتابة اسمه** لا بضغطة، وبعد تصديرٍ في
    * ‏آخر يوم وفصلِ حساباته (يقولها الخادمُ إن نقصت). ومنظّمتُك أنت ليست في القائمة.
@@ -913,10 +919,11 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
   const remove = others.length === 0 ? '' : html`<div class="mt-3">${raw(card({
     id: 'org-delete', title: 'احذف عميلًا وبياناته',
     desc: 'لا يُردّ. صدّر بياناته أوّلًا، وافصل حساباته، ثمّ اكتب اسمه كما هو. وما في نُسخ الاسترجاع يبقى حتّى تنقضي مدّتُها.',
-    body: html`<form method="POST" action="/panel/orgs/delete" data-busy="جار الحذف…">
+    // ‏والزرُّ معطَّلٌ حتّى يطابق المكتوبُ الاسمَ المختار (D-418) — في المتصفّح تيسيرًا، والخادمُ يفحص الفحصَ نفسَه بعدُ
+    body: html`<form method="POST" action="/panel/orgs/delete" data-busy="جار الحذف…" data-match-confirm>
       ${raw(field({ id: 'del-org', label: 'العميل',
-        control: html`<select name="org">${raw(others.map((o) => html`<option value="${o.id}">${o.name}</option>`.value).join(''))}</select>`.value }))}
-      ${raw(field({ id: 'del-confirm', label: 'اكتب اسمه للتأكيد',
+        control: html`<select name="org">${raw(others.map((o) => html`<option value="${o.id}" data-name="${o.name}">${o.name}</option>`.value).join(''))}</select>`.value }))}
+      ${raw(field({ id: 'del-confirm', label: 'اكتب اسمه للتأكيد', hint: html`اكتب: «<span data-match-name>${others[0]?.name ?? ''}</span>»`.value,
         control: html`<input name="confirm" required autocomplete="off" maxlength="${String(ORG_NAME_MAX)}">`.value }))}
       ${raw(button({ label: 'احذف عميلًا وبياناته', variant: 'danger', type: 'submit' }))}
     </form>`.value,
@@ -928,9 +935,12 @@ function orgsPane(d: Pick<ShellData, 'orgs' | 'org'>): string {
   <div class="card mt-3"><h2>منظّمة جديدة</h2>
     <form method="POST" action="/panel/orgs">
       <div class="field"><label for="org-name">الاسم</label>
-        <input id="org-name" name="name" required maxlength="${ORG_NAME_MAX}"></div>
+        <input id="org-name" name="name" required maxlength="${ORG_NAME_MAX}" autofocus></div>
       <div class="field"><label for="org-kind">النوع</label>
         <select id="org-kind" name="kind">${kinds}</select></div>
+      ${field({ id: 'org-switch', label: 'انتقل إليها وابدأ تهيئتها',
+        hint: 'تصير المنظّمةَ النشطة، وتُفتح على جاهزيّتها: الحسابات ثمّ الموجز ثمّ الحدود.',
+        control: '<input type="checkbox" name="switch" value="1" checked>' })}
       ${button({ label: 'أنشئ المنظّمة', variant: 'primary', type: 'submit' })}
     </form></div>${remove}`
 }
@@ -1453,7 +1463,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       التحليل والكتابة والخطّة والصور والنشر. وبلوغ أيّ منهما يوقف التوليد <b>ولا يوقف نشر ما اعتمدتَه</b>.</p>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_analysis_cap">
-      ${field({ id: 'c1', label: 'سقف التحليل (عدد)',
+      ${field({ id: 'c1', label: 'سقف التحليل (عدد)', hint: rangeHint(0, 500, 1),
         control: `<input type="number" name="value" min="0" max="500" step="1" value="${d.analysisCap}">` })}
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${d.usedAnalyses}</span>
@@ -1461,7 +1471,7 @@ function settingsPane(d: ShellData & SettingsData): string {
     <hr>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_spend_cap_usd">
-      ${field({ id: 'c2', label: 'سقف الإنفاق (دولار)',
+      ${field({ id: 'c2', label: 'سقف الإنفاق (دولار)', hint: rangeHint(0, 100, 0.5),
         control: `<input type="number" name="value" min="0" max="100" step="0.5" value="${d.spendCap}">` })}
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${money(d.usedSpend)}</span>
@@ -1473,7 +1483,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       والمحاولة التي تسقط تُعدّ كالتي تنجح. <b>وصفر يُغلق التحريك.</b></p>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_video_cap">
-      ${field({ id: 'c4', label: 'سقف المقاطع (عدد)',
+      ${field({ id: 'c4', label: 'سقف المقاطع (عدد)', hint: rangeHint(0, SETTING_LIMITS.dailyVideoCap.max, 1),
         control: `<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.dailyVideoCap.max}" step="1" value="${d.videoCap}">` })}
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
@@ -1489,7 +1499,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       والتوصية هنا تقترح <b>مالا</b> لا كتابة. <b>وصفر يعني لا توصية تُكتب أصلا.</b></p>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="weekly_promo_cap_usd">
-      ${field({ id: 'c3', label: 'سقف الترويج (دولار في الأسبوع)',
+      ${field({ id: 'c3', label: 'سقف الترويج (دولار في الأسبوع)', hint: rangeHint(0, 500, 1),
         control: `<input type="number" name="value" min="0" max="500" step="1"
                value="${d.promoCap}">` })}
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
@@ -1533,7 +1543,7 @@ function settingsPane(d: ShellData & SettingsData): string {
     </div>
     <form class="row mt-3" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="daily_image_cap">
-      ${field({ id: 'c5', label: 'سقف الصور (عدد في اليوم)',
+      ${field({ id: 'c5', label: 'سقف الصور (عدد في اليوم)', hint: rangeHint(0, SETTING_LIMITS.dailyImageCap.max, 1),
         control: `<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.dailyImageCap.max}" step="1" value="${d.imageCap}">` })}
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}

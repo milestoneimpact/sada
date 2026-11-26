@@ -12,7 +12,7 @@ import { latestPlan } from '../../lib/plan/job'
 import { money } from '../../lib/format'
 import { OWNER_EMAIL } from '../../lib/ownerEmail'
 import { inviteMember, listMembers, revokeMember, ROLE_LABEL, type MemberRole } from '../../lib/team'
-import { teamScreen } from '../ui/teamView'
+import { TEAM_SCRIPT, teamScreen } from '../ui/teamView'
 import { PERIODS, portfolio, previousWindow, type Period } from '../../lib/portfolio'
 import { clientsCalendar, portfolioScreen } from '../ui/portfolioView'
 import { portfolioCalendar } from '../../lib/portfolioCalendar'
@@ -109,6 +109,7 @@ client.get('/panel/client', async (c) => {
     orgName: orgRow?.name ?? 'منظّمتي',
     brief,
     linked: Object.fromEntries(linkedRows.results.map((r) => [r.platform, r.n])),
+    connected: linkedRows.results.reduce((n, r) => n + r.n, 0),
     plan,
     autoImage: settings.autoImage,
     estimate: estimateMonth({ perWeek: brief.perWeek, channels: brief.channels.length, autoImage: settings.autoImage, ...units }),
@@ -264,9 +265,9 @@ client.get('/panel/portfolio', async (c) => {
 client.get('/panel/team', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
-  const body = teamScreen({ zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
+  const body = teamScreen({ zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null), active: activeOrg(session.record), members: await listMembers(c.env.DB), orgs: await listOrgs(c.env.DB), flash: await takeFlash(c.env, c.req.raw) })
   return page((nonce) =>
-    soloPage('صدى — الفريق', { href: '/panel/settings', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, '',
+    soloPage('صدى — الفريق', { href: '/panel/settings', label: 'الإعدادات' }, injectCsrf(body, session.record.csrf), nonce, TEAM_SCRIPT,
       buildCommands({ onPanel: false }), soloNav('settings')),
   )
 })
@@ -281,7 +282,8 @@ client.post('/panel/team/invite', async (c) => {
   const f = gate.form
   const result = await inviteMember(c.env.DB, {
     email: String(f.get('email') ?? ''), role: String(f.get('role') ?? ''),
-    orgs: f.get('all') === '1' ? '*' : f.getAll('org').map(String), by: gate.session.record.email ?? OWNER_EMAIL,
+    // ‏«كلّ الشركات» لا يُؤشَّر افتراضًا (D-418): غيابُه يعني الشركاتِ المختارةَ بعينها، وفراغُهما يردّه inviteMember بسببه
+    orgs: f.get('all') === '1' ? '*' : [...new Set(f.getAll('org').map(String).filter((x) => x !== ''))], by: gate.session.record.email ?? OWNER_EMAIL,
   })
   if (!result.ok) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: result.reason })
