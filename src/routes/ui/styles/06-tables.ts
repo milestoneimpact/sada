@@ -3,6 +3,8 @@ import { below } from '../tokens'
 
 export const TABLES = `/* ══ الجداول ═════════════════════════════════════════════════ */
 .scroll{display:block; overflow-x:auto; margin:0 calc(-1 * var(--s-0)); padding:0 var(--s-0)}
+/* والورقُ لا يمرَّر: الهامشُ السالب يفيض عن عرض الصفحة المطبوعة (D-421) */
+@media print{.scroll{margin:0; padding:0}}
 /* الصفُّ نمطُ «ui-regular» والرأسُ لصيقة (D-185 · خطّة التصميم 7.5) */
 table{width:100%; border-collapse:collapse; font-size:var(--t-ui); line-height:var(--lh-ui); min-width:min(32.5rem,100%);
   font-variant-numeric:tabular-nums}
