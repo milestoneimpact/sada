@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
 import { toBase64 } from '../crypto'
 import { readSettings, writeSetting } from '../settings'
-import type { AiBinding } from './workersAi'
+import { AiError, type AiBinding } from './workersAi'
 import { animateForPost } from './video'
 import * as budget from './videoBudget'
 import { claimVideoSpend, markVideoGenerated, releaseVideoSpend, videoBudget, videoSpendThisMonth } from './videoBudget'
@@ -26,12 +26,14 @@ const OK_VIDEO = { state: 'Completed', result: { video: 'https://cf.example/v.mp
 
 let db: FakeDb
 
-function ai(fail = false): AiBinding & { calls: number } {
+function ai(fail: false | 'reject' | 'timeout' = false): AiBinding & { calls: number } {
   const a = {
     calls: 0,
     async run() {
       a.calls++
-      if (fail) throw new Error('رفض المزوّد')
+      // ‏رفضٌ صريحٌ كما يقوله وجهُ REST لجوابٍ ‎4xx، ومهلةٌ كما يرميها الربطُ بلا حكم (مراجعة D-425)
+      if (fail === 'reject') throw new AiError('رفض المزوّد (400)', false, true)
+      if (fail === 'timeout') throw new Error('Request timeout')
       return OK_VIDEO
     },
   }
@@ -116,10 +118,18 @@ describe('ميزانيّة المقاطع الشهريّة', () => {
   it('ما ردّه المزوّدُ يعيد مالَه ويبقى صفُّه أثرًا', async () => {
     await writeSetting(db, 'monthly_video_cap_usd', '0.5', 'omar')
     seed('p1')
-    expect((await animateForPost(deps(ai(true)), 'p1')).kind).toBe('failed')
+    expect((await animateForPost(deps(ai('reject')), 'p1')).kind).toBe('failed')
     expect(rows()).toEqual([{ operation: expect.stringMatching(/:released$/), total: 0 }])
     // ‏‏والمالُ عاد: المحاولةُ التالية تمرّ
     expect(await animateForPost(deps(ai()), 'p1')).toMatchObject({ kind: 'generated' })
+  })
+
+  it('ومهلةٌ أو عطلٌ مجهول لا يعيد المال — لعلّ المقطعَ وُلّد وحُوسب (مراجعة D-425 · D-415)', async () => {
+    await writeSetting(db, 'monthly_video_cap_usd', '0.5', 'omar')
+    seed('p1'); seed('p2')
+    expect((await animateForPost(deps(ai('timeout')), 'p1')).kind).toBe('failed')
+    expect(rows()).toEqual([{ operation: expect.not.stringMatching(/:released$/), total: 0.5 }])
+    expect(await animateForPost(deps(ai()), 'p2')).toMatchObject({ kind: 'blocked' })
   })
 
   it('سقفُ العميل يغلب الافتراضَ العامّ، وعميلٌ بلا سقفٍ يأخذ العامّ', async () => {

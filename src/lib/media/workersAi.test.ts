@@ -327,3 +327,14 @@ describe('نفاد رصيد AI Gateway', () => {
     expect((err as AiError).retryable).toBe(false)
   })
 })
+
+describe('الرفضُ الصريح لا المهلة (مراجعة D-425)', () => {
+  const status = (code: number) => restBinding('a', 't', (async () => new Response('{"errors":[{"message":"x"}]}', { status: code })) as unknown as typeof fetch)
+  const caught = async (code: number) => status(code).run('@cf/m', {}).then(() => null, (e: unknown) => e as AiError)
+
+  it('‎400 رفضٌ يُعيد المال، و‎408 و‎499 مهلتان تبقيانه محسوبًا', async () => {
+    expect((await caught(400))?.rejected).toBe(true)
+    expect((await caught(408))?.rejected).toBe(false)
+    expect((await caught(499))?.rejected).toBe(false)
+  })
+})

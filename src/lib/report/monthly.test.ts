@@ -64,3 +64,25 @@ describe('التقريرُ نصًّا للبريد (D-268)', () => {
     expect(text).not.toMatch(/<[a-z]/)
   })
 })
+
+describe('حدّا الشهر بمنطقة المالك (مراجعة D-425)', () => {
+  it('ما خرج فجرَ الأوّل بالرياض يُعدّ في شهره المحلّيّ، وكذلك صفُّ الدفتر', async () => {
+    const db = fakeDb()
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name) VALUES ('a-li', 'linkedin', 'member', 'e1', 'عمر')`)
+    db.raw.exec(`INSERT INTO posts (id, account_id, platform, type, text, scheduled_at, status, idempotency_key, approved_by, approved_at)
+      VALUES ('n', 'a-li', 'linkedin', 'text', 'ن', '2026-10-31 22:00:00', 'published', 'k-n', 'omar', '2026-10-31 22:00:00')`)
+    db.raw.exec(`INSERT INTO publish_attempts (id, post_id, idempotency_key, attempt_no, request_json, status, at)
+      VALUES ('at-n', 'n', 'k-n', 1, '{}', 'succeeded', '2026-10-31 22:00:00')`)
+    db.raw.exec(`INSERT INTO cost_ledger (id, provider, operation, units, unit_cost, total, at)
+      VALUES ('cn', 'anthropic', 'draft', 1, 0.03, 0.03, '2026-10-31 23:00:00')`)
+    const oct = await monthlyReport(db, 'org_owner', '2026-10', 'Asia/Riyadh')
+    const nov = await monthlyReport(db, 'org_owner', '2026-11', 'Asia/Riyadh')
+    expect(oct.published).toEqual({})
+    expect(oct.spend).toBe(0)
+    expect(nov.published).toEqual({ linkedin: 1 })
+    expect(nov.spend).toBeCloseTo(0.03)
+    // ‏و«الشهرُ الجاري» بالمنطقة نفسِها
+    expect(monthOf(undefined, new Date('2026-10-31T22:00:00Z'), 'Asia/Riyadh')).toBe('2026-11')
+    expect(monthOf(undefined, new Date('2026-11-01T03:03:00Z'), 'America/Los_Angeles')).toBe('2026-10')
+  })
+})

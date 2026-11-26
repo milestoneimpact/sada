@@ -1022,13 +1022,15 @@ plan.post('/panel/plan/month/approve', async (c) => {
   }
   if (stored.status === 'draft' && only === undefined) await approvePlan(c.env.DB, stored.id, org)
   const fresh = await planForId(c.env.DB, org, stored.id) ?? stored
-  const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
+  const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked, only === undefined ? undefined : new Set(only))
   await record(c.env.DB, { actor: 'panel', action: 'plan.month.approve', target: stored.id, detail: 'v' + String(done.version) + ':' + String(settled.scheduled) }, c.req.raw)
   const held = settled.skipped.length
   // ‏بجملة D-384: ما اعتُمد وما بقي بلا موعدٍ وسببُه — ثمّ التيّارُ (D-387) حيث يُرى المجدولُ في مواعيده
   await setFlash(c.env, c.req.raw, {
     kind: held === 0 ? 'ok' : 'warn',
-    text: 'اعتُمد الإصدار ' + String(done.version) + '. ' + saySettled(settled),
+    // ‏والفرزُ يُقال بعدده (مراجعة D-425): ما اعتُمد منه هو ما جُدول، لا ما في الخطّة كلِّها
+    text: (only === undefined ? 'اعتُمد الإصدار ' + String(done.version) + '. '
+      : 'اعتُمد من الفرز ' + String(done.approved + done.created) + ' من ' + String(only.length) + ' في الإصدار ' + String(done.version) + '. ') + saySettled(settled),
   })
   return c.redirect('/panel/feed', 303)
 })

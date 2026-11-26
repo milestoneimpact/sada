@@ -8,6 +8,7 @@
 import type { Db } from '../tokens'
 import { ESTIMATE_SUFFIX } from '../ai/spend'
 import { readFacts, whatWorks, type PostFact } from '../insights/whatWorks'
+import { dayKey, monthStart } from '../time/zone'
 
 export interface MonthlyReport {
   readonly month: string
@@ -24,9 +25,18 @@ export interface MonthlyReport {
   readonly why: string | null
 }
 
-/** `YYYY-MM` صالحٌ أو الشهرُ الجاري. */
-export function monthOf(raw: string | undefined, now: Date): string {
-  return raw !== undefined && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : now.toISOString().slice(0, 7)
+/** `YYYY-MM` صالحٌ أو الشهرُ الجاري **بمنطقة المالك** (مراجعة D-425) — و`null` يعني `FALLBACK_ZONE`. */
+export function monthOf(raw: string | undefined, now: Date, zone: string | null = null): string {
+  return raw !== undefined && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw) ? raw : dayKey(now, zone).slice(0, 7)
+}
+
+/**
+ * ‏**حدّا الشهر بمنطقة المالك** (مراجعة D-425) بصيغة القاعدة (`YYYY-MM-DD HH:MM:SS` بـ UTC): منشورٌ خرج فجرَ الأوّل
+ * ‏بالرياض (‏22:00 من آخر يومٍ بـ UTC) يُعدّ في شهره المحلّيّ لا في الذي قبله، وكذلك صفُّ الدفتر.
+ */
+export function monthBounds(month: string, zone: string | null): { readonly from: string; readonly to: string } {
+  const edge = (m: string): string => monthStart(new Date(`${m}-15T12:00:00Z`), zone).toISOString().slice(0, 19).replace('T', ' ')
+  return { from: edge(month), to: edge(shiftMonth(month, 1)) }
 }
 
 export function shiftMonth(month: string, by: number): string {
@@ -36,8 +46,7 @@ export function shiftMonth(month: string, by: number): string {
 }
 
 export async function monthlyReport(db: Db, org: string, month: string, zone: string | null): Promise<MonthlyReport> {
-  const from = `${month}-01 00:00:00`
-  const to = `${shiftMonth(month, 1)}-01 00:00:00`
+  const { from, to } = monthBounds(month, zone)
   const [out, costs, next, facts] = await Promise.all([
     db.prepare(`SELECT platform, COUNT(*) AS n FROM (
                   SELECT p.platform AS platform, min(pa.at) AS first FROM posts p

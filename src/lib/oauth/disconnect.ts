@@ -169,19 +169,20 @@ export async function disconnectAccount(
 
   /*
    * ‏**رمزُ المدير مشتركٌ بين الصفحات التي اختيرت في موافقةٍ واحدة** (مراجعة D-423): إبطالُه عند LinkedIn يُسقط الصفحاتِ الأخرى
-   * ‏وهي ما زالت مربوطة. فإن حملت صفحةٌ أخرى نشطةٌ الرمزَ نفسَه حُذف الحسابُ هنا وحده، ولا يُنادى الإبطال.
+   * ‏وهي ما زالت مربوطة. **والمقارنةُ ببصمة الموافقة لا بالرمز** (مراجعة D-425 · ‏0072): التجديدُ يجدّد كلَّ صفحةٍ وحدَها فتتباين
+   * ‏رموزُها بعد أوّل تجديد. وصفحةٌ بلا بصمة (رُبطت قبلها) تُعدّ مشتركةً مع كلّ صفحةٍ نشطة — فلا يُنادى الإبطالُ والخطأُ آمن.
    */
   let shared = false
   if (tokens !== null && target.platform === 'linkedin' && target.kind === 'org') {
-    const { results: others } = await db
-      .prepare(`SELECT a.id FROM accounts a JOIN tokens t ON t.account_id = a.id
-                 WHERE a.org_id = ? AND a.platform = 'linkedin' AND a.kind = 'org' AND a.status != 'revoked' AND a.id != ?`)
-      .bind(target.org, target.id)
-      .all<{ id: string }>()
-    for (const o of others) {
-      const theirs = await loadTokens(db, encKey, o.id, target.org).catch(() => null)
-      if (theirs !== null && theirs.accessToken === tokens.accessToken) { shared = true; break }
-    }
+    const mine = await db.prepare('SELECT grant_id FROM accounts WHERE id = ? AND org_id = ?').bind(target.id, target.org)
+      .first<{ grant_id: string | null }>().catch(() => null)
+    const other = await db
+      .prepare(`SELECT 1 AS hit FROM accounts
+                 WHERE org_id = ?1 AND platform = 'linkedin' AND kind = 'org' AND status != 'revoked' AND id != ?2
+                   AND (?3 IS NULL OR grant_id IS NULL OR grant_id = ?3) LIMIT 1`)
+      .bind(target.org, target.id, mine?.grant_id ?? null)
+      .first<{ hit: number }>()
+    shared = other !== null
   }
 
   const queued = await db

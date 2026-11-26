@@ -24,7 +24,8 @@ import { parseSqliteUtc } from '../format'
 import { sendChunked } from '../queue/batch'
 import { threadAuthor, unsettledTweet } from '../publish/xThread'
 import { missingMedia } from './media'
-import { approvalRequired } from '../clientOptions'
+import { approvalRequired, readClientOptions } from '../clientOptions'
+import { record } from '../audit'
 
 export type ScheduleResult =
   | {
@@ -116,11 +117,8 @@ export async function schedulePost(
 
   // ‏**وعميلٌ يوافق قبل النشر** (D-412): لا يُجدوَل منشورُه حتّى يقول «موافق» في رابطه. والحارسُ يُستورد عند الحاجة —
   // ‏المراجعةُ تستورد هذه الوحدة، فاستيرادُها في الرأس حلقة
-  if (await approvalRequired(db, post.org_id)) {
-    const { clientApprovalHold } = await import('../clientGate')
-    const hold = await clientApprovalHold(db, post.org_id, postId)
-    if (hold !== null) return { ok: false, reason: hold }
-  }
+  const hold = await approvalHoldFor(db, post.org_id, postId)
+  if (hold !== null) return { ok: false, reason: hold }
 
   // ‏ومنشورٌ يعرف الناشرُ أنّه سيردّه عند موعده لا يُجدوَل: TikTok وYouTube بلا مقطع،
   // ‏وInstagram بلا صورةٍ ولا مقطع — «مجدولة» على بطاقته وعدٌ يُخلَف بعد أيّام
@@ -241,6 +239,9 @@ export async function restoreSchedule(
   if (row.status !== 'approved' || row.scheduled_at !== null || row.dispatched_at !== null) {
     return { ok: false, reason: 'تبدّلت حالُها بعد السحب' }
   }
+  // ‏**وحارسُ موافقة العميل** (مراجعة D-425): التراجعُ عن السحب جدولةٌ من جديد، ورأيُ العميل ربّما تبدّل بين السحب والتراجع
+  const held = await approvalHoldFor(db, org, postId)
+  if (held !== null) return { ok: false, reason: held }
   const account = await db
     .prepare("SELECT id FROM accounts WHERE id = ? AND org_id = ? AND status = 'active'")
     .bind(accountId, org)
@@ -296,7 +297,11 @@ export async function undoSchedule(
  * «غيّر الموعد» (D-198) — **الموعدُ وحدَه، بلا سحبٍ وجدولةٍ من جديد**. والحارسُ حارسُ الجدولة:
  * لا ماضٍ، ولا ما غادر إلى الطابور، ولا حسابٌ سقط إذنُه. والسببُ بكلام المالك لا بمعرّف الحال.
  */
-export async function reschedulePost(db: Db, postId: string, when: string, now: Date, org: string | null = null): Promise<ScheduleResult> {
+export async function reschedulePost(
+  db: Db, postId: string, when: string, now: Date, org: string | null = null,
+  /** ‏نقلُ بندٍ في الخطّة (`moveItem` و`delayItem`): بصمتُه تتبدّل معه، فيُطلب رأيٌ جديد ويُمسَك عند الإرسال حتّى يأتي */
+  planMove = false,
+): Promise<ScheduleResult> {
   const row = await db
     .prepare(
       `SELECT p.org_id, p.platform, p.status, p.dispatched_at, a.status AS account_status, a.display_name
@@ -308,6 +313,14 @@ export async function reschedulePost(db: Db, postId: string, when: string, now: 
   if (row === null) return { ok: false, reason: 'لا منشور بهذا المعرّف' }
   if (row.status !== 'queued') return { ok: false, reason: 'ليس مجدولًا، فاختر له موعدًا من بطاقته' }
   if (row.dispatched_at !== null) return { ok: false, reason: 'أُرسل للنشر، ولا يُغيَّر موعدُه بعد الإرسال' }
+  // ‏**وحارسُ موافقة العميل** (مراجعة D-425): ما يُمسَك عند الجدولة يُمسَك عند تغيير الموعد. وموافقتُه على موعدٍ لا على كلّ
+  // ‏موعد: فتغييرُ موعد منشورٍ وافق عليه يُردّ إلّا أن يُنقل بندُه في الخطّة (`planMove`) — فتتبدّل بصمتُه ويُطلب له رأيٌ جديد
+  // ‏ونقلُ البند في الخطّة لا يُسأل قبل النقل: النقلُ هو ما يطلب الرأيَ الجديد، وحارسُ الإرسال يُمسكه حتّى يأتي
+  const held = planMove ? null : await approvalHoldFor(db, row.org_id, postId)
+  if (held !== null) return { ok: false, reason: held + ' — أو انقل البندَ في الخطّة ليُطلب رأيُه في موعدٍ جديد' }
+  if (!planMove && await approvalRequired(db, row.org_id)) {
+    return { ok: false, reason: 'هذا العميلُ يوافق قبل النشر، ووافق على هذا الموعد — انقل البندَ في الخطّة ليُطلب رأيُه في الموعد الجديد' }
+  }
   if (row.account_status !== null && row.account_status !== 'active') {
     return { ok: false, reason: `${row.display_name ?? 'الحساب'}: إذن الحساب لا يعمل، فجدّد إذنه أوّلًا` }
   }
@@ -482,6 +495,51 @@ export const DISPATCH_ROUNDS = 10
  *
  * ‏**وما أُرسل له مؤجَّلٌ لموعده لا يُرسَل ثانية** (`enqueued_for`) — إلّا أن تمضي عشرُ دقائقَ بلا ختم: فرسالتُه ضاعت.
  */
+/**
+ * ‏**حارسُ موافقة العميل** (D-412) في موضعٍ واحد: سببُ الإمساك بكلام المالك، أو `null`. والقاعدةُ التي لا تُقرأ تُمسك.
+ * ‏والحارسُ يُستورد عند الحاجة — المراجعةُ تستورد هذه الوحدة، فاستيرادُها في الرأس حلقة.
+ */
+async function approvalHoldFor(db: Db, org: string, postId: string): Promise<string | null> {
+  if (!(await approvalRequired(db, org))) return null
+  const { clientApprovalHold } = await import('../clientGate')
+  return clientApprovalHold(db, org, postId)
+}
+
+/**
+ * ‏**الحارسُ عند الإرسال** (مراجعة D-425): رأيٌ تبدّل بعد الجدولة («أطلب تعديلًا»، أو فُتح «يوافق قبل النشر» بعدها) يُمسك
+ * ‏المنشورَ قبل ختمه — **يعود معتمَدًا بلا موعد** (لا يُحذف ولا يُفشَل) ويُكتب السببُ في السجلّ. ويعيد ما يمضي.
+ * ‏**وقاعدةٌ لا تُقرأ هنا لا تُمسك**: الجدولةُ أمسكت حين قُرئت، وعطلُ D1 لحظةً لا يسحب منشوراتِ كلّ العملاء.
+ */
+/** ‏**ومرورٌ لأنّ الحارسَ لم يُقرأ لا يمرّ صامتًا** (مراجعة D-425): سطرٌ في سجلّ الدورة وصفٌّ في سجلّ المالك، بلا رمزٍ ولا نصّ. */
+async function gateSkipped(db: Db, org: string, post: string, error: unknown): Promise<void> {
+  const failed = error instanceof Error ? error.message.slice(0, 200) : 'unexpected_error'
+  console.error({ job: 'dispatch_gate', org, post, failed })
+  await record(db, { org, actor: 'dispatch', action: 'post.client_gate_skipped', target: post, detail: failed })
+}
+
+export async function clearForDispatch<T extends { readonly id: string; readonly org: string }>(db: Db, due: readonly T[]): Promise<T[]> {
+  const gated = new Map<string, boolean>()
+  const pass: T[] = []
+  for (const d of due) {
+    if (!gated.has(d.org)) {
+      gated.set(d.org, await readClientOptions(db, d.org).then((o) => o.approvalRequired, async (error: unknown) => {
+        await gateSkipped(db, d.org, d.id, error)
+        return false
+      }))
+    }
+    if (gated.get(d.org) !== true) { pass.push(d); continue }
+    const { clientApprovalHold } = await import('../clientGate')
+    const reason = await clientApprovalHold(db, d.org, d.id).catch(async (error: unknown) => { await gateSkipped(db, d.org, d.id, error); return null })
+    if (reason === null) { pass.push(d); continue }
+    const held = await db
+      .prepare(`UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, enqueued_for = NULL
+                 WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL RETURNING id`)
+      .bind(d.id, d.org).first<{ id: string }>()
+    if (held !== null) await record(db, { org: d.org, actor: 'dispatch', action: 'post.client_hold', target: d.id, detail: reason })
+  }
+  return pass
+}
+
 export async function dueNow(db: Db, now: Date, limit = DISPATCH_ROUND): Promise<DuePost[]> {
   const { results } = await db
     .prepare(
@@ -581,6 +639,9 @@ export async function claimDelivery(db: Db, postId: string, org: string, due: st
       .run()
     return { kind: 'paused', reason: blockerReason(allowance.blocker) }
   }
+  // ‏ورأيٌ تبدّل بين الإرسال المؤجَّل ووصوله يُمسك هنا أيضًا (مراجعة D-425): يعود معتمَدًا بلا موعد، فالرسالةُ لا تجد ما تختمه
+  // ‏والإعادةُ بعد ختمها مضى عليها الحارسُ حين خُتمت
+  if (!redelivery && (await clearForDispatch(db, [{ id: postId, org }])).length === 0) return { kind: 'stale' }
   const claimed = await db
     .prepare(
       `UPDATE posts SET dispatched_at = coalesce(dispatched_at, datetime('now'))
@@ -705,8 +766,10 @@ export async function dispatchDue(deps: DispatchDeps): Promise<DispatchReport> {
   for (let r = 0; r < DISPATCH_ROUNDS; r += 1) {
     const due = await dueNow(deps.db, now, round)
     if (due.length === 0) break
+    // ‏ما أمسكه رأيُ العميل يعود معتمَدًا بلا موعد، فلا يعود في الجولة التالية (مراجعة D-425)
+    const clear = await clearForDispatch(deps.db, due)
     // ‏ما ختمته هذه الدورةُ وحدَه يُرسَل: دورةٌ متزامنةٌ قد سبقت إلى بعضه (D-269)
-    const stamped = await markDispatched(deps.db, due.map((d) => d.id), now)
+    const stamped = await markDispatched(deps.db, clear.map((d) => d.id), now)
     try {
       await sendChunked(deps.queue, stamped.map((s): DispatchMessage => ({ body: { postId: s.id } })))
     } catch (error) {
@@ -737,7 +800,8 @@ export async function enqueueAhead(deps: DispatchDeps): Promise<number> {
   for (let r = 0; r < DISPATCH_ROUNDS; r += 1) {
     const soon = await dueAhead(deps.db, now, round)
     if (soon.length === 0) break
-    const marked = await markEnqueued(deps.db, soon.map((d) => d.id), now)
+    const clear = await clearForDispatch(deps.db, soon)
+    const marked = await markEnqueued(deps.db, clear.map((d) => d.id), now)
     try {
       await sendChunked(deps.queue, marked.map((m): DispatchMessage => ({
         body: { postId: m.id, org: m.org, due: m.due },

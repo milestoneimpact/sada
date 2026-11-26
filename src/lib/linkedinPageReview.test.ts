@@ -58,4 +58,22 @@ describe('بعد المراجعة (D-423)', () => {
     expect(last.remote).toBe('revoked')
     expect(sent.join(' ')).toContain('org-id')
   })
+
+  it('وبعد التجديد تتباين الرموز: بصمةُ الموافقة نفسُها تبقيه مشتركًا، وبصمةٌ أخرى تُبطله (مراجعة D-425)', async () => {
+    const { db, page, page2 } = await seed()
+    // ‏جدّد التجديدُ رمزَ الثانية وحدها — والبصمةُ بصمةُ الاختيار، لا الرمز
+    await saveTokens(db, KEY, page2, { accessToken: 'renewed', refreshToken: null, expiresAt: '2027-02-01T00:00:00Z', refreshExpiresAt: null, scopes: 'w_organization_social' })
+    db.raw.prepare("UPDATE accounts SET grant_id = 'g1' WHERE id IN (?, ?)").run(page, page2)
+    const sent: string[] = []
+    const impl = (async (input: Request) => { sent.push(await input.text()); return new Response('{}') }) as unknown as typeof fetch
+    const app = { clientId: 'org-id', clientSecret: 'org-secret' }
+    expect((await disconnectAccount(db, KEY, (await findLinked(db, 'org_owner', page, 'linkedin'))!, app, impl)).remote).toBe('shared')
+    expect(sent).toHaveLength(0)
+
+    const other = await seed()
+    other.db.raw.prepare("UPDATE accounts SET grant_id = ? WHERE id = ?").run('g1', other.page)
+    other.db.raw.prepare("UPDATE accounts SET grant_id = ? WHERE id = ?").run('g2', other.page2)
+    // ‏رمزٌ واحدٌ بالصدفة لا يجعلهما موافقةً واحدة: البصمتان مختلفتان
+    expect((await disconnectAccount(other.db, KEY, (await findLinked(other.db, 'org_owner', other.page, 'linkedin'))!, app, impl)).remote).toBe('revoked')
+  })
 })

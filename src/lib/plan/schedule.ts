@@ -116,11 +116,17 @@ export async function schedulePlan(
   db: Db, org: string, plan: StoredPlan, now: Date,
   /** مفاتيحُ بنودٍ منعها الفحص (`blockedKeys`، بصيغة `itemKey` في review.ts): تبقى معتمَدةً بلا موعد ويُقال سببُها. */
   blocked: ReadonlySet<string> = new Set(),
+  /**
+   * ‏بنودُ الفرز وحدَها (`plan_items.id`، مراجعة D-425): «اعتمد ما في الفرز» يجدول ما رآه الناشرُ في الفرز لا كلَّ معتمَدٍ في
+   * ‏الخطّة — فما سُحب موعدُه عمدًا أو كان في منصّةٍ أو أسبوعٍ آخر يبقى كما هو. والغيابُ يعني الخطّةَ كلَّها.
+   */
+  onlyItems?: ReadonlySet<string>,
 ): Promise<PlanSchedule> {
-  const { results: posts } = await db
-    .prepare("SELECT id, platform, source_id, source_refs, idempotency_key FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
+  const { results: all } = await db
+    .prepare("SELECT id, platform, source_id, source_refs, idempotency_key, plan_item_id FROM posts WHERE org_id = ? AND plan_id = ? AND status IN ('approved', 'edited')")
     .bind(org, plan.id)
-    .all<{ id: string; platform: string; source_id: string | null; source_refs: string | null; idempotency_key: string }>()
+    .all<{ id: string; platform: string; source_id: string | null; source_refs: string | null; idempotency_key: string; plan_item_id: string | null }>()
+  const posts = onlyItems === undefined ? all : all.filter((p) => p.plan_item_id !== null && onlyItems.has(p.plan_item_id))
   const peaks = new Map<string, number | null>()
   const accounts = new Map<string, string | null>()
   const skipped: { postId: string; reason: string }[] = []

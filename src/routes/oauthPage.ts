@@ -25,7 +25,7 @@ import { LEGACY_RAW, openScoped, sealScoped } from '../lib/crypto'
 import { loadSession, readCookie } from '../lib/session'
 import { record } from '../lib/audit'
 import { activeOrg } from '../lib/tenancy'
-import { listAdminOrgs, PAGE_CALLBACK_PATH, PAGE_SAY, PAGE_SCOPES, pageApp, pageCanPublish, type AdminOrg } from '../lib/linkedinPage'
+import { grantIdOf, listAdminOrgs, PAGE_CALLBACK_PATH, PAGE_SAY, PAGE_SCOPES, pageApp, pageCanPublish, type AdminOrg } from '../lib/linkedinPage'
 import { pagesFoundBody, pagesPickBody, pagesRefusedBody, unreachedBody } from './ui/oauthResult'
 import { devDetail, resultPage } from './oauth'
 import { guardPost, loginResponse, setFlash } from './panel/shared'
@@ -163,10 +163,13 @@ oauthPage.post('/panel/linkedin-pages/pick', async (c) => {
   }
   const saved: string[] = []
   const elsewhere: string[] = []
+  // ‏بصمةُ هذه الموافقة لكلّ صفحاتها (مراجعة D-425): بها يعرف الفصلُ أنّ رمزَ المدير مشترك ولو تجدّدت الرموزُ كلٌّ وحدها
+  const grant = await grantIdOf(blob.tokens)
   for (const o of chosen) {
     try {
       const id = await upsertAccount(c.env.DB, org, { platform: 'linkedin', kind: 'org', externalId: o.id, displayName: o.name })
       await saveTokens(c.env.DB, c.env.TOKEN_ENC_KEY, id, blob.tokens)
+      await c.env.DB.prepare('UPDATE accounts SET grant_id = ? WHERE id = ? AND org_id = ?').bind(grant, id, org).run()
       saved.push(o.name)
     } catch (error) {
       if (error instanceof AccountElsewhere) elsewhere.push(o.name)

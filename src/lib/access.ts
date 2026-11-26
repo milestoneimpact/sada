@@ -66,7 +66,7 @@ const STEP_UP_POST: readonly RegExp[] = [
 
 export function needsStepUp(method: string, path: string, settingKey?: string | null): boolean {
   // ‏وتصديرُ عميلٍ كلِّه (D-322) صفحتُه وملفُّه — والملفُّ ما تريده جلسةٌ مسروقةٌ تحديدًا
-  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+\/start$/.test(path) || /^\/panel\/orgs\/export(ed)?$/.test(path)
+  if (method === 'GET' || method === 'HEAD') return /^\/oauth\/[a-z]+(-[a-z]+)*\/start$/.test(path) || /^\/panel\/orgs\/export(ed)?$/.test(path)
   // ‏وفتحُ أبواب الطرفيّة (D-318): بابٌ يُنادى برمزٍ ثابتٍ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
   if (path === '/panel/settings') return settingKey === 'alert_webhook' || settingKey === 'admin_api'
   return STEP_UP_POST.some((re) => re.test(path))

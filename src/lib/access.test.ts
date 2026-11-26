@@ -100,6 +100,9 @@ describe('الجلسةُ الناقصةُ والفعلُ الحسّاس (D-317)'
       '/panel/team/invite', '/panel/team/revoke', '/panel/providers/add', '/panel/providers/key', '/panel/providers/delete',
       '/panel/channels/disconnect']) expect(needsStepUp('POST', p), p).toBe(true)
     expect(needsStepUp('GET', '/oauth/linkedin/start')).toBe(true)
+    // ‏وصفحاتُ LinkedIn مسارُها بشَرطة (مراجعة D-425)
+    expect(needsStepUp('GET', '/oauth/linkedin-page/start')).toBe(true)
+    expect(needsStepUp('GET', '/oauth/-/start')).toBe(false)
     expect(needsStepUp('POST', '/panel/settings', 'alert_webhook')).toBe(true)
     // ‏وأبوابُ الطرفيّة (D-318): رمزٌ ثابتٌ بلا عاملٍ ثانٍ لا تفتحه جلسةٌ مسروقة
     expect(needsStepUp('POST', '/panel/settings', 'admin_api')).toBe(true)
