@@ -82,12 +82,35 @@ export async function seedPasskey(env: Record<string, unknown>, email: string = 
   return seeded
 }
 
+/** البيئاتُ التي يجري فيها دخولٌ الآن — لكلّ بيئةٍ دخولٌ واحدٌ في كلّ لحظة (D-424). */
+const LOGGING_IN = new WeakSet<object>()
+
 /**
  * دخولٌ كامل: رمزٌ ثمّ `POST /panel/login`، **ثمّ العاملُ الثاني بمفتاح المرور** (D-317) — ويعيد ردَّ الخطوة الأخيرة.
  *
  * و`secondFactor: false` يعيد ردَّ رمز البريد وحده بلا مفتاحٍ مزروع: لاختبار ما يقع لحسابٍ لا عاملَ له.
+ *
+ * **ولا يُنادى متوازيًا على بيئةٍ واحدة** (D-424): كلُّ رمزٍ جديدٍ يُبطل ما قبله (`issueCode`)، والرسالةُ الأخيرةُ في
+ * الساعي قد تكون لدخولٍ آخر — فدخولان متداخلان يُرسل أحدُهما رمزًا أُبطل فيُردّ 401، بحسب ترتيب الوعود لا بحسب الشيفرة.
+ * فيُرمى هنا خطأٌ صريحٌ في كلّ مرّة بدل فشلٍ متقطّعٍ في CI.
  */
 export async function emailLogin(
+  app: App,
+  env: Record<string, unknown>,
+  options: Parameters<typeof loginOnce>[2] = {},
+): Promise<Response> {
+  if (LOGGING_IN.has(env)) {
+    throw new Error('emailLogin: دخولٌ آخرُ جارٍ على هذه البيئة — ادخل مرّةً واحدةً وأعد استعمال الكعكة (D-424)')
+  }
+  LOGGING_IN.add(env)
+  try {
+    return await loginOnce(app, env, options)
+  } finally {
+    LOGGING_IN.delete(env)
+  }
+}
+
+async function loginOnce(
   app: App,
   env: Record<string, unknown>,
   options: {
