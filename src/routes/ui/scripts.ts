@@ -19,6 +19,7 @@
  * نسختان تفترقان في أوّل تعديل.
  */
 import { BP } from './tokens'
+import { X_HEAVY, X_LIGHT_RANGES, X_URL_LENGTH } from '../../lib/draft/length'
 
 export const COPY_SCRIPT = `
 (function(){
@@ -640,7 +641,7 @@ export const SIZE_SCRIPT = `
  * **اختصاراتُ الحرف الواحد تُطفأ** (D-323 · WCAG 2.1.4 «اختصاراتُ المفتاح الواحد»).
  *
  * J وK وA وR وE وS و/ في المنشورات تعمل بحرفٍ واحدٍ بلا مُعدِّل، وقارئُ الشاشة والإدخالُ الصوتيّ يضغطان حروفًا
- * لم يقصدها صاحبُها — «R» تُرفض بها مسوّدة. فمفتاحُ إطفاءٍ في لوح الاختصارات وفي «الضبط ← المظهر»، يُحفظ في
+ * لم يقصدها صاحبُها — «R» تُرفض بها مسوّدة. فمفتاحُ إطفاءٍ في لوح الاختصارات وفي «الإعدادات ← المظهر»، يُحفظ في
  * المتصفّح كالكثافة (`sada-shortcuts`)، ويضع `data-shortcuts="off"` على `<html>`؛ وسكربتُ اللوحة يقرؤه عند كلّ
  * ضغطة لا عند التحميل، فيسري فورًا. والأزرارُ كلُّها (في اللوح وفي الضبط) تُربط معًا.
  */
@@ -801,6 +802,31 @@ export const RAIL_SCRIPT = `
     if(!x)return;
     x.hidden=false;
     x.addEventListener('click',function(){b.hidden=true;try{sessionStorage.setItem(k,'1');}catch(e){}});
+  });
+})();
+`
+
+/**
+ * **عدّادُ الأحرف خارج اللوحة** (D-417): محرّرُ المنشور صفحةٌ مستقلّة (`soloPage`) لا يحمل سكربتَ اللوحة، فكان
+ * التحريرُ أعمى عن حدّ المنصّة. يعدّ كما يعدّ سكربتُ اللوحة والخادم (D-071): X بوزنها وروابطها، وما سواها بالمحارف،
+ * والحدُّ من `data-limit` والإنذارُ من `data-target`. والناتجُ في `.draft-len` ‏(`aria-live` هادئ).
+ */
+// ‏والثوابتُ بالجمع لا بالإقحام: نصٌّ بلا وسم `html` لا يُقحِم قيمة (`audit_html`)
+export const COUNT_SCRIPT = '\n(function(){\n  var URL_LEN=' + String(X_URL_LENGTH) + ', HEAVY=' + String(X_HEAVY) + ', LIGHT=' + JSON.stringify(X_LIGHT_RANGES) + ';' + `
+  var RE_URL=/https?:\\/\\/\\S+/gu;
+  var RE_EMOJI=/\\p{RI}\\p{RI}|\\p{Extended_Pictographic}(?:\\uFE0F?(?:\\u200D\\p{Extended_Pictographic}\\uFE0F?)*)/gu;
+  var SEP=/^[ \\t]*---[ \\t]*$/m;
+  function weigh(cp){for(var i=0;i<LIGHT.length;i++){if(cp>=LIGHT[i][0]&&cp<=LIGHT[i][1])return 1;}return HEAVY;}
+  function xLen(t){var n=0;var r=t.replace(RE_URL,function(){n+=URL_LEN;return '';}).replace(RE_EMOJI,function(){n+=HEAVY;return '';});
+    for(var ch of r)n+=weigh(ch.codePointAt(0)||0);return n;}
+  function measure(t){var v=t.value.trim();if(t.dataset.count!=='x')return [v.length];
+    var p=v.replace(/\\r\\n?/g,'\\n').split(SEP).map(function(x){return x.trim();}).filter(function(x){return x!=='';});
+    return (p.length?p:[v]).map(xLen);}
+  document.querySelectorAll('textarea[data-limit][data-count]').forEach(function(t){
+    var out=t.parentNode.querySelector('.draft-len'); if(!out)return; var b=out.querySelector('b');
+    function tick(){var lim=+t.dataset.limit||0,tgt=+t.dataset.target||0,ns=measure(t),n=Math.max.apply(null,ns);
+      if(b)b.textContent=ns.join(' · '); out.className='draft-len'+(n>lim?' bad':n>tgt?' warn':'');}
+    t.addEventListener('input',tick); tick();
   });
 })();
 `

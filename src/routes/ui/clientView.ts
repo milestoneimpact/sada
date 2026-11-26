@@ -25,6 +25,8 @@ export interface ClientData {
   readonly brief: Brief
   /** الحساباتُ النشطة لكلّ منصّة. */
   readonly linked: Readonly<Record<string, number>>
+  /** الحساباتُ المتّصلة كلُّها (D-418) — صفرٌ يُبقي «خطّط» ثانويًّا: لا خطّةَ لقنواتٍ غير مربوطة. */
+  readonly connected?: number
   readonly plan: StoredPlan | null
   readonly autoImage: boolean
   readonly estimate: Estimate
@@ -135,7 +137,7 @@ function flow(d: ClientData): string {
   const ready = d.ready ?? 0
   const now = d.plan === null ? 0 : d.plan.status === 'draft' ? 1 : (d.written ?? 0) === 0 ? 2 : waiting > 0 ? 3 : ready > 0 ? 4 : 5
   const say: readonly string[] = [
-    `خطّط من أسبوعٍ إلى شهرين — يقسّم صدى المصادرَ والأفكارَ على الأيّام والقنوات. ${'<a href="/panel#sub-plan">خطّط</a>'}`,
+    `خطّط من أسبوعٍ إلى شهرين — يقسّم صدى المصادرَ والأفكارَ على الأيّام والقنوات. ${'<a href="/panel/plan">خطّط</a>'}`,
     'لكلّ بند: <b>ولّد</b> أو <b>ارفع</b> أو <b>من الأصول</b>، واسحبه إلى يومه — ثمّ «ابدأ الخطّة».',
     '«ابدأ الخطّة» يكتب كلَّ شيءٍ في الخلفيّة خلال دقائق — وإن ضغطتها فأعد فتح الصفحة بعد قليل.',
     `${waiting} ${waiting === 1 ? 'مسوّدةٌ تنتظر' : 'مسوّداتٍ تنتظر'}: عدّل نصَّها أو انقل موعدها أو احذفها، ثمّ اعتمد. <a href="/panel#posts">افتحها</a> ${
@@ -146,6 +148,37 @@ function flow(d: ClientData): string {
   const steps = FLOW.map((t, i) => `<li data-state="${i < now ? 'done' : i === now ? 'now' : 'next'}"${i === now ? ' aria-current="step"' : ''}>
       <span class="flow-n" aria-hidden="true">${i < now ? '✓' : i + 1}</span>${escapeHtml(t)}</li>`).join('')
   return `<div class="card mb-4"><ol class="flow">${steps}</ol><p class="hint m-0 mt-3">${say[now]}</p></div>`
+}
+
+/** ‏عددُ الحسابات المتّصلة — من `connected` إن مُرِّر، وإلّا من مجموع `linked`. */
+function connectedOf(d: ClientData): number {
+  return d.connected ?? Object.values(d.linked).reduce((n, v) => n + v, 0)
+}
+
+/**
+ * **جاهزيّةُ العميل** (D-418) — ثلاثةُ بنودٍ قبل أيّ خطّة: قناةٌ مربوطة، وموجزٌ مكتمل، وحدودٌ موروثةٌ أو مكتوبة.
+ * بمكوّن `ol.flow` نفسِه، وكلُّ بندٍ `done` أو `now`؛ والأوّلُ الناقصُ هو الخطوةُ الحاليّة. وإليه يُحوَّل من «أنشئ المنظّمة».
+ */
+function setup(d: ClientData): string {
+  const n = connectedOf(d)
+  const written = d.limits !== undefined && Object.keys(d.limits.mine).length > 0
+  const items: readonly { readonly done: boolean; readonly title: string; readonly say: string }[] = [
+    { done: n > 0, title: 'قناةٌ مربوطة',
+      say: n > 0 ? String(n) + ' ' + (n === 1 ? 'حسابٌ متّصل' : 'حساباتٍ متّصلة') + '.' : 'لا حسابَ متّصلًا بعد — والخطّةُ بلا قناةٍ لا تُنشر. <a href="/panel/accounts">اربط حسابًا</a>' },
+    { done: !isEmptyBrief(d.brief) && d.brief.channels.length > 0,
+      title: 'موجزٌ مكتمل',
+      say: isEmptyBrief(d.brief) ? 'اكتب ما يريده العميل ولمن وبأيّ نبرة. <a href="#brief">اكتب الموجز</a>'
+        : d.brief.channels.length === 0 ? 'بقي أن تختار قنواته في الموجز. <a href="#brief">اختر القنوات</a>' : 'الموجزُ مكتوبٌ وقنواتُه مختارة.' },
+    { done: true, title: 'حدودٌ موروثةٌ أو مكتوبة',
+      say: written ? 'لهذا العميل سقوفُه المكتوبة. <a href="#limits">راجعها</a>' : 'يرث الحدودَ العامّة، ولك أن تكتب له سقفًا دونها. <a href="#limits">الحدود</a>' },
+  ]
+  const now = items.findIndex((i) => !i.done)
+  const steps = items.map((it, i) => '<li data-state="' + (it.done ? 'done' : 'now') + '"' + (i === now ? ' aria-current="step"' : '') + '>'
+      + '<span class="flow-n" aria-hidden="true">' + (it.done ? '✓' : String(i + 1)) + '</span>' + escapeHtml(it.title)
+      + '<span class="vh">: ' + (it.done ? 'تمّ' : 'لم يتمّ') + '</span></li>').join('')
+  const line = now === -1 ? 'العميلُ جاهز — خطّط له الآن. <a href="/panel/plan">خطّط</a>' : (items[now]?.say ?? '')
+  return '<div class="mb-4">' + card({ id: 'setup', title: 'جاهزيّة العميل', titleId: 'setup-t', attrs: 'tabindex="-1"',
+    body: '<ol class="flow">' + steps + '</ol><p class="hint m-0 mt-3">' + line + '</p>' }) + '</div>'
 }
 
 export function clientScreen(d: ClientData): string {
@@ -174,8 +207,8 @@ export function clientScreen(d: ClientData): string {
       d.plan === null ? 'لا خطّة بعد — من أسبوعٍ إلى شهرين.'
         : `${SPAN_LABEL[d.plan.span ?? 'week']} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,
       d.plan === null
-        ? link('/panel#sub-plan', 'خطّط', true)
-        : `${link('/panel#sub-plan', 'افتحها')}${startForm(d)}`),
+        ? link('/panel/plan', 'خطّط', connectedOf(d) > 0)
+        : `${link('/panel/plan', 'افتحها')}${startForm(d)}`),
     station(5, 'المحتوى', at(d.autoImage ? 'done' : 'idle'),
       d.autoImage ? 'كلُّ مسوّدةٍ تأتي بصورتها، أو اختر لبندٍ من الأصول.' : 'لكلّ بند: ولّد، أو ارفع، أو اختر من الأصول.',
       `${link('/panel/assets', 'الأصول')}${link('/panel/settings#auto-image', 'الصورة الآليّة')}`),
@@ -191,6 +224,7 @@ export function clientScreen(d: ClientData): string {
   ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}
   ${d.saved === true ? toastRegion(notice({ tone: 'ok', g: '●', html: 'حُفظ الموجز — والخطّةُ والكتابةُ تقرآنه من الآن.' })) : ''}
   <p class="lede m-0 mb-4"><b>اكتمل ${ready} من 7</b>${next === undefined ? ' — العميلُ جاهز.' : ` — التالي: <b>${escapeHtml(next)}</b>.`}</p>
+  ${setup(d)}
   ${flow(d)}
   <div class="grid tiles c4 mb-4">${stations.join("")}</div>
   ${d.plan === null ? '' : planBoard(d.plan, d.names ?? {}, d.sources ?? [])}

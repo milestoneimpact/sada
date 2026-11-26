@@ -388,7 +388,8 @@ const R2stop: Journey = {
     m.note(`أزرار الشاشة الأولى في الرئيسيّة: ${homeCtas.join(' · ') || '—'}`)
     m.note(`أبواب الكتابة في الرئيسيّة: في الشاشة الأولى ${doors.first.join(' · ') || 'لا شيء'} · وتحتها ${doors.below.join(' · ') || 'لا شيء'}`)
     const drafts = () => q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE (idempotency_key LIKE 'draft:%' OR idempotency_key LIKE 'idea:%') AND status IN ('draft','approved','edited') AND created_at >= datetime('now','-5 minutes')")?.n ?? 0
-    await goSection(page, m, 'المنشورات')
+    // ‏«المنشورات» صار «المسوّدات والفيديو» (D-419)
+    await goSection(page, m, 'المسوّدات والفيديو')
     const goal = /اكتب|أنشئ|جديد|اعتمد/
     const screens: string[] = []
     let writeAt: number | null = null
@@ -544,12 +545,13 @@ const R4: Journey = {
 const R5: Journey = {
   id: 'R-5',
   title: 'استيراد خطّة من ملفّ CSV',
-  plan: { target: '4 (§6: «منشور جديد ▾» ← «خطّة من ملفّ» ← الملفّ ← «اعتمد وجدوِل»)' },
+  plan: { target: '4 (§6: «عندي خطّة» في «خطّةُ الشهر» ← الملفّ ← «اعتمد وجدوِل» ← التأكيد)' },
   async run({ page, m, stack, assets }) {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     // ‏**بطريق §6 من الرئيسيّة** (D-326): «منشور جديد ▾» ← «خطّة من ملفّ» — كانت الرحلةُ تفتح «المنشورات» أوّلًا فتعدّ لمسةً
     // ‏ليست في الهدف
-    await newPost(page, m, /خطّة من ملفّ/, 'خطّة من ملفّ')
+    // ‏خرج «خطّة من ملفّ» من «منشور جديد ▾» (D-417)، فالبابُ «عندي خطّة» في بطاقة «خطّةُ الشهر» بالرئيسيّة (D-422)
+    await m.tap(link(page.locator('.home-plan'), /عندي خطّة/), '«عندي خطّة» في بطاقة «خطّةُ الشهر»')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
     await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
@@ -1042,7 +1044,8 @@ const R17: Journey = {
     // ‏أوّلُ بطاقةٍ من الخطّة تنتظر: اعتمادُها يجدولها في موعد بندها (D-327)، وما ليس من خطّةٍ يُعتمَد بلا موعد
     const first = visible(page.locator('li.fd-card[data-status="draft"]:has(form[action="/panel/plan/review/approve"])')).first()
     const id = (await first.getAttribute('id') ?? '').replace(/^f-/, '')
-    await m.tap(button(first, 'اعتمد'), '«اعتمد» على أوّل بطاقةٍ تنتظر في التيّار')
+    // ‏«اعتمد» صار «اعتمد وجدوِل» واسمُه لقارئ الشاشة يحمل الموعد (D-417)
+    await m.tap(button(first, /^اعتمد وجدوِل/), '«اعتمد وجدوِل» على أوّل بطاقةٍ تنتظر في التيّار')
     await page.waitForURL(/\/panel\/feed/)
     const queued = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE plan_id = ? AND status = 'queued'", r13Plan)?.n ?? 0
     const card = page.locator(`#f-${id}`)

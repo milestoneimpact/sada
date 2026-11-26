@@ -137,7 +137,7 @@ export function planImportScreen(
                    : `يُعتمَد ${counted(ready, NOUNS.post)} ويُجدوَل كلّ في موعده. أتابع؟`)}">
                  <input type="hidden" name="lines" value="${escapeHtml(readyLines(read).join(','))}">
                  <button class="btn btn-primary" type="submit">اعتمد وجدوِل ${escapeHtml(counted(ready, NOUNS.post, 'acc'))}</button></form>`}
-          <a class="btn btn-secondary" href="/panel#plan-import">إلغاء</a>
+          <a class="btn btn-secondary" href="/panel/plan">إلغاء</a>
         </div>
       </div>`}`
 }

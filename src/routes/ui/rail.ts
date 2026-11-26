@@ -105,7 +105,7 @@ export function railHtml(input: RailInput): string {
     <button type="button" class="rail-fold btn-icon" id="rail-fold" hidden></button>
   </div>
   ${scopeMenu(input.scope)}
-  ${/* ‏ولا «منشور جديد» هنا (D-308): زرُّ الترويسة (D-216) بأبوابه الأربعة ظاهرٌ في كلّ صفحة، وزرّان أوّليّان
+  ${/* ‏ولا «منشور جديد» هنا (D-308): زرُّ الترويسة (D-216) بأبوابه الأربعة في رأس اللوحة ورأس كلّ صفحةٍ مفردة (D-419)، وزرّان أوّليّان
      ‏بالاسم نفسِه في شاشةٍ واحدة يُقرآن خيارين — وكان الرافدةُ تحمله منذ D-246 قبل أن يصل الترويسةَ */''}
   <nav class="tabs" aria-label="أقسام اللوحة">
     ${tabs}

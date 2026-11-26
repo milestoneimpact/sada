@@ -197,3 +197,12 @@ describe('زرٌّ معطَّلٌ يقول لماذا (D-325)', () => {
     }
   })
 })
+
+describe('الهاتفُ وسهولةُ الوصول في الجداول (D-421)', () => {
+  it('الغلافُ بهامشٍ صالح، والجدولُ لا يتجاوز عرضَ حاويته، ولا كبتَ لحلقة تركيز المعالج', () => {
+    expect(css.rule('.scroll').margin).toBe('0 calc(-1 * var(--s-0))')
+    expect(css.rule('table')['min-width']).toBe('min(32.5rem,100%)')
+    expect(css.rule('.wz-head h2:focus').outline).toBeUndefined()
+    expect(css.rule('.fd-card')['scroll-margin-top']).toMatch(/^var\(--s-/)
+  })
+})

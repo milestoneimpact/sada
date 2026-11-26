@@ -400,7 +400,7 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
     `<tr>
        <td><div class="nm">${escapeHtml(preset.label)}</div>
            <div class="sub m-0">${escapeHtml(preset.note)}</div></td>
-       <td><span class="mono">${pathArrows(escapeHtml(preset.keyFrom))}</span></td>
+       <td data-label="موضع المفتاح عندهم"><span class="mono">${pathArrows(escapeHtml(preset.keyFrom))}</span></td>
      </tr>`,
   ).join('')
 
@@ -466,16 +466,16 @@ export function providersSection(d: ProvidersData): ProvidersMarkup {
                 (<span class="mono">/ai/run</span> و <span class="mono">/ai/models/search</span>)
                 — فلا تُدخِل عنوانا ثانيا.</span></span>`}</span></li>
 
-        <li><span class="step-n">3</span><span class="body">
-          <span class="what">ضع المفتاح في صفّه، ثمّ «اختبر» و«حدّث»</span>
-          <span class="why">بعد الإضافة يظهر صفُّه في القائمة أعلاه. <b>«اختبر»</b> يقول أيعمل المفتاح،
+        <li><span class="step-n">3</span><div class="body">
+          <div class="what">ضع المفتاح في صفّه، ثمّ «اختبر» و«حدّث»</div>
+          <div class="why">بعد الإضافة يظهر صفُّه في القائمة أعلاه. <b>«اختبر»</b> يقول أيعمل المفتاح،
             <b>و«حدّث»</b> يجلب قائمة نماذجه الآن فتختار منها بدل أن تكتب اسما —
-            <b>والفهرس لا يُجلَب قبل حفظ المفتاح</b>: هو نداء باسمك عندهم.</span>
-          <span class="scroll mt-3"><table>
+            <b>والفهرس لا يُجلَب قبل حفظ المفتاح</b>: هو نداء باسمك عندهم.</div>
+          <div class="scroll mt-3"><table>
             <thead><tr><th>المزوّد</th><th>موضع المفتاح عندهم</th></tr></thead>
-            <tbody>${presetRows}</tbody></table></span>
-          <span class="why">وصلاحيّة مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
-            — ولا تكفي صلاحيّة AI Gateway وحدَها.</span></span></li>
+            <tbody>${presetRows}</tbody></table></div>
+          <div class="why">وصلاحيّة مفتاح Cloudflare: <span class="mono">Account · Workers AI · Read</span>
+            — ولا تكفي صلاحيّة AI Gateway وحدَها.</div></div></li>
       </ol>
     </form>
     </div>

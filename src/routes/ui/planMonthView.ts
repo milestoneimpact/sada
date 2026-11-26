@@ -11,6 +11,9 @@ export type { DiffRow, ImportRow }
 import { checksStrip, type ChecksView } from './checksView'
 import { statusBadge } from './components/badge'
 import { button } from './components/button'
+import { emptyState } from './components/empty'
+import { escapeHtml } from './escape'
+import { ICON } from './icons'
 import { card } from './components/card'
 import { html, raw } from './html'
 import { pageHead } from './parts'
@@ -82,7 +85,7 @@ export interface MonthScreenData {
   readonly prev: string
   readonly next: string
   /** التقويمُ الموحّد (D-410): الفرزُ من العنوان، والبنودُ بحالها، والمنصّاتُ المعروفة. وبلاه يبقى تقويمُ الحمل وحده. */
-  readonly cal?: { readonly q: CalQuery; readonly items: readonly CalItem[]; readonly platforms: readonly string[] }
+  readonly cal?: { readonly q: CalQuery; readonly canWrite?: boolean; readonly items: readonly CalItem[]; readonly platforms: readonly string[] }
 }
 
 const WEEKDAYS = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
@@ -138,7 +141,34 @@ function monthCell(q: CalQuery, day: string, items: readonly CalItem[], cap: num
     ${CAL_STATUSES.map((s) => { const n = items.filter((i) => i.status === s).length; return n === 0 ? '' : raw(statusBadge(CAL_STATUS_TONE[s], String(n), CAL_STATUS_SAY[s])) })}`.value
 }
 
-export interface CalBlock { readonly q: CalQuery; readonly items: readonly CalItem[]; readonly platforms: readonly string[]; readonly dailyCap: number }
+export interface CalBlock {
+  readonly q: CalQuery; readonly items: readonly CalItem[]; readonly platforms: readonly string[]; readonly dailyCap: number
+  /** ‏المحرّرُ فأعلى: «منشور جديد» في الحالة الفارغة (D-421). */
+  readonly canWrite?: boolean
+}
+
+/** ‏الفرزُ النشطُ جملةً: المنصّاتُ والحالاتُ المختارة، أو نصًّا فارغًا إن لم يُفرَز شيء. */
+function filterSay(q: CalQuery): string {
+  const parts = [
+    ...(q.platforms.length === 0 ? [] : ['المنصّة: ' + q.platforms.map(pfSay).join('، ')]),
+    ...(q.statuses.length === 0 ? [] : ['الحال: ' + q.statuses.map((s) => CAL_STATUS_SAY[s]).join('، ')]),
+  ]
+  return parts.join(' · ')
+}
+
+/** ‏الحالةُ الفارغة (D-421): عنوانٌ وتلميحٌ يذكر الفرزَ النشط، و«امسح الفرز» إن كان فرز، و«منشور جديد» للمحرّر. */
+export function calEmpty(q: CalQuery, canWrite: boolean): string {
+  const f = filterSay(q)
+  const acts = [
+    ...(f === '' ? [] : [button({ label: 'امسح الفرز', href: calHref(q, { platforms: [], statuses: [] }), variant: 'secondary' })]),
+    ...(canWrite ? [button({ label: 'منشور جديد', href: '/panel/new', variant: f === '' ? 'primary' : 'quiet', icon: ICON.add })] : []),
+  ]
+  return emptyState({
+    title: 'لا بند في هذه المدّة',
+    html: f === '' ? 'لا شيءَ مجدولٌ هنا بعد.' : 'الفرزُ النشط يُخفي ما سواه — ' + escapeHtml(f) + '.',
+    ...(acts.length === 0 ? {} : { action: '<div class="row gap-2">' + acts.join('') + '</div>' }),
+  })
+}
 
 /** التقويمُ الموحّد: شهرٌ بخاناتٍ غنيّة، أو أسبوعٌ، أو يوم — والبنودُ بعد الفرز. */
 export function unifiedCalendar(c: CalBlock): string {
@@ -151,8 +181,10 @@ export function unifiedCalendar(c: CalBlock): string {
       : html`<td>${raw(monthCell(c.q, day, on(day), c.dailyCap))}</td>`)}</tr>`)}</tbody></table></div>`.value
   }
   const span = calSpan(c.q)
+  const any = span.days.some((day) => on(day).length > 0)
   const nav = html`<div class="row gap-2">${raw(button({ label: '‹ السابق', href: calHref(c.q, { day: span.prev }), size: 'sm', variant: 'quiet' }))}
     ${raw(button({ label: 'التالي ›', href: calHref(c.q, { day: span.next }), size: 'sm', variant: 'quiet' }))}</div>`.value
+  if (!any) return nav + calEmpty(c.q, c.canWrite === true)
   return nav + span.days.map((day) => html`<section class="mt-2" aria-label="${day}"><h3 class="m-0"><a class="tap mono" href="${calHref(c.q, { view: 'day', day })}">${WEEKDAYS[new Date(day + 'T00:00:00Z').getUTCDay()]!} ${day}</a></h3>
     ${raw(dayItems(on(day)))}</section>`.value).join('')
 }

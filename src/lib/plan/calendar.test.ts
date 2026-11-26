@@ -93,3 +93,24 @@ describe('التقويم الموحّد (D-410)', () => {
     expect(w).toContain('نوفمبر')
   })
 })
+
+describe('الحالةُ الفارغة في التقويم (D-421)', () => {
+  it('يومٌ بلا بنودٍ يقود إلى فعل: الفرزُ النشطُ مذكور، و«امسح الفرز» يُسقطه، و«منشور جديد» للمحرّر وحدَه', () => {
+    const f = unifiedCalendar({ q: q('v=day&d=2026-11-10&pf=x&st=awaiting'), items, platforms: KNOWN, dailyCap: 5, canWrite: true })
+    expect(f).toContain('class="empty')
+    expect(f).not.toContain('لا بند.')
+    expect(f).toContain('الحال: ')
+    expect(f).toContain('امسح الفرز')
+    expect(f).toContain('href="/panel/new"')
+    expect(f).toContain('href="' + calHref(q('v=day&d=2026-11-10&pf=x&st=awaiting'), { platforms: [], statuses: [] }).replace(/&/g, '&amp;'))
+    const r = unifiedCalendar({ q: q('v=day&d=2026-11-10'), items, platforms: KNOWN, dailyCap: 5 })
+    expect(r).toContain('class="empty')
+    expect(r).not.toContain('امسح الفرز')
+    expect(r).not.toContain('/panel/new')
+  })
+  it('الأسبوعُ الذي فيه بنودٌ لا يُستبدل بالحالة الفارغة', () => {
+    const w = unifiedCalendar({ q: q('v=week&d=2026-11-02'), items, platforms: KNOWN, dailyCap: 5, canWrite: true })
+    expect(w).not.toContain('امسح الفرز')
+    expect(w).toContain('أ')
+  })
+})

@@ -1124,9 +1124,9 @@ describe('ما وراء المقاييس (D-149)', () => {
  */
 describe('الرأس الموحَّد (D-381)', () => {
   it('ترتيبُه: العلامةُ ثمّ البحثُ ثمّ الجرسُ ثمّ الحساب، ولا رابطَ رجوع', () => {
-    const html = pageTop()
+    const html = pageTop('owner')
     expect(html.startsWith('<header class="topbar page-top">')).toBe(true)
-    const at = ['class="home glyph tb"', 'class="cmdk-open"', 'class="bell"', 'class="menu-'].map((k) => html.indexOf(k))
+    const at = ['class="home glyph tb"', 'منشور جديد', 'class="cmdk-open"', 'class="bell"'].map((k) => html.indexOf(k)).concat(html.lastIndexOf('class="menu-'))
     for (const i of at) expect(i).toBeGreaterThan(0)
     expect([...at].sort((x, y) => x - y)).toEqual(at)
     expect(html).not.toContain('nav class="back"')
@@ -1135,6 +1135,22 @@ describe('الرأس الموحَّد (D-381)', () => {
     expect(css.rule('.topbar .glyph.tb').display).toBe('none')
     expect(css.rule('.topbar .glyph.tb', `@media${below('md')}`).display).toBe('grid')
     expect(css.rule('.glyph svg')).toMatchObject({ width: '56%', height: '56%' })
+  })
+
+  it('و«منشور جديد» في رأس الصفحة المفردة لمن يكتب وحدَه، ويُخفى دون md (D-419، D-420)', () => {
+    const html = pageTop('editor')
+    expect(html.match(/منشور جديد/g)?.length).toBe(1)
+    expect(html).toContain('href="/panel#idea"')
+    // ‏والوسمُ نفسُه الذي يُخفيه دون md كرأس اللوحة (D-216): هناك الزرُّ العائم
+    expect(html).toMatch(/<details[^>]*data-tb-new/)
+    expect(css.rule('details[data-tb-new]', `@media${below('md')}`).display).toBe('none')
+    expect(soloPage('صدى — تجربة', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, undefined, 'owner')).toContain('منشور جديد')
+  })
+
+  it('ولا بابَ كتابةٍ للقارئ ولا لصفحةٍ لم تمرّر الدور — والتيّارُ لا يمرّره فلا يتكرّر (D-420)', () => {
+    expect(pageTop('viewer')).not.toContain('منشور جديد')
+    expect(pageTop()).not.toContain('منشور جديد')
+    expect(soloPage('صدى — تجربة', { href: '/panel', label: 'اللوحة' }, '<p>x</p>', 'n', '', undefined, undefined, 'viewer')).not.toContain('منشور جديد')
   })
 
   it('وعلى الهاتف رأسٌ مختصر: لا بحثَ ولا حالَ فيه — هما في «المزيد» وبطاقة الآلة (§4.3)', () => {

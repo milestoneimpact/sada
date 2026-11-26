@@ -315,9 +315,10 @@ export function planCard(
   if (plan === null) {
     return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
       <div class="card-head"><h2 id="hp-t">خطّةُ الشهر</h2></div>
+      ${/* ‏و«عندي خطّة» رابطٌ ثانويٌّ إلى بطاقة الاستيراد في اللوح نفسِه (D-422): خرج من «منشور جديد ▾» (D-417) فبقي بلا بابٍ في الرئيسيّة */''}
       ${/* ‏بابٌ واحد (D-387): يكتبها المساعد، أو من ملفّ، أو من GitHub — والاختيارُ في صفحته لا هنا */''}
       <p class="m-0">لا خطّة بعد. يكتبها المساعد في أربع خطوات، أو ترفع خطّتك من ملفّ، أو تُزامن حزمتك من GitHub.</p>
-      <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/new">منشورات جديدة</a></div>
+      <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/new">منشورات جديدة</a><a class="tap" href="/panel#plan-import">عندي خطّة (CSV)</a></div>
     </div>`.value
   }
   const total = plan.plan.items.length
@@ -353,6 +354,6 @@ export function planCard(
     ${next.length === 0 ? html`` : html`<ol class="hp-next" aria-label="أقربُ ما في الخطّة">${next.map((i) => html`<li>
       <span class="pf-logo rv-pf" data-pf="${i.platform}" aria-hidden="true">${raw(LOGOS[i.platform] ?? '')}</span>
       <b>${dayLabel(i.day)}</b><bdi class="mono">${i.time}</bdi><span class="hp-a">${i.angle}</span></li>`)}</ol>`}
-    <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked && !expired ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}</div>
+    <div class="row gap-2 mt-3"><a class="btn btn-primary" href="${go.href}">${go.label}</a>${locked && !expired ? html`` : html`<a class="btn btn-secondary" href="/panel/plan/view">اعرض الخطّة</a>`}<a class="tap" href="/panel#plan-import">عندي خطّة (CSV)</a></div>
   </div>`.value
 }

@@ -229,6 +229,10 @@ export const NARROW = `/* ══ الشاشة الضيّقة: ما دون «md»
   table:not(.pv) td::before{content:attr(data-label); display:block; font-size:var(--t-caption);
     line-height:var(--lh-caption); font-weight:600; color:var(--ink-2); margin-bottom:var(--s-0)}
   table:not(.pv) td:first-child::before{display:none}
+  /* ‏وجدولُ قائمة الخطّة يأخذ عناوينَه من هنا لا من الوسم: شاشتُه على حدّ سقفها (D-421 · D-336) */
+  .rv-list td:nth-child(2)::before{content:"المنصّة"}
+  .rv-list td:nth-child(3)::before{content:"الحال"}
+  .rv-list td:nth-child(4)::before{content:"المنشور"}
 }
 
 /* ══ الرأسُ الموحَّد والرافدةُ المطويّة وتنبيهُ النظام (D-381، §4) ══════════════

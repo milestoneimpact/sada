@@ -39,7 +39,7 @@ notices.get('/panel/notices', async (c) => {
   return page((nonce) =>
     soloPage('صدى — الإشعارات', { href: '/panel', label: 'اللوحة' },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('overview')),
+      buildCommands({ onPanel: false }), soloNav('overview'), session.record.role ?? 'owner'),
   )
 })
 

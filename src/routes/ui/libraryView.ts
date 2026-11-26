@@ -148,7 +148,7 @@ export function libraryScreen(d: LibraryData): string {
       + (d.pickPost.w === '' ? '' : '?w=' + escapeHtml(d.pickPost.w)) + '#c-' + String(d.pickPost.index) + '">عُد إلى الخطّة</a>'
     : d.pick === null
     ? 'كلُّ ما رُفع أو وُلّد أو في Drive — <b>يُحفظ مصنَّفًا ويُعاد استعمالُه بلا كلفة</b>.'
-    : `<b>اختر ملفًّا لبند الخطّة</b> — أو ارفع جديدًا فيُحفظ في الأصول ويُربط به. <a href="/panel/client#board">عُد إلى الخطّة</a>`
+    : `<b>اختر ملفًّا لبند الخطّة</b> — أو ارفع جديدًا فيُحفظ في الأصول ويُربط به. <a href="/panel/plan">عُد إلى الخطّة</a>`
   const accept = [...LIBRARY_MIMES].join(',')
   // ‏نموذجُ الرفع بحقلٍ من العُدّة (اسمٌ يُقرأ، وهدفُ لمسٍ كامل)، ورابطُ المقاطع زرٌّ لا كلمةٌ صغيرةٌ في سطر (D-347)
   const upload = '<form class="card card-inset" id="upload" method="POST" action="/panel/assets/upload" enctype="multipart/form-data">'

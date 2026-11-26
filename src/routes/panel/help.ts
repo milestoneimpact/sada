@@ -18,6 +18,6 @@ help.get('/panel/help', async (c) => {
   return page((nonce) =>
     soloPage('صدى — المساعدة', { href: '/panel', label: 'اللوحة', at: '/panel/help' },
       injectCsrf(helpScreen(), session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('overview')),
+      buildCommands({ onPanel: false }), soloNav('overview'), session.record.role ?? 'owner'),
   )
 })

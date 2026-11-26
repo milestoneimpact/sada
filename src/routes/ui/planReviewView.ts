@@ -350,7 +350,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const toggle = html`<span class="rv-vw" hidden>${raw(segmented('طريقة العرض', 'view', [{ value: 'cards', label: 'بطاقات', pressed: true }, { value: 'list', label: 'قائمة' }]))}</span>`
   // ‏تبويباتُ الخطّة تحت العنوان (§6.2): ثلاثُ صفحاتٍ لشيءٍ واحد، فالتنقّلُ بينها بلغة التنقّل
   const sub = tabBar('صفحات الخطّة', [
-    { label: 'الخطّة', href: '/panel/plan/review', current: true },
+    { label: 'الخطّة', href: '/panel/plan', current: true },
     { label: 'عرض للطباعة', href: '/panel/plan/view' },
     { label: 'خطّة جديدة', href: '/panel/plan/new' },
   ])

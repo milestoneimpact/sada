@@ -61,7 +61,7 @@ reports.get('/panel/tasks', async (c) => {
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('tasks')}`, { href: '/panel', label: 'اللوحة', at: '/panel/tasks' },
       injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('tasks')),
+      buildCommands({ onPanel: false }), soloNav('tasks'), session.record.role ?? 'owner'),
   )
 })
 
@@ -140,7 +140,7 @@ reports.get('/panel/report', async (c) => {
 
   return page((nonce) =>
     soloPage(`صدى — ${sectionLabel('results')}`, { href: '/panel', label: 'اللوحة', at: '/panel/report' }, injectCsrf(body, session.record.csrf), nonce, '',
-      buildCommands({ onPanel: false }), soloNav('results')),
+      buildCommands({ onPanel: false }), soloNav('results'), session.record.role ?? 'owner'),
   )
 })
 

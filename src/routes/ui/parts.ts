@@ -261,7 +261,7 @@ export function machineCard(pulses: readonly Pulse[], now: Date): string {
 }
 
 
-/** ‏ما ترسمه «صحّة صدى» (D-321) — يُحمَّل للمالك وحدَه في «الضبط ← متقدّم ← النظام». */
+/** ‏ما ترسمه «صحّة صدى» (D-321) — يُحمَّل للمالك وحدَه في «الإعدادات ← متقدّم ← النظام». */
 export interface HealthView {
   readonly slis: readonly Sli[]
   /** ‏أمربوطٌ دلوُ النسخ الخاصّ (`BACKUP`، M-51)؟ */

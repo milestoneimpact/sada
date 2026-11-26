@@ -75,7 +75,7 @@ export function segmented(label: string, name: string, options: readonly Segment
 }
 
 /**
- * مبدّلُ اختصارات الحرف الواحد (D-323 · WCAG 2.1.4) — في لوح الاختصارات وفي «الضبط ← المظهر»، وسكربتُه
+ * مبدّلُ اختصارات الحرف الواحد (D-323 · WCAG 2.1.4) — في لوح الاختصارات وفي «الإعدادات ← المظهر»، وسكربتُه
  * (`SHORTCUTS_SCRIPT`) يربط النسختين ويحفظ الاختيار في المتصفّح. والافتراضُ «تعمل» كما كانت.
  */
 export function shortcutsSwitch(): string {

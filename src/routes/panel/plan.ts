@@ -20,6 +20,8 @@ import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
 import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
 import { postEditScreen } from '../ui/postEditView'
+import { COUNT_SCRIPT } from '../ui/scripts'
+import { vtName } from '../ui/parts'
 import { copyToDraft, holdPost, postHistory, restoreEdit, revisePost, type ReviseResult } from '../../lib/plan/revise'
 import { stageOf } from '../../lib/plan/rights'
 import { localToUtc } from '../../lib/time/local'
@@ -82,7 +84,7 @@ import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/cli
 import { injectCsrf, soloPage } from '../ui/shell'
 import { record } from '../../lib/audit'
 import { type PanelFlash } from '../panelView'
-import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, toFeed } from './shared'
+import { deciderOf, finalizeLater, page, loginResponse, setFlash, takeFlash, guardPost, reachNow, back, toFeed, POST_ID } from './shared'
 import type { PlanSchedule } from '../../lib/plan/schedule'
 
 export const plan = new Hono<{ Bindings: Env }>()
@@ -470,7 +472,7 @@ plan.post('/panel/plan/approve-all', async (c) => {
   })
   // ‏وبعد اعتماد الخطّة كلِّها من المراجعة تنتقل إلى المتابعة (ابنِ ← راجع ← اعتمد ← تابع)
   // ‏ومن التيّار إليه (D-386)
-  if (gate.form.get('back') === 'feed') return c.redirect('/panel/feed', 303)
+  if (gate.form.get('back') === 'feed') return feedNext(gate.form, '')
   // ‏ومن المراجعة إلى التيّار حين لا فشل (D-388: لا «متابعة»)، وإلى المراجعة حين تعثّر شيء
   return c.redirect(gate.form.get('back') === 'review' ? (done.failed.length === 0 ? '/panel/feed' : '/panel/plan/review') : '/panel/client', 303)
 })
@@ -747,9 +749,20 @@ const weekOf = (form: FormData): string => {
   return /^(?:\d{1,2}|all)$/.test(w) ? '?w=' + w : ''
 }
 
+/**
+ * ‏**ومن التيّار إلى البطاقة التالية التي تنتظر** (D-417): حقلُ `next` يملؤه التيّارُ بترتيب `awaitingIds`، فيُعتمَد
+ * ‏أسبوعٌ بلا فقد الموضع. ولا يُكتب في العنوان إلّا معرّفٌ بنمط `vtName` (`toFeed` يفحصه)، وما سواه إلى البطاقة نفسِها.
+ */
+const feedNext = (form: FormData, id: string): Response => {
+  const next = String(form.get('next') ?? '')
+  if (POST_ID.test(next)) return toFeed(next)
+  // ‏وما ليس على بطاقةٍ (اعتمادُ الكلّ) يعود إلى رأس التيّار كما كان
+  return id === '' ? new Response(null, { status: 303, headers: { Location: '/panel/feed' } }) : toFeed(id)
+}
+
 /** العودةُ إلى البطاقة نفسِها في أسبوعها، لا إلى رأس الصفحة — ومن التيّار (D-386) إلى بطاقته فيه. */
 const toCard = (form: FormData, anchor = true): Response => {
-  if (form.get('back') === 'feed') return toFeed(String(form.get('post') ?? ''))
+  if (form.get('back') === 'feed') return feedNext(form, String(form.get('post') ?? ''))
   const index = form.get('index')
   return new Response(null, { status: 303, headers: { Location: '/panel/plan/review' + weekOf(form) + (anchor && index !== null && Number.isInteger(Number(index)) ? '#c-' + String(Number(index)) : '') } })
 }
@@ -1099,7 +1112,7 @@ plan.get('/panel/plan/month', async (c) => {
     canApprove: canFix && stored?.status === 'draft',
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
-    cal: { q: calQ, items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
+    cal: { q: calQ, canWrite: allows(session.record.role ?? 'owner', 'editor'), items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
   })
   // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
   return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
@@ -1289,7 +1302,7 @@ plan.post('/panel/plan/review/bulk', async (c) => {
     text: sayDecided(verb, done, already, failed) + tail,
   })
   // ‏والاعتمادُ يهبط في التيّار (D-387)؛ والتأخيرُ والحذفُ يبقيان في الورشة
-  if (act === 'approve' && f.get('back') === 'feed') return c.redirect('/panel/feed', 303)
+  if (act === 'approve' && f.get('back') === 'feed') return feedNext(f, '')
   f.delete('back')
   return toCard(f, false)
 })
@@ -1576,8 +1589,8 @@ plan.get('/panel/plan/post/:id', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   const org = activeOrg(session.record)
   const id = c.req.param('id')
-  const row = await c.env.DB.prepare('SELECT id, status, text, scheduled_at, dispatched_at, rev, edited_in_sada FROM posts WHERE id = ? AND org_id = ?')
-    .bind(id, org).first<{ id: string; status: string; text: string; scheduled_at: string | null; dispatched_at: string | null; rev: number; edited_in_sada: number }>()
+  const row = await c.env.DB.prepare('SELECT id, platform, status, text, scheduled_at, dispatched_at, rev, edited_in_sada FROM posts WHERE id = ? AND org_id = ?')
+    .bind(id, org).first<{ id: string; platform: string; status: string; text: string; scheduled_at: string | null; dispatched_at: string | null; rev: number; edited_in_sada: number }>()
   if (row === null) return c.redirect('/panel/feed', 303)
   const [history, zone, flash, library] = await Promise.all([
     postHistory(c.env.DB, org, id),
@@ -1587,11 +1600,11 @@ plan.get('/panel/plan/post/:id', async (c) => {
   ])
   const media = library.filter((a) => a.kind === 'image' && a.origin !== 'drive').slice(0, 30).map((a) => ({ ref: a.ref, name: a.name }))
   const body = postEditScreen({
-    id: row.id, text: row.text, scheduledAt: row.scheduled_at, rev: row.rev, edited: row.edited_in_sada === 1,
+    id: row.id, platform: row.platform, text: row.text, scheduledAt: row.scheduled_at, rev: row.rev, edited: row.edited_in_sada === 1,
     stage: stageOf(row, new Date()), role: session.record.role ?? 'owner', history, media,
   }, zone ?? null) + (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
-  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
-    '', buildCommands({ onPanel: false }), soloNav('plan')))
+  return page((nonce) => soloPage('صدى — تعديل المنشور', { href: '/panel/feed#' + vtName(row.id), label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
+    COUNT_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')))
 })
 
 async function editDone(c: Context<{ Bindings: Env }>, id: string, result: ReviseResult | { ok: true; id: string } | { ok: false; reason: string }, to = id): Promise<Response> {

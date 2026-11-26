@@ -479,7 +479,6 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .wz-on.wz-one .wz-bar{position:sticky; top:0; z-index:4; margin-inline:calc(-1 * var(--pad-card)); padding:var(--s-3) var(--pad-card) 0; background:var(--surface)}
 .wz-head{margin-bottom:var(--s-5)}
 .wz-head h2{margin:var(--s-1) 0; font-size:var(--t-h2); line-height:var(--lh-h2)}
-.wz-head h2:focus{outline:none}
 .wz-k{font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; color:var(--accent)}
 .wz-opts{display:grid; gap:var(--s-3); grid-template-columns:repeat(auto-fit,minmax(min(100%,11rem),1fr))}
 /* ‏والسطوحُ من العُدّة (card · card-inset) لا قواعدُ جديدة: هنا التخطيطُ وحالُ الاختيار وحدَهما */
@@ -912,7 +911,7 @@ details.card .nt-list{margin-top:var(--s-4)}
 .fd-sec{display:grid; gap:var(--s-3)}
 .fd-h{margin:0; font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600}
 .fd-list{display:grid; gap:var(--s-3); margin:0}
-.fd-card{display:grid; gap:var(--s-3)}
+.fd-card{display:grid; gap:var(--s-3); scroll-margin-top:var(--s-16)}
 .fd-head{display:flex; align-items:center; gap:var(--s-2); flex-wrap:wrap}
 .fd-who{display:grid; min-width:0}
 .fd-when{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2); font-variant-numeric:tabular-nums}

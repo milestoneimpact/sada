@@ -96,8 +96,8 @@ describe('الفهرس — ولا فعل يقع من هنا', () => {
   })
 
   it('واللوح يُقصَد بمرساة في اللوحة وبمسار خارجَها', () => {
-    const on = buildCommands({ onPanel: true }).find((c) => c.label === 'المنشورات')!
-    const off = buildCommands({ onPanel: false }).find((c) => c.label === 'المنشورات')!
+    const on = buildCommands({ onPanel: true }).find((c) => c.label === 'المسوّدات والفيديو')!
+    const off = buildCommands({ onPanel: false }).find((c) => c.label === 'المسوّدات والفيديو')!
     expect(on.href).toBe('#posts')
     expect(off.href).toBe('/panel#posts')
   })
@@ -113,7 +113,7 @@ describe('الفهرس — ولا فعل يقع من هنا', () => {
   it('والفعل يُسمّى بفعله — «امسح Drive» لا «قسم المصادر»', () => {
     const labels = buildCommands().map((c) => c.label)
     expect(labels).toContain('امسح Drive')
-    expect(labels).toContain('اربط قناةً جديدة')
+    expect(labels).toContain('اربط حسابًا جديدًا')
   })
 
   /*
@@ -181,7 +181,7 @@ describe('مفتاح البحث — يُطبَّع مرّةً في الخادم'
   })
 
   it('وهو مطبوع لا خام — فالمقارنة لا تطبع مع كلّ ضغطة', () => {
-    const c = buildCommands().find((x) => x.label === 'المنشورات')!
+    const c = buildCommands().find((x) => x.label === 'المسوّدات والفيديو')!
     expect(searchKey(c)).toBe(normalize(searchKey(c)))
   })
 })
@@ -235,9 +235,9 @@ describe('شريط الجوّال — أربعة في اليد: ثلاث وجه�
    */
   it('**مجموعتان وذيل** بترتيب D-388، والمطويُّ في الجدول لا في الرافدة', () => {
     expect(SECTIONS.map((s) => s.label)).toEqual(
-      ['الرئيسيّة', 'التيّار', 'النتائج', 'المنشورات', 'الخطّة', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
+      ['الرئيسيّة', 'التيّار', 'النتائج', 'المسوّدات والفيديو', 'الخطّة', 'المكتبة', 'حزمة المحتوى', 'الحسابات', 'ما عليك', 'الإعدادات'])
     expect(SECTIONS.filter((s) => s.tucked === undefined).map((s) => s.id)).toEqual(['overview', 'feed', 'results', 'library', 'accounts', 'tasks', 'settings'])
-    expect(SECTIONS.filter((s) => s.tucked !== undefined).map((s) => [s.id, s.tucked])).toEqual([['posts', 'more'], ['plan', 'palette'], ['package', 'palette']])
+    expect(SECTIONS.filter((s) => s.tucked !== undefined).map((s) => [s.id, s.tucked])).toEqual([['posts', 'more'], ['plan', 'more'], ['package', 'palette']])
     expect(SECTIONS.filter((s) => s.group === 'العمل' && s.tucked === undefined).map((s) => s.id)).toEqual(['overview', 'feed', 'results'])
     expect(SECTIONS.filter((s) => s.group === 'الموارد' && s.tucked === undefined).map((s) => s.id)).toEqual(['library', 'accounts', 'tasks'])
     expect(SECTIONS.filter((s) => s.foot === true).map((s) => s.id)).toEqual(['settings'])
@@ -249,10 +249,21 @@ describe('شريط الجوّال — أربعة في اليد: ثلاث وجه�
       ['#overview', '/panel/feed', '/panel/report', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
   })
 
+  it('ولكلّ مكانٍ اسمٌ واحد (D-419): الاعتمادُ في التيّار، والخطّةُ رابطٌ واحد، ولا «الضبط» مجموعةً', () => {
+    const cmds = buildCommands({ onPanel: false })
+    const approve = cmds.find((c) => c.label === 'اعتمد مسوّدة')!
+    expect(approve.note).toContain('في التيّار')
+    expect(approve.href).toContain('/panel/feed')
+    expect(SECTIONS.find((s) => s.id === 'posts')?.tight).toBe('مسوّدات')
+    expect(SECTIONS.find((s) => s.id === 'plan')?.page).toBe('/panel/plan')
+    expect(SECTIONS.find((s) => s.id === 'settings')?.group).toBe('الإعدادات')
+    expect(SECTIONS.some((s) => (s.group as string) === 'الضبط')).toBe(false)
+  })
+
   it('والمطويُّ في لوحة الأوامر بين الأفعال لا الأقسام، و«تقويم الشهر» بدل الخطّ الزمنيّ', () => {
     const cmds = buildCommands({ onPanel: false })
     expect(cmds.filter((c) => c.group === 'الأقسام').map((c) => c.label)).toEqual(['الرئيسيّة', 'التيّار', 'النتائج', 'المكتبة', 'الحسابات', 'ما عليك', 'الإعدادات'])
-    for (const label of ['المنشورات', 'الخطّة', 'حزمة المحتوى']) expect(cmds.find((c) => c.label === label)?.group).toBe('الأفعال')
+    for (const label of ['المسوّدات والفيديو', 'الخطّة', 'حزمة المحتوى']) expect(cmds.find((c) => c.label === label)?.group).toBe('الأفعال')
     expect(cmds.find((c) => c.label === 'تقويم الشهر')?.href).toBe('/panel/plan/month')
     expect(cmds.some((c) => c.href === '/panel/timeline')).toBe(false)
   })
@@ -314,7 +325,7 @@ describe('شريط الجوّال — أربعة في اليد: ثلاث وجه�
     const sheet = html.slice(html.indexOf('<details class="more-sheet">'), html.indexOf('</details>') + 10)
     expect(sheet).toContain('<summary>')
     expect(sheet).toMatch(/<span>المزيد<\/span><span class="count">5<\/span><\/summary>/)
-    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#posts', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
+    expect([...sheet.matchAll(/<a href="([^"]+)"/g)].map((m) => m[1])).toEqual(['#posts', '/panel/plan', '/panel/library', '/panel/accounts', '/panel/tasks', '/panel/settings'])
     expect(sheet).toContain('بحث وأوامر')
     expect(sheet).not.toMatch(/<(details|button)[^>]* hidden[ >]/)
   })

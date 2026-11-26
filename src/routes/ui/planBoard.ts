@@ -123,9 +123,9 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
 
   // ٥ · جدول: سطرٌ لكلّ بند، مرتّبًا بالموعد
   const rows = [...items].sort((a, b) => `${a.item.day}${a.item.time}`.localeCompare(`${b.item.day}${b.item.time}`)).map(({ item }) => `<tr>
-      <td>${escapeHtml(label(item.day))}</td><td><bdi dir="ltr">${escapeHtml(item.time)}</bdi></td><td>${plat(item.platform)}</td>
-      <td dir="auto">${escapeHtml(item.angle)}</td><td><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td>
-      <td>${kindChip(item.kind).value} ${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
+      <td>${escapeHtml(label(item.day))}</td><td data-label="الساعة"><bdi dir="ltr">${escapeHtml(item.time)}</bdi></td><td data-label="المنصّة">${plat(item.platform)}</td>
+      <td data-label="الزاوية" dir="auto">${escapeHtml(item.angle)}</td><td data-label="المصدر"><bdi>${escapeHtml(names[item.sourceId] ?? 'مصدر')}</bdi></td>
+      <td data-label="المحتوى">${kindChip(item.kind).value} ${item.asset === undefined ? 'يُولَّد' : 'من الأصول'}</td></tr>`).join('')
 
   /** **أضف بندًا** (D-264): مصدرٌ من مصادر العميل، ويومٌ ومنصّةٌ وساعةٌ وزاوية — يُلحق آخرَ الخطّة. */
   const addForm = (): string => sources.length === 0 ? '' : `<details class="pb-more mb-4"><summary>أضف بندًا</summary>

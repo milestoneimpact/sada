@@ -364,6 +364,15 @@ function scheduleUndo(id: string, at: string, to: 'draft' | 'approved', now: Dat
  * يُسجَّل في `audit_log` بمعرّف المسوّدة وحالتها الجديدة: D-009 يشترط
  * موافقةً بشريّة، وموافقةٌ بلا أثرٍ يُقرأ لا تُراجَع بعد شهر.
  */
+/**
+ * ‏**ومن التيّار إلى البطاقة التالية التي تنتظر** (D-417): `next` يملؤه التيّارُ بترتيب `awaitingIds`، ولا يُكتب في
+ * ‏العنوان إلّا بنمط `vtName` — وما سواه إلى البطاقة نفسِها.
+ */
+function feedNext(form: FormData, id: string): Response {
+  const next = String(form.get('next') ?? '')
+  return toFeed(POST_ID.test(next) ? next : id)
+}
+
 drafts.post('/panel/drafts/decide', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
@@ -472,7 +481,7 @@ drafts.post('/panel/drafts/decide', async (c) => {
   )
   await setFlash(c.env, c.req.raw, flash)
   // ‏ومن التيّار (D-386) إلى بطاقته فيه
-  if (form.get('back') === 'feed') return toFeed(id)
+  if (form.get('back') === 'feed') return feedNext(form, id)
   /*
    * ‏ومن المحرّر (D-198): المردودةُ والمعتمَدةُ بلا موعدٍ إلى المحرّر نفسِه (موعدُها فيه)، والمجدولةُ
    * ‏والمرفوضةُ إلى بطاقتها في القائمة. ومن البطاقة كما كان: المعتمَدةُ إلى شريط جدولتها.
@@ -1007,7 +1016,7 @@ drafts.post('/panel/drafts/requeue', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: 'عاد معتمَدًا بنصّه كما هو — اختر له موعدًا جديدًا.' }
     : { kind: 'bad', text: `تعذّرت الإعادة: ${result.reason}` })
-  if (fromFeed) return toFeed(id)
+  if (fromFeed) return feedNext(gate.form, id)
   if (card) return toCard('s', id)
   if (to !== '') return new Response(null, { status: 303, headers: { Location: to } })
   return toCard('d', id)
