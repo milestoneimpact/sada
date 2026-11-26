@@ -62,7 +62,9 @@ import { approvePlanVersion, reopenVersion, unscheduleMonth } from '../../lib/pl
 import { attachToPost, listLibrary } from '../../lib/library'
 import { rejectMedia } from '../../lib/image/job'
 import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
-import { itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { calendarItems, itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
+import { bulkPick, parseCalQuery } from '../../lib/plan/calendar'
+import { PLATFORM_IDS } from '../../lib/oauth/providers'
 import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
 import { PLAN_BUILD_SCRIPT, planBuildScreen, planningLine } from '../ui/planBuildView'
@@ -71,7 +73,7 @@ import { readSettings } from '../../lib/settings'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
-import { readPlanFlags } from '../../lib/plan/platforms'
+import { PLAN_BASE, readPlanFlags } from '../../lib/plan/platforms'
 import { ownerZone, storedZone } from '../../lib/time/ownerZone'
 import { addDays, nextSunday, renderTemplate, shortTemplate, templateReadme } from '../../lib/plan/template'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
@@ -983,12 +985,23 @@ plan.post('/panel/plan/month/approve', async (c) => {
   const [model, rules] = await Promise.all([reviewModel(c.env.DB, org, stored), readRules(c.env.DB, org)])
   const findings = planChecks(await reviewCheckInput(c.env.DB, org, model, zone, now), rules)
   const blocked = blockedKeys(findings)
-  const done = await approvePlanVersion(c.env.DB, org, stored.id, gate.session.record.email ?? 'owner', now)
+  // ‏«اعتمد ما في الفرز» (D-410): البنودُ المنتظرة المطابقة وحدَها، والخطّةُ تبقى مسوّدةً لما بقي
+  let only: string[] | undefined
+  if (String(f.get('scope') ?? '') === 'filter') {
+    const fq = new URLSearchParams()
+    for (const k of ['v', 'p', 'd', 'pf', 'st']) fq.set(k, String(f.get(k) ?? ''))
+    only = bulkPick(await calendarItems(c.env.DB, org, stored.id), parseCalQuery(fq, period + '-01', PLATFORM_IDS))
+    if (only.length === 0) {
+      await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لا بند ينتظر الاعتماد في هذا الفرز.' })
+      return c.redirect(to, 303)
+    }
+  }
+  const done = await approvePlanVersion(c.env.DB, org, stored.id, gate.session.record.email ?? 'owner', now, only)
   if (!done.ok) {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.reason })
     return c.redirect(to, 303)
   }
-  if (stored.status === 'draft') await approvePlan(c.env.DB, stored.id, org)
+  if (stored.status === 'draft' && only === undefined) await approvePlan(c.env.DB, stored.id, org)
   const fresh = await planForId(c.env.DB, org, stored.id) ?? stored
   const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
   await record(c.env.DB, { actor: 'panel', action: 'plan.month.approve', target: stored.id, detail: 'v' + String(done.version) + ':' + String(settled.scheduled) }, c.req.raw)
@@ -1048,8 +1061,8 @@ plan.get('/panel/plan/month', async (c) => {
   const now = new Date()
   const today = localDay(localParts(now, zone))
   const current = today.slice(0, 7)
-  const q = c.req.query('p')
-  const period = isPeriod(q) ? q : current
+  const calQ = parseCalQuery(new URL(c.req.url).searchParams, today, PLATFORM_IDS)
+  const period = calQ.period
   const canFix = allows(session.record.role ?? 'owner', 'publisher')
   const [stored, rules, diff, facts] = await Promise.all([
     planForPeriod(c.env.DB, org, period), readRules(c.env.DB, org), readDiff(c.env.DB, org, period),
@@ -1063,6 +1076,7 @@ plan.get('/panel/plan/month', async (c) => {
     total = model.cards.length
   }
   const blocked = blockedKeys(findings)
+  const calItems = stored === null ? [] : await calendarItems(c.env.DB, org, stored.id)
   const firstBlock = findings.find((f) => f.severity === 'block')
   const body = monthJourneyCard(facts.map((f) => monthJourney(f, today))) + '<div class="mt-3"></div>' + monthScreen({
     period, planId: stored?.id ?? null,
@@ -1074,6 +1088,7 @@ plan.get('/panel/plan/month', async (c) => {
     canApprove: canFix && stored?.status === 'draft',
     canRollback: canFix && stored !== null,
     prev: prevPeriod(period), next: nextPeriod(period),
+    cal: { q: calQ, items: calItems, platforms: [...new Set([...PLAN_BASE, ...calItems.map((i) => i.platform)])] },
   })
   // ‏وتقويمُ الشهر عرضٌ ثانٍ يُبلَغ من رأس التيّار (D-388)، فرافدتُه تعلِّم التيّارَ أبًا
   return page((nonce) => soloPage('صدى — شهر ' + period, { href: '/panel/feed', label: 'التيّار' }, injectCsrf(body, session.record.csrf), nonce,
