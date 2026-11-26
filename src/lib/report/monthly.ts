@@ -81,7 +81,8 @@ export function reportText(r: MonthlyReport, orgName: string, label: (platform: 
     '',
     `خرج: ${out}${out === 0 ? '' : ` (${Object.entries(r.published).map(([p, n]) => `${label(p)} ${n}`).join('، ')})`}`,
     `التفاعل: ${r.engagement} من ${r.measured} منشورًا قِيس`,
-    `أُنفق: ${money(r.spend)}`,
+    // ‏‏والبريدُ بأرقام الصفحة نفسِها (D-268): التقديرُ سطرٌ وحده (D-415)
+    `أُنفق: ${money(r.spend)}${r.estimated > 0 ? ` · ومقاطع بالتقدير: ${money(r.estimated)} (تقدير)` : ''}`,
     `قادم: ${r.upcoming} مجدولًا بعد هذا الشهر`,
     `أرجح موعد: ${r.slot ?? (r.why ?? 'لم يُقَس بعد')}`,
   ]

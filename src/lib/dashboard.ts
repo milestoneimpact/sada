@@ -52,7 +52,7 @@ export interface TileSource {
    * إنفاقُ ثلاثين يومًا **من الدفتر كلِّه**، صفًّا لكلّ جهة — لا من مزوّدي الذكاء
    * وحدهم: كان التعليقُ يعدّ نداءاتِ الذكاء والرقمُ فوقه يجمع X معها.
    */
-  readonly spendBy: readonly { readonly calls: number; readonly total: number }[]
+  readonly spendBy: readonly { readonly calls: number; readonly total: number; readonly estimate?: boolean }[]
   /** ما أُنفق منذ أوّل الشهر بتوقيت المالك — و`utc` حين غابت منطقتُه فحُسب بـ UTC. */
   readonly spendMonth: { readonly total: number; readonly estimated?: number; readonly utc: boolean }
   readonly series: readonly { day: string; total: number }[]
@@ -174,13 +174,17 @@ export const TILES: readonly TileSpec[] = [
     label: 'إنفاق 30 يومًا',
     why: 'آخر ثلاثين يومًا متّصلة، وعلى كم خدمة توزّعت.',
     of: (d, f) => {
-      const calls = d.spendBy.reduce((sum, s) => sum + s.calls, 0)
+      // ‏‏تقديرُ المقاطع ليس إنفاقًا حقيقيًّا ولا خدمةً أخرى (D-415): يُقال بجانب الرقم موسومًا
+      const real = d.spendBy.filter((s) => s.estimate !== true)
+      const estimated = d.spendBy.filter((s) => s.estimate === true).reduce((sum, s) => sum + s.total, 0)
+      const calls = real.reduce((sum, s) => sum + s.calls, 0)
+      const tail = estimated > 0 ? ` · ومقاطع بالتقدير ${f.money(estimated)} (تقدير)` : ''
       return {
-        value: f.money(d.spendBy.reduce((sum, s) => sum + s.total, 0)),
+        value: f.money(real.reduce((sum, s) => sum + s.total, 0)),
         // ‏والعددُ من «counted» (D-177): «6 طلبات إلى خدمتَين» لا «1 مزوّدا نشطا · 6 نداءً»
-        note: calls === 0
+        note: (calls === 0
           ? 'لا طلب مدفوعًا في 30 يومًا'
-          : `${counted(calls, NOUNS.request)} إلى ${counted(d.spendBy.length, NOUNS.service, 'gen')}`,
+          : `${counted(calls, NOUNS.request)} إلى ${counted(real.length, NOUNS.service, 'gen')}`) + tail,
       }
     },
   },

@@ -10,11 +10,12 @@ import { toBase64 } from '../crypto'
 import { readSettings, writeSetting } from '../settings'
 import type { AiBinding } from './workersAi'
 import { animateForPost } from './video'
-import { claimVideoSpend, markVideoGenerated, reclaimStuckVideoSpend, releaseVideoSpend, videoBudget, videoSpendThisMonth } from './videoBudget'
-import { STALE_MINUTES } from './claim'
+import * as budget from './videoBudget'
+import { claimVideoSpend, markVideoGenerated, releaseVideoSpend, videoBudget, videoSpendThisMonth } from './videoBudget'
 import { checkAllowance, videoMonthCapOf } from '../limits'
 import { spendByProvider, spendRows, spendThisMonth } from '../ai/spend'
-import { monthlyReport } from '../report/monthly'
+import { monthlyReport, reportText } from '../report/monthly'
+import { TILES } from '../dashboard'
 import { videoBudgetForms } from '../../routes/panelView'
 import { videoReadiness } from './readiness'
 import { videoCapGate } from '../limits'
@@ -154,22 +155,15 @@ describe('ملاحظاتُ المراجعة على D-414 (D-415)', () => {
     return c.ledgerId
   }
 
-  it('حجزٌ علق بلا نتيجةٍ بعد مهلة حجز التوليد يعود مالُه، وما وُلّد لا يُلمس، والحديثُ ينتظر', async () => {
-    const stuck = await claim('a')
+  it('لا كنّاسَ: صفٌّ بلا نتيجة — قديمٌ أو حديث، موسومٌ أم لا — يبقى محسوبًا (D-415)', async () => {
+    expect('reclaimStuckVideoSpend' in budget).toBe(false)
+    const old = await claim('a')
     const made = await claim('b')
-    const fresh = await claim('c')
     await markVideoGenerated(db, 'org_owner', made)
-    minutesAgo(stuck, STALE_MINUTES.video + 1)
-    minutesAgo(made, STALE_MINUTES.video + 1)
-    minutesAgo(fresh, STALE_MINUTES.video - 1)
-    expect(await reclaimStuckVideoSpend(db, new Date())).toBe(1)
-    const by = (id: string) => db.raw.prepare('SELECT operation, total FROM cost_ledger WHERE id = ?').get(id) as { operation: string; total: number }
-    expect(by(stuck)).toEqual({ operation: expect.stringMatching(/:released$/), total: 0 })
-    expect(by(made)).toEqual({ operation: expect.stringMatching(/:generated$/), total: 0.5 })
-    expect(by(fresh).total).toBe(0.5)
+    minutesAgo(old, 60 * 24 * 3)
+    // ‏‏وإعادةٌ متأخّرةٌ لصفٍّ وُلّد لا تلمسه
+    await releaseVideoSpend(db, 'org_owner', made)
     expect(await videoSpendThisMonth(db, 'org_owner')).toBe(1)
-    // ‏‏ومرّةً ثانيةً لا شيء: الكنسُ لا يكرّر
-    expect(await reclaimStuckVideoSpend(db, new Date())).toBe(0)
   })
 
   it('وإعادةٌ فشلت تُسجَّل ولا تُبلَع — بالمعرّف وحده', async () => {
@@ -212,5 +206,25 @@ describe('ملاحظاتُ المراجعة على D-414 (D-415)', () => {
     expect(videoMonthCapOf(await checkAllowance(db, 'video', 'org_owner'))).toEqual({ cap: 10, scope: 'global' })
     const html = videoBudgetForms(10, 0.5, 1, active.cap)
     expect(html).toContain('من ⁦3.00$⁩')
+  })
+
+  it('بلاطةُ «إنفاق 30 يومًا» لا تجمع التقدير ولا تعدّه خدمة، وتقوله بجانبها', () => {
+    const t = TILES.find((x) => x.id === 'spend_30d')
+    if (t === undefined) throw new Error('لا بلاطة')
+    const fmt = { money: (n: number) => `$${n.toFixed(2)}` } as never
+    const one = t.of({ spendBy: [{ key: 'anthropic', label: 'A', calls: 2, total: 1 }] } as never, fmt)
+    const out = t.of({ spendBy: [
+      { key: 'anthropic', label: 'A', calls: 2, total: 1 },
+      { key: 'cloudflare:estimate', label: 'تقدير', calls: 1, total: 0.5, estimate: true },
+    ] } as never, fmt)
+    expect(out.value).toBe('$1.00')
+    expect(out.note).toBe(`${one.note} · ومقاطع بالتقدير $0.50 (تقدير)`)
+  })
+
+  it('بريدُ التقرير الشهريّ يحمل سطرَ التقدير كالصفحة (D-268)', async () => {
+    await claim('v')
+    const r = await monthlyReport(db, 'org_owner', new Date().toISOString().slice(0, 7), null)
+    const text = reportText(r, 'صدى', (p) => p, (n) => `$${n.toFixed(2)}`)
+    expect(text).toContain('أُنفق: $0.00 · ومقاطع بالتقدير: $0.50 (تقدير)')
   })
 })

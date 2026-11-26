@@ -25,7 +25,6 @@ import { scanDriveMedia } from './lib/drive/media'
 import { publishPost, type PublishMessage } from './lib/publish/publisher'
 import { claimDelivery, dispatchDue, sweepStuck } from './lib/schedule/job'
 import { expireStaleUploads } from './lib/media/uploads'
-import { reclaimStuckVideoSpend } from './lib/media/videoBudget'
 import { pullDue } from './lib/metrics/job'
 import { runWeeklyAll } from './lib/report/job'
 import { collectAlerts } from './lib/alerts/collect'
@@ -808,12 +807,6 @@ async function dispatchTick(env: Env): Promise<void> {
       return []
     })
     if (swept.length > 0) console.error({ job: 'sweep', failed_posts: swept.map((s) => s.id) })
-    // ‏‏وحجزُ مقطعٍ بلا نتيجةٍ بعد مهلة حجز التوليد يعود مالُه (D-415) — وما وُلّد لا يُلمس
-    const reclaimed = await reclaimStuckVideoSpend(env.DB, new Date()).catch((error: unknown) => {
-      console.error({ job: 'video_reclaim', failed: String(error) })
-      return 0
-    })
-    if (reclaimed > 0) console.info({ job: 'video_reclaim', released: reclaimed })
     const report = await dispatchDue({ db: env.DB, queue: env.PUBLISH_QUEUE })
     if (report.kind === 'sent') {
       console.info({ job: 'dispatch', sent: report.count, ids: report.ids, ahead: report.ahead })
