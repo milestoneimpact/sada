@@ -165,7 +165,9 @@ export async function spendTodayFor(db: Db, provider: string): Promise<number> {
         `SELECT coalesce(sum(total), 0) AS total
            FROM cost_ledger
           -- سقفُ المزوّد عامّ لكلّ المنظّمات: المزوّدون إعدادٌ عامّ
-          WHERE org_id IN (SELECT id FROM orgs) AND provider = ? AND at >= date('now')`,
+          -- والمقاطعُ خارجه: ميزانيّتُها الشهريّةُ تحرسها، وتقديرُها لا يوقف صورَ المزوّد نفسِه (D-414)
+          WHERE org_id IN (SELECT id FROM orgs) AND provider = ? AND at >= date('now')
+            AND operation NOT LIKE 'video:%'`,
       )
       .bind(provider)
       .first<{ total: number }>()

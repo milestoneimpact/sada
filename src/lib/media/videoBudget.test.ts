@@ -13,6 +13,7 @@ import { animateForPost } from './video'
 import { claimVideoSpend, videoBudget, videoSpendThisMonth } from './videoBudget'
 import { videoReadiness } from './readiness'
 import { videoCapGate } from '../limits'
+import { spendTodayFor } from '../ai/spend'
 
 const KEY = toBase64(crypto.getRandomValues(new Uint8Array(32)))
 const OK_VIDEO = { state: 'Completed', result: { video: 'https://cf.example/v.mp4' } }
@@ -97,6 +98,12 @@ describe('ميزانيّة المقاطع الشهريّة', () => {
       claimVideoSpend(db, { org: 'org_owner', cap: 1.5, clip: 0.5, operation: 'video:m:price_unverified', refId: `r${i}` })))
     expect(claims.filter((c) => c.kind === 'claimed')).toHaveLength(3)
     expect(await videoSpendThisMonth(db, 'org_owner')).toBe(1.5)
+  })
+
+  it('تقديرُ المقطع لا يدخل سقفَ المزوّد اليوميّ فلا يوقف صورَه (D-414)', async () => {
+    await claimVideoSpend(db, { org: 'org_owner', cap: 10, clip: 0.5, operation: 'video:m:price_unverified', refId: 'rv' })
+    expect(await videoSpendThisMonth(db, 'org_owner')).toBe(0.5)
+    expect(await spendTodayFor(db, 'cloudflare')).toBe(0)
   })
 
   it('ما ردّه المزوّدُ يعيد مالَه ويبقى صفُّه أثرًا', async () => {
