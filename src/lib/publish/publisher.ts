@@ -175,7 +175,7 @@ export async function publishPost(
   }
 
   /*
-   * ‏**صفحةُ LinkedIn تُنشَر باسمها** (D-422 — كانت تُردّ هنا منذ D-087 حتّى يُبنى سائقُها). والمؤلّفُ
+   * ‏**صفحةُ LinkedIn تُنشَر باسمها** (D-423 — كانت تُردّ هنا منذ D-087 حتّى يُبنى سائقُها). والمؤلّفُ
    * ‏`urn:li:organization:<رقم>` من الحساب، والمسارُ مسارُ الشخص نفسُه (Posts API) بمفتاحه ودفتره.
    * ‏**ومعرّفٌ ليس رقمًا يُردّ الآن** لا عند المنصّة. والنطاقُ يُسأل بعد قراءة الرمز أدناه.
    * ‏والحارسُ لـ LinkedIn وحدها: YouTube يحفظ قناتَه بنوع `org` (`identity.ts`).
@@ -338,7 +338,7 @@ export async function publishPost(
    * ثمنُه وجاهز. فالثاني تحسينٌ يُقرأ لا شرطٌ يُفرَض.
    */
   const direct = post.platform === 'tiktok' && canUploadMedia('tiktok', tokens.scopes)
-  // ‏**ورمزُ الصفحة من التطبيق الثاني لا يحمل w_member_social** (D-422): نطاقُه w_organization_social، وبه يُرفع الوسيطُ أيضًا.
+  // ‏**ورمزُ الصفحة من التطبيق الثاني لا يحمل w_member_social** (D-423): نطاقُه w_organization_social، وبه يُرفع الوسيطُ أيضًا.
   // ‏وبلاه سببٌ يُقرأ بالعربيّة، لا اسمُ نطاقٍ عارٍ
   if (page && !pageCanPublish(tokens.scopes)) return preflightFailed(db, post, PAGE_SAY.scope, deps.queueAttempt)
   const capable = page ? true : CLIP_PLATFORMS.has(post.platform)

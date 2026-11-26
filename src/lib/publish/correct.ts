@@ -76,7 +76,7 @@ export interface Original {
   readonly remote_ids: readonly string[]
 }
 
-// ‏النطاقُ والمؤلّفُ في موضعهما الواحد مع سائق الصفحة (D-422)
+// ‏النطاقُ والمؤلّفُ في موضعهما الواحد مع سائق الصفحة (D-423)
 export { LINKEDIN_ORG_SCOPE, linkedInAuthor } from '../linkedinPage'
 import { LINKEDIN_ORG_SCOPE, linkedInAuthor } from '../linkedinPage'
 

@@ -161,7 +161,7 @@ channels.post('/panel/channels/disconnect', async (c) => {
     return toSetup(form)
   }
 
-  // ‏وصفحةُ LinkedIn تُبطَل بسرّي تطبيقها الثاني لا الأوّل (مراجعة D-422)
+  // ‏وصفحةُ LinkedIn تُبطَل بسرّي تطبيقها الثاني لا الأوّل (مراجعة D-423)
   const app = target.platform === 'linkedin' && target.kind === 'org'
     ? pageApp(c.env as unknown as Record<string, unknown>)
     : await readApp(c.env.DB, c.env.TOKEN_ENC_KEY, target.platform, c.env as unknown as Record<string, string | undefined>)
@@ -411,7 +411,7 @@ channels.get('/panel/channels/:platform', async (c) => {
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
-    // ‏وسرّا تطبيق الصفحة (D-422): اسمٌ يُسأل عن وجوده، لا قيمة
+    // ‏وسرّا تطبيق الصفحة (D-423): اسمٌ يُسأل عن وجوده، لا قيمة
     pageApp: pageApp(c.env as unknown as Record<string, unknown>) !== null,
     // ‏ويومُ المالك من كعكة متصفّحه، لا من إعدادٍ يُخزَّن (D-173)
     zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),

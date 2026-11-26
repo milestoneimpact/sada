@@ -1114,7 +1114,7 @@ describe('ما يسقط قبل الإرسال يترك أثرًا (D-159)', () =
  * `org`، فكان كلُّ رفعٍ إليها يُردّ بسببٍ يخصّ صفحاتِ LinkedIn.
  */
 describe('حساب الصفحة', () => {
-  /** ‏صفحةٌ رقمُها 12345 وإذنُها من التطبيق الثاني (D-422) — أو بنطاقات الشخص حين `scopes` يُمرَّر. */
+  /** ‏صفحةٌ رقمُها 12345 وإذنُها من التطبيق الثاني (D-423) — أو بنطاقات الشخص حين `scopes` يُمرَّر. */
   async function seedPage(scopes = 'w_organization_social r_organization_social', externalId = '12345'): Promise<string> {
     const accountId = await upsertAccount(db, 'org_owner', { platform: 'linkedin', kind: 'org', externalId, displayName: 'صدى للنشر' })
     await saveTokens(db, KEY, accountId, { ...LIVE_TOKENS, scopes })
@@ -1125,7 +1125,7 @@ describe('حساب الصفحة', () => {
     return 'p-page'
   }
 
-  it('صفحة LinkedIn بإذنها تُنشَر باسمها: urn:li:organization في الجسم، ومفتاحُها مسجّل (D-422)', async () => {
+  it('صفحة LinkedIn بإذنها تُنشَر باسمها: urn:li:organization في الجسم، ومفتاحُها مسجّل (D-423)', async () => {
     const post = await seedPage()
     let author = ''
     const impl = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {

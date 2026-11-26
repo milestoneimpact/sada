@@ -116,7 +116,7 @@ export interface PlatformScreenData {
    * صندوق التطبيق، وتقول البطاقةُ ذلك بدل «للعامّة».
    */
   readonly reachNoScope?: boolean
-  /** ‏أضُبط سرّا تطبيق صفحة LinkedIn الثاني؟ (D-422) — لـ LinkedIn وحدها، وغيابُه «لا». */
+  /** ‏أضُبط سرّا تطبيق صفحة LinkedIn الثاني؟ (D-423) — لـ LinkedIn وحدها، وغيابُه «لا». */
   readonly pageApp?: boolean
   /** نبضُ القناة لهذا العميل (D-263) — يغيب لمنصّةٍ لا تُقاس. */
   readonly pulse?: Pulse
@@ -960,7 +960,7 @@ function setupSection(d: PlatformScreenData, r: Readiness): string {
 }
 
 /**
- * ‏**صفحةُ LinkedIn — وجهةٌ ثانيةٌ بتطبيقٍ ثانٍ** (D-422 · M-03). بلا سرّيه حالٌ تُقال بالعربيّة لا زرٌّ يفشل،
+ * ‏**صفحةُ LinkedIn — وجهةٌ ثانيةٌ بتطبيقٍ ثانٍ** (D-423 · M-03). بلا سرّيه حالٌ تُقال بالعربيّة لا زرٌّ يفشل،
  * ‏وبهما «اربط صفحة LinkedIn» ومعه عنوانُ العودة كما يُلصق في بوّابة المطوّر.
  */
 export function pageConnectCard(ready: boolean, base: string, accounts: readonly { readonly kind: string; readonly displayName: string; readonly pagePublish?: boolean }[]): string {

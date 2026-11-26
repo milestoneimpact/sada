@@ -427,7 +427,7 @@ drafts.post('/panel/drafts/decide', async (c) => {
   let extraNote = ''
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
     // ‏والإمساكُ بنافذة «تراجَع» (D-324): موعدٌ أقربُ منها يُردّ، فلا يُنشَر شيءٌ والزرُّ قائم
-    // ‏‏وجهتان أو أكثر (D-422): منشورٌ لكلّ وجهةٍ بمفتاحه، والأولى على المنشور نفسِه
+    // ‏‏وجهتان أو أكثر (D-423): منشورٌ لكلّ وجهةٍ بمفتاحه، والأولى على المنشور نفسِه
     const all = await scheduleDestinations(c.env.DB, id, form.getAll('account').map(String), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS)
     scheduled = all[0]!.result
     extraNote = await destinationsNote(c.env.DB, activeOrg(gate.session.record), all.slice(1))
@@ -620,7 +620,7 @@ drafts.post('/panel/drafts/approve-many', async (c) => {
  * موضعٍ واحد يشترك فيه هذا الزرّ وأيُّ منادٍ آخر. وزرٌّ في صفحةٍ ليس
  * طريقا جانبيّا حول الحارس (D-019).
  */
-/** ‏ما وقع للوجهات الزائدة — سطرٌ لكلٍّ باسمها، يُلحق بإشعار الأولى (D-422). */
+/** ‏ما وقع للوجهات الزائدة — سطرٌ لكلٍّ باسمها، يُلحق بإشعار الأولى (D-423). */
 async function destinationsNote(db: Env['DB'], org: string, extra: readonly DestinationResult[]): Promise<string> {
   if (extra.length === 0) return ''
   const accounts = await listAccounts(db, org)
@@ -639,7 +639,7 @@ drafts.post('/panel/drafts/schedule', async (c) => {
   const id = String(form.get('id') ?? '')
   const now = new Date()
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  // ‏‏وجهتان أو أكثر (D-422): «LinkedIn · حسابي» و«LinkedIn · صفحة …» معًا منشوران، لكلٍّ مفتاحُه، وسقوطُ واحدٍ لا يوقف الآخر
+  // ‏‏وجهتان أو أكثر (D-423): «LinkedIn · حسابي» و«LinkedIn · صفحة …» معًا منشوران، لكلٍّ مفتاحُه، وسقوطُ واحدٍ لا يوقف الآخر
   const all = await scheduleDestinations(
     c.env.DB,
     id,
@@ -925,7 +925,7 @@ drafts.post('/panel/drafts/undo-schedule', async (c) => {
   const result = await undoSchedule(c.env.DB, id, activeOrg(gate.session.record), {
     at: String(form.get('at') ?? ''), until: String(form.get('until') ?? ''), to,
   }, new Date())
-  // ‏ونُسخُ الوجهات من الجدولة نفسِها تُسحب معها (مراجعة D-422): وإلّا نُشرت الصفحةُ والأصلُ قد سُحب
+  // ‏ونُسخُ الوجهات من الجدولة نفسِها تُسحب معها (مراجعة D-423): وإلّا نُشرت الصفحةُ والأصلُ قد سُحب
   const copies = result.ok ? await withdrawCopies(c.env.DB, id, activeOrg(gate.session.record), String(form.get('at') ?? '')) : { withdrawn: 0, stuck: 0 }
   const also = (copies.withdrawn > 0 ? ' وسُحب معها ' + String(copies.withdrawn) + (copies.withdrawn === 1 ? ' منشورٌ على حسابٍ آخر.' : ' منشوراتٍ على حساباتٍ أخرى.') : '')
     + (copies.stuck > 0 ? ' و' + String(copies.stuck) + ' غادر إلى الطابور فلم يُسحب — افتحه من بطاقته.' : '')

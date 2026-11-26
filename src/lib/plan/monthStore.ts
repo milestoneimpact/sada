@@ -75,7 +75,7 @@ export async function monthFacts(db: Db, org: string, period: string): Promise<M
 
 /** بنودُ التقويم الموحّد (D-410): كلُّ بندٍ بموعده ومنصّته وحال منشوره، والمرفوضُ لا يُعدّ. */
 export async function calendarItems(db: Db, org: string, planId: string): Promise<CalItem[]> {
-  // ‏وبندٌ جُدول منشورُه على صفحة LinkedIn يُعرض وجهتَه (D-422): «LinkedIn · صفحة» لا «LinkedIn»
+  // ‏وبندٌ جُدول منشورُه على صفحة LinkedIn يُعرض وجهتَه (D-423): «LinkedIn · صفحة» لا «LinkedIn»
   const r = await db.prepare(`SELECT i.id,
                                      CASE WHEN i.platform = 'linkedin' AND EXISTS (SELECT 1 FROM posts p JOIN accounts a ON a.id = p.account_id
                                             WHERE p.plan_item_id = i.id AND p.org_id = i.org_id AND p.status != 'rejected' AND a.kind = 'org')

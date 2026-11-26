@@ -425,7 +425,7 @@ export interface LinkedAccount {
   readonly renewable?: boolean
   /** متى ينتهي إذنُ التجديد — و`null` لتجديدٍ بلا موعد. */
   readonly refreshExpiresAt?: string | null
-  /** ‏أيحمل إذنُه w_organization_social؟ — لصفحة LinkedIn وحدها معنًى (D-422). */
+  /** ‏أيحمل إذنُه w_organization_social؟ — لصفحة LinkedIn وحدها معنًى (D-423). */
   readonly pagePublish?: boolean
 }
 
@@ -443,7 +443,7 @@ export function isLinkedInPage(a: { readonly platform: string; readonly kind: st
 }
 
 /**
- * ‏**صفحةٌ تُنشَر باسمها** (D-422): صفحةُ LinkedIn رُبطت بالتطبيق الثاني فحمل إذنُها w_organization_social.
+ * ‏**صفحةٌ تُنشَر باسمها** (D-423): صفحةُ LinkedIn رُبطت بالتطبيق الثاني فحمل إذنُها w_organization_social.
  * ‏وهي وجهةٌ مستقلّةٌ تُختار صراحةً («LinkedIn · صفحة …»)، **ولا تحلّ محلّ الحساب الشخصيّ** حيث يُختار الحسابُ آليًّا.
  */
 export function isPublishablePage(a: { readonly platform: string; readonly kind: string; readonly pagePublish?: boolean }): boolean {

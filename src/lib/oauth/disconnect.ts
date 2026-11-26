@@ -18,7 +18,7 @@ import type { Platform } from './providers'
 import { withTimeout } from '../net/timeout'
 
 /** ما وقع عند المنصّة: أُبطل، أو تعذّر، أو لا نهايةَ إبطالٍ تُنادى. */
-/** ‏و`shared`: رمزُ مديرٍ تحمله صفحةٌ أخرى ما زالت مربوطة (مراجعة D-422) — فلا يُبطَل عند المنصّة. */
+/** ‏و`shared`: رمزُ مديرٍ تحمله صفحةٌ أخرى ما زالت مربوطة (مراجعة D-423) — فلا يُبطَل عند المنصّة. */
 export type RevokeOutcome = 'revoked' | 'failed' | 'unsupported' | 'no_tokens' | 'shared'
 
 /** أين يسحب المالكُ الإذنَ بيده: الصفحةُ نفسُها لا وصفُها. */
@@ -119,7 +119,7 @@ export interface DisconnectTarget {
   readonly id: string
   readonly platform: Platform
   readonly displayName: string
-  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn بتطبيقها الثاني (D-422). */
+  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn بتطبيقها الثاني (D-423). */
   readonly kind?: string
   /** منظّمةُ الحساب: لا يُفصَل حسابُ منظّمةٍ من شاشة غيرها (D-229). */
   readonly org: string
@@ -168,7 +168,7 @@ export async function disconnectAccount(
   }
 
   /*
-   * ‏**رمزُ المدير مشتركٌ بين الصفحات التي اختيرت في موافقةٍ واحدة** (مراجعة D-422): إبطالُه عند LinkedIn يُسقط الصفحاتِ الأخرى
+   * ‏**رمزُ المدير مشتركٌ بين الصفحات التي اختيرت في موافقةٍ واحدة** (مراجعة D-423): إبطالُه عند LinkedIn يُسقط الصفحاتِ الأخرى
    * ‏وهي ما زالت مربوطة. فإن حملت صفحةٌ أخرى نشطةٌ الرمزَ نفسَه حُذف الحسابُ هنا وحده، ولا يُنادى الإبطال.
    */
   let shared = false

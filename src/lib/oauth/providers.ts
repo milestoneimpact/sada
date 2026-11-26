@@ -45,7 +45,7 @@ export const PLATFORM_LABEL: Readonly<Record<Platform, string>> = {
 }
 
 export function platformLabel(id: string): string {
-  // ‏وصفحةُ LinkedIn وجهةٌ لا منصّة (D-422): `linkedin-page` في الخطّة والتقويم والفرز
+  // ‏وصفحةُ LinkedIn وجهةٌ لا منصّة (D-423): `linkedin-page` في الخطّة والتقويم والفرز
   if (id === 'linkedin-page') return 'LinkedIn · صفحة'
   return (PLATFORM_LABEL as Readonly<Record<string, string>>)[id] ?? id
 }

@@ -155,14 +155,14 @@ export async function readPackagePlan(bytes: Uint8Array): Promise<PackagePlan> {
  * القالبُ خطّةَ حزمة: مفتاحُ البند `dDD` (والثاني لليوم والمنصّة نفسَيهما `dDD-2`) لا رقمَ مادّة، فلا يُطابَق بوسيطة مادّةٍ أخرى،
  * والنصُّ من العمود نفسِه (يغلبه نصُّ 02-copy إن وُجد بالمفتاح نفسِه، ولن يوجد). والأخطاءُ مشكلاتُ الخطّة بسطرها وعمودها.
  */
-/** ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-422). */
+/** ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-423). */
 export const PAGE_PACKAGE_REFUSAL = 'صفحة LinkedIn (linkedin-page) لا تُجدوَل من حزمة المستودع بعد، فتُرك السطر ولم يُنشر على حسابك الشخصيّ — جدوِله على الصفحة من المحرّر أو استورده «من ملفّ».'
 
 export function planFromTemplate(text: string, path: string): PackagePlan {
   const format = /\.csv$/i.test(path) ? 'csv' : 'md'
   const read = readTemplate(text, format, templatePeriod(path))
   const count = new Map<string, number>()
-  // ‏**وسطرُ `linkedin-page` يُردّ في مسار الحزمة ولا يُحوَّل** (مراجعة D-422): كان يصير بندَ LinkedIn فيُنشر على الحساب الشخصيّ،
+  // ‏**وسطرُ `linkedin-page` يُردّ في مسار الحزمة ولا يُحوَّل** (مراجعة D-423): كان يصير بندَ LinkedIn فيُنشر على الحساب الشخصيّ،
   // ‏وخطّةٌ بالسطرين تنشره عليه مرّتين. فيُترك بسببٍ في تقرير الحزمة، والصفحةُ تُجدوَل من المحرّر أو بـ«من ملفّ»
   const pageRows = read.rows.filter((r) => r.platform === 'linkedin-page')
   const entries: PlanEntry[] = read.rows.filter((r) => r.platform !== 'linkedin-page').map((r) => {

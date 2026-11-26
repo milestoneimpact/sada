@@ -86,7 +86,7 @@ export async function reviewModel(db: Db, org: string, plan: StoredPlan): Promis
   const [meta, posts, media, versions, failures] = await Promise.all([
     db.prepare('SELECT version, locked_at FROM plans WHERE id = ? AND org_id = ?').bind(plan.id, org)
       .first<{ version: number; locked_at: string | null }>().catch(() => null),
-    // ‏واسمُ الصفحة إن جُدول المنشورُ على صفحة LinkedIn (D-422): البطاقةُ تقول «LinkedIn · صفحة …» لا «LinkedIn»
+    // ‏واسمُ الصفحة إن جُدول المنشورُ على صفحة LinkedIn (D-423): البطاقةُ تقول «LinkedIn · صفحة …» لا «LinkedIn»
     db.prepare(`SELECT id, platform, text, status, scheduled_at, source_id, source_refs, idempotency_key, edited_in_sada,
                        (SELECT a.display_name FROM accounts a WHERE a.id = posts.account_id AND a.kind = 'org' AND a.platform = 'linkedin') AS page_name
                   FROM posts
