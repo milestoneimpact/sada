@@ -33,12 +33,13 @@ export function importsScreen(rows: readonly ImportRow[], canRecheck: boolean): 
     <tbody>${rows.map((r) => html`<tr>
       <td><span class="chip">${SOURCE_SAY[r.sourceKind] ?? r.sourceKind}</span>${r.sourceRef === null ? '' : html` <span class="mono">${r.sourceRef}</span>`}</td>
       <td class="mono">${r.period ?? '—'}</td>
-      <td>${raw(statusBadge(STATUS_TONE[r.status] ?? 'idle', r.status === 'failed' ? '×' : '•', STATUS_SAY[r.status] ?? r.status))}</td>
+      <td>${raw(statusBadge(STATUS_TONE[r.status] ?? 'idle', r.status === 'failed' ? '×' : '•', STATUS_SAY[r.status] ?? r.status))}${(r.reseen ?? 0) === 0 ? '' : html`
+        ${raw(statusBadge('idle', '○', 'أُعيد رفعُه بلا تغيير ' + String(r.reseen)))}${r.lastSeenAt == null ? '' : html` <span class="ago">آخرُها <bdi dir="ltr">${r.lastSeenAt.slice(0, 16)}</bdi></span>`}`}</td>
       <td class="mono">${r.contentHash.slice(0, 10)}</td>
       <td>${r.summary}</td>
       <td>${canRecheck && r.period !== null
         ? html`<form class="inline" method="GET" action="/panel/plan/month"><input type="hidden" name="p" value="${r.period}">${raw(button({ label: 'إعادة الفحص', size: 'sm', type: 'submit', variant: 'secondary' }))}</form>`
-        : ''}</td>
+        : ''}${r.planId == null ? '' : html` <a class="tap" href="/panel/plan/versions?plan=${r.planId}">قارن الإصدارات</a>`}</td>
     </tr>`)}</tbody></table></div>`
   return head + card({ title: 'آخر ' + String(rows.length) + ' استيراد', body: body.value })
 }

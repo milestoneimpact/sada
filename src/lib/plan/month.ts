@@ -132,6 +132,10 @@ export interface ImportRow {
   readonly createdAt: string
   /** سطرٌ ممّا في `report_json`: ما أُضيف وتغيّر وحُذف، أو سببُ الفشل. */
   readonly summary: string
+  readonly planId?: string | null
+  /** كم مرّةً أُعيد رفعُ الملفّ نفسِه بلا تغيير (D-406)، ومتى آخرُها. */
+  readonly reseen?: number
+  readonly lastSeenAt?: string | null
 }
 
 export interface DiffRow {

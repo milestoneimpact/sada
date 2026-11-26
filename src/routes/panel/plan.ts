@@ -7,9 +7,11 @@ import { statusBadge } from '../ui/components/badge'
 import { awaitingCount, awaitingRevision } from '../../lib/package/revision'
 import { sourceNames } from './client'
 import { PLAN_DOC_SCRIPT, planDocScreen } from '../ui/planDocView'
-import { fillGaps, seatPlan, seatedPosts, toTable } from '../../lib/plan/seat'
+import { fillGaps, seatPlan, previewSeat, seatedPosts, toTable } from '../../lib/plan/seat'
 import { PLAN_SEAT_SCRIPT, planSeatScreen } from '../ui/planSeatView'
 import { planPreviewScreen } from '../ui/planPreviewView'
+import { versionsScreen } from '../ui/planVersionsView'
+import { diffVersions, readPlanVersions, type PlanVersion } from '../../lib/plan/versions'
 import { widenPlan } from '../../lib/plan/widen'
 import { rulesSection, type PlanRules } from '../../lib/plan/guidelines'
 import type { PlanImageStyle } from '../../lib/plan/prompt'
@@ -25,7 +27,7 @@ import { checksStrip, rulesScreen } from '../ui/checksView'
 import { blockedKeys, hhmm, parseRulesForm, planChecks, planFix, RULE_LABEL, type RuleId } from '../../lib/plan/checks'
 import { readRules, reviewCheckInput, writeRules } from '../../lib/plan/checkStore'
 import { itemKey } from '../../lib/plan/review'
-import { localParts } from '../../lib/time/zone'
+import { dayLabel, localParts } from '../../lib/time/zone'
 import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
@@ -1081,6 +1083,21 @@ plan.get('/panel/plan/imports', async (c) => {
     '', buildCommands({ onPanel: false }), soloNav('posts')))
 })
 
+/** **«قارن الإصدارات»** (D-406): إصداران من خطّةٍ مرفوعة متجاوران — صورُ `plan_versions` والإصدارُ القائم. */
+plan.get('/panel/plan/versions', async (c) => {
+  const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
+  if (session === null) return loginResponse(c.env, c.req.raw)
+  const planId = c.req.query('plan') ?? ''
+  const versions = /^[0-9a-f-]{36}$/.test(planId) ? await readPlanVersions(c.env.DB, activeOrg(session.record), planId) : []
+  if (versions.length === 0) return c.redirect('/panel/plan/imports', 303)
+  const pick = (q: string | undefined, fallback: PlanVersion): PlanVersion => versions.find((v) => String(v.version) === q) ?? fallback
+  const b = pick(c.req.query('b'), versions[versions.length - 1]!)
+  const a = pick(c.req.query('a'), versions[Math.max(0, versions.length - 2)]!)
+  const body = versionsScreen({ planId, versions, a, b, changes: diffVersions(a, b) })
+  return page((nonce) => soloPage('صدى — قارن الإصدارات', { href: '/panel/plan/imports', label: 'الاستيرادات' }, body, nonce,
+    '', buildCommands({ onPanel: false }), soloNav('posts')))
+})
+
 plan.get('/panel/plan-rules', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
@@ -1347,7 +1364,10 @@ plan.get('/panel/plan/import/preview', async (c) => {
     platforms: rows.map((r) => r.platform), write, imageStyle: p.imageStyle, imageRoom: room,
   }), used))
   const estimate = { write: await lineFor(true), seat: p.imageStyle === null ? null : await lineFor(false) }
-  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate })
+  // ‏وما سيفعله «ابنِ» بكلّ صفّ (D-406): جديدٌ أو معدَّلٌ أو مجدولٌ أو منشورٌ سابقًا، وما في الخطّة وغاب عن الملفّ
+  const seat = await previewSeat(c.env.DB, activeOrg(session.record), p.csv, facts, p.via === 'model' ? 'text' : 'csv')
+  const importedLabel = seat.importedAt === null ? null : dayLabel(new Date(seat.importedAt.replace(' ', 'T') + 'Z'), facts.zone)
+  const body = planPreviewScreen({ key, csv: p.csv, filled: p.filled, via: p.via, widened: p.widened, cost: p.cost, rules: p.rules ?? null, media, estimate, seat: { ...seat, importedLabel } })
   return page((nonce) =>
     soloPage('صدى — هذا ما فهمته', { href: '/panel/plan/import', label: 'عندي خطّة' }, injectCsrf(body, session.record.csrf), nonce,
       '', buildCommands({ onPanel: false }), soloNav('plan')),

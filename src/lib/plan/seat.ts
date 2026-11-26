@@ -259,6 +259,80 @@ export interface SeatOutcome {
 
 const SPANS: readonly PlanSpan[] = ['week', '2weeks', 'month', '2months']
 
+type SeatRows =
+  | { readonly fileProblems: readonly string[] }
+  | {
+    readonly skipped: { line: number; reason: string }[]; readonly within: PlanRow[]
+    readonly normalized: Awaited<ReturnType<typeof normalizeImport>>; readonly keyOf: Map<PlanRow, NormalizedItem>
+    readonly start: string; readonly span: PlanSpan
+  }
+
+/**
+ * **صفوفُ الملفّ التي تُسكَّن** — مشتركةٌ بين `seatPlan` و`previewSeat` (D-406): ما تراه المعاينةُ هو ما يُسكَّن،
+ * بالبصمة نفسِها والمفتاح نفسِه والمدى نفسِه.
+ */
+async function seatable(csv: string, facts: PlanFacts, write: boolean): Promise<SeatRows> {
+  const read = readPlan(csv, facts)
+  if (read.fileProblems.length > 0) return { fileProblems: read.fileProblems }
+  const skipped: { line: number; reason: string }[] = []
+  const ok: PlanRow[] = []
+  for (const row of read.rows) {
+    if (row.platform === null || !(PLAN_CHANNELS as readonly string[]).includes(row.platform)) { skipped.push({ line: row.line, reason: `منصّةٌ لا أعرفها «${row.platformRaw}»` }); continue }
+    if (row.whenUtc === null) { skipped.push({ line: row.line, reason: row.understoodUtc === null ? 'لم أفهم الموعد' : 'موعدُه مضى' }); continue }
+    if (row.text.trim() === '') { skipped.push({ line: row.line, reason: 'بلا نصّ' }); continue }
+    ok.push(row)
+  }
+  if (ok.length === 0) return { skipped, within: [], normalized: await normalizeImport([], 'draft'), keyOf: new Map(), start: '', span: 'week' }
+  const days = ok.map((r) => r.whenUtc!.slice(0, 10)).sort()
+  const start = days[0]!
+  const width = (Date.parse(days[days.length - 1]! + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000 + 1
+  const span = SPANS.find((s) => spanDays(s) >= width) ?? '2months'
+  const within = ok.filter((r) => (Date.parse(r.whenUtc!.slice(0, 10) + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000 < spanDays(span))
+  for (const r of ok) if (!within.includes(r)) skipped.push({ line: r.line, reason: 'أبعدُ من شهرين عن أوّل موعد — ارفعه في خطّةٍ تالية' })
+
+  // ‏المُطبِّعُ الواحد (D-383): مفتاحُ كلِّ بندٍ وبصمةُ الاستيراد والشهرُ من التواريخ
+  const normalized = await normalizeImport(within, write ? 'idea' : 'draft')
+  const keyOf = new Map(normalized.items.map((n) => [n.row, n]))
+  return { skipped, within, normalized, keyOf, start, span }
+}
+
+type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
+
+/** الخطّةُ التي يحلّ فيها الملفّ (D-404) وشهرُه. */
+async function targetPlan(
+  db: Db, org: string, within: readonly PlanRow[], start: string, span: PlanSpan, keyOf: ReadonlyMap<PlanRow, NormalizedItem>, zone: string,
+): Promise<{ existing: Existing | null; period: string | null }> {
+  const sameSpan = await db
+    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
+    .bind(org, start, span).first<Existing>()
+  const months = [...new Set(within.map((r) => keyOf.get(r)?.period ?? ownerSlot(r.whenUtc!, zone).day.slice(0, 7)))]
+  const period = span === 'month' && months.length === 1 ? months[0]! : null
+  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
+  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
+  const holder = period === null ? null : await db
+    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
+    .bind(org, period).first<Existing>()
+  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
+  return { existing: intoPackage ? holder : sameSpan, period }
+}
+
+/** بندُ خطّةٍ قائمة من الملفّ ومنشورُه الأبعد (D-405). */
+export type OldItem = { id: string; item_key: string; platform: string; due_local: string | null; source_id: string | null; angle: string | null; post_id: string | null; status: string | null }
+
+async function planOlds(db: Db, org: string, planId: string): Promise<OldItem[]> {
+  const joined: OldItem[] = (await db
+    .prepare(`SELECT i.id, i.item_key, i.platform, i.due_local, i.source_id, i.angle, p.id AS post_id, p.status FROM plan_items i
+               LEFT JOIN posts p ON p.plan_item_id = i.id AND p.org_id = i.org_id AND p.plan_id = i.plan_id
+               WHERE i.org_id = ? AND i.plan_id = ? AND i.source_kind <> 'github'`)
+    .bind(org, planId).all<OldItem>()).results
+  // ‏**بندٌ واحدٌ بأبعد منشوراته** (D-405): الوصلُ صفٌّ لكلّ منشور، فبندٌ رُفض منشورُه ثمّ جُدول آخرُ يظهر مرّتين،
+  // ‏وكان «المرفوضُ» أوّلَهما فيمرّ الصفُّ المعدَّل وتُكتب مسوّدةٌ ثانية بجوار المجدول
+  const rank = (s: string | null): number => s === null ? 0 : s === 'rejected' ? 1 : s === 'draft' ? 2 : 3
+  const perItem = new Map<string, OldItem>()
+  for (const o of joined) { const was = perItem.get(o.id); if (was === undefined || rank(o.status) > rank(was.status)) perItem.set(o.id, o) }
+  return [...perItem.values()]
+}
+
 /**
  * **يُسكِّن**: الصفُّ السليمُ بندٌ ومسوّدة، والمدى أصغرُ ما يحمل مواعيدَه، والخطّةُ السابقةُ لهذا المدى تُستبدَل كما في
  * `planSpan`. وما يمنعه — منصّةٌ لا تُعرف، أو موعدٌ لم يُفهم أو مضى، أو نصٌّ فارغ — يُسمّى بسطره وسببه.
@@ -277,27 +351,10 @@ export async function seatPlan(
   /** مصدرُ الاستيراد في `import_jobs` (D-383): ملفٌّ جدوليّ، أو نصٌّ استخرجه النموذج. */
   source: { readonly kind: ImportSourceKind; readonly ref?: string } = { kind: 'csv' },
 ): Promise<SeatOutcome> {
-  const read = readPlan(csv, facts)
-  if (read.fileProblems.length > 0) return { planId: null, seated: 0, skipped: read.fileProblems.map((r) => ({ line: 1, reason: r })) }
-  const skipped: { line: number; reason: string }[] = []
-  const ok: PlanRow[] = []
-  for (const row of read.rows) {
-    if (row.platform === null || !(PLAN_CHANNELS as readonly string[]).includes(row.platform)) { skipped.push({ line: row.line, reason: `منصّةٌ لا أعرفها «${row.platformRaw}»` }); continue }
-    if (row.whenUtc === null) { skipped.push({ line: row.line, reason: row.understoodUtc === null ? 'لم أفهم الموعد' : 'موعدُه مضى' }); continue }
-    if (row.text.trim() === '') { skipped.push({ line: row.line, reason: 'بلا نصّ' }); continue }
-    ok.push(row)
-  }
-  if (ok.length === 0) return { planId: null, seated: 0, skipped }
-  const days = ok.map((r) => r.whenUtc!.slice(0, 10)).sort()
-  const start = days[0]!
-  const width = (Date.parse(days[days.length - 1]! + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000 + 1
-  const span = SPANS.find((s) => spanDays(s) >= width) ?? '2months'
-  const within = ok.filter((r) => (Date.parse(r.whenUtc!.slice(0, 10) + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000 < spanDays(span))
-  for (const r of ok) if (!within.includes(r)) skipped.push({ line: r.line, reason: 'أبعدُ من شهرين عن أوّل موعد — ارفعه في خطّةٍ تالية' })
-
-  // ‏المُطبِّعُ الواحد (D-383): مفتاحُ كلِّ بندٍ وبصمةُ الاستيراد والشهرُ من التواريخ
-  const normalized = await normalizeImport(within, write ? 'idea' : 'draft')
-  const keyOf = new Map(normalized.items.map((n) => [n.row, n]))
+  const prep = await seatable(csv, facts, write)
+  if ('fileProblems' in prep) return { planId: null, seated: 0, skipped: prep.fileProblems.map((r) => ({ line: 1, reason: r })) }
+  const { skipped, within, normalized, keyOf, start, span } = prep
+  if (within.length === 0) return { planId: null, seated: 0, skipped }
   const kind = source.kind
   // ‏**البصمةُ نفسُها من المصدر نفسِه لا تغيّر شيئًا** ما دامت خطّتُها قائمة: كلُّ صفٍّ «مُسكَّنٌ من قبل»
   const prior = await db
@@ -306,39 +363,19 @@ export async function seatPlan(
     .bind(org, kind, normalized.contentHash).first<{ id: string; plan_id: string }>().catch(() => null)
   if (prior !== null) {
     for (const r of within) skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' })
+    // ‏وإعادةُ الرفع بلا تغيير تُرى في السجلّ (D-406) — القيدُ الفريدُ يمنع صفًّا ثانيًا، فيُعدّ على الصفّ نفسِه
+    await db.prepare("UPDATE import_jobs SET seen_count = seen_count + 1, last_seen_at = datetime('now') WHERE id = ? AND org_id = ?")
+      .bind(prior.id, org).run().catch(() => null)
     return { planId: null, seated: 0, skipped, unchanged: true }
   }
 
   // ‏الخطّةُ التي يحلّ فيها الملفّ تُعرف قبل الصفوف (D-404): صفٌّ لم يتغيّر يبقى بنده ومنشورُه، وصفٌّ عُدّل يُحدَّث في مكانه
-  type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
-  const sameSpan = await db
-    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
-    .bind(org, start, span).first<Existing>()
-  const months = [...new Set(within.map((r) => keyOf.get(r)?.period ?? ownerSlot(r.whenUtc!, facts.zone).day.slice(0, 7)))]
-  const period = span === 'month' && months.length === 1 ? months[0]! : null
-  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
-  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
-  const holder = period === null ? null : await db
-    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
-    .bind(org, period).first<Existing>()
-  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
-  const existing = intoPackage ? holder : sameSpan
+  const { existing, period } = await targetPlan(db, org, within, start, span, keyOf, facts.zone)
   const planId = existing?.id ?? crypto.randomUUID()
 
   // ‏بنودُ الخطّة القائمة من الملفّ ومنشورُ كلٍّ منها — **والمنشورُ الذي جاوز المسوّدة (اعتُمد أو جُدول أو نُشر) لا يُفصَل
   // ‏عن خطّته ولا يُمسّ نصُّه ولا مفتاحُه (D-004)**: كان الاستبدالُ يُفرغ إشارتَه فيختفي من الشهر والخطّة
-  type Old = { id: string; item_key: string; platform: string; due_local: string | null; source_id: string | null; post_id: string | null; status: string | null }
-  const joined: Old[] = existing === null ? [] : (await db
-    .prepare(`SELECT i.id, i.item_key, i.platform, i.due_local, i.source_id, p.id AS post_id, p.status FROM plan_items i
-               LEFT JOIN posts p ON p.plan_item_id = i.id AND p.org_id = i.org_id AND p.plan_id = i.plan_id
-               WHERE i.org_id = ? AND i.plan_id = ? AND i.source_kind <> 'github'`)
-    .bind(org, planId).all<Old>()).results
-  // ‏**بندٌ واحدٌ بأبعد منشوراته** (D-405): الوصلُ صفٌّ لكلّ منشور، فبندٌ رُفض منشورُه ثمّ جُدول آخرُ يظهر مرّتين،
-  // ‏وكان «المرفوضُ» أوّلَهما فيمرّ الصفُّ المعدَّل وتُكتب مسوّدةٌ ثانية بجوار المجدول
-  const rank = (s: string | null): number => s === null ? 0 : s === 'rejected' ? 1 : s === 'draft' ? 2 : 3
-  const perItem = new Map<string, Old>()
-  for (const o of joined) { const was = perItem.get(o.id); if (was === undefined || rank(o.status) > rank(was.status)) perItem.set(o.id, o) }
-  const olds = [...perItem.values()]
+  const olds = existing === null ? [] : await planOlds(db, org, planId)
   const claimed = new Set<string>()
   const keptPosts = new Set<string>()
   let kept = 0
@@ -498,6 +535,57 @@ export async function seatPlan(
   if (db.batch !== undefined) await db.batch(statements)
   else for (const st of statements) await st.run()
   return { planId, seated: items.length, skipped, kept, updated }
+}
+
+/** وسمُ الصفّ في المعاينة (D-406) — قبل أن يضغط المالكُ «ابنِ». */
+export type RowTag = 'new' | 'modified' | 'unchanged' | 'scheduled' | 'published'
+
+export interface SeatPreview {
+  /** رقمُ السطر ← وسمُه؛ وما لا يُسكَّن (منصّةٌ أو موعدٌ أو نصّ) لا وسمَ له. */
+  readonly tags: Readonly<Record<string, RowTag>>
+  /** بنودٌ في الخطّة القائمة غاب صفُّها عن الملفّ. */
+  readonly removed: readonly { readonly platform: string; readonly due: string | null; readonly angle: string; readonly guarded: boolean }[]
+  /** الملفُّ نفسُه (البصمةُ نفسُها من المصدر نفسِه) استُورد من قبل: متى. */
+  readonly importedAt: string | null
+}
+
+const beyond = (status: string | null): RowTag | null =>
+  status === 'published' ? 'published' : status === null || status === 'draft' || status === 'rejected' ? null : 'scheduled'
+
+/**
+ * **ما سيفعله «ابنِ» بكلّ صفّ — قراءةٌ بلا كتابة** (D-406). يمرّ بما يمرّ به `seatPlan` نفسِه: `seatable` و`targetPlan`
+ * و`planOlds` ومطابقةُ المفتاح ثمّ المنصّة والموعد، فما يُوسَم «معدَّل» هو ما يُحدَّث، وما يُوسَم «مجدول سابقًا» هو ما يُتخطّى.
+ */
+export async function previewSeat(db: Db, org: string, csv: string, facts: PlanFacts, kind: ImportSourceKind = 'csv'): Promise<SeatPreview> {
+  const empty: SeatPreview = { tags: {}, removed: [], importedAt: null }
+  const prep = await seatable(csv, facts, false)
+  if ('fileProblems' in prep || prep.within.length === 0) return empty
+  const { within, normalized, keyOf, start, span } = prep
+  const prior = await db
+    .prepare(`SELECT j.created_at FROM import_jobs j JOIN plans p ON p.id = j.plan_id AND p.org_id = j.org_id
+               WHERE j.org_id = ? AND j.source_kind = ? AND j.content_hash = ? AND p.status <> 'superseded'`)
+    .bind(org, kind, normalized.contentHash).first<{ created_at: string }>().catch(() => null)
+  const { existing } = await targetPlan(db, org, within, start, span, keyOf, facts.zone)
+  const olds = existing === null ? [] : await planOlds(db, org, existing.id)
+  const claimed = new Set<string>()
+  const tags: Record<string, RowTag> = {}
+  for (const r of within) {
+    const n = keyOf.get(r)
+    const key = n?.key ?? await rowKey(r)
+    const dup = await db.prepare("SELECT plan_id, plan_item_id, status FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'")
+      .bind(org, key).first<{ plan_id: string | null; plan_item_id: string | null; status: string }>()
+    const own = dup !== null && existing !== null && dup.plan_id === existing.id
+    if (dup !== null && !own) { tags[String(r.line)] = beyond(dup.status) ?? 'unchanged'; continue }
+    const dueLocal = n?.dueLocal ?? null
+    const old = own
+      ? olds.find((o) => o.id === dup.plan_item_id && !claimed.has(o.id))
+      : olds.find((o) => !claimed.has(o.id) && o.platform === r.platform && dueLocal !== null && o.due_local === dueLocal)
+    if (old !== undefined) claimed.add(old.id)
+    tags[String(r.line)] = own ? beyond(dup.status) ?? 'unchanged' : old === undefined ? 'new' : beyond(old.status) ?? 'modified'
+  }
+  const removed = olds.filter((o) => !claimed.has(o.id))
+    .map((o) => ({ platform: o.platform, due: o.due_local, angle: o.angle ?? '', guarded: beyond(o.status) !== null }))
+  return { tags, removed, importedAt: prior?.created_at ?? null }
 }
 
 /** معرّفاتُ مسوّدات خطّةٍ مسكَّنة — لرسم صورها في الخلفيّة إن اختيرت. */

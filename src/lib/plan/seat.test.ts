@@ -1,7 +1,7 @@
 /** «عندي خطّة» (D-287): كلُّ صيغةٍ جدول، والناقصُ يُكمَّل ويُقال، والسليمُ يُسكَّن بندًا ومسوّدة، وما يمنعه يُسمّى. */
 import { beforeEach, describe, expect, it } from 'vitest'
 import { fakeDb, type FakeDb } from '../../test/fakes'
-import { fillGaps, markdownTables, rowsFromModel, seatPlan, toTable } from './seat'
+import { fillGaps, markdownTables, rowsFromModel, previewSeat, seatPlan, toTable } from './seat'
 import type { PlanFacts } from './import'
 
 let db: FakeDb
@@ -224,5 +224,52 @@ describe('إعادةُ الاستيراد تحمي الخطّة (D-404)', () => 
     const snap = db.raw.prepare('SELECT version, plan_json FROM plan_versions').all() as { version: number; plan_json: string }[]
     expect(snap.map((v) => v.version)).toEqual([1])
     expect((JSON.parse(snap[0]!.plan_json) as { items: unknown[] }).items).toHaveLength(1)
+  })
+})
+
+/** ‏**معاينةٌ تقول ما سيفعله «ابنِ»** (D-406): كلُّ صفٍّ بوسمه قبل الضغط، وما غاب عن الملفّ، والملفُّ نفسُه بتاريخه. */
+describe('معاينةُ الاستيراد بوسومها (D-406)', () => {
+  const HEAD = 'التاريخ,الوقت,المنصة,النص'
+  const A = '2099-01-04,09:00,LinkedIn,الأولى كما هي'
+  const B = '2099-01-05,13:00,X,الثانية قبل التعديل'
+  const C = '2099-01-06,13:00,X,الثالثة تُجدوَل'
+  const D = '2099-01-07,13:00,X,الرابعة نُشرت'
+  const E = '2099-01-08,13:00,X,الخامسة تُحذف'
+  const count = () => db.raw.prepare('SELECT (SELECT count(*) FROM posts) AS posts, (SELECT count(*) FROM plan_items) AS items, (SELECT count(*) FROM import_jobs) AS jobs').get()
+
+  it('خطّةٌ أولى: كلُّ صفٍّ جديد، ولا شيءَ محذوف ولا تاريخَ سابق — ولا يُكتب شيء', async () => {
+    const out = await previewSeat(db, 'org_owner', [HEAD, A, B].join('\n'), facts())
+    expect(out).toEqual({ tags: { '2': 'new', '3': 'new' }, removed: [], importedAt: null })
+    expect(count()).toEqual({ posts: 0, items: 0, jobs: 0 })
+  })
+
+  it('إعادةٌ معدَّلة: بلا تغيير ومعدَّل ومجدول ومنشور وجديد، والمحذوفُ من الملفّ يُسمّى ومحميُّه يُقال', async () => {
+    await seatPlan(db, 'org_owner', [HEAD, A, B, C, D, E].join('\n'), facts(), new Map(), null)
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('ax', 'x', 'member', 'e1', 'عمر', 'active')`)
+    db.raw.prepare("UPDATE posts SET status = 'queued', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-06 10:00:00' WHERE text = 'الثالثة تُجدوَل'").run()
+    db.raw.prepare("UPDATE posts SET status = 'published', approved_at = '2099-01-01 08:00:00', approved_by = 'owner', account_id = 'ax', scheduled_at = '2099-01-07 10:00:00' WHERE text = 'الرابعة نُشرت'").run()
+    const before = count()
+    const F = '2099-01-09,13:00,X,السادسة جديدة'
+    const csv = [HEAD, A, B.replace('قبل التعديل', 'بعد التعديل'), C.replace('تُجدوَل', 'عُدّلت'), D, F].join('\n')
+    const out = await previewSeat(db, 'org_owner', csv, facts())
+    expect(out.tags).toEqual({ '2': 'unchanged', '3': 'modified', '4': 'scheduled', '5': 'published', '6': 'new' })
+    expect(out.removed).toEqual([{ platform: 'x', due: expect.stringContaining('2099-01-08'), angle: 'الخامسة تُحذف', guarded: false }])
+    expect(out.importedAt).toBeNull()
+    expect(count()).toEqual(before)
+    // ‏والوسمُ يصدق: «ابنِ» يُحدِّث المعدَّلَ ويتخطّى المجدول
+    const seated = await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(seated).toMatchObject({ kept: 2, updated: 1 })
+    expect(seated.skipped).toEqual([{ line: 4, reason: expect.stringContaining('عدّله من بطاقته') }])
+  })
+
+  it('الملفُّ نفسُه: تاريخُ استيراده، وإعادةُ رفعه بلا تغيير تُعدّ في السجلّ', async () => {
+    const csv = [HEAD, A, B].join('\n')
+    await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    const out = await previewSeat(db, 'org_owner', csv, facts())
+    expect(out.importedAt).toMatch(/^\d{4}-\d{2}-\d{2} /)
+    expect(Object.values(out.tags)).toEqual(['unchanged', 'unchanged'])
+    expect(await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)).toMatchObject({ unchanged: true })
+    await seatPlan(db, 'org_owner', csv, facts(), new Map(), null)
+    expect(db.raw.prepare('SELECT seen_count, last_seen_at IS NOT NULL AS seen FROM import_jobs').get()).toEqual({ seen_count: 3, seen: 1 })
   })
 })

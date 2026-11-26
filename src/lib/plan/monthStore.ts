@@ -6,13 +6,16 @@ import type { Db } from '../tokens'
 import type { DiffRow, ImportRow, MonthFacts } from './month'
 
 export async function readImports(db: Db, org: string, limit = 30): Promise<ImportRow[]> {
-  const r = await db.prepare(`SELECT id, source_kind, source_ref, content_hash, period, status, report_json, created_at FROM import_jobs
-                               WHERE org_id = ? ORDER BY created_at DESC LIMIT ?`).bind(org, limit)
-    .all<{ id: string; source_kind: string; source_ref: string | null; content_hash: string; period: string | null; status: string; report_json: string; created_at: string }>()
+  const r = await db.prepare(`SELECT id, source_kind, source_ref, content_hash, period, status, report_json, created_at, plan_id, seen_count, last_seen_at
+                               FROM import_jobs WHERE org_id = ? ORDER BY COALESCE(last_seen_at, created_at) DESC LIMIT ?`).bind(org, limit)
+    .all<{ id: string; source_kind: string; source_ref: string | null; content_hash: string; period: string | null; status: string; report_json: string; created_at: string;
+           plan_id: string | null; seen_count: number | null; last_seen_at: string | null }>()
     .catch(() => ({ results: [] as never[] }))
   return r.results.map((x) => ({
     id: x.id, sourceKind: x.source_kind, sourceRef: x.source_ref, contentHash: x.content_hash, period: x.period,
     status: x.status, createdAt: x.created_at, summary: reportLine(x.report_json),
+    // ‏وإعادةُ الرفع بلا تغيير (D-406): كم مرّةً بعد الأولى، ومتى آخرُها
+    planId: x.plan_id, reseen: Math.max(0, Number(x.seen_count ?? 1) - 1), lastSeenAt: x.last_seen_at,
   }))
 }
 

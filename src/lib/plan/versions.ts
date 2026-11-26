@@ -1,0 +1,57 @@
+/**
+ * **إصدارا خطّةٍ متجاوران** (D-406): كلُّ استيرادٍ يحفظ صورةَ الإصدار السابق في `plan_versions` (D-404)، وهنا تُقرأ الصورُ
+ * والإصدارُ القائم، ويُحسب الفرقُ بين اثنين بـ`diffSnapshots` نفسِها التي تحسب فرقَ الحزمة (D-370) — لا فرقٌ ثانٍ.
+ *
+ * والمفتاحُ موعدُ البند (يومُه وساعتُه بتوقيت المالك) ومنصّتُه: `sourceId` في الملفّ «import:<سطر>» يتزحزح بحذف صفّ،
+ * فلا يصلح مفتاحًا. فالنصُّ المعدَّل في موعده «النصّ عُدّل»، والموعدُ المنقولُ حذفٌ وإضافة.
+ */
+import type { Db } from '../tokens'
+import type { PlanItem } from './prompt'
+import { diffSnapshots, type Change, type Snapshot, type SnapshotEntry } from '../package/diff'
+
+export interface PlanVersion {
+  readonly version: number
+  /** القائمُ في `plans`، لا صورةٌ محفوظة. */
+  readonly current: boolean
+  readonly at: string
+  readonly items: readonly PlanItem[]
+}
+
+const itemsOf = (json: string): PlanItem[] => {
+  try { return (JSON.parse(json) as { items?: PlanItem[] }).items ?? [] } catch { return [] }
+}
+
+/** إصداراتُ الخطّة من الأقدم إلى القائم — وخطّةٌ لمنظّمةٍ أخرى لا تُقرأ. */
+export async function readPlanVersions(db: Db, org: string, planId: string): Promise<PlanVersion[]> {
+  const plan = await db.prepare('SELECT version, plan_json, created_at FROM plans WHERE id = ? AND org_id = ?')
+    .bind(planId, org).first<{ version: number; plan_json: string; created_at: string }>().catch(() => null)
+  if (plan === null) return []
+  const { results } = await db.prepare('SELECT version, plan_json, locked_at FROM plan_versions WHERE org_id = ? AND plan_id = ? AND version < ? ORDER BY version')
+    .bind(org, planId, plan.version).all<{ version: number; plan_json: string; locked_at: string }>()
+    .catch(() => ({ results: [] as { version: number; plan_json: string; locked_at: string }[] }))
+  return [
+    ...results.map((r) => ({ version: Number(r.version), current: false, at: r.locked_at, items: itemsOf(r.plan_json) })),
+    { version: Number(plan.version), current: true, at: plan.created_at, items: itemsOf(plan.plan_json) },
+  ]
+}
+
+/** لقطةُ إصدارٍ بشكل لقطة الحزمة: المادّةُ موعدُ البند، وبندان في الموعد والمنصّة نفسِهما يفترقان بترتيبهما. */
+export function versionSnapshot(items: readonly PlanItem[]): Snapshot {
+  const seen = new Map<string, number>()
+  const entries: SnapshotEntry[] = items.map((i) => {
+    const slot = i.day + ' ' + i.time
+    const k = slot + '|' + i.platform
+    const n = (seen.get(k) ?? 0) + 1
+    seen.set(k, n)
+    return {
+      item: n === 1 ? slot : slot + ' #' + String(n), platform: i.platform, date: i.day, time: i.time, format: i.kind ?? 'text',
+      idea: i.angle, text: i.angle, media: i.asset ?? null, mediaName: i.asset ?? null, problems: [],
+    }
+  })
+  return { entries, copySha: null, planPath: null }
+}
+
+/** الفرقُ من الإصدار `a` إلى `b`. */
+export function diffVersions(a: PlanVersion, b: PlanVersion): Change[] {
+  return diffSnapshots(versionSnapshot(a.items), versionSnapshot(b.items))
+}
