@@ -8,6 +8,7 @@
     "typecheck": "tsc -p tsconfig.worker.json && tsc -p tsconfig.test.json && tsc -p tsconfig.scripts.json",
     "test": "vitest run",
     "test:watch": "vitest",
+    "plan:check": "tsx scripts/plan_check.ts",
     "ci": "npm run typecheck && npm run cycles && npm run contrast && npm run tokens && npm run classes && npm run rtl && npm run dead && npm run columns && npm run migrations && npm run tenancy && npm run html && npm run markup && npm run docs && npm run delivery && npm run smoke && npm run drill && npm run sus && npm run journeys:gate && npm run test",
     "dev": "wrangler dev --env staging",
     "migrate:staging": "wrangler d1 migrations apply sada-staging --env staging --remote",

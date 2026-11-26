@@ -51,6 +51,7 @@ export function newWays(hasPackage: boolean): readonly Way[] {
       cost: 'المزامنةُ بلا كلفة؛ وما لا نصَّ له يُكتب بنداءٍ لكلّ منشور.',
       href: '/panel/package', label: hasPackage ? 'زامن الحزمة' : 'اربط الحزمة',
       links: [{ href: '/panel/plan/month-template?f=md', label: 'نزّل قالب الشهر القادم' }, { href: '/panel/plan/month-template?f=readme', label: 'README القالب' },
+        { href: '/panel/plan/month-template?k=week', label: 'قالب أسبوع' }, { href: '/panel/plan/month-template?k=day', label: 'قالب يوم' },
         { href: '/panel/plan/imports', label: 'الاستيرادات' }, { href: '/panel/plan-rules', label: 'قواعد الجدولة' }],
     },
   ]

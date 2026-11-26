@@ -73,7 +73,7 @@ import { loadSession } from '../../lib/session'
 import { CHANNELS, listAccounts } from '../../lib/channels'
 import { readPlanFlags } from '../../lib/plan/platforms'
 import { ownerZone, storedZone } from '../../lib/time/ownerZone'
-import { renderTemplate, templateReadme } from '../../lib/plan/template'
+import { addDays, nextSunday, renderTemplate, shortTemplate, templateReadme } from '../../lib/plan/template'
 import { addPlanItem, editPlanItem, removePlanItem } from '../../lib/plan/edit'
 import { approvePlanDrafts, schedulePlan } from '../../lib/plan/schedule'
 import { activeLinks, createLink, revokeLinks, verdictsFor } from '../../lib/clientReview'
@@ -570,9 +570,16 @@ plan.get('/panel/plan/month-template', async (c) => {
   if (session === null) return loginResponse(c.env, c.req.raw)
   const asked = c.req.query('p')
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const period = isPeriod(asked) ? asked : nextPeriod(localDay(localParts(new Date(), zone ?? DEFAULT_ZONE)).slice(0, 7))
+  const today = localDay(localParts(new Date(), zone ?? DEFAULT_ZONE))
+  const period = isPeriod(asked) ? asked : nextPeriod(today.slice(0, 7))
   const f = c.req.query('f')
+  // ‏قالبا الأسبوع واليوم (D-408): `k=week` من الأحد القادم، و`k=day` للغد — و`d=YYYY-MM-DD` ليومٍ بعينه.
+  const k = c.req.query('k')
+  const d = c.req.query('d')
+  const day = d !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d ? d : null
+  const short = k === 'week' || k === 'day' ? shortTemplate(k, day ?? (k === 'week' ? nextSunday(today) : addDays(today, 1)), f === 'csv' ? 'csv' : 'md') : null
   const [body, type, name] = f === 'readme' ? [templateReadme(), 'text/markdown; charset=utf-8', 'README.md']
+    : short !== null ? [short.body, short.type, short.name]
     : f === 'csv' ? [renderTemplate(period, 'csv'), 'text/csv; charset=utf-8', period + '.csv']
     : [renderTemplate(period, 'md'), 'text/markdown; charset=utf-8', period + '.md']
   return new Response(body, { headers: { 'Content-Type': type, 'Content-Disposition': 'attachment; filename="' + name + '"', 'Cache-Control': 'no-store' } })
