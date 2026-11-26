@@ -32,6 +32,13 @@ export const MOMENT = `/* ══ لحظةُ العلامة: الدخولُ وا�
 .moment-glyph{display:block; height:var(--s-10); aspect-ratio:4/3; color:var(--mark-fg)}
 .moment-glyph svg{display:block; width:100%; height:100%}
 .moment-line{margin:0; font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400; color:var(--moment-ink)}
+/* ‏**والقفلُ يصل مرّةً** (D-403): ظهورٌ هادئٌ بـ«--dur-4» للاسم والرمز ثمّ السطر — والنقشُ ثابتٌ لا يتحرّك.
+   وحدَها الحركةُ فوق ‏٣٠٠ لأنّها لا تتكرّر، وتسكن لمن طلب تقليلَ الحركة (بالوسيط وبالمبدّل) */
+@keyframes moment-in{from{opacity:0; transform:translateY(var(--s-1))}}
+@media(prefers-reduced-motion:no-preference){
+  :root:not([data-motion=reduced]) .moment-id{animation:moment-in var(--dur-4) var(--ease-out) both}
+  :root:not([data-motion=reduced]) .moment-line{animation:moment-in var(--dur-4) var(--ease-out) var(--stagger) both}
+}
 /* ‏**وعلى الشاشة القصيرة القفلُ وحده** (مراجعة D-196): الشريطُ ‏٢٥٦px أيًّا كان الارتفاع دفع الحقلَ وزرَّه
    تحت الطيّة في ‏375×548 (iPhone SE بشريط Safari)، ولم يُبق الهاتف أفقيًّا (‏844×390) إلّا الشريط
    والعنوان. فتحت ‏٤٠rem ارتفاعًا يسقط النقش والسطران، ويبقى القفل شريطًا عميقًا بقدره —
