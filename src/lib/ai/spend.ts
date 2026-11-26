@@ -10,6 +10,14 @@ import { platformLabel } from '../oauth/providers'
 import { monthStart } from '../time/zone'
 import type { ProviderName } from './registry'
 
+/**
+ * صفوفُ المقاطع تقديرُ المالك لا سعرٌ مقروء (D-414، `price_unverified`) — **فلا تُجمع في «الإنفاق الحقيقيّ»** (D-415).
+ * تبقى في الدفتر (D-008) وتُرى سطرًا وحدها موسومًا «تقدير».
+ */
+const ESTIMATE = `operation LIKE 'video:%'`
+/** لاحقةُ مفتاح سطر التقدير في `SpendByProvider` — `cloudflare:estimate` غيرُ `cloudflare`. */
+export const ESTIMATE_SUFFIX = ':estimate'
+
 export interface ProviderSpend {
   readonly calls: number
   readonly total: number
@@ -26,11 +34,12 @@ export type SpendByProvider = Readonly<Partial<Record<ProviderName | string, Pro
 export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvider> {
   const { results } = await db
     .prepare(
-      `SELECT provider, count(*) AS calls, coalesce(sum(total), 0) AS total
+      `SELECT CASE WHEN ${ESTIMATE} THEN provider || '${ESTIMATE_SUFFIX}' ELSE provider END AS provider,
+              count(*) AS calls, coalesce(sum(total), 0) AS total
          FROM cost_ledger
         -- السقفُ عامّ لكلّ المنظّمات: دفترُ الإنفاق يُقرأ على المنظّمات كلِّها
         WHERE org_id IN (SELECT id FROM orgs) AND at >= datetime('now', ?)
-        GROUP BY provider`,
+        GROUP BY 1`,
     )
     .bind(`-${days} days`)
     .all<{ provider: string; calls: number; total: number }>()
@@ -50,16 +59,18 @@ export async function spendByProvider(db: Db, days = 30): Promise<SpendByProvide
  * متحرّكة — فيدخل فيها الشهرُ الماضي. **والحدُّ بصيغة القاعدة** لا بـ ISO: حرفُ
  * `T` بعد المسافة في المقارنة النصّيّة (وهي علّةُ التقرير الأسبوعيّ نفسُها).
  */
-async function spendSince(db: Db, since: Date): Promise<number> {
+async function spendSince(db: Db, since: Date): Promise<{ total: number; estimated: number }> {
   try {
     const row = await db
-      // السقفُ عامّ لكلّ المنظّمات (D-277)
-      .prepare('SELECT coalesce(sum(total), 0) AS total FROM cost_ledger WHERE org_id IN (SELECT id FROM orgs) AND at >= ?')
+      // السقفُ عامّ لكلّ المنظّمات (D-277)، والتقديرُ سطرٌ وحده (D-415)
+      .prepare(`SELECT coalesce(sum(CASE WHEN ${ESTIMATE} THEN 0 ELSE total END), 0) AS total,
+                       coalesce(sum(CASE WHEN ${ESTIMATE} THEN total ELSE 0 END), 0) AS estimated
+                  FROM cost_ledger WHERE org_id IN (SELECT id FROM orgs) AND at >= ?`)
       .bind(since.toISOString().slice(0, 19).replace('T', ' '))
-      .first<{ total: number | null }>()
-    return row?.total ?? 0
+      .first<{ total: number | null; estimated: number | null }>()
+    return { total: row?.total ?? 0, estimated: row?.estimated ?? 0 }
   } catch {
-    return 0
+    return { total: 0, estimated: 0 }
   }
 }
 
@@ -73,8 +84,8 @@ export async function spendThisMonth(
   db: Db,
   zone: string | null,
   now: Date,
-): Promise<{ total: number; utc: boolean }> {
-  return { total: await spendSince(db, monthStart(now, zone)), utc: zone === null }
+): Promise<{ total: number; estimated: number; utc: boolean }> {
+  return { ...(await spendSince(db, monthStart(now, zone))), utc: zone === null }
 }
 
 /** صفٌّ في «أين يذهب المال» — جهةٌ في الدفتر باسمها، وما أُنفق عليها. */
@@ -83,6 +94,8 @@ export interface SpendRow {
   readonly label: string
   readonly calls: number
   readonly total: number
+  /** تقديرُ المالك لا إنفاقٌ مقروء (D-415). */
+  readonly estimate?: boolean
 }
 
 /**
@@ -93,6 +106,9 @@ const LEDGER_LABEL: Readonly<Record<string, string>> = {
   x: 'X — النشر والقياس',
   'cloudflare-browser': 'Cloudflare — رسم الشرائح',
 }
+
+/** سطرُ التقدير باسم مزوّده ووسمه — لا يُقرأ إنفاقًا حقيقيًّا (D-415). */
+const estimateLabel = (base: string): string => `${base} — المقاطع (تقدير، price_unverified)`
 
 /**
  * صفوفُ الإنفاق **من كلّ جهةٍ في الدفتر**، لا من مزوّدي الذكاء وحدهم.
@@ -105,8 +121,11 @@ export function spendRows(spend: SpendByProvider, labels: Readonly<Record<string
   return Object.entries(spend)
     .flatMap(([key, e]) => (e === undefined ? [] : [{
       key,
-      label: labels[key] ?? LEDGER_LABEL[key]
-        ?? (platformLabel(key) === key ? key : `${platformLabel(key)} — النشر`),
+      label: key.endsWith(ESTIMATE_SUFFIX)
+        ? estimateLabel(labels[key.slice(0, -ESTIMATE_SUFFIX.length)] ?? key.slice(0, -ESTIMATE_SUFFIX.length))
+        : labels[key] ?? LEDGER_LABEL[key]
+          ?? (platformLabel(key) === key ? key : `${platformLabel(key)} — النشر`),
+      estimate: key.endsWith(ESTIMATE_SUFFIX),
       calls: e.calls,
       total: e.total,
     }]))
@@ -135,7 +154,7 @@ export async function dailySpend(db: Db, days = 14): Promise<DailySpend[]> {
         `SELECT date(at) AS day, coalesce(sum(total), 0) AS total, count(*) AS calls
            FROM cost_ledger
           -- السقفُ عامّ لكلّ المنظّمات
-          WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now', ?)
+          WHERE org_id IN (SELECT id FROM orgs) AND at >= date('now', ?) AND NOT (${ESTIMATE})
           GROUP BY date(at)`,
       )
       .bind(`-${days - 1} days`)

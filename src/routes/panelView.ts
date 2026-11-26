@@ -393,12 +393,14 @@ export interface PanelData {
   readonly usedClips: number
   /** ميزانيّةُ المقاطع الشهريّة العامّة بالدولار وتقديرُ المقطع وما أُنفق هذا الشهر (D-414) — اختياريّةٌ لمن لا يحملها. */
   readonly videoMonthCap?: number
+  /** سقفُ الشهر الفعّالُ للعميل النشط — يُقرَن به ما أُنفق له (D-415). */
+  readonly videoMonthActiveCap?: number
   readonly videoClip?: number
   readonly usedVideoMonth?: number
   /** إنفاقُ ثلاثين يومًا من الدفتر كلِّه، صفًّا لكلّ جهةٍ باسمها — الذكاءُ والنشرُ معًا. */
   readonly spendBy: readonly SpendRow[]
   /** منذ أوّل الشهر بتوقيت المالك، و`utc` حين غابت منطقتُه (ر-10). */
-  readonly spendMonth: { readonly total: number; readonly utc: boolean }
+  readonly spendMonth: { readonly total: number; readonly estimated?: number; readonly utc: boolean }
   readonly series: { day: string; total: number }[]
   readonly sources: PanelSource[]
   readonly providers: PanelProvider[]
@@ -546,7 +548,7 @@ export type LibraryData = Pick<PanelData,
  * ميزانيّةُ المقاطع الشهريّة (D-414): العامّةُ افتراضٌ لكلّ عميل، وتقديرُ المقطع الذي تُحجز به قبل النداء.
  * وعميلٌ يكتب لنفسه ميزانيّةً من «رحلة العميل».
  */
-function videoBudgetForms(cap: number, clip: number, used: number): string {
+export function videoBudgetForms(cap: number, clip: number, used: number, activeCap: number = cap): string {
   return html`<hr>
     <p class="hint"><b>وميزانيّة المقاطع بالمال في الشهر</b>: تُحجز كلفةُ المقطع بتقديرك قبل النداء، وتعود إن ردّه المزوّد.
       وهي لكلّ عميلٍ على حدة، وهذه افتراضُهم. <b>وصفر يُغلق التحريك.</b></p>
@@ -556,7 +558,7 @@ function videoBudgetForms(cap: number, clip: number, used: number): string {
         control: html`<input type="number" name="value" min="0"
           max="${SETTING_LIMITS.monthlyVideoCapUsd.max}" step="0.5" value="${cap}">`.value }))}
       ${raw(button({ label: 'حفظ', variant: 'primary', type: 'submit' }))}
-      <span class="note self-center">أُنفق هذا الشهر: ${money(used)}</span>
+      <span class="note self-center">أُنفق هذا الشهر لهذا العميل: ${money(used)} من ${money(activeCap)} (تقدير)</span>
     </form>
     <form class="row" method="POST" action="/panel/settings" data-autosave>
       <input type="hidden" name="key" value="video_clip_usd">
@@ -572,7 +574,7 @@ export type AccountsData = Pick<PanelData, 'channels'>
 
 /** «الإعدادات»: الحدودُ والمزوّدون والأمانُ والمنظّمات وما للمطوّر. */
 export type SettingsData = Pick<PanelData,
-  'dashboardTiles' | 'analysisCap' | 'usedAnalyses' | 'spendCap' | 'usedSpend' | 'videoCap' | 'usedClips' | 'videoMonthCap' | 'videoClip' | 'usedVideoMonth' | 'promoCap'
+  'dashboardTiles' | 'analysisCap' | 'usedAnalyses' | 'spendCap' | 'usedSpend' | 'videoCap' | 'usedClips' | 'videoMonthCap' | 'videoMonthActiveCap' | 'videoClip' | 'usedVideoMonth' | 'promoCap'
   | 'autoEnqueue' | 'autoImage' | 'imageCap' | 'usedImages' | 'alertWebhook' | 'outbox' | 'imageOverlay' | 'slide'
   | 'sessions' | 'factors' | 'audit' | 'providers' | 'routing' | 'knownProviders' | 'cfAccountId' | 'baseUrl' | 'adminApi' | 'health'>
 
@@ -1477,7 +1479,7 @@ function settingsPane(d: ShellData & SettingsData): string {
       ${button({ label: 'حفظ', variant: 'primary', type: 'submit' })}
       <span class="note self-center">المستهلَك اليوم: ${d.usedClips}</span>
     </form>
-    ${d.videoMonthCap === undefined ? '' : videoBudgetForms(d.videoMonthCap, d.videoClip ?? 0, d.usedVideoMonth ?? 0)}
+    ${d.videoMonthCap === undefined ? '' : videoBudgetForms(d.videoMonthCap, d.videoClip ?? 0, d.usedVideoMonth ?? 0, d.videoMonthActiveCap)}
   </div>
 
   ${allowsRules(d.role) ? rulesLink() : ''}

@@ -19,7 +19,7 @@
 import { spendTodayFor } from './ai/spend'
 import { money } from './format'
 import { getProvider } from './providers'
-import { readSettingsBoth, type Settings } from './settings'
+import { readSettingsBoth, type OrgKey, type Settings } from './settings'
 import { OWNER_ORG } from './tenancy'
 import type { Db } from './tokens'
 
@@ -48,7 +48,12 @@ export interface Allowance {
    * العميلُ إن كان غيرَ منظّمة المالك (D-295): سقوفُه الفعّالة (العامُّ وفوقه ما كتبه) واستهلاكُه وحدَه.
    * **والسقفُ العامُّ يبقى فوق الكلّ**: يُفحَص أوّلًا على المجموع، ثمّ سقفُ العميل على ما أنفقه هو.
    */
-  readonly org?: { readonly settings: Settings; readonly usage: DailyUsage }
+  readonly org?: {
+    readonly settings: Settings
+    readonly usage: DailyUsage
+    /** ما كتبه العميلُ لنفسه (D-415) — «سقفُ العميل» بوجود صفّه لا بتساوي القيم. */
+    readonly overridden: ReadonlySet<OrgKey>
+  }
   /** ما أُنفق على مقاطع هذه المنظّمة منذ أوّل الشهر (D-414) — للّوح؛ والحجزُ يعيد الحسابَ في جملته. */
   readonly videoMonth?: number
 }
@@ -229,6 +234,15 @@ export type Duty = 'analyze' | 'draft' | 'plan' | 'image' | 'video' | 'publish' 
 
 const PAID: ReadonlySet<Duty> = new Set(['analyze', 'draft', 'plan', 'image', 'video'])
 
+/**
+ * ميزانيّةُ مقاطع الشهر الفعّالة لهذا العميل ومن أين جاءت (D-415): صفُّه إن كتبه لنفسه، وإلّا الافتراضُ العامّ.
+ * **بوجود الصفّ لا بتساوي القيمتين** — تحتها الزرُّ ورسالةُ الردّ وصفحةُ الإعدادات معًا، فلا تفترق.
+ */
+export function videoMonthCapOf(a: Allowance): { readonly cap: number; readonly scope: 'org' | 'global' } {
+  if (a.org !== undefined && a.org.overridden.has('monthly_video_cap_usd')) return { cap: a.org.settings.monthlyVideoCapUsd, scope: 'org' }
+  return { cap: a.settings.monthlyVideoCapUsd, scope: 'global' }
+}
+
 /** الحكمُ نفسُه بلا قراءة — لمن قرأ الإعدادَ والاستهلاكَ مرّةً ويسأل عن عملين. */
 export function blockerFor(duty: Duty, settings: Settings, usage: DailyUsage, scope?: CapScope): Blocker | null {
   if (settings.paused) return { kind: 'paused' }
@@ -252,7 +266,7 @@ export async function checkAllowance(db: Db, duty: Duty, org: string = OWNER_ORG
   const settings = both.global
   let blocker = blockerFor(duty, settings, usage.all)
   if (org === OWNER_ORG) return { allowed: blocker === null, blocker, settings, usage: usage.all, videoMonth: usage.videoMonth }
-  const mine = { settings: both.effective, usage: usage.mine }
+  const mine = { settings: both.effective, usage: usage.mine, overridden: both.overridden }
   if (blocker === null && both.overridden.size > 0) blocker = blockerFor(duty, mine.settings, mine.usage, 'org')
   return { allowed: blocker === null, blocker, settings, usage: usage.all, org: mine, videoMonth: usage.videoMonth }
 }

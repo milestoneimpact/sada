@@ -17,6 +17,7 @@
  * وما سقط **بعد** أن ولّد المزوّدُ المقطع (السحبُ أو R2) لا يُعاد: المالُ أُنفق.
  */
 import type { Db } from '../tokens'
+import { STALE_MINUTES } from './claim'
 
 /** ميزانيّةُ الشهر كما تُقرأ تحت الزرّ وفي رسالة الردّ. */
 export interface VideoBudget {
@@ -81,16 +82,59 @@ export async function claimVideoSpend(
   return { kind: 'cap', budget: videoBudget(c.cap, await videoSpendThisMonth(db, c.org), c.clip) }
 }
 
-/** نداءٌ لم يبلغ المزوّدَ يعيد مالَه — ويبقى صفُّه موسومًا أثرًا. */
+/** وسمُ صفٍّ ولّد مزوّدُه المقطع (D-415): مالُه أُنفق، فلا يعيده الكنّاسُ أبدًا. */
+export const GENERATED_TAG = ':generated'
+/** وسمُ صفٍّ أُعيد مالُه — ردّه المزوّد، أو علق بلا نتيجة حتّى كنسه الكنّاس. */
+export const RELEASED_TAG = ':released'
+
+/** نداءٌ لم يبلغ المزوّدَ يعيد مالَه — ويبقى صفُّه موسومًا أثرًا. **وفشلُ الإعادة يُسجَّل لا يُبلَع** (D-415). */
 export async function releaseVideoSpend(db: Db, org: string, ledgerId: string): Promise<void> {
   await db
     .prepare(
-      `UPDATE cost_ledger SET unit_cost = 0, total = 0, operation = operation || ':released'
-        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%:released'`,
+      `UPDATE cost_ledger SET unit_cost = 0, total = 0, operation = operation || '${RELEASED_TAG}'
+        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%${RELEASED_TAG}' AND operation NOT LIKE '%${GENERATED_TAG}'`,
     )
     .bind(ledgerId, org)
     .run()
-    .catch(() => undefined)
+    // ‏‏المعرّفُ وحده في السجلّ — لا رمزَ ولا سرّ؛ والكنّاسُ يعيده بعد مهلة الحجز
+    .catch((error: unknown) => { console.error({ job: 'video_release', ledger: ledgerId, failed: String(error) }) })
+}
+
+/**
+ * ولّد المزوّدُ المقطع: يُوسَم صفُّه فلا يعيده الكنّاس (D-415).
+ * والفشلُ هنا يُسجَّل ولا يُسقط المقطع — ما أُنفق أُنفق، والصفُّ يبقى بكلفته حتّى يكنسه الكنّاس.
+ */
+export async function markVideoGenerated(db: Db, org: string, ledgerId: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE cost_ledger SET operation = operation || '${GENERATED_TAG}'
+        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%${RELEASED_TAG}' AND operation NOT LIKE '%${GENERATED_TAG}'`,
+    )
+    .bind(ledgerId, org)
+    .run()
+    .catch((error: unknown) => { console.error({ job: 'video_mark', ledger: ledgerId, failed: String(error) }) })
+}
+
+/**
+ * الكنّاسُ (D-415): حجزٌ بلا نتيجةٍ بعد مهلة حجز التوليد (`STALE_MINUTES.video`) يعود مالُه.
+ *
+ * Worker مات بين الحجز وعودة المزوّد — فلا وسمَ «وُلّد» ولا «أُعيد»، والتقديرُ يبقى محسوبًا أبدًا.
+ * **وبعد المهلة نفسِها** التي يُفتح بها حجزُ التوليد: ما لم يعد فيها لن يُنتظر.
+ * وما وُسم `:generated` لا يُلمس — مالُه أُنفق. يعيد عددَ ما أُعيد.
+ */
+export async function reclaimStuckVideoSpend(db: Db, now: Date): Promise<number> {
+  const cutoff = new Date(now.getTime() - STALE_MINUTES.video * 60_000).toISOString().slice(0, 19).replace('T', ' ')
+  const res = await db
+    .prepare(
+      `UPDATE cost_ledger SET unit_cost = 0, total = 0, operation = operation || '${RELEASED_TAG}'
+        -- الكنّاسُ عامّ لكلّ المنظّمات: حجزٌ عالقٌ عند أيّ عميلٍ يعود مالُه
+        WHERE org_id IN (SELECT id FROM orgs) AND operation LIKE 'video:%' AND operation NOT LIKE '%${RELEASED_TAG}'
+          AND operation NOT LIKE '%${GENERATED_TAG}' AND at < ?`,
+    )
+    .bind(cutoff)
+    .run()
+  const shaped = res as { meta?: { changes?: number }; changes?: number }
+  return shaped?.meta?.changes ?? shaped?.changes ?? 0
 }
 
 /** رسالةُ البلوغ — عربيّةٌ بأرقامها، وتقول أين يُرفع. */

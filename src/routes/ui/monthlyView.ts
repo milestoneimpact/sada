@@ -9,7 +9,9 @@ import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
 import { shiftMonth, type MonthlyReport } from '../../lib/report/monthly'
 
-const PROVIDER: Readonly<Record<string, string>> = { anthropic: 'الكتابة (Claude)', gemini: 'Gemini', google: 'Google', x: 'X', linkedin: 'LinkedIn' }
+const PROVIDER: Readonly<Record<string, string>> = { anthropic: 'الكتابة (Claude)', gemini: 'Gemini', google: 'Google', x: 'X', linkedin: 'LinkedIn',
+  // ‏‏تقديرُ المالك لا سعرٌ مقروء (D-415)
+  'cloudflare:estimate': 'Cloudflare — المقاطع (تقدير، price_unverified)' }
 
 export const MONTHLY_SCRIPT = `document.querySelectorAll('[data-print]').forEach(function(b){b.addEventListener('click',function(){window.print()})})`
 
@@ -35,7 +37,9 @@ export function monthlyScreen(r: MonthlyReport, orgName: string, flash: { readon
   <div class="grid tiles c4 mb-4">
     ${tile('خرج', String(out), platforms.length === 0 ? 'لا منشورَ هذا الشهر' : platforms.map(([p, n]) => `${escapeHtml(platformLabel(p as never))} ${n}`).join(' · '))}
     ${tile('التفاعل', String(r.engagement), `${r.measured} منشورًا قِيس بعد يومه الأوّل`)}
-    ${tile('أُنفق', escapeHtml(money(r.spend)), 'من دفتر الإنفاق، كلُّ نداءٍ مدفوع')}
+    ${tile('أُنفق', escapeHtml(money(r.spend)), r.estimated > 0
+      ? 'من دفتر الإنفاق، ومعه تقديرُ المقاطع ' + escapeHtml(money(r.estimated)) + ' (تقدير) خارجَه'
+      : 'من دفتر الإنفاق، كلُّ نداءٍ مدفوع')}
     ${tile('قادم', String(r.upcoming), 'مجدولٌ بعد هذا الشهر')}
   </div>
   <div class="card mb-4"><h2>أرجحُ موعد</h2><p class="m-0">${r.slot === null ? escapeHtml(r.why ?? 'لم يُقَس بعد.') : `<b>${escapeHtml(r.slot)}</b> — من كلّ ما قِيس لهذا العميل.`}</p></div>

@@ -6,6 +6,7 @@
  * وأرجحُ موعدٍ لا يُذكر قبل ثمانية منشوراتٍ مقيسة.
  */
 import type { Db } from '../tokens'
+import { ESTIMATE_SUFFIX } from '../ai/spend'
 import { readFacts, whatWorks, type PostFact } from '../insights/whatWorks'
 
 export interface MonthlyReport {
@@ -15,6 +16,8 @@ export interface MonthlyReport {
   readonly engagement: number
   readonly top: readonly PostFact[]
   readonly spend: number
+  /** تقديرُ المقاطع خارجَ `spend` (D-415). */
+  readonly estimated: number
   readonly spendBy: Readonly<Record<string, number>>
   readonly upcoming: number
   readonly slot: string | null
@@ -41,7 +44,9 @@ export async function monthlyReport(db: Db, org: string, month: string, zone: st
                     JOIN publish_attempts pa ON pa.post_id = p.id AND pa.status = 'succeeded'
                    WHERE p.org_id = ? GROUP BY p.id) WHERE first >= ? AND first < ? GROUP BY platform`)
       .bind(org, from, to).all<{ platform: string; n: number }>().then((r) => r.results).catch(() => []),
-    db.prepare('SELECT provider, SUM(total) AS t FROM cost_ledger WHERE org_id = ? AND at >= ? AND at < ? GROUP BY provider')
+    // ‏‏والمقاطعُ تقديرُ المالك سطرٌ وحده خارجَ «أُنفق» (D-415) — والصفُّ باقٍ في الدفتر (D-008)
+    db.prepare(`SELECT CASE WHEN operation LIKE 'video:%' THEN provider || '${ESTIMATE_SUFFIX}' ELSE provider END AS provider,
+                       SUM(total) AS t FROM cost_ledger WHERE org_id = ? AND at >= ? AND at < ? GROUP BY 1`)
       .bind(org, from, to).all<{ provider: string; t: number }>().then((r) => r.results).catch(() => []),
     db.prepare("SELECT COUNT(*) AS n FROM posts WHERE org_id = ? AND status = 'queued' AND scheduled_at >= ?")
       .bind(org, to).first<{ n: number }>().catch(() => null),
@@ -56,7 +61,8 @@ export async function monthlyReport(db: Db, org: string, month: string, zone: st
     measured: inMonth.length,
     engagement: inMonth.reduce((s, f) => s + f.engagement, 0),
     top: [...inMonth].sort((a, b) => b.engagement - a.engagement).slice(0, 3),
-    spend: costs.reduce((s, c) => s + c.t, 0),
+    spend: costs.filter((c) => !c.provider.endsWith(ESTIMATE_SUFFIX)).reduce((s, c) => s + c.t, 0),
+    estimated: costs.filter((c) => c.provider.endsWith(ESTIMATE_SUFFIX)).reduce((s, c) => s + c.t, 0),
     spendBy,
     upcoming: next?.n ?? 0,
     slot: works.slot?.label ?? null,

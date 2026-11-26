@@ -33,7 +33,7 @@ import { unitCosts } from '../../lib/estimate'
 import { appStatuses } from '../../lib/oauth/apps'
 import { scanDrive } from '../../lib/drive/job'
 import { money } from '../../lib/format'
-import { blockerFor, checkAllowance, providerBlocker, videoCapGate, type Allowance } from '../../lib/limits'
+import { blockerFor, checkAllowance, providerBlocker, videoCapGate, videoMonthCapOf, type Allowance } from '../../lib/limits'
 import { listProviders, resolveKey } from '../../lib/providers'
 import { SETTING_KEYS, settingLabel, writeSetting, type SettingKey } from '../../lib/settings'
 import { chosenTiles, TILE_MAX, TILE_MIN } from '../../lib/dashboard'
@@ -500,7 +500,7 @@ function readiness(load: Load, p: ProviderLoad): { readonly slide: SlideGate; re
       blocker: blockerFor('video', allowance.settings, allowance.usage),
       clips: videoCapGate(allowance.usage.clips, allowance.settings.dailyVideoCap),
       // ‏‏وميزانيّةُ الشهر للمنظّمة النشطة: سقفُها الفعّالُ بتقدير المالك للمقطع (D-414)
-      budget: videoBudget((allowance.org?.settings ?? allowance.settings).monthlyVideoCapUsd, allowance.videoMonth ?? 0,
+      budget: videoBudget(videoMonthCapOf(allowance).cap, allowance.videoMonth ?? 0,
         allowance.settings.videoClipUsd),
     }),
   }
@@ -838,6 +838,8 @@ async function settingsData(load: Load): Promise<SettingsData> {
     videoCap: s.dailyVideoCap,
     usedClips: Number.isFinite(allowance.usage.clips) ? allowance.usage.clips : 0,
     videoMonthCap: s.monthlyVideoCapUsd,
+    // ‏‏وما أُنفق للعميل النشط يُقرَن بسقفه هو لا بالافتراض العامّ (D-415)
+    videoMonthActiveCap: videoMonthCapOf(allowance).cap,
     videoClip: s.videoClipUsd,
     usedVideoMonth: Number.isFinite(allowance.videoMonth) ? allowance.videoMonth ?? 0 : 0,
     promoCap: s.weeklyPromoCapUsd,

@@ -54,7 +54,7 @@ export interface TileSource {
    */
   readonly spendBy: readonly { readonly calls: number; readonly total: number }[]
   /** ما أُنفق منذ أوّل الشهر بتوقيت المالك — و`utc` حين غابت منطقتُه فحُسب بـ UTC. */
-  readonly spendMonth: { readonly total: number; readonly utc: boolean }
+  readonly spendMonth: { readonly total: number; readonly estimated?: number; readonly utc: boolean }
   readonly series: readonly { day: string; total: number }[]
   readonly sources: readonly { analyzed: boolean; stale: boolean }[]
   readonly providers: readonly { configured: boolean; calls: number }[]
@@ -164,7 +164,9 @@ export const TILES: readonly TileSpec[] = [
     why: 'ما أُنفق منذ أوّل الشهر بتوقيتك، على الكتابة والصور والنشر معًا.',
     of: (d, f) => ({
       value: f.money(d.spendMonth.total),
-      note: d.spendMonth.utc ? 'منذ أوّل الشهر بتوقيت الرياض' : 'منذ أوّل الشهر',
+      // ‏‏وتقديرُ المقاطع خارجَ الرقم، يُقال بجانبه موسومًا (D-415)
+      note: `${d.spendMonth.utc ? 'منذ أوّل الشهر بتوقيت الرياض' : 'منذ أوّل الشهر'}${
+        (d.spendMonth.estimated ?? 0) > 0 ? ` · ومقاطع بالتقدير ${f.money(d.spendMonth.estimated ?? 0)} (تقدير)` : ''}`,
     }),
   },
   {
