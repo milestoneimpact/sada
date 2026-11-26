@@ -236,8 +236,8 @@ function scheduler(
     // يرسل المالكَ يربط ما هو مربوط
     if (pageOnly.includes(d.platform)) {
       return `<div class="card card-inset sched none" ${anchor}>
-        ${statusBadge('warn', '!', `الصفحة مربوطة — والنشر باسمها لم يُبن`)}
-        <span class="ago">اعتُمد النصّ ويبقى. واربط <b>حسابَك الشخصيّ</b> لتنشر الآن،
+        ${statusBadge('warn', '!', `الصفحة مربوطة بلا إذن النشر باسمها`)}
+        <span class="ago">اعتُمد النصّ ويبقى. اربط الصفحة بتطبيقها الثاني (w_organization_social)، أو <b>حسابَك الشخصيّ</b> لتنشر الآن،
           أو انتظر موافقة <span class="mono">Community Management API</span>.</span>
         <span class="grow"></span>
         <a class="btn btn-secondary btn-sm" href="${taskHref('M-03')}">ما عليك</a>
@@ -257,12 +257,12 @@ function scheduler(
    * ‏‹mm/dd/yyyy› ولا كلمةَ UTC ما لم يطلبهما. والمرآةُ تقول ما اختاره الزرّ.
    */
   const id = d.id.slice(0, 8)
-  const account = fit.length === 1
+  const account = destinationsField(fit, null, 'ds-' + (id)) ?? (fit.length === 1
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">`
     : `<div class="field"><label for="ac-${id}">الحساب</label>
       <select id="ac-${id}" name="account">${fit
         .map((t) => `<option value="${escapeHtml(t.id)}">${escapeHtml(t.label)}</option>`)
-        .join('')}</select></div>`
+        .join('')}</select></div>`)
   return `<form class="card card-inset sched" ${anchor} method="POST" action="/panel/drafts/schedule" data-busy="جار…" data-swap>
     <input type="hidden" name="id" value="${escapeHtml(d.id)}">
     ${account}
@@ -1025,6 +1025,25 @@ export interface Target {
   readonly id: string
   readonly platform: PublishPlatform
   readonly label: string
+  /** ‏وجهةٌ هي صفحةُ LinkedIn (D-423) — تُختار بجانب الحساب الشخصيّ لا بدلَه. */
+  readonly page?: boolean
+}
+
+/**
+ * ‏**الوجهاتُ مربّعاتٌ حين تكون بينها صفحة** (D-423): «LinkedIn · حسابي» و«LinkedIn · صفحة …» يُختاران معًا أو
+ * ‏واحدًا واحدًا، ولكلٍّ منشورُه ومفتاحُه. والحسابُ الشخصيّ مختارٌ ابتداءً — كما كان يُنشَر قبل الصفحة.
+ * ‏وبلا صفحةٍ تبقى القائمةُ كما كانت: الحساباتُ المتعدّدةُ على منصّةٍ واحدةٍ بدائلُ لا وجهاتٌ معًا.
+ */
+export function destinationsField(fit: readonly Target[], form: string | null, idBase: string): string | null {
+  if (!fit.some((t) => t.page === true) || fit.length < 2) return null
+  const firstChecked = Math.max(0, fit.findIndex((t) => t.page !== true))
+  // ‏حقلٌ لكلّ وجهةٍ بدالّة العُدّة (اسمُه ووسمُ المنصّة فوقه)، والوسمُ html يهرّب ما يُقحَم
+  return html`<fieldset class="stack" id="${idBase}"><legend>أين يُنشَر</legend>${fit.map((t, i) => raw(field({
+    id: idBase + '-' + String(i),
+    label: t.label,
+    hint: html`<span class="pf-logo rv-pf" data-pf="${t.page === true ? 'linkedin-page' : t.platform}" aria-hidden="true">${raw(LOGOS[t.platform] ?? '')}</span>`.value,
+    control: html`<input type="checkbox" name="account" value="${t.id}"${form === null ? '' : html` form="${form}"`}${raw(i === firstChecked ? ' checked' : '')}>`.value,
+  })))}</fieldset>`.value
 }
 
 /** صورةٌ مولَّدة كما تُعرض — بلا بايتات، فالبايتاتُ خلف `/panel/media/:id`. */

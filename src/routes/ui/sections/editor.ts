@@ -38,7 +38,7 @@ import { nativePost } from '../nativePost'
 import { whenField } from '../when'
 import { fileName } from '../parts'
 import {
-  deciderText, imagePane, lengthOf, platformMark, writerName, notesPane, readyLines, readyMimes, requeueForm, specOf, statusOf, threadCheckForm,
+  deciderText, destinationsField, imagePane, lengthOf, platformMark, writerName, notesPane, readyLines, readyMimes, requeueForm, specOf, statusOf, threadCheckForm,
   type MediaView, type Target,
 } from './drafts'
 
@@ -65,6 +65,9 @@ function ownerTime(at: string | null, zone: string | null, now: Date): string {
 
 /** الحسابُ الذي يُنشر عليه: سطرٌ إن كان واحدًا، وقائمةٌ إن تعدّد. */
 function accountField(form: string, fit: readonly Target[]): string {
+  // ‏وجهتا LinkedIn معًا (D-423): مربّعٌ لكلٍّ، ولكلٍّ منشورُه
+  const both = destinationsField(fit, form, form + '-dest')
+  if (both !== null) return both
   if (fit.length === 1) {
     return `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}" form="${form}">
       <p class="ed-on">على حساب <b><bdi>${escapeHtml(fit[0]!.label)}</bdi></b></p>`
@@ -89,7 +92,7 @@ function scheduleBlock(d: DraftRow, input: EditorInput): { readonly text: string
   if (input.targets.some((t) => t.platform === d.platform)) return null
   if (input.pageOnly.includes(d.platform)) {
     // ‏وموافقةُ Community Management مهمّةُ M-03، قدرةٌ في «تفتح قدرة» (متابعة D-324)
-    return { text: 'الصفحة مربوطة، والنشر باسمها لم يُبن بعد. اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: taskHref('M-03') }
+    return { text: 'الصفحة مربوطة بلا إذن النشر باسمها (w_organization_social). اربطها من «اربط صفحة LinkedIn»، أو اربط حسابَك الشخصيّ لتنشر الآن.', label: 'ما عليك', href: taskHref('M-03') }
   }
   return { text: `لا قناة ${specOf(d.platform).label} مربوطة، ويبقى النصّ حتّى تُربَط.`, label: 'اربط قناة', href: '#channels' }
 }

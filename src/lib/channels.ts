@@ -425,6 +425,8 @@ export interface LinkedAccount {
   readonly renewable?: boolean
   /** متى ينتهي إذنُ التجديد — و`null` لتجديدٍ بلا موعد. */
   readonly refreshExpiresAt?: string | null
+  /** ‏أيحمل إذنُه w_organization_social؟ — لصفحة LinkedIn وحدها معنًى (D-423). */
+  readonly pagePublish?: boolean
 }
 
 /**
@@ -440,6 +442,14 @@ export function isLinkedInPage(a: { readonly platform: string; readonly kind: st
   return a.platform === 'linkedin' && a.kind === 'org'
 }
 
+/**
+ * ‏**صفحةٌ تُنشَر باسمها** (D-423): صفحةُ LinkedIn رُبطت بالتطبيق الثاني فحمل إذنُها w_organization_social.
+ * ‏وهي وجهةٌ مستقلّةٌ تُختار صراحةً («LinkedIn · صفحة …»)، **ولا تحلّ محلّ الحساب الشخصيّ** حيث يُختار الحسابُ آليًّا.
+ */
+export function isPublishablePage(a: { readonly platform: string; readonly kind: string; readonly pagePublish?: boolean }): boolean {
+  return isLinkedInPage(a) && a.pagePublish === true
+}
+
 interface AccountRow {
   id: string
   platform: string
@@ -450,6 +460,7 @@ interface AccountRow {
   expires_at: string | null
   renewable: number | null
   refresh_expires_at: string | null
+  page_publish?: number
 }
 
 /**
@@ -485,7 +496,8 @@ export async function listAccounts(db: Db, org: string): Promise<LinkedAccount[]
       .prepare(
         `SELECT a.id, a.platform, a.kind, a.display_name, a.status, a.created_at,
                 t.expires_at, t.refresh_expires_at,
-                CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS renewable
+                CASE WHEN t.refresh_enc IS NULL THEN 0 ELSE 1 END AS renewable,
+                CASE WHEN (' ' || replace(coalesce(t.scopes, ''), ',', ' ') || ' ') LIKE '% w_organization_social %' THEN 1 ELSE 0 END AS page_publish
            FROM accounts a
            LEFT JOIN tokens t ON t.account_id = a.id
           WHERE a.org_id = ?
@@ -504,6 +516,7 @@ export async function listAccounts(db: Db, org: string): Promise<LinkedAccount[]
       expiresAt: row.expires_at ?? null,
       renewable: row.renewable === 1,
       refreshExpiresAt: row.refresh_expires_at ?? null,
+      pagePublish: row.page_publish === 1,
     }))
   } catch {
     return []

@@ -27,7 +27,7 @@ const LABEL_OF: Readonly<Record<TemplateColumn, string>> = { day: 'اليوم', 
 export const SUGGESTED = { linkedin: '09:00', x: '20:00' } as const
 const WORKDAYS = new Set([0, 1, 2, 3, 4])
 const WEEKDAY = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'] as const
-export const TEXT_LIMIT = { linkedin: 3000, x: 280 } as const
+export const TEXT_LIMIT = { linkedin: 3000, 'linkedin-page': 3000, x: 280 } as const
 
 /** مسارُ قالبٍ في المستودع: `plans/YYYY-MM.md` أو `.csv` — وملفُّ الحالة `.status.json` ليس منها. */
 export const TEMPLATE_PATH = /^plans\/(\d{4}-(0[1-9]|1[0-2]))\.(md|csv)$/i
@@ -39,7 +39,7 @@ export const GUIDE_URL = 'https://github.com/milestoneimpact/sada/blob/main/docs
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
-export interface TemplateRow { readonly day: string; readonly time: string; readonly platform: 'linkedin' | 'x'; readonly text: string; readonly media: string; readonly note: string }
+export interface TemplateRow { readonly day: string; readonly time: string; readonly platform: 'linkedin' | 'x' | 'linkedin-page'; readonly text: string; readonly media: string; readonly note: string }
 
 /** صفوفُ أيّامٍ بعينها (`YYYY-MM-DD`): X مساءً كلَّ يوم، وLinkedIn صباحَ أيّام العمل — والنصُّ فارغٌ يكتبه المالك. */
 export function dayListRows(days: readonly string[]): TemplateRow[] {
@@ -161,7 +161,11 @@ export interface TemplateRead {
   readonly skipped: number
 }
 
-const PLATFORM: Readonly<Record<string, 'linkedin' | 'x'>> = { linkedin: 'linkedin', 'لينكدإن': 'linkedin', x: 'x', twitter: 'x', 'إكس': 'x', 'اكس': 'x' }
+/** ‏وصفحةُ LinkedIn `linkedin-page` (D-423) — وجهةٌ ثانيةٌ بحسابها، ويُقبل `linkedin:page`. */
+const PLATFORM: Readonly<Record<string, 'linkedin' | 'x' | 'linkedin-page'>> = {
+  linkedin: 'linkedin', 'لينكدإن': 'linkedin', x: 'x', twitter: 'x', 'إكس': 'x', 'اكس': 'x',
+  'linkedin-page': 'linkedin-page', 'linkedin:page': 'linkedin-page', 'صفحة لينكدإن': 'linkedin-page',
+}
 
 /** يتحقّق من القالب صفًّا صفًّا — **نقيّة**، وكلُّ خطأٍ بسطره وعموده بالعربيّة. و`period` يُلزم الأيّامَ بشهر الملفّ. */
 export function readTemplate(text: string, format: 'md' | 'csv', period: string | null = null): TemplateRead {
@@ -190,10 +194,10 @@ export function readTemplate(text: string, format: 'md' | 'csv', period: string 
     if (tm === null || +tm[1]! > 23 || +tm[2]! > 59) bad('time', `«${time}» ليست ساعة — اكتبها مثل 09:30 بتوقيتك`)
     const raw = at(r, 'platform')
     const platform = PLATFORM[raw.toLowerCase()] ?? null
-    if (platform === null) bad('platform', raw === '' ? 'فارغة — اكتب linkedin أو x' : `«${raw}» لا أعرفها — linkedin أو x`)
+    if (platform === null) bad('platform', raw === '' ? 'فارغة — اكتب linkedin أو linkedin-page أو x' : `«${raw}» لا أعرفها — linkedin أو linkedin-page أو x`)
     else {
       const len = platform === 'x' ? longestTweet('x', text) : text.length
-      if (len > TEXT_LIMIT[platform]) bad('text', `${len} محرفًا و${platform === 'x' ? 'X تقبل' : 'LinkedIn تقبل'} ${TEXT_LIMIT[platform]}`)
+      if (len > TEXT_LIMIT[platform]) bad('text', `${len} محرفًا و${platform === 'x' ? 'X تقبل' : platform === 'linkedin-page' ? 'صفحة LinkedIn تقبل' : 'LinkedIn تقبل'} ${TEXT_LIMIT[platform]}`)
     }
     if (issues.length === before && platform !== null) {
       rows.push({ line, day, time: time.padStart(5, '0'), platform, text, media: at(r, 'media'), note: at(r, 'note') })

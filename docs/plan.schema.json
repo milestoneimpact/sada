@@ -28,9 +28,10 @@
       "platform": {
         "enum": [
           "linkedin",
+          "linkedin-page",
           "x"
         ],
-        "description": "المنصة"
+        "description": "المنصة — linkedin-page لصفحة الشركة"
       },
       "text": {
         "type": "string",
@@ -52,6 +53,22 @@
           "properties": {
             "platform": {
               "const": "linkedin"
+            }
+          }
+        },
+        "then": {
+          "properties": {
+            "text": {
+              "maxLength": 3000
+            }
+          }
+        }
+      },
+      {
+        "if": {
+          "properties": {
+            "platform": {
+              "const": "linkedin-page"
             }
           }
         },

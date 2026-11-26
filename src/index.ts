@@ -35,6 +35,7 @@ import { expiringTokens, recordAlerts } from './lib/token/expiry'
 import { renewDue, renewStalled } from './lib/token/renew'
 import { PROVIDERS as OAUTH_PROVIDERS } from './lib/oauth/providers'
 import { readApp, SECRET_NAMES } from './lib/oauth/apps'
+import { PAGE_SECRET_NAMES, pageApp } from './lib/linkedinPage'
 import { ICON_BYTES } from './routes/ui/shell'
 import { assets } from './routes/assets'
 import { pwa } from './routes/pwa'
@@ -45,6 +46,7 @@ import { landing } from './routes/landing'
 import { verify } from './routes/verify'
 import { media } from './routes/media'
 import { oauth } from './routes/oauth'
+import { oauthPage } from './routes/oauthPage'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
 import { mailMonthlyReports } from './lib/report/mail'
@@ -207,6 +209,8 @@ async function readinessDetail(env: Env): Promise<{
   readonly drive_folder: boolean
   readonly missing_secrets: readonly string[]
   readonly configured_in_vault: readonly string[]
+  /** ‏أسرارٌ اختياريّة ناقصة (D-423): لا تمنع الجاهزيّة — سرّا تطبيق صفحة LinkedIn بانتظار M-03. */
+  readonly missing_optional_secrets: readonly string[]
 }> {
   const state = readiness(env)
   let database: 'ok' | 'unreachable' = 'unreachable'
@@ -235,6 +239,10 @@ async function readinessDetail(env: Env): Promise<{
     drive_folder: sealed.driveFolder,
     missing_secrets: sealed.missing,
     configured_in_vault: inVault,
+    missing_optional_secrets: PAGE_SECRET_NAMES.filter((n) => {
+      const v = (env as unknown as Record<string, unknown>)[n]
+      return typeof v !== 'string' || v.trim() === ''
+    }),
   }
 }
 
@@ -450,6 +458,7 @@ app.route('/', legal)
 app.route('/', landing)
 app.route('/', verify)
 app.route('/', media)
+app.route('/', oauthPage)
 app.route('/', oauth)
 // قبل اللوحة: مسارات العامل الثاني أخصّ، ولها حارسُها الذي يقبل المعلَّقة
 app.route('/', auth)
@@ -767,8 +776,10 @@ async function renewTick(env: Env): Promise<void> {
       db: env.DB,
       encKey: env.TOKEN_ENC_KEY,
       providerFor: (platform) => OAUTH_PROVIDERS[platform],
-      credentialsFor: async (platform) =>
-        readApp(
+      // ‏صفحةُ LinkedIn بتطبيقها الثاني (D-423)، وما عداها بالأوّل
+      credentialsFor: async (platform, kind) => platform === 'linkedin' && kind === 'org'
+        ? pageApp(env as unknown as Record<string, unknown>)
+        : readApp(
           env.DB,
           env.TOKEN_ENC_KEY,
           platform,

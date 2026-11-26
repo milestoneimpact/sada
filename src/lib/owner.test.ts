@@ -291,12 +291,13 @@ describe('M-30 رصيد AI Gateway', () => {
 
 describe('M-58 مقطعُ الحزمة على LinkedIn: الحسابُ الشخصيّ', () => {
   const section = DOC.slice(DOC.indexOf('<a name="m-58">'), DOC.indexOf('<a name="m-59">'))
-  const publisher = readFileSync(new URL('./publish/publisher.ts', import.meta.url), 'utf8')
+  // ‏سببُ الصفحة في موضعه الواحد مع سائقها (D-423)، والناشرُ يقرؤه من هناك
+  const publisher = readFileSync(new URL('./linkedinPage.ts', import.meta.url), 'utf8')
 
   it('تطلب الحسابَ الشخصيّ وتسمّي فشلَ حساب الصفحة بنصّه كما يكتبه الناشر', () => {
     expect(section).toContain('حسابك الشخصيّ')
     expect(section).toContain('/panel/accounts')
-    const failure = 'حساب صفحة — والنشر باسم الصفحة لم يُبن بعد (M-03)'
+    const failure = 'إذنُ صفحة LinkedIn لا يشمل w_organization_social، فلا يُنشر باسمها.'
     expect(publisher).toContain(failure)
     expect(section).toContain(failure)
   })
