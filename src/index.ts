@@ -47,6 +47,8 @@ import { media } from './routes/media'
 import { oauth } from './routes/oauth'
 import { panel } from './routes/panel'
 import { beat } from './lib/ops/heartbeat'
+import { mailMonthlyReports } from './lib/report/mail'
+import { ownerZone } from './lib/time/ownerZone'
 import { sweepRetention } from './lib/privacy/retention'
 import { purgeDeleted } from './lib/privacy/trash'
 import { record } from './lib/audit'
@@ -1261,6 +1263,19 @@ async function rotateTick(env: Env): Promise<void> {
  *
  * **وعطلُه لا يُوقف ما بعده**: يُقال في السجلّ ويُعاد غدًا. وأثرُه سطرٌ في سجلّ نشاط المالك بأعداده — بلا نصٍّ ولا عنوان.
  */
+/**
+ * ‏**تقريرُ الشهر إلى البريد** (D-412): لمن فُتح له الخيار، في المسح اليوميّ — والشهرُ لا يُرسَل مرّتين، وما تعثّر يُعاد غدًا.
+ */
+async function reportMailTick(env: Env): Promise<void> {
+  try {
+    const zone = await ownerZone(env.DB, null).catch(() => null)
+    const out = await mailMonthlyReports(env.DB, env.EMAIL, new Date(), zone)
+    if (out.length > 0) console.info({ job: 'report-mail', sent: out.filter((o) => o.sent).length, unsent: out.filter((o) => !o.sent).map((o) => o.org) })
+  } catch (error) {
+    console.error({ job: 'report-mail', failed: error instanceof Error ? error.message : 'unexpected_error' })
+  }
+}
+
 async function retentionTick(env: Env): Promise<void> {
   // ‏الكنسُ والمحوُ مستقلّان: R2 أو KV لا يردّ لا يُبقي سجلَّ النشاط بلا كنس، ولا العكس
   const swept = await sweepRetention(env.DB)
@@ -1294,6 +1309,7 @@ async function scheduled(controller: ScheduledController, env: Env): Promise<voi
     await alertTick(env)
     await quotaTick(env)
     await retentionTick(env)
+    await reportMailTick(env)
     // ‏آخرًا (D-321): النسخةُ تقرأ ما كتبه المسحُ، ولا تؤخّر ما يُنتظر
     await backupTick(env)
     await prunePulseSlots(env.DB, new Date()).catch((error: unknown) => {

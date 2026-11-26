@@ -24,6 +24,7 @@ import { parseSqliteUtc } from '../format'
 import { sendChunked } from '../queue/batch'
 import { threadAuthor, unsettledTweet } from '../publish/xThread'
 import { missingMedia } from './media'
+import { approvalRequired } from '../clientOptions'
 
 export type ScheduleResult =
   | {
@@ -111,6 +112,14 @@ export async function schedulePost(
   // المعتمَدُ وحده يُجدول: المسوّدةُ لم تُقرأ، والمجدولُ له موعدٌ يُسحب أوّلا
   if (post.status !== 'approved' && post.status !== 'edited') {
     return { ok: false, reason: `حالتُه «${post.status}» — والجدولة للمعتمَد وحده` }
+  }
+
+  // ‏**وعميلٌ يوافق قبل النشر** (D-412): لا يُجدوَل منشورُه حتّى يقول «موافق» في رابطه. والحارسُ يُستورد عند الحاجة —
+  // ‏المراجعةُ تستورد هذه الوحدة، فاستيرادُها في الرأس حلقة
+  if (await approvalRequired(db, post.org_id)) {
+    const { clientApprovalHold } = await import('../clientGate')
+    const hold = await clientApprovalHold(db, post.org_id, postId)
+    if (hold !== null) return { ok: false, reason: hold }
   }
 
   // ‏ومنشورٌ يعرف الناشرُ أنّه سيردّه عند موعده لا يُجدوَل: TikTok وYouTube بلا مقطع،

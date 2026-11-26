@@ -8,6 +8,8 @@ import { escapeHtml } from './escape'
 import { html, raw } from './html'
 import { pageHead } from './parts'
 import { field } from './components/field'
+import { card } from './components/card'
+import { button } from './components/button'
 import { notice, toastRegion } from './components/toast'
 import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
@@ -46,6 +48,8 @@ export interface ClientData {
    * حدودُ هذا العميل (D-295): العامُّ من منظّمة المالك، وما كتبه العميلُ لنفسه فوقه في السقوف الأربعة.
    * ولمنظّمة المالك نفسِها البطاقةُ تحيل إلى «الإنفاق والحدود»: هي العامّ.
    */
+  /** خيارا العميل للوكالة (D-412) — وغيابُهما لا يرسم البطاقة. */
+  readonly options?: { readonly approvalRequired: boolean; readonly reportMail: boolean }
   readonly limits?: {
     readonly ownerOrg: boolean
     readonly global: { readonly spend: number; readonly image: number; readonly video: number; readonly analysis: number }
@@ -194,7 +198,22 @@ export function clientScreen(d: ClientData): string {
     <p class="hint">يقرؤه مخطِّطُ الخطّة وكاتبُ المسوّدات، <b>وصفًا يُراعى</b>: القيودُ قبله أعلى منه، فلا رقمَ يُخترَع ولا رابط.</p>
     ${briefForm(b)}
   </div>
+  ${d.options === undefined ? '' : optionsCard(d.options)}
   ${d.limits === undefined ? '' : limitsCard(d.limits)}`
+}
+
+/**
+ * **خيارا هذا العميل** (D-412): كلاهما مطفأٌ حتّى يُفتح. الموافقةُ تُمسك الجدولةَ حتّى يقول العميلُ «موافق» في رابطه،
+ * والتقريرُ يصل بريدَ المالك أوّلَ كلّ شهرٍ عن الشهر الذي انقضى — أرقامٌ وحدَها، بلا رمزٍ ولا رابط.
+ */
+function optionsCard(o: NonNullable<ClientData['options']>): string {
+  const box = (id: string, name: string, on: boolean, label: string, hint: string): string =>
+    field({ id, label, hint, control: '<input type="checkbox" name="' + name + '" value="1"' + (on ? ' checked' : '') + '>' })
+  return '<div class="mt-4">' + card({ id: 'options', title: 'خيارا هذا العميل', body: html`<form method="POST" action="/panel/client/options" class="stack">
+      ${raw(box('co-approval', 'approval_required', o.approvalRequired, 'لا يُنشر قبل موافقته', 'لا يُجدوَل منشورٌ حتّى يقول «موافق» في رابط الموافقة، ومنشورٌ نُقل موعدُه يُطلب له رأيٌ جديد.'))}
+      ${raw(box('co-report', 'report_mail', o.reportMail, 'تقريرُ الشهر إلى البريد', 'أوّلَ كلّ شهرٍ يصل بريدَك تقريرُ الشهر الذي انقضى، فتحوّله إليه.'))}
+      <div class="row gap-2">${raw(button({ label: 'احفظ الخيارين', variant: 'primary', type: 'submit' }))}</div>
+    </form>`.value }) + '</div>'
 }
 
 /**
