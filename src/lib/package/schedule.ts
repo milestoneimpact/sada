@@ -12,17 +12,20 @@ import type { Db } from '../tokens'
 import { decide } from '../draft/store'
 import { schedulePost } from '../schedule/job'
 import { localToUtc } from '../time/local'
-import { isLinkedInPage, listAccounts } from '../channels'
+import { isLinkedInPage, isPublishablePage, listAccounts } from '../channels'
+import { isPageKey } from './apply'
+import { PAGE_PACKAGE_REFUSAL } from './plan'
 import { videoMisfit, type VideoTarget } from '../publish/video'
 import { readRules } from '../plan/checkStore'
 import { arrangeSlots } from '../plan/scheduler'
 
-export type SkipReason = 'text' | 'past' | 'account' | 'video' | 'time' | 'quiet' | 'gap'
+export type SkipReason = 'text' | 'past' | 'account' | 'page' | 'video' | 'time' | 'quiet' | 'gap'
 
 export const SKIP_SAY: Readonly<Record<SkipReason, string>> = {
   text: 'بلا نصّ',
   past: 'موعدُه مضى',
   account: 'لا حساب متّصلًا لمنصّته',
+  page: PAGE_PACKAGE_REFUSAL,
   video: 'مقطعُه لا يناسب حدود المنصّة',
   time: 'موعدُه غير مفهوم',
   quiet: 'موعدُه في ساعات الهدوء',
@@ -57,16 +60,16 @@ const VIDEO_TARGETS: readonly string[] = ['x', 'linkedin']
 
 /** ما سيُجدوَل وما يُتخطّى ولماذا — يقرؤه التأكيدُ قبل الضغطة والتنفيذُ نفسُه. */
 export async function planPackageSchedule(db: Db, org: string, zone: string | null, now: Date): Promise<PackageSchedulePlan> {
-  const skipped: Record<SkipReason, number> = { text: 0, past: 0, account: 0, video: 0, time: 0, quiet: 0, gap: 0 }
+  const skipped: Record<SkipReason, number> = { text: 0, past: 0, account: 0, page: 0, video: 0, time: 0, quiet: 0, gap: 0 }
   const { results } = await db
     .prepare(
-      `SELECT id, platform, status, text, package_due FROM posts
+      `SELECT id, platform, status, text, package_due, idempotency_key FROM posts
         WHERE org_id = ? AND package_item_no IS NOT NULL AND status IN ('draft', 'approved', 'edited')
         ORDER BY package_due, platform, id`,
     )
     .bind(org)
-    .all<{ id: string; platform: string; status: string; text: string | null; package_due: string | null }>()
-    .catch(() => ({ results: [] as { id: string; platform: string; status: string; text: string | null; package_due: string | null }[] }))
+    .all<{ id: string; platform: string; status: string; text: string | null; package_due: string | null; idempotency_key: string | null }>()
+    .catch(() => ({ results: [] as { id: string; platform: string; status: string; text: string | null; package_due: string | null; idempotency_key: string | null }[] }))
   if (results.length === 0) return { ready: [], skipped }
   const accounts = await listAccounts(db, org)
   const nowKey = now.toISOString().slice(0, 16)
@@ -76,8 +79,12 @@ export async function planPackageSchedule(db: Db, org: string, zone: string | nu
     const at = dueToUtc(p.package_due, zone)
     if (at === null) { skipped.time += 1; continue }
     if (at <= nowKey) { skipped.past += 1; continue }
-    const account = accounts.find((a) => a.platform === p.platform && a.status === 'active' && !isLinkedInPage(a))
-    if (account === undefined) { skipped.account += 1; continue }
+    // ‏بندُ الصفحة (D-426) إلى صفحةٍ تنشر باسمها وحدها، وبلاها يُردّ بسببه — لا يسقط إلى الحساب الشخصيّ
+    const page = p.platform === 'linkedin' && isPageKey(p.idempotency_key)
+    const account = page
+      ? accounts.find((a) => a.status === 'active' && isPublishablePage(a))
+      : accounts.find((a) => a.platform === p.platform && a.status === 'active' && !isLinkedInPage(a))
+    if (account === undefined) { skipped[page ? 'page' : 'account'] += 1; continue }
     if (VIDEO_TARGETS.includes(p.platform)) {
       const { results: videos } = await db
         .prepare(

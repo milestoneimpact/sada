@@ -39,11 +39,11 @@ describe('بعد المراجعة (D-423)', () => {
     expect((db.raw.prepare("SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'").get() as { n: number }).n).toBe(0)
   })
 
-  it('سطرُ linkedin-page في حزمة المستودع يُردّ بسببه ولا يصير بندًا على الحساب الشخصيّ', () => {
+  it('سطرُ linkedin-page في حزمة المستودع يبقى بمنصّته ولا يصير بندًا على الحساب الشخصيّ (D-426)', () => {
     const md = '| اليوم | الساعة | المنصة | النص | الملف | ملاحظة |\n|---|---|---|---|---|---|\n| 2026-12-03 | 09:00 | linkedin | نصّ | | |\n| 2026-12-03 | 09:00 | linkedin-page | نصّ | | |\n'
     const plan = planFromTemplate(md, 'plans/2026-12.md')
-    expect(plan.entries.map((e) => e.platform)).toEqual(['linkedin'])
-    expect(plan.problems.join(' ')).toContain(PAGE_PACKAGE_REFUSAL)
+    expect(plan.entries.map((e) => e.platform)).toEqual(['linkedin', 'linkedin-page'])
+    expect(plan.problems.join(' ')).not.toContain(PAGE_PACKAGE_REFUSAL)
   })
 
   it('فصلُ صفحةٍ يشارك رمزَها صفحةٌ أخرى لا يُبطله عند LinkedIn، والأخيرةُ تُبطله بسرّي تطبيقها', async () => {

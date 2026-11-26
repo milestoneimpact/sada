@@ -155,22 +155,24 @@ export async function readPackagePlan(bytes: Uint8Array): Promise<PackagePlan> {
  * القالبُ خطّةَ حزمة: مفتاحُ البند `dDD` (والثاني لليوم والمنصّة نفسَيهما `dDD-2`) لا رقمَ مادّة، فلا يُطابَق بوسيطة مادّةٍ أخرى،
  * والنصُّ من العمود نفسِه (يغلبه نصُّ 02-copy إن وُجد بالمفتاح نفسِه، ولن يوجد). والأخطاءُ مشكلاتُ الخطّة بسطرها وعمودها.
  */
-/** ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-423). */
-export const PAGE_PACKAGE_REFUSAL = 'صفحة LinkedIn (linkedin-page) لا تُجدوَل من حزمة المستودع بعد، فتُرك السطر ولم يُنشر على حسابك الشخصيّ — جدوِله على الصفحة من المحرّر أو استورده «من ملفّ».'
+/**
+ * ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-423، ثمّ D-426): يُقال حين لا صفحةَ مربوطةً تنشر باسمها، فيبقى السطرُ مسوّدةً
+ * ‏ولا يسقط إلى الحساب الشخصيّ أبدًا.
+ */
+export const PAGE_PACKAGE_REFUSAL = 'لا صفحة LinkedIn مربوطة تنشر باسمها، فتُرك سطرُ linkedin-page ولم يُنشر على حسابك الشخصيّ — اربط الصفحة من «الحسابات» ثمّ جدوِل ثانيةً.'
 
 export function planFromTemplate(text: string, path: string): PackagePlan {
   const format = /\.csv$/i.test(path) ? 'csv' : 'md'
   const read = readTemplate(text, format, templatePeriod(path))
   const count = new Map<string, number>()
-  // ‏**وسطرُ `linkedin-page` يُردّ في مسار الحزمة ولا يُحوَّل** (مراجعة D-423): كان يصير بندَ LinkedIn فيُنشر على الحساب الشخصيّ،
-  // ‏وخطّةٌ بالسطرين تنشره عليه مرّتين. فيُترك بسببٍ في تقرير الحزمة، والصفحةُ تُجدوَل من المحرّر أو بـ«من ملفّ»
-  const pageRows = read.rows.filter((r) => r.platform === 'linkedin-page')
-  const entries: PlanEntry[] = read.rows.filter((r) => r.platform !== 'linkedin-page').map((r) => {
+  // ‏**وسطرُ `linkedin-page` يبقى بمنصّته** (D-426): بندٌ مستقلٌّ عن سطر LinkedIn الشخصيّ في يومه، بمفتاحٍ غيرِ مفتاحه،
+  // ‏والجدولةُ تختار له الصفحةَ وحدها (`schedule.ts`) — ولا يُحوَّل `linkedin` فيُنشر على الحساب الشخصيّ
+  const entries: PlanEntry[] = read.rows.map((r) => {
     const base = 'd' + r.day.slice(8, 10)
     const n = (count.get(base + r.platform) ?? 0) + 1
     count.set(base + r.platform, n)
     return { item: n === 1 ? base : `${base}-${n}`, platform: r.platform, date: r.day, time: r.time, idea: r.note, format: '', mediaHint: r.media, text: r.text }
   })
   const name = path.split('/').pop() ?? path
-  return { entries, rules: null, days: new Set(entries.map((e) => e.date)).size, columns: [...TEMPLATE_HEADER], problems: [...read.issues.map((i) => `${name}: ${issueText(i)}`), ...pageRows.map((r) => name + ': السطر ' + String(r.line) + ': ' + PAGE_PACKAGE_REFUSAL)] }
+  return { entries, rules: null, days: new Set(entries.map((e) => e.date)).size, columns: [...TEMPLATE_HEADER], problems: [...read.issues.map((i) => `${name}: ${issueText(i)}`)] }
 }
