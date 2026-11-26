@@ -31,6 +31,7 @@ import { publishXThread } from './xThread'
 import { clipShape, isMediaIdRejection, isVideoTarget, uploadLinkedInVideo, uploadXVideo, videoMisfit } from './video'
 import { tweetsOf } from '../draft/thread'
 import { isLinkedInPage } from '../channels'
+import { linkedInAuthor, PAGE_SAY, pageCanPublish } from '../linkedinPage'
 import { mediaUrl, signMediaToken } from '../media/link'
 import { publishTikTok, tiktokNote } from './tiktok'
 import { publishYouTube } from './youtube'
@@ -174,28 +175,14 @@ export async function publishPost(
   }
 
   /*
-   * **حسابُ صفحةٍ لا يُنشَر عليه — ويُقال ذلك هنا لا عند المنصّة** (D-087).
-   *
-   * السائقُ يبني `urn:li:person:` حرفا (D-080)، فمنشورٌ إلى صفحةٍ
-   * يُرسَل بمعرّفِ الصفحة تحت وسمِ شخص — **فتردّه LinkedIn برسالةٍ لا
-   * تدلّ على السبب**، بعد أن يكون قد وقع في الطابور وانتُظر موعدُه.
-   *
-   * والوقتُ هو الثمن: تُجدوَل السادسةَ والنصف، ويكتشف المالكُ السابعةَ
-   * أنّ شيئا لم يخرج. **فيُردّ الآن، بسببٍ يُقرأ، وبلا إعادة** — حتّى
-   * يُبنى سائقُ الصفحات يومَ تصل موافقةُ `Community Management API`.
+   * ‏**صفحةُ LinkedIn تُنشَر باسمها** (D-423 — كانت تُردّ هنا منذ D-087 حتّى يُبنى سائقُها). والمؤلّفُ
+   * ‏`urn:li:organization:<رقم>` من الحساب، والمسارُ مسارُ الشخص نفسُه (Posts API) بمفتاحه ودفتره.
+   * ‏**ومعرّفٌ ليس رقمًا يُردّ الآن** لا عند المنصّة. والنطاقُ يُسأل بعد قراءة الرمز أدناه.
+   * ‏والحارسُ لـ LinkedIn وحدها: YouTube يحفظ قناتَه بنوع `org` (`identity.ts`).
    */
-  /*
-   * **والحارسُ لـ LinkedIn وحدها**: YouTube يحفظ قناتَه بنوع `org`
-   * (`identity.ts`)، فكان كلُّ رفعٍ إليها يُردّ هنا بسببٍ يخصّ LinkedIn.
-   */
-  if (isLinkedInPage({ platform: post.platform, kind: post.account_kind })) {
-    return preflightFailed(
-      db, post,
-      'حساب صفحة — والنشر باسم الصفحة لم يُبن بعد (M-03). ' +
-        'انشر من حسابك الشخصيّ، أو انتظر موافقة Community Management API.',
-      deps.queueAttempt,
-    )
-  }
+  const page = isLinkedInPage({ platform: post.platform, kind: post.account_kind })
+  const author = post.platform === 'linkedin' ? linkedInAuthor(post) : null
+  if (page && author === null) return preflightFailed(db, post, PAGE_SAY.badId, deps.queueAttempt)
 
   // ٢ — هل نُشر بالمفتاح نفسه من قبل؟
   const done = await db
@@ -351,7 +338,10 @@ export async function publishPost(
    * ثمنُه وجاهز. فالثاني تحسينٌ يُقرأ لا شرطٌ يُفرَض.
    */
   const direct = post.platform === 'tiktok' && canUploadMedia('tiktok', tokens.scopes)
-  const capable = CLIP_PLATFORMS.has(post.platform)
+  // ‏**ورمزُ الصفحة من التطبيق الثاني لا يحمل w_member_social** (D-423): نطاقُه w_organization_social، وبه يُرفع الوسيطُ أيضًا.
+  // ‏وبلاه سببٌ يُقرأ بالعربيّة، لا اسمُ نطاقٍ عارٍ
+  if (page && !pageCanPublish(tokens.scopes)) return preflightFailed(db, post, PAGE_SAY.scope, deps.queueAttempt)
+  const capable = page ? true : CLIP_PLATFORMS.has(post.platform)
     ? canPublish(post.platform, tokens.scopes)
     : needsMedia
       ? canUploadMedia(post.platform, tokens.scopes)
@@ -534,7 +524,7 @@ export async function publishPost(
           }
           try {
             mediaId = target === 'linkedin'
-              ? await uploadLinkedInVideo(tokens.accessToken, `urn:li:person:${post.external_id}`, clip, fetchImpl, opts)
+              ? await uploadLinkedInVideo(tokens.accessToken, author!, clip, fetchImpl, opts)
               : await uploadXVideo(tokens.accessToken, clip, fetchImpl, opts)
           } catch (error) {
             // ‏‏المردودُ نهائيًّا يُكتب سببُه على الوسيط ويُنسى معرّفُه: «أعده» بعد تصحيح المقطع يرفع من أوّله
@@ -583,7 +573,7 @@ export async function publishPost(
         post.platform === 'linkedin'
           ? await uploadLinkedInImage(
               tokens.accessToken,
-              `urn:li:person:${post.external_id}`,
+              author!,
               upload,
               fetchImpl,
             )
@@ -678,7 +668,7 @@ export async function publishPost(
         post.platform === 'linkedin'
           ? await publishLinkedIn(
               tokens.accessToken,
-              `urn:li:person:${post.external_id}`,
+              author!,
               post.text,
               fetchImpl,
               mediaId,

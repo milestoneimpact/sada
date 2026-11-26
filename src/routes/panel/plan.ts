@@ -34,6 +34,7 @@ import { approveMany, decide, saveText } from '../../lib/draft/store'
 import { notice, toastRegion } from '../ui/components/toast'
 import { escapeHtml } from '../ui/escape'
 import { DRAFT_IMAGE_MODEL, FINAL_IMAGE_MODEL, freeImagesLeft, imageNeurons, neuronsUsedToday } from '../../lib/ai/imagePricing'
+import { PAGE_PLATFORM } from '../../lib/linkedinPage'
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
@@ -1003,7 +1004,7 @@ plan.post('/panel/plan/month/approve', async (c) => {
   if (String(f.get('scope') ?? '') === 'filter') {
     const fq = new URLSearchParams()
     for (const k of ['v', 'p', 'd', 'pf', 'st']) fq.set(k, String(f.get(k) ?? ''))
-    only = bulkPick(await calendarItems(c.env.DB, org, stored.id), parseCalQuery(fq, period + '-01', PLATFORM_IDS))
+    only = bulkPick(await calendarItems(c.env.DB, org, stored.id), parseCalQuery(fq, period + '-01', [...PLATFORM_IDS, PAGE_PLATFORM]))
     if (only.length === 0) {
       await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لا بند ينتظر الاعتماد في هذا الفرز.' })
       return c.redirect(to, 303)
@@ -1079,7 +1080,7 @@ plan.get('/panel/plan/month', async (c) => {
   const now = new Date()
   const today = localDay(localParts(now, zone))
   const current = today.slice(0, 7)
-  const calQ = parseCalQuery(new URL(c.req.url).searchParams, today, PLATFORM_IDS)
+  const calQ = parseCalQuery(new URL(c.req.url).searchParams, today, [...PLATFORM_IDS, PAGE_PLATFORM])
   const period = calQ.period
   const canFix = allows(session.record.role ?? 'owner', 'publisher')
   const [stored, rules, diff, facts] = await Promise.all([

@@ -47,7 +47,8 @@ import { listSessions, loadSession, type Session } from '../../lib/session'
 import { factorState } from '../../lib/security/factors'
 import { OWNER_EMAIL } from '../../lib/ownerEmail'
 import { digest, fingerprint } from '../../lib/security/digest'
-import { isLinkedInPage, linkStates, listAccounts, viewChannels, type ChannelView, type LinkedAccount } from '../../lib/channels'
+import { destinationLabel } from '../../lib/linkedinPage'
+import { isLinkedInPage, isPublishablePage, linkStates, listAccounts, viewChannels, type ChannelView, type LinkedAccount } from '../../lib/channels'
 import { activeScopes } from '../../lib/platform/screen'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
@@ -585,11 +586,13 @@ function targetsOf(channels: readonly ChannelView[]): Target[] {
   return channels.flatMap((ch) =>
     ch.spec.built
       ? ch.accounts
-          .filter((a) => a.status === 'active' && !isLinkedInPage(a))
+          // ‏وصفحةُ LinkedIn وجهةٌ حين يحمل إذنُها w_organization_social (D-423)، وإلّا بقيت خارجها كما كانت (D-087)
+          .filter((a) => a.status === 'active' && (!isLinkedInPage(a) || isPublishablePage(a)))
           .map((a) => ({
             id: a.id,
             platform: ch.spec.id as PublishPlatform,
-            label: `${a.displayName} · ${ch.spec.label}`,
+            label: destinationLabel(a, ch.spec.label),
+            ...(isPublishablePage(a) ? { page: true } : {}),
           }))
       : [],
   )
@@ -741,7 +744,7 @@ async function postsData(load: Load): Promise<PostsData> {
         (ch) =>
           ch.spec.built &&
           ch.accounts.some((a) => a.status === 'active') &&
-          !ch.accounts.some((a) => a.status === 'active' && !isLinkedInPage(a)),
+          !ch.accounts.some((a) => a.status === 'active' && (!isLinkedInPage(a) || isPublishablePage(a))),
       )
       .map((ch) => ch.spec.id),
     peaks: Object.fromEntries(peakRows),

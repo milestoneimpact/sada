@@ -5,6 +5,7 @@
  */
 import { Hono, type Context } from 'hono'
 import type { Env } from '../../env'
+import { pageApp } from '../../lib/linkedinPage'
 import { ROUTES, type TaskName } from '../../lib/ai/registry'
 import { listModels, type ModelList } from '../../lib/ai/models'
 import { cfAccountId } from '../../lib/ai/cloudflare'
@@ -160,7 +161,10 @@ channels.post('/panel/channels/disconnect', async (c) => {
     return toSetup(form)
   }
 
-  const app = await readApp(c.env.DB, c.env.TOKEN_ENC_KEY, target.platform, c.env as unknown as Record<string, string | undefined>)
+  // ‏وصفحةُ LinkedIn تُبطَل بسرّي تطبيقها الثاني لا الأوّل (مراجعة D-423)
+  const app = target.platform === 'linkedin' && target.kind === 'org'
+    ? pageApp(c.env as unknown as Record<string, unknown>)
+    : await readApp(c.env.DB, c.env.TOKEN_ENC_KEY, target.platform, c.env as unknown as Record<string, string | undefined>)
   const result = await disconnectAccount(c.env.DB, c.env.TOKEN_ENC_KEY, target, app)
   await record(
     c.env.DB,
@@ -180,11 +184,13 @@ channels.post('/panel/channels/disconnect', async (c) => {
     : `وأُوقف ${result.stopped} من منشوراته المجدولة فصار «فشل» بسبب الفصل، ولن يُنشَر منها شيء.`
   const remote = result.remote === 'revoked'
     ? `وأبطلت ${label} الإذن عندها.`
+    : result.remote === 'shared'
+      ? 'ولم يُبطَل الإذنُ عند LinkedIn: صفحةٌ أخرى مربوطةٌ تنشر بالإذن نفسِه — افصلها أيضًا ليُبطَل.'
     : result.remote === 'failed'
       ? `وتعذّر إبطال الإذن عند ${label}، فاسحبه بيدك من «${page.label}».`
       : `ولا نداء إبطال يُنادى عند ${label} لهذا الحساب، فاسحب الإذن بيدك من «${page.label}».`
   await setFlash(c.env, c.req.raw, {
-    kind: result.remote === 'revoked' ? 'ok' : 'warn',
+    kind: result.remote === 'revoked' || result.remote === 'shared' ? 'ok' : 'warn',
     text: `فُصل «${target.displayName}» وحُذفت رموزُه من القاعدة. ${stopped} ${remote}`,
   })
   return toSetup(form)
@@ -405,6 +411,8 @@ channels.get('/panel/channels/:platform', async (c) => {
     // ‏الدليلُ يسكن الشاشةَ لا اللوح (D-111) — فتحتاج حالَ التطبيق وأصلَ اللوحة
     app: apps.find((a) => a.platform === id),
     baseUrl: c.env.PUBLIC_BASE_URL,
+    // ‏وسرّا تطبيق الصفحة (D-423): اسمٌ يُسأل عن وجوده، لا قيمة
+    pageApp: pageApp(c.env as unknown as Record<string, unknown>) !== null,
     // ‏ويومُ المالك من كعكة متصفّحه، لا من إعدادٍ يُخزَّن (D-173)
     zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
     // ‏ووميضُ الفعل يُقرأ حيث عاد المالك، لا في لوحٍ لم يفتحه

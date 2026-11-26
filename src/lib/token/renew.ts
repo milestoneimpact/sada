@@ -95,7 +95,8 @@ export interface RenewDeps {
   readonly db: Db
   readonly encKey: string
   /** أسرارُ التطبيق لكلّ منصّة — تُقرأ مرّةً لا لكلّ حساب. */
-  readonly credentialsFor: (platform: Platform) => Promise<ClientCredentials | null>
+  /** ‏والنوعُ معه (D-423): صفحةُ LinkedIn تتجدّد بسرّي تطبيقها الثاني لا الأوّل. */
+  readonly credentialsFor: (platform: Platform, kind?: string) => Promise<ClientCredentials | null>
   readonly providerFor: (platform: Platform) => Provider
   readonly fetchImpl?: typeof fetch
   readonly now?: () => Date
@@ -116,6 +117,8 @@ interface DueRow {
   platform: string
   /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-277). */
   org_id: string
+  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn تتجدّد بتطبيقها الثاني (D-423). */
+  kind?: string
   /** ‏كم رُفض تجديدُه متتاليًا (D-320 · تحقّق D-320 على main: الرفضُ وحدَه لا العابر) — صفرٌ للسليم، وغيابُه صفر. */
   renew_failures?: number
 }
@@ -140,7 +143,7 @@ export async function dueForRenewal(
   const cutoff = new Date(now.getTime() + marginSeconds * 1000).toISOString()
   const { results } = await db
     .prepare(
-      `SELECT t.account_id, a.platform, a.org_id, t.renew_failures
+      `SELECT t.account_id, a.platform, a.kind, a.org_id, t.renew_failures
          FROM tokens t JOIN accounts a ON a.id = t.account_id AND a.org_id = t.org_id
         WHERE a.status != 'revoked'
           AND t.refresh_enc IS NOT NULL
@@ -195,7 +198,7 @@ export async function renewOne(deps: RenewDeps, row: DueRow): Promise<RenewOutco
   const platform = row.platform as Platform
   let creds: ClientCredentials | null
   try {
-    creds = await deps.credentialsFor(platform)
+    creds = await deps.credentialsFor(platform, row.kind)
   } catch {
     creds = null
   }

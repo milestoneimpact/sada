@@ -32,6 +32,9 @@ import { blamedScopes } from '../../lib/oauth/refusal'
 import { PLATFORM_LABEL, type Platform } from '../../lib/oauth/providers'
 import { callbackStep, SETUP, setupHref } from '../../lib/channels'
 import { escapeHtml } from './shell'
+import { html, raw } from './html'
+import { card } from './components/card'
+import { field } from './components/field'
 import { LOGOS } from './logos'
 import { pathArrows } from './parts'
 import { statusBadge } from './components/badge'
@@ -537,4 +540,44 @@ export function unreachedBody(d: UnreachedData): string {
     <details class="mt-3"><summary>للمطوّر</summary>
       <p class="hint"><span class="mono">${escapeHtml(d.detail)}</span></p></details>
   </div>`
+}
+
+// ── صفحةُ LinkedIn بالتطبيق الثاني (D-423 · M-03) ─────────────────────
+
+/** ‏وافق LinkedIn، والصفحاتُ التي تديرها تنتظر اختيارك — والاختيارُ في اللوحة حيث جلستُك. */
+export function pagesFoundBody(names: readonly string[], pickHref: string): string {
+  const lede = html`وافق LinkedIn، ووجدنا ${names.length} ${names.length === 1 ? 'صفحةً تديرها' : 'صفحاتٍ تديرها'}. <b>ولم يُحفَظ حسابٌ بعد</b> — اختر ما يُنشَر باسمه.`.value
+  return head('linkedin', 'بقيت خطوة', 'اختر صفحاتك', lede) + card({
+    title: 'الصفحات',
+    body: html`<ul class="plain stack">${names.map((n) => html`<li><bdi>${n}</bdi></li>`)}</ul>
+    <p class="hint">الاختيارُ متاحٌ عشرَ دقائق، ثمّ يُعاد الربط.</p>
+    <div class="row mt-3">${raw(button({ label: 'اختر الصفحات', variant: 'primary', href: pickHref }))}${raw(ACCOUNTS)}</div>`.value,
+  })
+}
+
+/** ‏وافق LinkedIn ولم يمنح النطاق، أو لا صفحةَ يديرها صاحبُ الحساب. لم يُحفَظ شيء. */
+export function pagesRefusedBody(reason: string): string {
+  return head('linkedin', 'لم يكتمل', 'لم تُربَط صفحة', html`${reason} <b>ولم يُحفَظ شيء.</b>`.value) + card({
+    title: 'ما يُفعَل',
+    body: html`<p class="hint">تأكّد أنّ Community Management API مُجازٌ على تطبيق «SADA Pages»، وأنّك مديرُ الصفحة، ثمّ «اربط صفحة LinkedIn» من جديد.</p>
+    <div class="row mt-3">${raw(button({ label: 'صفحة LinkedIn', variant: 'primary', href: '/panel/channels/linkedin?tab=setup' }))}${raw(ACCOUNTS)}</div>`.value,
+  })
+}
+
+/** ‏شاشةُ الاختيار — صفحةٌ أو أكثر، ولكلٍّ حسابُه. */
+export function pagesPickBody(d: { readonly pick: string; readonly csrf: string; readonly orgs: readonly { readonly id: string; readonly name: string }[] }): string {
+  return head('linkedin', 'صفحة LinkedIn', 'اختر ما يُنشَر باسمه',
+    'كلُّ صفحةٍ تختارها تُنشَر عليها وحدها: «LinkedIn · صفحة …» بجانب «LinkedIn · حسابي».') + card({
+    title: 'الصفحات التي تديرها',
+    body: html`<form method="POST" action="/panel/linkedin-pages/pick" data-busy="جار…" class="stack">
+    <input type="hidden" name="_csrf" value="${d.csrf}">
+    <input type="hidden" name="pick" value="${d.pick}">
+    ${d.orgs.map((o, i) => raw(field({
+      id: 'pg-' + String(i),
+      label: 'LinkedIn · صفحة ' + o.name,
+      control: html`<input type="checkbox" name="org" value="${o.id}"${raw(i === 0 ? ' checked' : '')}>`.value,
+    })))}
+    <div class="row mt-3">${raw(button({ label: 'اربط ما اخترت', variant: 'primary', type: 'submit' }))}${raw(ACCOUNTS)}</div>
+  </form>`.value,
+  })
 }

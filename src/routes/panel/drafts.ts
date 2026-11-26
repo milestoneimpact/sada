@@ -25,6 +25,8 @@ import { getProvider } from '../../lib/providers'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { isLinkedInPage, linkStates, listAccounts } from '../../lib/channels'
+import { scheduleDestinations, withdrawCopies, type DestinationResult } from '../../lib/schedule/destinations'
+import { destinationLabel } from '../../lib/linkedinPage'
 import { clock, dayLabel, localParts, validZone, zoneNote } from '../../lib/time/zone'
 import { ownerZone } from '../../lib/time/ownerZone'
 import { backTo } from '../../lib/nav/back'
@@ -431,9 +433,13 @@ drafts.post('/panel/drafts/decide', async (c) => {
   // ‏والصورةُ النهائيّةُ بعد الاعتماد (D-285)
   if (result.ok && result.status !== 'rejected') finalizeLater(c, activeOrg(gate.session.record), [id])
   let scheduled: ScheduleResult | null = null
+  let extraNote = ''
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
     // ‏والإمساكُ بنافذة «تراجَع» (D-324): موعدٌ أقربُ منها يُردّ، فلا يُنشَر شيءٌ والزرُّ قائم
-    scheduled = await schedulePost(c.env.DB, id, String(form.get('account') ?? ''), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS)
+    // ‏‏وجهتان أو أكثر (D-423): منشورٌ لكلّ وجهةٍ بمفتاحه، والأولى على المنشور نفسِه
+    const all = await scheduleDestinations(c.env.DB, id, form.getAll('account').map(String), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS)
+    scheduled = all[0]!.result
+    extraNote = await destinationsNote(c.env.DB, activeOrg(gate.session.record), all.slice(1))
     await record(c.env.DB, {
       actor: 'panel', action: 'draft.schedule', target: id, detail: scheduled.ok ? scheduled.at : `refused:${scheduled.reason}`,
     }, c.req.raw)
@@ -452,7 +458,7 @@ drafts.post('/panel/drafts/decide', async (c) => {
       : scheduled !== null && scheduled.ok
         ? {
             kind: 'ok',
-            text: `اعتُمدت وجُدولت على ${platformLabel(scheduled.platform)} (${scheduled.account}) ${ownerWhen(scheduled.at, zone, now)}.`,
+            text: `اعتُمدت وجُدولت على ${platformLabel(scheduled.platform)} (${scheduled.account}) ${ownerWhen(scheduled.at, zone, now)}.${extraNote}`,
             // ‏والتراجعُ دقيقتين يعيدها مسوّدةً (D-324): كان الإشعارُ يُغلَق بلا رجعة
             undo: scheduleUndo(id, scheduled.at, 'draft', now),
           }
@@ -623,6 +629,17 @@ drafts.post('/panel/drafts/approve-many', async (c) => {
  * موضعٍ واحد يشترك فيه هذا الزرّ وأيُّ منادٍ آخر. وزرٌّ في صفحةٍ ليس
  * طريقا جانبيّا حول الحارس (D-019).
  */
+/** ‏ما وقع للوجهات الزائدة — سطرٌ لكلٍّ باسمها، يُلحق بإشعار الأولى (D-423). */
+async function destinationsNote(db: Env['DB'], org: string, extra: readonly DestinationResult[]): Promise<string> {
+  if (extra.length === 0) return ''
+  const accounts = await listAccounts(db, org)
+  const name = (id: string): string => {
+    const a = accounts.find((x) => x.id === id)
+    return a === undefined ? id : destinationLabel(a, platformLabel(a.platform))
+  }
+  return extra.map((d) => d.result.ok ? ' وجُدولت أيضًا على «' + (name(d.accountId)) + '».' : ' وتعذّرت على «' + (name(d.accountId)) + '»: ' + (d.result.reason)).join('')
+}
+
 drafts.post('/panel/drafts/schedule', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
@@ -631,26 +648,29 @@ drafts.post('/panel/drafts/schedule', async (c) => {
   const id = String(form.get('id') ?? '')
   const now = new Date()
   const zone = await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)
-  const result = await schedulePost(
+  // ‏‏وجهتان أو أكثر (D-423): «LinkedIn · حسابي» و«LinkedIn · صفحة …» معًا منشوران، لكلٍّ مفتاحُه، وسقوطُ واحدٍ لا يوقف الآخر
+  const all = await scheduleDestinations(
     c.env.DB,
     id,
-    String(form.get('account') ?? ''),
+    form.getAll('account').map(String),
     // ‏و«when» بـ UTC من شريط البطاقة، أو زرٌّ ويومٌ بتوقيت المالك من المحرّر (D-198)
     readWhen(form, zone, now),
     now,
     activeOrg(gate.session.record),
     UNDO_WINDOW_SECONDS,
   )
+  const result = all[0]!.result
+  const extraNote = await destinationsNote(c.env.DB, activeOrg(gate.session.record), all.slice(1))
 
   let flash: PanelFlash = result.ok
     ? {
         kind: 'ok',
         text: `جُدولت على ${platformLabel(result.platform)} (${result.account}) ${
-          ownerWhen(result.at, zone, now)}.`,
+          ownerWhen(result.at, zone, now)}.${extraNote}`,
         // ‏وتراجعُ الجدولة دقيقتين يعيدها معتمَدةً (D-324)
         undo: scheduleUndo(id, result.at, 'approved', now),
       }
-    : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}` }
+    : { kind: 'bad', text: `تعذّرت الجدولة: ${result.reason}${extraNote}` }
 
   // ‏YouTube وTikTok يصلان خاصَّين (ر-4): يُقال في إشعار الجدولة، لا في صفحة المنصّة وحدها
   const scheduled = result.ok
@@ -914,11 +934,15 @@ drafts.post('/panel/drafts/undo-schedule', async (c) => {
   const result = await undoSchedule(c.env.DB, id, activeOrg(gate.session.record), {
     at: String(form.get('at') ?? ''), until: String(form.get('until') ?? ''), to,
   }, new Date())
+  // ‏ونُسخُ الوجهات من الجدولة نفسِها تُسحب معها (مراجعة D-423): وإلّا نُشرت الصفحةُ والأصلُ قد سُحب
+  const copies = result.ok ? await withdrawCopies(c.env.DB, id, activeOrg(gate.session.record), String(form.get('at') ?? '')) : { withdrawn: 0, stuck: 0 }
+  const also = (copies.withdrawn > 0 ? ' وسُحب معها ' + String(copies.withdrawn) + (copies.withdrawn === 1 ? ' منشورٌ على حسابٍ آخر.' : ' منشوراتٍ على حساباتٍ أخرى.') : '')
+    + (copies.stuck > 0 ? ' و' + String(copies.stuck) + ' غادر إلى الطابور فلم يُسحب — افتحه من بطاقته.' : '')
   await record(c.env.DB, {
-    actor: 'panel', action: 'draft.undo_schedule', target: id, detail: result.ok ? to : 'refused:' + result.reason,
+    actor: 'panel', action: 'draft.undo_schedule', target: id, detail: result.ok ? to + ':copies=' + String(copies.withdrawn) : 'refused:' + result.reason,
   }, c.req.raw)
   await setFlash(c.env, c.req.raw, result.ok
-    ? { kind: 'ok', text: to === 'draft' ? 'عادت مسوّدةً تنتظر قرارك، بلا موعد.' : 'سُحب الموعد، وتبقى معتمَدةً تنتظر موعدًا.' }
+    ? { kind: 'ok', text: (to === 'draft' ? 'عادت مسوّدةً تنتظر قرارك، بلا موعد.' : 'سُحب الموعد، وتبقى معتمَدةً تنتظر موعدًا.') + also }
     : { kind: 'bad', text: 'تعذّر التراجع: ' + result.reason })
   return toCard(result.ok && to === 'approved' ? 's' : 'd', id)
 })

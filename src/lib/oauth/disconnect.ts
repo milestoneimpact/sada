@@ -18,7 +18,8 @@ import type { Platform } from './providers'
 import { withTimeout } from '../net/timeout'
 
 /** ما وقع عند المنصّة: أُبطل، أو تعذّر، أو لا نهايةَ إبطالٍ تُنادى. */
-export type RevokeOutcome = 'revoked' | 'failed' | 'unsupported' | 'no_tokens'
+/** ‏و`shared`: رمزُ مديرٍ تحمله صفحةٌ أخرى ما زالت مربوطة (مراجعة D-423) — فلا يُبطَل عند المنصّة. */
+export type RevokeOutcome = 'revoked' | 'failed' | 'unsupported' | 'no_tokens' | 'shared'
 
 /** أين يسحب المالكُ الإذنَ بيده: الصفحةُ نفسُها لا وصفُها. */
 export const REVOKE_PAGE: Readonly<Record<Platform, { readonly url: string; readonly label: string }>> = {
@@ -118,6 +119,8 @@ export interface DisconnectTarget {
   readonly id: string
   readonly platform: Platform
   readonly displayName: string
+  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn بتطبيقها الثاني (D-423). */
+  readonly kind?: string
   /** منظّمةُ الحساب: لا يُفصَل حسابُ منظّمةٍ من شاشة غيرها (D-229). */
   readonly org: string
 }
@@ -134,12 +137,12 @@ export async function findLinked(
 ): Promise<DisconnectTarget | null> {
   const row = await db
     .prepare(
-      `SELECT id, platform, display_name FROM accounts
+      `SELECT id, platform, kind, display_name FROM accounts
         WHERE id = ? AND platform = ? AND org_id = ? AND status != 'revoked'`,
     )
     .bind(id, platform, org)
-    .first<{ id: string; platform: Platform; display_name: string }>()
-  return row === null ? null : { id: row.id, platform: row.platform, displayName: row.display_name, org }
+    .first<{ id: string; platform: Platform; kind: string; display_name: string }>()
+  return row === null ? null : { id: row.id, platform: row.platform, kind: row.kind, displayName: row.display_name, org }
 }
 
 export interface DisconnectResult {
@@ -162,6 +165,23 @@ export async function disconnectAccount(
     tokens = await loadTokens(db, encKey, target.id, target.org)
   } catch {
     tokens = null
+  }
+
+  /*
+   * ‏**رمزُ المدير مشتركٌ بين الصفحات التي اختيرت في موافقةٍ واحدة** (مراجعة D-423): إبطالُه عند LinkedIn يُسقط الصفحاتِ الأخرى
+   * ‏وهي ما زالت مربوطة. فإن حملت صفحةٌ أخرى نشطةٌ الرمزَ نفسَه حُذف الحسابُ هنا وحده، ولا يُنادى الإبطال.
+   */
+  let shared = false
+  if (tokens !== null && target.platform === 'linkedin' && target.kind === 'org') {
+    const { results: others } = await db
+      .prepare(`SELECT a.id FROM accounts a JOIN tokens t ON t.account_id = a.id
+                 WHERE a.org_id = ? AND a.platform = 'linkedin' AND a.kind = 'org' AND a.status != 'revoked' AND a.id != ?`)
+      .bind(target.org, target.id)
+      .all<{ id: string }>()
+    for (const o of others) {
+      const theirs = await loadTokens(db, encKey, o.id, target.org).catch(() => null)
+      if (theirs !== null && theirs.accessToken === tokens.accessToken) { shared = true; break }
+    }
   }
 
   const queued = await db
@@ -196,6 +216,6 @@ export async function disconnectAccount(
   }
   await atomically(db, statements)
 
-  const remote = await revokeRemote(target.platform, tokens, app, fetchImpl)
+  const remote: RevokeOutcome = shared ? 'shared' : await revokeRemote(target.platform, tokens, app, fetchImpl)
   return { stopped: queued.results.length, remote }
 }

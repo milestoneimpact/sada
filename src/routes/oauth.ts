@@ -38,7 +38,7 @@ import { ownerZone } from '../lib/time/ownerZone'
  * ولا يقول أيَّ نطاقٍ ولا مَن يمنحه — فأعاد توليدَ سرِّه، وهي أوّلُ
  * حركةٍ خاطئة.
  */
-function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
+export function resultPage(title: string, body: string, status: 200 | 400 | 502 | 503): Response {
   // القالبُ الواحد (D-151): علامةٌ وعودةٌ و⌘K وثيمٌ كسائر الشاشات المستقلّة
   const nonce = makeNonce()
   const html = soloPage(title, { href: panelHref('channels'), label: sectionLabel('accounts') }, body, nonce, '',
@@ -81,7 +81,7 @@ async function toSetup(env: Env, request: Request, platform: Platform): Promise<
  * ‏نصُّ `TypeError` من `fetch` يحمل الرابطَ أحيانًا، ورابطُ منصّةٍ قد يحمل رمزًا في
  * ‏استعلامه؛ وهذه الصفحةُ ليست خلف دخول، والسجلُّ لا يحمل رمزًا (D-005).
  */
-function devDetail(error: unknown): string {
+export function devDetail(error: unknown): string {
   const name = error instanceof Error ? error.name : typeof error
   const message = error instanceof Error ? error.message : String(error)
   return `${name}: ${message.replace(/\?\S*/g, '?…')}`.slice(0, 200)
