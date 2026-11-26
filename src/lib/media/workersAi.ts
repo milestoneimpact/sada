@@ -121,7 +121,8 @@ export function restBinding(
         // الرمزُ يقرّر الإعادة. و 429 و 5xx تُعاد، وما عداهما لا
         const retryable = response.status === 429 || response.status >= 500
         // ولا يُقرأ الجسدُ كاملا: أوّلُ خطأٍ وحده، مقصوصًا وبلا روابط
-        throw new AiError(await refusal(response), retryable, response.status >= 400 && response.status < 500)
+        // ‏و‎408 و‎499 مهلتان لا رفض (مراجعة D-425): لعلّ العملَ تمّ، فالمالُ يبقى محسوبًا (D-415)
+        throw new AiError(await refusal(response), retryable, response.status >= 400 && response.status < 500 && !TIMEOUT_STATUSES.has(response.status))
       }
 
       const contentType = response.headers.get('Content-Type') ?? ''
@@ -142,6 +143,9 @@ export function restBinding(
     },
   }
 }
+
+/** ‏رموزُ ‎4xx التي تعني مهلةً لا رفضًا: ‎408 (Request Timeout) و‎499 (أغلق العميلُ قبل الجواب). */
+const TIMEOUT_STATUSES: ReadonlySet<number> = new Set([408, 499])
 
 export class AiError extends Error {
   override readonly name = 'AiError'

@@ -315,8 +315,9 @@ export async function reschedulePost(
   if (row.dispatched_at !== null) return { ok: false, reason: 'أُرسل للنشر، ولا يُغيَّر موعدُه بعد الإرسال' }
   // ‏**وحارسُ موافقة العميل** (مراجعة D-425): ما يُمسَك عند الجدولة يُمسَك عند تغيير الموعد. وموافقتُه على موعدٍ لا على كلّ
   // ‏موعد: فتغييرُ موعد منشورٍ وافق عليه يُردّ إلّا أن يُنقل بندُه في الخطّة (`planMove`) — فتتبدّل بصمتُه ويُطلب له رأيٌ جديد
-  const held = await approvalHoldFor(db, row.org_id, postId)
-  if (held !== null) return { ok: false, reason: held }
+  // ‏ونقلُ البند في الخطّة لا يُسأل قبل النقل: النقلُ هو ما يطلب الرأيَ الجديد، وحارسُ الإرسال يُمسكه حتّى يأتي
+  const held = planMove ? null : await approvalHoldFor(db, row.org_id, postId)
+  if (held !== null) return { ok: false, reason: held + ' — أو انقل البندَ في الخطّة ليُطلب رأيُه في موعدٍ جديد' }
   if (!planMove && await approvalRequired(db, row.org_id)) {
     return { ok: false, reason: 'هذا العميلُ يوافق قبل النشر، ووافق على هذا الموعد — انقل البندَ في الخطّة ليُطلب رأيُه في الموعد الجديد' }
   }
@@ -509,16 +510,26 @@ async function approvalHoldFor(db: Db, org: string, postId: string): Promise<str
  * ‏المنشورَ قبل ختمه — **يعود معتمَدًا بلا موعد** (لا يُحذف ولا يُفشَل) ويُكتب السببُ في السجلّ. ويعيد ما يمضي.
  * ‏**وقاعدةٌ لا تُقرأ هنا لا تُمسك**: الجدولةُ أمسكت حين قُرئت، وعطلُ D1 لحظةً لا يسحب منشوراتِ كلّ العملاء.
  */
+/** ‏**ومرورٌ لأنّ الحارسَ لم يُقرأ لا يمرّ صامتًا** (مراجعة D-425): سطرٌ في سجلّ الدورة وصفٌّ في سجلّ المالك، بلا رمزٍ ولا نصّ. */
+async function gateSkipped(db: Db, org: string, post: string, error: unknown): Promise<void> {
+  const failed = error instanceof Error ? error.message.slice(0, 200) : 'unexpected_error'
+  console.error({ job: 'dispatch_gate', org, post, failed })
+  await record(db, { org, actor: 'dispatch', action: 'post.client_gate_skipped', target: post, detail: failed })
+}
+
 export async function clearForDispatch<T extends { readonly id: string; readonly org: string }>(db: Db, due: readonly T[]): Promise<T[]> {
   const gated = new Map<string, boolean>()
   const pass: T[] = []
   for (const d of due) {
     if (!gated.has(d.org)) {
-      gated.set(d.org, await readClientOptions(db, d.org).then((o) => o.approvalRequired, () => false))
+      gated.set(d.org, await readClientOptions(db, d.org).then((o) => o.approvalRequired, async (error: unknown) => {
+        await gateSkipped(db, d.org, d.id, error)
+        return false
+      }))
     }
     if (gated.get(d.org) !== true) { pass.push(d); continue }
     const { clientApprovalHold } = await import('../clientGate')
-    const reason = await clientApprovalHold(db, d.org, d.id).catch(() => null)
+    const reason = await clientApprovalHold(db, d.org, d.id).catch(async (error: unknown) => { await gateSkipped(db, d.org, d.id, error); return null })
     if (reason === null) { pass.push(d); continue }
     const held = await db
       .prepare(`UPDATE posts SET status = 'approved', scheduled_at = NULL, account_id = NULL, enqueued_for = NULL

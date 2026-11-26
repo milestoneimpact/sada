@@ -2,7 +2,7 @@
  * خيارا العميل للوكالة (D-412): موافقتُه تُمسك الجدولة حتّى يقول «موافق»، وتقريرُ الشهر يصل البريدَ آليًّا مرّةً للشهر —
  * وكلاهما مطفأٌ حتّى يُفتح.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fakeDb, type FakeDb } from '../test/fakes'
 import { fakeMailer } from '../test/emailLogin'
 import { createLink, findLink, recordVerdict } from './clientReview'
@@ -76,9 +76,33 @@ describe('حارسُ الموافقة في كلّ أبواب الطابور (م�
     const moved = await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner')
     expect(!moved.ok && moved.reason).toContain('انقل البندَ في الخطّة')
     await say('changes')
-    const held = await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner', true)
+    const held = await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner')
     expect(!held.ok && held.reason).toContain('طلب العميلُ تعديل')
     expect(status('p1').scheduled_at).toBe('2099-01-04 04:00:00')
+  })
+
+  it('نقلُ البند في الخطّة يمرّ ولو طلب العميلُ تعديلًا، والإرسالُ يُمسكه؛ و«غيّر الموعد» يدلّ على الخطّة', async () => {
+    await say('changes')
+    expect((await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner', true)).ok).toBe(true)
+    const editor = await reschedulePost(db, 'p1', '2099-01-06T04:00', NOW, 'org_owner')
+    expect(!editor.ok && editor.reason).toContain('انقل البندَ في الخطّة')
+    await dispatchDue({ db, queue: { async sendBatch() { throw new Error('لا يُرسَل') } }, now: () => new Date('2099-01-05T04:05:00Z') })
+    expect(status('p1')).toEqual({ status: 'approved', scheduled_at: null })
+  })
+
+  it('حارسٌ لم يُقرأ عند الإرسال يمرّ ولا يمرّ صامتًا: سطرٌ في السجلّ وصفُّ post.client_gate_skipped', async () => {
+    const errors: unknown[] = []
+    const spy = vi.spyOn(console, 'error').mockImplementation((e: unknown) => { errors.push(e) })
+    const broken = new Proxy(db, { get: (t, k) => k === 'prepare'
+      ? (sql: string) => { if (sql.includes('FROM client_options')) throw new Error('D1 timeout'); return t.prepare(sql) }
+      : Reflect.get(t, k) as unknown }) as FakeDb
+    const sent: unknown[] = []
+    await dispatchDue({ db: broken, queue: { async sendBatch(m) { sent.push(...m) } }, now: () => new Date('2099-01-04T04:05:00Z') })
+    spy.mockRestore()
+    expect(sent).toHaveLength(1)
+    expect(errors).toContainEqual({ job: 'dispatch_gate', org: 'org_owner', post: 'p1', failed: 'D1 timeout' })
+    const rows = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'post.client_gate_skipped'").all() as { detail: string }[]
+    expect(rows.map((r) => r.detail)).toEqual(['D1 timeout'])
   })
 
   it('التراجعُ عن السحب لا يعيد إلى الطابور ما طلب العميلُ تعديلَه بعد السحب', async () => {
