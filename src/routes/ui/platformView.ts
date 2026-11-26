@@ -977,7 +977,8 @@ export function pageConnectCard(ready: boolean, base: string, accounts: readonly
   return card({
     id: 'linkedin-page',
     title: 'صفحة LinkedIn',
-    action: ready ? statusBadge('ok', '●', 'التطبيق الثاني مضبوط') : statusBadge('warn', '!', 'بانتظار الموافقة'),
+    // ‏والانتظارُ يقوله المتنُ، لا شارةٌ صغيرةٌ تكرّره (سلّمُ الخطّ: ما تحت ‏14px ‏≤ ‏10٪)
+    ...(ready ? { action: statusBadge('ok', '●', 'التطبيق الثاني مضبوط') } : {}),
     body,
   })
 }
