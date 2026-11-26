@@ -24,15 +24,36 @@ async function login(): Promise<string> {
 }
 
 describe('صفحة الهبوط على الجذر (D-193)', () => {
-  it('بلا جلسة: صفحة لا ‏٤٠٤، وزرّ أوّليّ واحد إلى اللوحة', async () => {
+  it('بلا جلسة: موقعٌ كامل لا بابُ دخول — و«ادخل» رابطٌ ثانويّ (D-416)', async () => {
     const r = await app.request('/', {}, env)
     expect(r.status).toBe(200)
     const html = await r.text()
-    expect(html).toContain('<a class="btn btn-primary land-cta" href="/panel">ادخل إلى لوحتك</a>')
-    expect(html.match(/btn-primary/g)).toHaveLength(1)
+    expect(html).not.toMatch(/btn-primary/)
+    expect(html).toContain('<a class="tap site-enter" href="/panel">ادخل</a>')
     for (const p of ['LinkedIn', 'X', 'YouTube', 'TikTok', 'Instagram']) expect(html).toContain(`aria-label="${p}"`)
-    expect(html).toContain('href="/privacy"')
-    expect(html).toContain('href="/terms"')
+    for (const s of ['Login Kit', 'Content Posting API', 'video.upload', 'href="/about"', 'href="/contact"', 'href="/en"', 'og:title'])
+      expect(html).toContain(s)
+  })
+  it('صفحاتُ الموقع العامّة: ‏200 بلا جلسة، مفهرسة، بالوثيقتين، وبلا سمة style', async () => {
+    env.LEGAL_CONTACT = 'contact@example.org'
+    for (const path of ['/', '/en', '/about', '/contact', '/features', '/privacy', '/terms']) {
+      const r = await app.request(path, {}, env)
+      expect(r.status, path).toBe(200)
+      const html = await r.text()
+      if (path !== '/privacy') expect(html, path).toMatch(/href="\/privacy(#en)?"/)
+      if (path !== '/terms') expect(html, path).toMatch(/href="\/terms(#en)?"/)
+      expect(html, path).toContain('content="index,follow"')
+      expect(html, path).toMatch(/<meta name="description" content="[^"]+">/)
+      expect(html, path).not.toMatch(/\sstyle=/)
+      expect(html, path).not.toMatch(/<form/)
+      if (path !== '/privacy' && path !== '/terms') {
+        expect(html, path).toContain('og:url')
+        expect(html, path).toContain('href="/about')
+        expect(html, path).toContain('href="/contact')
+      }
+    }
+    expect(await (await app.request('/contact', {}, env)).text()).toContain('href="mailto:contact@example.org"')
+    expect(await (await app.request('/en', {}, env)).text()).toContain('How SADA uses TikTok')
   })
   it('ولا تُخزَّن في ذاكرة مشتركة: الردّ يختلف بالكعكة', async () => {
     const r = await app.request('/', {}, env)

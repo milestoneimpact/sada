@@ -4,7 +4,7 @@
   "routes/authView.ts": 6,
   "routes/errors.ts": 1,
   "routes/fonts.ts": 1,
-  "routes/landing.ts": 4,
+  "routes/landing.ts": 3,
   "routes/legal.ts": 10,
   "routes/media.ts": 1,
   "routes/oauth.ts": 7,
