@@ -8,7 +8,7 @@ import { EDITED_MARK, STAGE_LABEL, mayDo, type EditStage } from '../../lib/plan/
 import type { EditEntry } from '../../lib/plan/revise'
 import type { Role } from '../../lib/ownerEmail'
 import { stamp } from '../../lib/time/zone'
-import { pageHead } from './parts'
+import { pageHead, vtName } from './parts'
 import { button } from './components/button'
 import { card } from './components/card'
 import { field } from './components/field'
@@ -88,7 +88,7 @@ function historyCard(m: PostEditModel, zone: string | null): string {
 
 export function postEditScreen(m: PostEditModel, zone: string | null): string {
   const when = m.scheduledAt === null ? 'بلا موعد' : stamp(m.scheduledAt, zone).slice(0, 16)
-  const head = pageHead('الخطّة', 'تعديل المنشور', STAGE_LABEL[m.stage] + ' · ' + when)
+  const head = pageHead('الخطّة', 'تعديل المنشور', STAGE_LABEL[m.stage] + ' · ' + when, '', '', vtName(m.id))
   const mark = m.edited ? html`<p class="m-0">${raw(statusBadge('warn', '!', EDITED_MARK))}</p>` : html``
   return html`${raw(head)}<div class="stack">${mark}${raw(editCard(m, zone))}${raw(actionsCard(m))}${raw(historyCard(m, zone))}</div>`.value
 }

@@ -15,7 +15,7 @@ import { mayDo } from '../../lib/plan/rights'
 import { allows } from '../../lib/access'
 import type { Role } from '../../lib/ownerEmail'
 import { EDITED_MARK } from '../../lib/plan/rights'
-import { pageHead } from './parts'
+import { vtName, pageHead } from './parts'
 import { LOGOS } from './logos'
 import { ICON } from './icons'
 import { statusBadge } from './components/badge'
@@ -150,8 +150,9 @@ function badges(c: FeedCard): Html {
 }
 
 function card(c: FeedCard, v: FeedView): Html {
-  const id = c.kind === 'item' ? 'f-item-' + c.id.slice(5).replace(/[^\w-]+/g, '_') : 'f-' + c.id
+  const id = c.kind === 'item' ? 'f-item-' + c.id.slice(5).replace(/[^\w-]+/g, '_') : vtName(c.id)
   // ‏والصنفُ من `cardClass` (D-325): البطاقةُ عنصرُ قائمةٍ لا `div`، فلا يرسمها `card()`
+  // ‏و«id» البطاقة هو اسمُ انتقالها المشترك (D-401): رأسُ صفحة المنشور يحمله، و«view-transition-name:auto» يقرؤه — لا «style» (CSP)
   return html`<li class="${cardClass()} fd-card" id="${id}" data-status="${c.status}">
     <div class="fd-head">
       <span class="pf-logo rv-pf" data-pf="${c.platform}" aria-hidden="true">${raw(LOGOS[c.platform] ?? '')}</span>
