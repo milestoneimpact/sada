@@ -84,7 +84,7 @@ export function packageKey(org: string, period: string, item: string, platform: 
 }
 
 /**
- * ‏**بندُ الصفحة** (D-426): `linkedin-page` في الخطّة، و`posts.platform` يبقى `linkedin` (الفرقُ في الحساب، D-423) —
+ * ‏**بندُ الصفحة** (D-429): `linkedin-page` في الخطّة، و`posts.platform` يبقى `linkedin` (الفرقُ في الحساب، D-423) —
  * ‏فالعلامةُ مفتاحُه: `plan:…:linkedin-page`، غيرُ مفتاح البند الشخصيّ في يومه. فلا ترحيل.
  */
 export const PAGE_ITEM = 'linkedin-page'

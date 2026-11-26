@@ -156,7 +156,7 @@ export async function readPackagePlan(bytes: Uint8Array): Promise<PackagePlan> {
  * والنصُّ من العمود نفسِه (يغلبه نصُّ 02-copy إن وُجد بالمفتاح نفسِه، ولن يوجد). والأخطاءُ مشكلاتُ الخطّة بسطرها وعمودها.
  */
 /**
- * ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-423، ثمّ D-426): يُقال حين لا صفحةَ مربوطةً تنشر باسمها، فيبقى السطرُ مسوّدةً
+ * ‏سببُ ردّ سطر الصفحة في مسار الحزمة (مراجعة D-423، ثمّ D-429): يُقال حين لا صفحةَ مربوطةً تنشر باسمها، فيبقى السطرُ مسوّدةً
  * ‏ولا يسقط إلى الحساب الشخصيّ أبدًا.
  */
 export const PAGE_PACKAGE_REFUSAL = 'لا صفحة LinkedIn مربوطة تنشر باسمها، فتُرك سطرُ linkedin-page ولم يُنشر على حسابك الشخصيّ — اربط الصفحة من «الحسابات» ثمّ جدوِل ثانيةً.'
@@ -165,7 +165,7 @@ export function planFromTemplate(text: string, path: string): PackagePlan {
   const format = /\.csv$/i.test(path) ? 'csv' : 'md'
   const read = readTemplate(text, format, templatePeriod(path))
   const count = new Map<string, number>()
-  // ‏**وسطرُ `linkedin-page` يبقى بمنصّته** (D-426): بندٌ مستقلٌّ عن سطر LinkedIn الشخصيّ في يومه، بمفتاحٍ غيرِ مفتاحه،
+  // ‏**وسطرُ `linkedin-page` يبقى بمنصّته** (D-429): بندٌ مستقلٌّ عن سطر LinkedIn الشخصيّ في يومه، بمفتاحٍ غيرِ مفتاحه،
   // ‏والجدولةُ تختار له الصفحةَ وحدها (`schedule.ts`) — ولا يُحوَّل `linkedin` فيُنشر على الحساب الشخصيّ
   const entries: PlanEntry[] = read.rows.map((r) => {
     const base = 'd' + r.day.slice(8, 10)

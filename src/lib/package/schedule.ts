@@ -79,7 +79,7 @@ export async function planPackageSchedule(db: Db, org: string, zone: string | nu
     const at = dueToUtc(p.package_due, zone)
     if (at === null) { skipped.time += 1; continue }
     if (at <= nowKey) { skipped.past += 1; continue }
-    // ‏بندُ الصفحة (D-426) إلى صفحةٍ تنشر باسمها وحدها، وبلاها يُردّ بسببه — لا يسقط إلى الحساب الشخصيّ
+    // ‏بندُ الصفحة (D-429) إلى صفحةٍ تنشر باسمها وحدها، وبلاها يُردّ بسببه — لا يسقط إلى الحساب الشخصيّ
     const page = p.platform === 'linkedin' && isPageKey(p.idempotency_key)
     const account = page
       ? accounts.find((a) => a.status === 'active' && isPublishablePage(a))

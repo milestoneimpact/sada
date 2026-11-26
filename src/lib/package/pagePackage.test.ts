@@ -1,5 +1,5 @@
 /**
- * ‏مسارُ الحزمة لصفحة LinkedIn (D-426): سطرُ `linkedin-page` يصير بندًا مستقلًّا بمفتاحه، يُجدوَل على الصفحة المربوطة وحدها،
+ * ‏مسارُ الحزمة لصفحة LinkedIn (D-429): سطرُ `linkedin-page` يصير بندًا مستقلًّا بمفتاحه، يُجدوَل على الصفحة المربوطة وحدها،
  * ‏ولا يُنشر على الحساب الشخصيّ أبدًا؛ وبلا صفحةٍ مربوطة يُردّ بسببه.
  */
 import { describe, expect, it } from 'vitest'
@@ -36,7 +36,7 @@ async function seed(withPage: boolean) {
   return { db, me, page, plan }
 }
 
-describe('صفحة LinkedIn في حزمة المستودع (D-426)', () => {
+describe('صفحة LinkedIn في حزمة المستودع (D-429)', () => {
   it('السطران في يومٍ واحد ← منشورٌ شخصيّ ومنشورُ صفحة، بمفتاحين مختلفين', async () => {
     const { db, me, page, plan } = await seed(true)
     expect(plan.entries.map((e) => e.platform)).toEqual(['linkedin', 'linkedin-page'])
