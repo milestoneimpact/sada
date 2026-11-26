@@ -341,8 +341,8 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     const st = c.post === null ? (c.failed !== undefined ? { tone: 'bad', text: 'تعذّرت كتابتُه' } : { tone: 'idle', text: 'تُكتب الآن' }) : face(c.post.status)
     const text = c.post === null ? c.item.angle : c.post.text.replace(/\s+/g, ' ').trim()
     return html`<tr><td><span class="ago">${dayLabel(c.item.day, 'short')}</span> <bdi dir="ltr" class="mono">${c.item.time}</bdi></td>
-      <td data-label="المنصّة">${platformLabel(c.item.platform as never)}</td><td data-label="الحال"><span class="st ${st.tone}">${st.text}</span></td>
-      <td data-label="المنشور"><a href="#c-${String(c.index)}" data-sheet="${String(c.index)}">${text.length > 80 ? text.slice(0, 80) + '…' : text}</a></td></tr>`
+      <td>${platformLabel(c.item.platform as never)}</td><td><span class="st ${st.tone}">${st.text}</span></td>
+      <td><a href="#c-${String(c.index)}" data-sheet="${String(c.index)}">${text.length > 80 ? text.slice(0, 80) + '…' : text}</a></td></tr>`
   })
   const table = visible.length === 0 ? html`` : html`<div class="scroll rv-list"><table><caption class="vh">منشوراتُ ${scopeName(m, shown)} قائمةً</caption>
       <thead><tr><th scope="col">الموعد</th><th scope="col">المنصّة</th><th scope="col">الحال</th><th scope="col">المنشور</th></tr></thead><tbody>${rows}</tbody></table></div>`
