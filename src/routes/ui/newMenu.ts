@@ -8,7 +8,7 @@ import { menu, menuItem } from './components/menu'
 import { ICON } from './icons'
 import { panelHref } from '../../lib/nav/panes'
 
-/** ‏أبوابُ الكتابة الخمسة بمساراتها إلى «/panel» — لتصل من أيّ لوحٍ أو صفحة. */
+/** ‏أبوابُ الكتابة الأربعة (و«خطّة من ملفّ» في قائمة الخطّة برأس التيّار، D-417) بمساراتها إلى «/panel» — لتصل من أيّ لوحٍ أو صفحة. */
 export function newItems(): string[] {
   return [
     menuItem({ label: 'من فكرة', note: 'جملة أو كلمات', href: '/panel#idea' }),
@@ -16,7 +16,6 @@ export function newItems(): string[] {
     // ‏ونصُّك كما كتبته، بلا نموذج ولا كلفة (D-324)
     menuItem({ label: 'بنفسي', note: 'نصّك كما تكتبه', href: '/panel#own' }),
     menuItem({ label: 'فيديو', note: 'يُرفع ثمّ يُكتب نصُّه', href: panelHref('videos') }),
-    menuItem({ label: 'خطّة من ملفّ', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
   ]
 }
 

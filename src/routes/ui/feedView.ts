@@ -23,6 +23,7 @@ import { button } from './components/button'
 import { cardClass } from './components/card'
 import { emptyState } from './components/empty'
 import { newPostMenu } from './newMenu'
+import { menu, menuItem } from './components/menu'
 import { html, raw, type Html } from './html'
 
 export interface FeedView {
@@ -75,24 +76,45 @@ function thumb(c: FeedCard): Html {
 }
 
 /** الفعلُ الواحد بحال البطاقة — ولمن يملكه (`mayDo`)، وما سواه رابطٌ إلى حيث يُقرأ. */
+/**
+ * ‏**البطاقةُ التالية التي تنتظر** (D-417): بعد «اعتمد» أو «أعد» يعود التحويلُ إليها بترتيب `awaitingIds` فيُعتمَد أسبوعٌ
+ * ‏بلا فقد الموضع — وآخرُ ما ينتظر (أو ما ليس منه) يعود إلى نفسه. والخادمُ يفحصه بنمط `vtName` قبل أن يكتبه.
+ */
+function nextOf(c: FeedCard, v: FeedView): string {
+  const ids = v.model.awaitingIds
+  const i = ids.indexOf(c.id)
+  return i >= 0 && i + 1 < ids.length ? ids[i + 1]! : c.id
+}
+
+/** ‏«يُنشر الأحد 28 سبتمبر · 9:00 ص» لزرّ الاعتماد حين يُعرف الموعد. */
+function publishAttrs(c: FeedCard, v: FeedView): string {
+  if (c.at === null) return ''
+  const d = parseSqliteUtc(c.at)
+  if (d === null) return ''
+  const say = 'يُنشر ' + dayLabel(d, v.zone, false) + ' · ' + clock(d, v.zone)
+  return html`title="${say}" aria-label="${'اعتمد وجدوِل: ' + say}"`.value
+}
+
 function action(c: FeedCard, v: FeedView): Html {
   const role = v.role
-  if (c.kind === 'item') return html`<a class="tap" href="/panel/plan/review">افتح الخطّة</a>`
+  if (c.kind === 'item') return html`<a class="tap" href="/panel/plan">افتح الخطّة</a>`
+  const next = html`<input type="hidden" name="next" value="${nextOf(c, v)}">`
   if (c.status === 'draft') {
     if (!mayDo(role, 'approve', 'draft').ok) return html`<a class="tap" href="/panel/plan/post/${c.id}">افتح</a>`
+    const approve = { label: 'اعتمد وجدوِل', variant: 'primary' as const, size: 'sm' as const, type: 'submit' as const, icon: ICON.check, attrs: publishAttrs(c, v) }
     // ‏مسوّدةُ الخطّة تُعتمَد بمسار المراجعة (D-327: الاعتمادُ يجدول في موعد بندها)، وما سواها بقرار المسوّدات
     return c.planId !== null
-      ? html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">
-        <input type="hidden" name="id" value="${c.planId}"><input type="hidden" name="post" value="${c.id}"><input type="hidden" name="back" value="feed">
-        ${raw(button({ label: 'اعتمد', variant: 'primary', size: 'sm', type: 'submit' }))}</form>`
-      : html`<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جار…">
-        <input type="hidden" name="id" value="${c.id}"><input type="hidden" name="back" value="feed">
-        ${raw(button({ label: 'اعتمد', variant: 'primary', size: 'sm', type: 'submit', name: 'do', value: 'approve' }))}</form>`
+      ? html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="يُعتمَد…">
+        <input type="hidden" name="id" value="${c.planId}"><input type="hidden" name="post" value="${c.id}"><input type="hidden" name="back" value="feed">${next}
+        ${raw(button({ ...approve }))}</form>`
+      : html`<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="يُعتمَد…">
+        <input type="hidden" name="id" value="${c.id}"><input type="hidden" name="back" value="feed">${next}
+        ${raw(button({ ...approve, name: 'do', value: 'approve' }))}</form>`
   }
   if (c.status === 'failed') {
     return mayDo(role, 'approve', 'draft').ok
-      ? html`<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جار…">
-        <input type="hidden" name="id" value="${c.id}"><input type="hidden" name="back" value="feed">
+      ? html`<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="يُعاد…">
+        <input type="hidden" name="id" value="${c.id}"><input type="hidden" name="back" value="feed">${next}
         ${raw(button({ label: 'أعد المحاولة', variant: 'primary', size: 'sm', type: 'submit' }))}</form>`
       : html`<a class="tap" href="/panel/journey/${c.id}">افتح</a>`
   }
@@ -192,6 +214,13 @@ function entry(v: FeedView, approve: string): Html {
   if (v.model.plan !== null) {
     parts.push(html`<a class="tap" href="/panel/plan/review">ورشة الخطّة</a>`)
     parts.push(html`<a class="tap" href="/panel/plan/month">تقويم الشهر</a>`)
+  }
+  // ‏وأبوابُ الخطّة في قائمةٍ ثانويّةٍ واحدة (D-417) — خرج «خطّة من ملفّ» من «منشور جديد ▾»: الخطّةُ ليست منشورًا واحدًا
+  if (allows(v.role, 'editor')) {
+    parts.push(raw(menu({ label: 'الخطّة', variant: 'secondary', size: 'sm', attrs: 'data-feed-plan', items: [
+      menuItem({ label: 'خطّة جديدة', note: 'تُبنى من أهدافك', href: '/panel/plan/new' }),
+      menuItem({ label: 'عندي خطّة', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
+    ] })))
   }
   if (allows(v.role, 'editor')) {
     parts.push(raw(button({ label: 'منشورات جديدة', variant: approve === '' ? 'primary' : 'secondary', href: '/panel/new', icon: ICON.add })))

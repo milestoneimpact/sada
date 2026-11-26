@@ -4316,7 +4316,7 @@ describe('الرئيسيّة: خطوتُك، ثمّ الرحلة، ثمّ الم
     const at = html.indexOf('<section data-pane="posts"')
     const head = html.slice(at, html.indexOf('</details>', html.indexOf('data-head-new', at)))
     expect(head.match(/class="btn btn-primary/g) ?? []).toHaveLength(1)
-    for (const [anchor, label] of [['idea', 'من فكرة'], ['write', 'من مصدر'], ['videos', 'فيديو'], ['plan-import', 'خطّة من ملفّ']] as const) {
+    for (const [anchor, label] of [['idea', 'من فكرة'], ['write', 'من مصدر'], ['videos', 'فيديو']] as const) {
       // ‏و«فيديو» إلى «المكتبة» بمسارها (D-211)، والبقيّةُ مراسٍ في «/panel»
       expect(head).toContain(`href="${anchor === 'videos' ? '/panel/library#videos' : `#${anchor}`}"`)
       expect(head).toContain(`<b>${label}</b>`)

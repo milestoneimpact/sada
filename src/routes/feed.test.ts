@@ -121,6 +121,20 @@ describe('التيّار (D-386)', () => {
     expect(res.headers.get('Location')).toBe('/panel/feed')
   })
 
+  it('بعد «اعتمد» يعود التحويلُ إلى البطاقة التالية التي تنتظر بحقل «next»، وما ليس بنمط vtName يُترك (D-417)', async () => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, account_id, created_at) VALUES ('0a1b2c3d-0005-4000-8000-000000000005', 'linkedin', 'text', '${TEXT} بنفسي', 'draft', 'k5', 'a1', '2026-01-02 10:00:00')`)
+    const { cookie, csrf } = await session()
+    const html = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
+    // ‏الزرُّ يقول ما يفعل، والتيّارُ يملأ «next» لكلّ بطاقةٍ تنتظر
+    expect(html).toContain('اعتمد وجدوِل')
+    expect(html).toContain('data-busy="يُعتمَد…"')
+    expect(html.match(/name="next" value="[0-9a-f-]+"/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    const one = await app.request('/panel/drafts/decide', { method: 'POST', body: form({ _csrf: csrf, id: '0a1b2c3d-0005-4000-8000-000000000005', do: 'approve', back: 'feed', next: '0a1b2c3d-0001-4000-8000-000000000001' }), headers: { Cookie: cookie } }, env)
+    expect(one.headers.get('Location')).toBe('/panel/feed#f-0a1b2c3d-0001-4000-8000-000000000001')
+    const bad = await app.request('/panel/plan/review/approve', { method: 'POST', body: form({ _csrf: csrf, id: 'pl1', post: '0a1b2c3d-0001-4000-8000-000000000001', back: 'feed', next: '"><script>' }), headers: { Cookie: cookie } }, env)
+    expect(bad.headers.get('Location')).toBe('/panel/feed#f-0a1b2c3d-0001-4000-8000-000000000001')
+  })
+
   it('القارئُ يرى التيّار بلا زرّ اعتماد، ومن لا جلسةَ له يُردّ إلى الدخول', async () => {
     db.raw.prepare("INSERT INTO members (email, role, orgs, invited_by) VALUES ('v@example.com', 'viewer', '*', 'owner')").run()
     const { cookie } = await session('v@example.com')
