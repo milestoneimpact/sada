@@ -54,7 +54,7 @@ export const PAGES = `/* ══ شاشةُ المنصّة ═══════�
 /* ── الموقعُ العامّ (D-416): رأسٌ يتنقّل، وبطاقاتُ مزايا، وأسئلة، وتذييلٌ بالوثيقتين ── */
 .site-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s-3);
   padding-bottom:var(--s-4); margin-bottom:var(--s-6); border-bottom:var(--bd)}
-.site-brand{display:flex; align-items:center; gap:var(--s-2); color:var(--ink); text-decoration:none; font-size:var(--t-h3); line-height:var(--lh-h3)}
+.site-brand{display:flex; align-items:center; gap:var(--s-2); color:var(--ink); text-decoration:none; font-size:var(--t-h3); line-height:var(--lh-h3); min-block-size:var(--tap)}
 .site-mark svg{display:block; width:var(--icon-lg); height:var(--icon-lg); border-radius:var(--r-control)}
 .site-nav{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-4); font-size:var(--t-small); line-height:var(--lh-small)}
 .site-enter{padding:var(--s-1) var(--s-3); border:var(--bd); border-radius:var(--r-pill)}
