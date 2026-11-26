@@ -14,7 +14,7 @@
 | D1 | قاعدة | كلّ الحالة |
 | R2 | تخزين | الصور والمستندات والوسائط |
 | KV | مفاتيح | عدّادات الحدّ، `dedupe` قصير العمر |
-| Secrets | Worker secrets | `TOKEN_ENC_KEY` · `LINKEDIN_CLIENT_SECRET` · `LINKEDIN_ORG_CLIENT_ID`/`LINKEDIN_ORG_CLIENT_SECRET` (اختياريّان، صفحةُ LinkedIn D-417) · `X_CLIENT_SECRET` · `ANTHROPIC_API_KEY` · `GEMINI_API_KEY` · `GOOGLE_SA_JSON` |
+| Secrets | Worker secrets | `TOKEN_ENC_KEY` · `LINKEDIN_CLIENT_SECRET` · `LINKEDIN_ORG_CLIENT_ID`/`LINKEDIN_ORG_CLIENT_SECRET` (اختياريّان، صفحةُ LinkedIn D-422) · `X_CLIENT_SECRET` · `ANTHROPIC_API_KEY` · `GEMINI_API_KEY` · `GOOGLE_SA_JSON` |
 
 الخدمات الخارجية: Google Drive API · Anthropic API · Gemini API · LinkedIn API · X API.
 

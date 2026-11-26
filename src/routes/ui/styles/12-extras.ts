@@ -588,7 +588,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-pf{width:var(--s-6); height:var(--s-6)}
 .rv-pf[data-pf=linkedin]{background:var(--pf-linkedin)}
 .rv-pf[data-pf=x]{background:var(--pf-x)}
-/* ‏صفحةُ LinkedIn وجهةٌ بعلامتها (D-417): لونُ LinkedIn وحلقةٌ تفرقها عن الحساب الشخصيّ */
+/* ‏صفحةُ LinkedIn وجهةٌ بعلامتها (D-422): لونُ LinkedIn وحلقةٌ تفرقها عن الحساب الشخصيّ */
 .rv-pf[data-pf=linkedin-page]{background:var(--pf-linkedin); outline:var(--stroke) solid var(--accent); outline-offset:var(--stroke)}
 /* ‏والبطاقةُ منشورٌ بشكل منصّته (D-327): المعاينةُ بعرض البطاقة، وسطرُ الصورة بأزراره تحتها */
 .rv-pv{min-width:0}

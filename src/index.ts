@@ -209,7 +209,7 @@ async function readinessDetail(env: Env): Promise<{
   readonly drive_folder: boolean
   readonly missing_secrets: readonly string[]
   readonly configured_in_vault: readonly string[]
-  /** ‏أسرارٌ اختياريّة ناقصة (D-417): لا تمنع الجاهزيّة — سرّا تطبيق صفحة LinkedIn بانتظار M-03. */
+  /** ‏أسرارٌ اختياريّة ناقصة (D-422): لا تمنع الجاهزيّة — سرّا تطبيق صفحة LinkedIn بانتظار M-03. */
   readonly missing_optional_secrets: readonly string[]
 }> {
   const state = readiness(env)
@@ -776,7 +776,7 @@ async function renewTick(env: Env): Promise<void> {
       db: env.DB,
       encKey: env.TOKEN_ENC_KEY,
       providerFor: (platform) => OAUTH_PROVIDERS[platform],
-      // ‏صفحةُ LinkedIn بتطبيقها الثاني (D-417)، وما عداها بالأوّل
+      // ‏صفحةُ LinkedIn بتطبيقها الثاني (D-422)، وما عداها بالأوّل
       credentialsFor: async (platform, kind) => platform === 'linkedin' && kind === 'org'
         ? pageApp(env as unknown as Record<string, unknown>)
         : readApp(

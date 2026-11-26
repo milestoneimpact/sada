@@ -113,7 +113,7 @@ function imageActs(c: ReviewCard, m: ReviewModel, w: string): Html {
       <form class="inline" method="POST" action="/panel/media/reject">${back}<input type="hidden" name="id" value="${c.mediaId}">${raw(button({ label: 'بدون صورة', size: 'sm', type: 'submit' }))}</form></div>`
 }
 
-/** ‏اسمُ وجهة البطاقة (D-417): صفحةُ LinkedIn باسمها «LinkedIn · صفحة …»، وما عداها اسمُ منصّته. */
+/** ‏اسمُ وجهة البطاقة (D-422): صفحةُ LinkedIn باسمها «LinkedIn · صفحة …»، وما عداها اسمُ منصّته. */
 export function cardLabel(c: Pick<ReviewCard, 'item' | 'post'>): string {
   if (c.post?.page !== undefined) return 'LinkedIn · صفحة ' + (c.post.page)
   return platformLabel(c.item.platform as never)

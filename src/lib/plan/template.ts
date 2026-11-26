@@ -161,7 +161,7 @@ export interface TemplateRead {
   readonly skipped: number
 }
 
-/** ‏وصفحةُ LinkedIn `linkedin-page` (D-417) — وجهةٌ ثانيةٌ بحسابها، ويُقبل `linkedin:page`. */
+/** ‏وصفحةُ LinkedIn `linkedin-page` (D-422) — وجهةٌ ثانيةٌ بحسابها، ويُقبل `linkedin:page`. */
 const PLATFORM: Readonly<Record<string, 'linkedin' | 'x' | 'linkedin-page'>> = {
   linkedin: 'linkedin', 'لينكدإن': 'linkedin', x: 'x', twitter: 'x', 'إكس': 'x', 'اكس': 'x',
   'linkedin-page': 'linkedin-page', 'linkedin:page': 'linkedin-page', 'صفحة لينكدإن': 'linkedin-page',

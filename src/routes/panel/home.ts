@@ -586,7 +586,7 @@ function targetsOf(channels: readonly ChannelView[]): Target[] {
   return channels.flatMap((ch) =>
     ch.spec.built
       ? ch.accounts
-          // ‏وصفحةُ LinkedIn وجهةٌ حين يحمل إذنُها w_organization_social (D-417)، وإلّا بقيت خارجها كما كانت (D-087)
+          // ‏وصفحةُ LinkedIn وجهةٌ حين يحمل إذنُها w_organization_social (D-422)، وإلّا بقيت خارجها كما كانت (D-087)
           .filter((a) => a.status === 'active' && (!isLinkedInPage(a) || isPublishablePage(a)))
           .map((a) => ({
             id: a.id,

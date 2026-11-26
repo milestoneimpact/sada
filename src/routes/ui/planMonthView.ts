@@ -99,7 +99,7 @@ export function monthCalendar(d: Pick<MonthScreenData, 'period' | 'perDay' | 'da
     })}</tr>`)}</tbody></table></div>`.value
 }
 
-// ‏ووجهتا LinkedIn اسمان (D-417): «LinkedIn · حسابي» و«LinkedIn · صفحة»
+// ‏ووجهتا LinkedIn اسمان (D-422): «LinkedIn · حسابي» و«LinkedIn · صفحة»
 const pfSay = (p: string): string => (p === 'linkedin' ? 'LinkedIn · حسابي' : platformLabel(p as never))
 const VIEWS: readonly CalView[] = ['month', 'week', 'day']
 

@@ -1,5 +1,5 @@
 /**
- * ‏**منشورٌ إلى وجهتين: منشوران** (D-417).
+ * ‏**منشورٌ إلى وجهتين: منشوران** (D-422).
  *
  * ‏`posts.account_id` حسابٌ واحد، و`idempotency_key` لكلّ منشور (D-004). فاختيارُ «LinkedIn · حسابي» و«LinkedIn · صفحة …»
  * ‏معًا لا يُرسل المنشورَ مرّتين بمفتاحٍ واحد: **تُنسخ نسخةٌ لكلّ وجهةٍ زائدة** بمفتاحٍ مشتقٍّ من الأصل والحساب
@@ -80,4 +80,27 @@ export async function scheduleDestinations(
   }
   out.unshift({ accountId: first!, postId, result: await schedulePost(db, postId, first!, when, now, org, holdSeconds) })
   return out
+}
+
+/**
+ * ‏**«تراجَع» يشمل نُسخَ الوجهات** (مراجعة D-422): الجدولةُ الواحدةُ صنعت نسخةً لكلّ وجهةٍ زائدة (`<المفتاح>:dest:`) بالموعد
+ * ‏نفسِه. فتُمحى كلُّ نسخةٍ ما زالت في الطابور لم تُرسَل بموعد ذلك الإشعار، ووسيطُها. وما أُرسل يُعدّ ولا يُمسّ.
+ */
+export async function withdrawCopies(db: Db, postId: string, org: string, at: string): Promise<{ withdrawn: number; stuck: number }> {
+  const post = await db.prepare('SELECT idempotency_key FROM posts WHERE id = ? AND org_id = ?').bind(postId, org).first<{ idempotency_key: string }>()
+  if (post === null) return { withdrawn: 0, stuck: 0 }
+  const prefix = post.idempotency_key + ':dest:'
+  const { results } = await db
+    .prepare('SELECT id, status, dispatched_at FROM posts WHERE org_id = ? AND substr(idempotency_key, 1, ?) = ? AND scheduled_at = ?')
+    .bind(org, prefix.length, prefix, at)
+    .all<{ id: string; status: string; dispatched_at: string | null }>()
+  let withdrawn = 0
+  let stuck = 0
+  for (const r of results) {
+    if (r.status !== 'queued' || r.dispatched_at !== null) { stuck += 1; continue }
+    await db.prepare('DELETE FROM media WHERE post_id = ? AND org_id = ?').bind(r.id, org).run()
+    await db.prepare("DELETE FROM posts WHERE id = ? AND org_id = ? AND status = 'queued' AND dispatched_at IS NULL").bind(r.id, org).run()
+    withdrawn += 1
+  }
+  return { withdrawn, stuck }
 }

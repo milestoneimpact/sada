@@ -542,7 +542,7 @@ export function unreachedBody(d: UnreachedData): string {
   </div>`
 }
 
-// ── صفحةُ LinkedIn بالتطبيق الثاني (D-417 · M-03) ─────────────────────
+// ── صفحةُ LinkedIn بالتطبيق الثاني (D-422 · M-03) ─────────────────────
 
 /** ‏وافق LinkedIn، والصفحاتُ التي تديرها تنتظر اختيارك — والاختيارُ في اللوحة حيث جلستُك. */
 export function pagesFoundBody(names: readonly string[], pickHref: string): string {

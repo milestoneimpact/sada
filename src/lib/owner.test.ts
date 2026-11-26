@@ -291,7 +291,7 @@ describe('M-30 رصيد AI Gateway', () => {
 
 describe('M-58 مقطعُ الحزمة على LinkedIn: الحسابُ الشخصيّ', () => {
   const section = DOC.slice(DOC.indexOf('<a name="m-58">'), DOC.indexOf('<a name="m-59">'))
-  // ‏سببُ الصفحة في موضعه الواحد مع سائقها (D-417)، والناشرُ يقرؤه من هناك
+  // ‏سببُ الصفحة في موضعه الواحد مع سائقها (D-422)، والناشرُ يقرؤه من هناك
   const publisher = readFileSync(new URL('./linkedinPage.ts', import.meta.url), 'utf8')
 
   it('تطلب الحسابَ الشخصيّ وتسمّي فشلَ حساب الصفحة بنصّه كما يكتبه الناشر', () => {

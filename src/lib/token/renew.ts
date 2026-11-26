@@ -95,7 +95,7 @@ export interface RenewDeps {
   readonly db: Db
   readonly encKey: string
   /** أسرارُ التطبيق لكلّ منصّة — تُقرأ مرّةً لا لكلّ حساب. */
-  /** ‏والنوعُ معه (D-417): صفحةُ LinkedIn تتجدّد بسرّي تطبيقها الثاني لا الأوّل. */
+  /** ‏والنوعُ معه (D-422): صفحةُ LinkedIn تتجدّد بسرّي تطبيقها الثاني لا الأوّل. */
   readonly credentialsFor: (platform: Platform, kind?: string) => Promise<ClientCredentials | null>
   readonly providerFor: (platform: Platform) => Provider
   readonly fetchImpl?: typeof fetch
@@ -117,7 +117,7 @@ interface DueRow {
   platform: string
   /** منظّمةُ الحساب — تُحمَل إلى كلّ ما يلي من كتابة (D-277). */
   org_id: string
-  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn تتجدّد بتطبيقها الثاني (D-417). */
+  /** ‏نوعُ الحساب — `org` لصفحة LinkedIn تتجدّد بتطبيقها الثاني (D-422). */
   kind?: string
   /** ‏كم رُفض تجديدُه متتاليًا (D-320 · تحقّق D-320 على main: الرفضُ وحدَه لا العابر) — صفرٌ للسليم، وغيابُه صفر. */
   renew_failures?: number

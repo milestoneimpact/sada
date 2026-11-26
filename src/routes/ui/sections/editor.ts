@@ -65,7 +65,7 @@ function ownerTime(at: string | null, zone: string | null, now: Date): string {
 
 /** الحسابُ الذي يُنشر عليه: سطرٌ إن كان واحدًا، وقائمةٌ إن تعدّد. */
 function accountField(form: string, fit: readonly Target[]): string {
-  // ‏وجهتا LinkedIn معًا (D-417): مربّعٌ لكلٍّ، ولكلٍّ منشورُه
+  // ‏وجهتا LinkedIn معًا (D-422): مربّعٌ لكلٍّ، ولكلٍّ منشورُه
   const both = destinationsField(fit, form, form + '-dest')
   if (both !== null) return both
   if (fit.length === 1) {

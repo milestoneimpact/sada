@@ -103,7 +103,7 @@ export interface Env {
   readonly LINKEDIN_CLIENT_ID: string
   readonly LINKEDIN_CLIENT_SECRET: string
   /**
-   * ‏تطبيقُ LinkedIn الثاني («SADA Pages») — Community Management API وحده، للنشر باسم الصفحة (D-417 · M-03).
+   * ‏تطبيقُ LinkedIn الثاني («SADA Pages») — Community Management API وحده، للنشر باسم الصفحة (D-422 · M-03).
    * ‏**سرّا Worker وحدهما، واختياريّان**: بلاهما تقول الشاشة «بانتظار موافقة LinkedIn» ولا ينكسر شيء.
    */
   readonly LINKEDIN_ORG_CLIENT_ID?: string

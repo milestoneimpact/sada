@@ -53,7 +53,7 @@ const PLATFORM_NAMES: Readonly<Record<string, PlanPlatform>> = {
 }
 
 /**
- * ‏**صفحةُ LinkedIn وجهةٌ في الملفّ** (D-417): `linkedin-page` — والمنصّةُ `linkedin`، والحسابُ صفحةٌ تنشر باسمها.
+ * ‏**صفحةُ LinkedIn وجهةٌ في الملفّ** (D-422): `linkedin-page` — والمنصّةُ `linkedin`، والحسابُ صفحةٌ تنشر باسمها.
  * ‏ويُقبل `linkedin:page` و«صفحة لينكدإن» لمن كتبها كذلك.
  */
 export const PAGE_NAMES: ReadonlySet<string> = new Set(['linkedin-page', 'linkedin:page', 'linkedin page', 'صفحة لينكدإن', 'صفحة linkedin'])
@@ -204,7 +204,7 @@ export interface PlanRow {
   /** رقمُ السطر في الملفّ (العنوانُ ‏1) — ليجده المالكُ في جدوله. */
   readonly line: number
   readonly platform: PlanPlatform | null
-  /** ‏السطرُ لصفحة LinkedIn (`linkedin-page`، D-417). */
+  /** ‏السطرُ لصفحة LinkedIn (`linkedin-page`، D-422). */
   readonly page?: boolean
   readonly platformRaw: string
   readonly date: string
@@ -366,7 +366,7 @@ export function readPlan(csv: string, facts: PlanFacts): PlanRead {
 
     // ‏الحسابُ: أوّلُ حسابٍ نشطٍ على المنصّة — وبلا حسابٍ لا موعد. وصفحةُ الشركة على
     // LinkedIn لا تُختار (D-087): النشرُ باسمها لم يُبنَ، فمنشورُها يُردّ ساعةَ النشر
-    // ‏وسطرُ `linkedin-page` لصفحةٍ تنشر باسمها وحدها (D-417) — لا يسقط إلى الحساب الشخصيّ
+    // ‏وسطرُ `linkedin-page` لصفحةٍ تنشر باسمها وحدها (D-422) — لا يسقط إلى الحساب الشخصيّ
     const account = platform === null ? undefined
       : page
         ? facts.accounts.find((a) => a.status === 'active' && isPublishablePage(a))
@@ -429,7 +429,7 @@ export async function rowKey(row: PlanRow): Promise<string> {
   // ‏هي صيغةُ المفتاح قبلها، فما اعتُمد من قبل يبقى مفتاحُه
   const pad = (s: string): string => s.trim().replace(/(^|[-:])(\d)(?=$|[-:])/g, '$10$2')
   const [day, clock] = row.local === null ? [pad(row.date), pad(row.time)] : row.local.split(' ')
-  // ‏وصفحةُ LinkedIn مفتاحُها غيرُ مفتاح الحساب الشخصيّ (D-417): النصُّ نفسُه في الموعد نفسِه منشوران
+  // ‏وصفحةُ LinkedIn مفتاحُها غيرُ مفتاح الحساب الشخصيّ (D-422): النصُّ نفسُه في الموعد نفسِه منشوران
   const raw = [row.page === true ? 'linkedin-page' : row.platform, day, clock, row.zoneCell.trim(), norm(row.text), norm(row.video)].join('|')
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(raw))
   return `plan:${[...new Uint8Array(hash)].map((b) => b.toString(16).padStart(2, '0')).join('').slice(0, 32)}`
