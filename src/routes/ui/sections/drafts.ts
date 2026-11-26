@@ -35,6 +35,7 @@ import { button } from '../components/button'
 import { maySpend, SPEND_LOCKED } from '../../../lib/access'
 import { menu, menuAction, menuItem } from '../components/menu'
 import { field } from '../components/field'
+import { destinationLimit } from '../../../lib/schedule/destinations'
 import { linkLine } from '../reach'
 import { html, raw } from '../html'
 import { INFO_SIZE } from '../../../lib/image/infographic'
@@ -1043,7 +1044,21 @@ export function destinationsField(fit: readonly Target[], form: string | null, i
     label: t.label,
     hint: html`<span class="pf-logo rv-pf" data-pf="${t.page === true ? 'linkedin-page' : t.platform}" aria-hidden="true">${raw(LOGOS[t.platform] ?? '')}</span>`.value,
     control: html`<input type="checkbox" name="account" value="${t.id}"${form === null ? '' : html` form="${form}"`}${raw(i === firstChecked ? ' checked' : '')}>`.value,
-  })))}</fieldset>`.value
+  }) + (i === firstChecked ? '' : ownText(t, form, idBase + '-t' + String(i)))))}</fieldset>`.value
+}
+
+/**
+ * ‏**نصٌّ لهذه الوجهة** (D-426): طيّةٌ بحقلٍ عاديٍّ `text:<الحساب>` يعمل بلا JS، فارغُه نصُّ الأصل. وحدُّ المنصّة ظاهرٌ تحته
+ * ‏و`maxlength` يمسكه في المتصفّح، والخادمُ يردّ ما زاد. والوجهةُ الأولى نصُّها النصُّ الرئيس.
+ */
+function ownText(t: Target, form: string | null, id: string): string {
+  const limit = destinationLimit(t.page === true ? 'linkedin-page' : t.platform)
+  return html`<details class="sched-more"><summary>نصٌّ آخر لـ«${t.label}»</summary>${raw(field({
+    id,
+    label: 'النصُّ لهذا الحساب',
+    hint: html`فارغًا يُنشَر النصُّ نفسُه${limit === null ? '' : html` · حتّى ${String(limit)} حرف`}`.value,
+    control: html`<textarea name="text:${t.id}" rows="4"${form === null ? '' : html` form="${form}"`}${raw(limit === null ? "" : " maxlength=\"" + String(limit) + "\" data-limit=\"" + String(limit) + "\"")}></textarea>`.value,
+  }))}</details>`.value
 }
 
 /** صورةٌ مولَّدة كما تُعرض — بلا بايتات، فالبايتاتُ خلف `/panel/media/:id`. */
