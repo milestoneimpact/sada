@@ -90,3 +90,33 @@ export async function verdictsFor(db: Db, org: string, planId: string): Promise<
   for (const r of rows) out.set(r.item_key, { itemKey: r.item_key, verdict: r.verdict, note: r.note, at: r.at })
   return out
 }
+
+/** الاسمان البذرتان في D-031 — عنصرٌ نائبٌ لا اسمَ عميل، فلا يُعرضان له. */
+const SEED_NAMES = new Set(['علامتي', 'منظّمتي'])
+
+export interface ClientIdentity {
+  readonly name: string
+  /** حرفا العلامة حين لا شعار — أوّلُ حرفٍ من أوّل كلمتين. */
+  readonly initials: string
+}
+
+/** حرفا الاسم: «مقهى النخلة» ← «من»، و«Acme» ← «A». */
+export function initialsOf(name: string): string {
+  const words = name.trim().split(/\s+/).filter((w) => w !== '')
+  return words.slice(0, 2).map((w) => Array.from(w.replace(/^ال(?=\p{L}{2})/u, ''))[0] ?? '').join('').toUpperCase() || 'ص'
+}
+
+/**
+ * **هويّةُ العميل في صفحته** (D-428): أوّلُ علامةٍ مسمّاةٍ في منظّمته، ثمّ اسمُ المنظّمة — وكلاهما مقيّدٌ بـ`org` الرابط
+ * وحده، فلا يُقرأ اسمُ عميلٍ آخر. ولا شعارَ مخزونًا بعد (لا عمودَ له في `brands`)، فالحرفان علامتُه.
+ */
+export async function clientIdentity(db: Db, org: string): Promise<ClientIdentity> {
+  const [brand, orgRow] = await Promise.all([
+    db.prepare('SELECT name FROM brands WHERE org_id = ? ORDER BY created_at, id').bind(org)
+      .all<{ name: string }>().then((r) => r.results).catch(() => []),
+    db.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
+  ])
+  const pick = [...brand.map((b) => b.name), orgRow?.name ?? ''].map((n) => n.trim()).find((n) => n !== '' && !SEED_NAMES.has(n))
+  const name = pick ?? orgRow?.name?.trim() ?? 'صدى'
+  return { name: name === '' ? 'صدى' : name, initials: initialsOf(name === '' ? 'صدى' : name) }
+}

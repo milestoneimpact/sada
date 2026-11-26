@@ -96,3 +96,26 @@ describe('رابطُ موافقة العميل (D-353)', () => {
     expect((await app.request('/r/' + token, { method: 'POST', body: form({ key: 'x', verdict: 'publish' }) }, env)).status).toBe(400)
   })
 })
+
+describe('صفحةُ العميل بهويّته (D-428)', () => {
+  it('اسمُ علامة العميل وحرفاه في الرأس، و«بإدارة صدى» صغيرةً، ولا شيءَ من علامة عميلٍ آخر', async () => {
+    db.raw.exec(`INSERT INTO brands (id, org_id, name, created_at) VALUES ('b_c', 'org_owner', 'مقهى النخلة', '2000-01-01 00:00:00')`)
+    db.raw.exec(`INSERT INTO orgs (id, name, kind) VALUES ('org_x', 'وكالةٌ أخرى', 'agency')`)
+    db.raw.exec(`INSERT INTO brands (id, org_id, name, created_at) VALUES ('b_x', 'org_x', 'متجر الغير', '1999-01-01 00:00:00')`)
+    const { token } = await createLink(db, 'org_owner', 'pl1', 'owner')
+    const html = await (await app.request('/r/' + token, {}, env)).text()
+    expect(html).toContain('<title>مقهى النخلة — راجع منشوراتك</title>')
+    expect(html).toMatch(/class="cr-mark"[^>]*>من<\/span>/)
+    expect(html).toContain('class="cr-powered"')
+    expect(html).not.toContain('متجر الغير')
+  })
+
+  it('الوقتُ بمنطقة العميل حين يعرفها متصفّحُه، واسمُ المنطقة بجانبه', async () => {
+    const { token } = await createLink(db, 'org_owner', 'pl1', 'owner')
+    const first = await (await app.request('/r/' + token, {}, env)).text()
+    expect(first).toContain('7:00 ص بتوقيت الرياض')
+    expect(first).toContain('sada_ctz=')
+    const html = await (await app.request('/r/' + token, { headers: { Cookie: 'sada_ctz=Europe%2FLondon' } }, env)).text()
+    expect(html).toContain('4:00 ص بتوقيت لندن')
+  })
+})

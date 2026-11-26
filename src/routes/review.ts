@@ -8,7 +8,9 @@
  */
 import { Hono } from 'hono'
 import type { Env } from '../env'
-import { findLink, recordVerdict, verdictsFor, type ClientVerdict } from '../lib/clientReview'
+import { clientIdentity, findLink, recordVerdict, verdictsFor, type ClientVerdict } from '../lib/clientReview'
+import { validZone } from '../lib/time/zone'
+import { CLIENT_TZ_COOKIE, CLIENT_TZ_SCRIPT } from './ui/clientReviewView'
 import { latestPlan } from '../lib/plan/job'
 import { reviewModel } from '../lib/plan/review'
 import { ownerZone } from '../lib/time/ownerZone'
@@ -22,6 +24,13 @@ export const review = new Hono<{ Bindings: Env }>()
 
 const TITLE = 'صدى — راجع منشوراتك'
 
+/** منطقةُ متصفّح العميل من كعكته القصيرة على `/r` (D-428) — ليست سرًّا ولا تدخل قرارًا. */
+function clientZoneOf(cookie: string | null): string | null {
+  const m = new RegExp('(?:^|;\\s*)' + CLIENT_TZ_COOKIE + '=([^;]+)').exec(cookie ?? '')
+  if (m === null) return null
+  try { return validZone(decodeURIComponent(m[1]!)) } catch { return null }
+}
+
 function gone(): Response {
   return page((nonce) => shell(TITLE, clientReviewGone(), nonce), 404)
 }
@@ -32,11 +41,11 @@ review.get('/r/:token', async (c) => {
   if (link === null) return gone()
   const plan = await latestPlan(c.env.DB, link.org)
   if (plan === null || plan.id !== link.planId) return gone()
-  const [model, verdicts, zone, orgRow, accounts] = await Promise.all([
+  const [model, verdicts, zone, identity, accounts] = await Promise.all([
     reviewModel(c.env.DB, link.org, plan),
     verdictsFor(c.env.DB, link.org, plan.id),
     ownerZone(c.env.DB, null),
-    c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(link.org).first<{ name: string }>().catch(() => null),
+    clientIdentity(c.env.DB, link.org),
     c.env.DB.prepare("SELECT platform, display_name FROM accounts WHERE org_id = ? AND status = 'active' ORDER BY id")
       .bind(link.org).all<{ platform: string; display_name: string | null }>().then((r) => r.results).catch(() => []),
   ])
@@ -47,10 +56,11 @@ review.get('/r/:token', async (c) => {
     mediaSrc: card.mediaId === null ? null : '/m/' + await signMediaToken(c.env.TOKEN_ENC_KEY, card.mediaId, now).catch(() => ''),
   })))
   const body = clientReviewScreen({
-    token: c.req.param('token'), orgName: orgRow?.name ?? 'صدى', authors, cards, verdicts, zone: zone ?? null,
+    token: c.req.param('token'), orgName: identity.name, initials: identity.initials, authors, cards, verdicts, zone: zone ?? null,
+    clientZone: clientZoneOf(c.req.header('Cookie') ?? null),
     expiresAt: link.expiresAt, saved: c.req.query('saved') === '1',
   })
-  const res = page((nonce) => shell(TITLE, body, nonce))
+  const res = page((nonce) => shell(identity.name + ' — راجع منشوراتك', body, nonce, CLIENT_TZ_SCRIPT))
   // ‏الرمزُ في العنوان: لا يُرسَل إلى موقعٍ آخر في «Referer»، ولا تُخزَّن الصفحةُ في وسيط
   res.headers.set('Referrer-Policy', 'no-referrer')
   res.headers.set('Cache-Control', 'no-store')
