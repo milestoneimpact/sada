@@ -251,6 +251,10 @@ export interface SeatOutcome {
   readonly skipped: readonly { readonly line: number; readonly reason: string }[]
   /** البصمةُ نفسُها من المصدر نفسِه (D-383): لم يتغيّر شيء. */
   readonly unchanged?: boolean
+  /** صفوفٌ لم تتغيّر بقي بندُها ومنشورُها كما هما (D-404). */
+  readonly kept?: number
+  /** صفوفٌ عُدّلت فحُدّثت مسوّدتُها في مكانها (D-404). */
+  readonly updated?: number
 }
 
 const SPANS: readonly PlanSpan[] = ['week', '2weeks', 'month', '2months']
@@ -305,9 +309,38 @@ export async function seatPlan(
     return { planId: null, seated: 0, skipped, unchanged: true }
   }
 
+  // ‏الخطّةُ التي يحلّ فيها الملفّ تُعرف قبل الصفوف (D-404): صفٌّ لم يتغيّر يبقى بنده ومنشورُه، وصفٌّ عُدّل يُحدَّث في مكانه
+  type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
+  const sameSpan = await db
+    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
+    .bind(org, start, span).first<Existing>()
+  const months = [...new Set(within.map((r) => keyOf.get(r)?.period ?? ownerSlot(r.whenUtc!, facts.zone).day.slice(0, 7)))]
+  const period = span === 'month' && months.length === 1 ? months[0]! : null
+  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
+  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
+  const holder = period === null ? null : await db
+    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
+    .bind(org, period).first<Existing>()
+  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
+  const existing = intoPackage ? holder : sameSpan
+  const planId = existing?.id ?? crypto.randomUUID()
+
+  // ‏بنودُ الخطّة القائمة من الملفّ ومنشورُ كلٍّ منها — **والمنشورُ الذي جاوز المسوّدة (اعتُمد أو جُدول أو نُشر) لا يُفصَل
+  // ‏عن خطّته ولا يُمسّ نصُّه ولا مفتاحُه (D-004)**: كان الاستبدالُ يُفرغ إشارتَه فيختفي من الشهر والخطّة
+  type Old = { id: string; item_key: string; platform: string; due_local: string | null; source_id: string | null; post_id: string | null; status: string | null }
+  const olds: Old[] = existing === null ? [] : (await db
+    .prepare(`SELECT i.id, i.item_key, i.platform, i.due_local, i.source_id, p.id AS post_id, p.status FROM plan_items i
+               LEFT JOIN posts p ON p.plan_item_id = i.id AND p.org_id = i.org_id AND p.plan_id = i.plan_id
+               WHERE i.org_id = ? AND i.plan_id = ? AND i.source_kind <> 'github'`)
+    .bind(org, planId).all<Old>()).results
+  const claimed = new Set<string>()
+  const keptPosts = new Set<string>()
+  let kept = 0
+  let updated = 0
+
   const items: PlanItem[] = []
-  const rowsOf: { item: PlanItem; n: NormalizedItem | undefined }[] = []
-  const posts: { id: string; row: PlanRow; ref: string; key: string; itemId: string }[] = []
+  const rowsOf: { item: PlanItem; n: NormalizedItem | undefined; reuse?: string }[] = []
+  const posts: { id: string; row: PlanRow; ref: string; key: string; itemId: string; mode: 'new' | 'update' | 'relink' }[] = []
   const importIdeas: string[] = []
   for (const r of within) {
     if (write) {
@@ -324,9 +357,24 @@ export async function seatPlan(
       rowsOf.push({ item, n: keyOf.get(r) })
       continue
     }
-    const key = keyOf.get(r)?.key ?? await rowKey(r)
-    const dup = await db.prepare("SELECT id FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'").bind(org, key).first<{ id: string }>()
-    if (dup !== null) { skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' }); continue }
+    const n = keyOf.get(r)
+    const key = n?.key ?? await rowKey(r)
+    const dup = await db.prepare("SELECT id, plan_id, plan_item_id FROM posts WHERE org_id = ? AND idempotency_key = ? AND status <> 'rejected'")
+      .bind(org, key).first<{ id: string; plan_id: string | null; plan_item_id: string | null }>()
+    // ‏منشورُ الصفّ نفسِه في خطّةٍ أخرى أو بلا خطّة: لا يُكرَّر
+    const own = dup !== null && existing !== null && dup.plan_id === existing.id
+    if (dup !== null && !own) { skipped.push({ line: r.line, reason: 'مُسكَّنٌ من قبل' }); continue }
+    const dueLocal = n?.dueLocal ?? null
+    // ‏البندُ القديم: بمفتاحه إن لم يتغيّر الصفّ، وإلّا بمنصّته وموعده (صفٌّ عُدّل نصُّه)
+    const old = own
+      ? olds.find((o) => o.id === dup.plan_item_id && !claimed.has(o.id))
+      : olds.find((o) => !claimed.has(o.id) && o.platform === r.platform && dueLocal !== null && o.due_local === dueLocal)
+    if (old !== undefined) claimed.add(old.id)
+    if (!own && old !== undefined && old.post_id !== null && old.status !== 'draft' && old.status !== 'rejected') {
+      // ‏عُدّل صفٌّ منشورُه معتمدٌ أو مجدولٌ أو منشور: يبقى المنشورُ وبندُه كما هما، ولا يُكتب آخرُ يُنشر مرّتين
+      skipped.push({ line: r.line, reason: 'منشورُه معتمدٌ أو مجدولٌ من قبل — عدّله من بطاقته' })
+      continue
+    }
     const ref = 'import:' + String(r.line)
     // ‏ما لا يمنع التسكينَ يُكتب على البند: حسابٌ غيرُ مربوط، أو طولٌ زائد، أو ما كمّله صدى
     const notes = [...r.problems.filter((p) => !/موعد|مضى/.test(p)), filled.get(r.line) ?? ''].filter((x) => x !== '')
@@ -337,54 +385,55 @@ export async function seatPlan(
       ...(notes.length === 0 ? {} : { note: notes.join(' · ') }),
     }
     items.push(item)
-    rowsOf.push({ item, n: keyOf.get(r) })
-    posts.push({ id: crypto.randomUUID(), row: r, ref, key, itemId: '' })
+    rowsOf.push({ item, n, ...(old === undefined ? {} : { reuse: old.id }) })
+    if (own) {
+      kept++
+      keptPosts.add(dup.id)
+      posts.push({ id: dup.id, row: r, ref, key, itemId: '', mode: 'relink' })
+    } else if (old !== undefined && old.post_id !== null && old.status === 'draft') {
+      updated++
+      keptPosts.add(old.post_id)
+      posts.push({ id: old.post_id, row: r, ref, key, itemId: '', mode: 'update' })
+    } else {
+      posts.push({ id: crypto.randomUUID(), row: r, ref, key, itemId: '', mode: 'new' })
+    }
   }
   if (items.length === 0) return { planId: null, seated: 0, skipped }
+  // ‏وبندٌ قديمٌ منشورُه جاوز المسوّدة يبقى في الخطّة ولو غاب صفُّه عن الملفّ
+  const reusing = new Set(rowsOf.flatMap((x) => x.reuse === undefined ? [] : [x.reuse]))
+  const guarded = olds.filter((o) => !reusing.has(o.id) && o.post_id !== null && o.status !== 'draft' && o.status !== 'rejected')
+  const oldItems = existing === null ? [] : ((JSON.parse(existing.plan_json) as { items?: PlanItem[] }).items ?? [])
+  const usedRefs = new Set(items.map((i) => i.sourceId))
+  const carried = oldItems.filter((i) => guarded.some((o) => o.source_id === i.sourceId) && !usedRefs.has(i.sourceId))
   const channels = [...new Set(items.map((i) => i.platform))]
   const choices = { channels, cadence: {}, sources: 'all', ideas: [], assets: [], autoImage: imageStyle !== null, imageStyle: imageStyle ?? 'infographic', startDay: start, ...(rules === null ? {} : { rules }), ...(write ? { importIdeas } : {}) }
-  const planJson = JSON.stringify({ rationale: 'خطّتُك المرفوعة', items })
+  const planJson = JSON.stringify({ rationale: 'خطّتُك المرفوعة', items: [...items, ...carried] })
 
   // ‏**إصدارٌ جديد لا حذف** (D-383): `(org_id, week_start, span)` فريد، فخطّةُ المدى نفسِه تُحدَّث في مكانها برقم إصدارٍ أعلى.
-  // ‏وما ثُبّت منها قبلُ محفوظٌ في `plan_versions`، ومسوّداتُها السابقة تبقى في المنشورات بلا خطّة كما كانت بعد الحذف
-  type Existing = { id: string; version: number; plan_json: string; locked_at: string | null; model: string }
-  const sameSpan = await db
-    .prepare('SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND week_start = ? AND span = ?')
-    .bind(org, start, span).first<Existing>()
-  const months = [...new Set(rowsOf.map((x) => x.n?.period ?? x.item.day.slice(0, 7)))]
-  const period = span === 'month' && months.length === 1 ? months[0]! : null
-  // ‏**خطّةٌ واحدة للشهر** (D-383): إن حملت خطّةُ الحزمة شهرَ هذا الملفّ، نزلت صفوفُه فيها كما تنزل الحزمةُ في خطّة الشهر،
-  // ‏ولا تُنشأ خطّةٌ بلا شهرٍ لا تراها شاشتُه
-  const holder = period === null ? null : await db
-    .prepare("SELECT id, version, plan_json, locked_at, model FROM plans WHERE org_id = ? AND period = ? AND status <> 'superseded'")
-    .bind(org, period).first<Existing>()
-  const intoPackage = holder !== null && holder.model === 'package' && holder.id !== sameSpan?.id
-  const existing = intoPackage ? holder : sameSpan
-  const planId = existing?.id ?? crypto.randomUUID()
   const jobId = crypto.randomUUID()
   const periodFree = period === null ? false : (await db.prepare('SELECT id FROM plans WHERE org_id = ? AND period = ? AND id <> ?')
     .bind(org, period, planId).first<{ id: string }>()) === null
   const planPeriod = periodFree ? period : null
   const keepPackage = existing?.model === 'package'
-  const itemRows = rowsOf.map(({ item, n }) => ({ id: crypto.randomUUID(), item, n }))
+  const itemRows = rowsOf.map(({ item, n, reuse }) => ({ id: reuse ?? crypto.randomUUID(), item, n, reuse }))
   // ‏المسوّدةُ تشير إلى بندها (`posts.plan_item_id`) بمرجعها
   for (const p of posts) p.itemId = itemRows.find((x) => x.item.sourceId === p.ref)!.id
   const statements: DbStatement[] = []
   if (existing !== null) {
-    const versions = await db.prepare('SELECT count(*) AS n FROM plan_versions WHERE org_id = ? AND plan_id = ?').bind(org, planId).first<{ n: number }>()
-    // ‏صورةُ الإصدار السابق تُحفظ إن كان قد ثُبّت أو له تاريخ، فلا يضيع شيءٌ اعتمده المالك
-    if (existing.locked_at !== null || (versions?.n ?? 0) > 0) {
-      statements.push(db.prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id, import_job_id)
-                                  VALUES (?, ?, ?, ?, 0, 'import', ?, (SELECT id FROM import_jobs WHERE org_id = ? AND plan_id = ? ORDER BY created_at DESC LIMIT 1))
-                                  ON CONFLICT (plan_id, version) DO NOTHING`)
-        .bind(crypto.randomUUID(), planId, existing.version, existing.plan_json, org, org, planId))
-    }
+    // ‏**صورةُ الإصدار السابق تُحفظ قبل كلّ استبدال** (D-404) — كانت لما ثُبّت أو له تاريخٌ وحده، فضاع ما لم يُثبَّت
+    statements.push(db.prepare(`INSERT INTO plan_versions (id, plan_id, version, plan_json, scheduled, locked_by, org_id, import_job_id)
+                                VALUES (?, ?, ?, ?, 0, 'import', ?, (SELECT id FROM import_jobs WHERE org_id = ? AND plan_id = ? ORDER BY created_at DESC LIMIT 1))
+                                ON CONFLICT (plan_id, version) DO NOTHING`)
+      .bind(crypto.randomUUID(), planId, existing.version, existing.plan_json, org, org, planId))
     statements.push(
-      // ‏ومنشوراتُ بنود الحزمة تبقى على خطّتها: الاستيرادُ يستبدل صفوفَه وحدها
-      db.prepare(`UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ?
-                    AND NOT EXISTS (SELECT 1 FROM plan_items i WHERE i.id = posts.plan_item_id AND i.source_kind = 'github')`).bind(org, planId),
-      // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)
-      db.prepare("DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github'").bind(org, planId),
+      // ‏ومنشوراتُ بنود الحزمة تبقى على خطّتها، وما جاوز المسوّدة يبقى، وما بقي صفُّه أو عُدّل يبقى: الاستيرادُ يفصل مسوّداتٍ غاب صفُّها وحدها
+      db.prepare(`UPDATE posts SET plan_id = NULL, plan_item_id = NULL WHERE org_id = ? AND plan_id = ? AND status IN ('draft', 'rejected')
+                    AND id NOT IN (SELECT value FROM json_each(?))
+                    AND NOT EXISTS (SELECT 1 FROM plan_items i WHERE i.id = posts.plan_item_id AND i.source_kind = 'github')`).bind(org, planId, JSON.stringify([...keptPosts])),
+      // ‏بنودُ الحزمة في خطّة الشهر نفسِها لا يمحوها استيرادُ ملفّ (D-383 المرحلة ٤)، ولا بندٌ يُعاد استعمالُه أو منشورُه محميّ
+      db.prepare(`DELETE FROM plan_items WHERE org_id = ? AND plan_id = ? AND source_kind <> 'github' AND id NOT IN (SELECT value FROM json_each(?))
+                    AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.plan_item_id = plan_items.id AND p.org_id = plan_items.org_id AND p.plan_id = plan_items.plan_id
+                                    AND p.status NOT IN ('draft', 'rejected'))`).bind(org, planId, JSON.stringify([...reusing])),
       // ‏وخطّةُ الحزمة تبقى خطّةَ حزمة، ويُضاف مصدرُ الملفّ إلى مصادرها
       db.prepare(`UPDATE plans SET plan_json = ?, model = CASE WHEN ? THEN model ELSE 'import' END, status = 'draft', choices_json = ?, version = version + 1, locked_at = NULL, time_basis = 'local',
                          created_at = datetime('now'), period = ?, source_kinds = ? WHERE id = ? AND org_id = ?`)
@@ -394,29 +443,47 @@ export async function seatPlan(
     statements.push(db.prepare("INSERT INTO plans (id, week_start, plan_json, model, status, org_id, span, choices_json, period, source_kinds, time_basis) VALUES (?, ?, ?, 'import', 'draft', ?, ?, ?, ?, ?, 'local')")
       .bind(planId, start, planJson, org, span, JSON.stringify(choices), planPeriod, JSON.stringify([kind])))
   }
+  const itemValues = (item: PlanItem, n: NormalizedItem | undefined): unknown[] =>
+    [n?.key ?? item.sourceId, item.platform, n?.dueLocal ?? item.day + ' ' + item.time, item.kind, item.angle, n?.row.text ?? null, item.asset ?? null, n?.key ?? null, item.sourceId]
   statements.push(
-    ...itemRows.map(({ id, item, n }) => db
+    // ‏البندُ المُعاد يُحدَّث في مكانه بمعرّفه — فمنشورُه يبقى مشيرًا إليه
+    ...itemRows.filter((x) => x.reuse !== undefined).map(({ id, item, n }) => db
+      .prepare(`UPDATE plan_items SET item_key = ?, platform = ?, due_local = ?, kind = ?, angle = ?, copy = ?, media_ref = ?, content_hash = ?, source_id = ?,
+                       source_kind = ?, rev = rev + 1, updated_at = datetime('now') WHERE id = ? AND org_id = ?`)
+      .bind(...itemValues(item, n), kind, id, org)),
+    ...itemRows.filter((x) => x.reuse === undefined).map(({ id, item, n }) => db
       .prepare(`INSERT INTO plan_items (id, org_id, plan_id, item_key, platform, due_local, kind, angle, copy, media_ref, content_hash, source_id, source_kind)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT (plan_id, item_key, platform) DO NOTHING`)
-      .bind(id, org, planId, n?.key ?? item.sourceId, item.platform, n?.dueLocal ?? item.day + ' ' + item.time, item.kind, item.angle,
-        n?.row.text ?? null, item.asset ?? null, n?.key ?? null, item.sourceId, kind)),
-    ...posts.map((p) => db
-      .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id, plan_item_id)
-                VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?, ?)`)
-      .bind(p.id, p.row.platform, isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text', p.row.text, p.key, planId, JSON.stringify([p.ref]), org, p.itemId)),
+      .bind(id, org, planId, ...itemValues(item, n), kind)),
+    ...posts.map((p) => {
+      const type = isThread(p.row.platform ?? '', p.row.text) ? 'thread' : 'text'
+      if (p.mode === 'relink') {
+        // ‏لم يتغيّر صفُّه: المنشورُ كما هو بحاله ومفتاحه، ويشير إلى بنده
+        return db.prepare('UPDATE posts SET plan_item_id = ?, source_refs = ? WHERE id = ? AND org_id = ?').bind(p.itemId, JSON.stringify([p.ref]), p.id, org)
+      }
+      if (p.mode === 'update') {
+        // ‏عُدّل صفُّه ومنشورُه مسوّدة: يُحدَّث نصُّه ومفتاحُه من صفّه الجديد (D-004) — والمسوّدةُ وحدها
+        return db.prepare(`UPDATE posts SET text = ?, type = ?, idempotency_key = ?, source_refs = ?, plan_item_id = ? WHERE id = ? AND org_id = ? AND status = 'draft'`)
+          .bind(p.row.text, type, p.key, JSON.stringify([p.ref]), p.itemId, p.id, org)
+      }
+      return db
+        .prepare(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, plan_id, source_refs, org_id, plan_item_id)
+                  VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من خطّتك المرفوعة', ?, ?, ?, ?)`)
+        .bind(p.id, p.row.platform, type, p.row.text, p.key, planId, JSON.stringify([p.ref]), org, p.itemId)
+    }),
     // ‏وسيطةُ المالك من مكتبة Drive تُربط بمسوّدتها (D-363) — فلا تُرسم لها صورة (`seatedPosts` يتخطّاها)
-    ...posts.flatMap((p) => { const m = driveMediaRow(db, org, p.id, p.row); return m === null ? [] : [m] }),
+    ...posts.filter((p) => p.mode !== 'relink').flatMap((p) => { const m = driveMediaRow(db, org, p.id, p.row); return m === null ? [] : [m] }),
     // ‏ومهمّةُ الاستيراد ببصمتها: البصمةُ نفسُها بعد حذف خطّتها تُعاد إلى الخطّة الجديدة
     db.prepare(`INSERT INTO import_jobs (id, org_id, source_kind, source_ref, content_hash, period, status, report_json, plan_id)
                 VALUES (?, ?, ?, ?, ?, ?, 'applied', ?, ?)
                 ON CONFLICT (org_id, source_kind, content_hash) DO UPDATE SET plan_id = excluded.plan_id, status = 'applied',
                   report_json = excluded.report_json, source_ref = excluded.source_ref, period = excluded.period`)
       .bind(jobId, org, kind, source.ref ?? null, normalized.contentHash, normalized.periods.length === 1 ? normalized.periods[0]! : null,
-        JSON.stringify({ seated: items.length, skipped: skipped.length, periods: normalized.periods, replaced: existing !== null }), planId),
+        JSON.stringify({ seated: items.length, kept, updated, skipped: skipped.length, periods: normalized.periods, replaced: existing !== null }), planId),
   )
   if (db.batch !== undefined) await db.batch(statements)
   else for (const st of statements) await st.run()
-  return { planId, seated: items.length, skipped }
+  return { planId, seated: items.length, skipped, kept, updated }
 }
 
 /** معرّفاتُ مسوّدات خطّةٍ مسكَّنة — لرسم صورها في الخلفيّة إن اختيرت. */
