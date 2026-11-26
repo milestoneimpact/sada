@@ -34,6 +34,8 @@ export interface CalItem {
   readonly due: string
   readonly title: string
   readonly status: CalStatus
+  /** يقدر `approvePlanVersion` أن يعتمده: مسوّدةٌ ذاتُ نصّ، أو بندٌ بلا منشورٍ وله نصّ (D-411). والفاشلُ والفارغُ لا. */
+  readonly ready: boolean
 }
 
 const isDay = (v: unknown): v is string => typeof v === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(v)
@@ -43,6 +45,18 @@ export function calStatus(post: string | null): CalStatus {
   if (post === 'published') return 'published'
   if (post === 'approved' || post === 'edited' || post === 'queued' || post === 'publishing') return 'scheduled'
   return 'awaiting'
+}
+
+/** هل يعتمده `approvePlanVersion` فعلًا؟ بشرطه نفسِه: مسوّدةٌ ذاتُ نصّ، أو لا منشورَ وللبند نصّ (D-411). */
+export function calReady(post: string | null, postText: string | null, copy: string | null): boolean {
+  if (post === null) return (copy ?? '').trim() !== ''
+  return post === 'draft' && (postText ?? '').trim() !== ''
+}
+
+/** فتراتُ الأيّام المعروضة «YYYY-MM» بلا تكرار: الأسبوعُ العابرُ يمسّ شهرين فتُقرأ خطّتاهما (D-411). */
+export function spanPeriods(q: CalQuery): string[] {
+  const days = calSpan(q).days
+  return days.length === 0 ? [q.period] : [...new Set(days.map((d) => d.slice(0, 7)))]
 }
 
 /** يقرأ العنوان: `v` و`p` و`d` و`pf` (مكرَّرًا أو بفواصل) و`st`. وكلُّ قيمةٍ غريبةٍ تسقط إلى الافتراض. */
@@ -95,8 +109,8 @@ export function toggle<T>(list: readonly T[], x: T): T[] {
   return list.includes(x) ? list.filter((y) => y !== x) : [...list, x]
 }
 
-/** بنودُ «اعتمد ما في الفرز»: ما ينتظر الاعتماد ويطابق الفرز، وفي الأيّام المعروضة إن لم يكن العرضُ شهرًا. */
+/** بنودُ «اعتمد ما في الفرز»: ما ينتظر الاعتماد ويقدر الاعتمادُ عليه (`ready` · D-411) ويطابق الفرز، وفي الأيّام المعروضة إن لم يكن العرضُ شهرًا. */
 export function bulkPick(items: readonly CalItem[], q: CalQuery): string[] {
   const span = calSpan(q).days
-  return items.filter((it) => it.status === 'awaiting' && matches(it, q) && (span.length === 0 || span.includes(it.due.slice(0, 10)))).map((it) => it.id)
+  return items.filter((it) => it.status === 'awaiting' && it.ready && matches(it, q) && (span.length === 0 || span.includes(it.due.slice(0, 10)))).map((it) => it.id)
 }

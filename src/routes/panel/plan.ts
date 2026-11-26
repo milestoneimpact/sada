@@ -63,7 +63,7 @@ import { attachToPost, listLibrary } from '../../lib/library'
 import { rejectMedia } from '../../lib/image/job'
 import { approvalLine, isPeriod, localDay, monthJourney, nextPeriod, prevPeriod } from '../../lib/plan/month'
 import { calendarItems, itemsPerDay, monthFacts, readDiff, readImports } from '../../lib/plan/monthStore'
-import { bulkPick, parseCalQuery } from '../../lib/plan/calendar'
+import { bulkPick, parseCalQuery, spanPeriods } from '../../lib/plan/calendar'
 import { PLATFORM_IDS } from '../../lib/oauth/providers'
 import { importsScreen, monthJourneyCard, monthScreen } from '../ui/planMonthView'
 import { d1BuildStore, readBuild, running, shownBuild, writeBuild, type PlanBuild } from '../../lib/plan/build'
@@ -1001,6 +1001,11 @@ plan.post('/panel/plan/month/approve', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: done.reason })
     return c.redirect(to, 303)
   }
+  // ‏ولا يُقال «اعتُمد» على صفر (D-411): الفرزُ يعدّ ما يُعتمد فعلًا، وهذا حارسُ ما تغيّر بين الفتح والإرسال
+  if (only !== undefined && done.approved + done.created === 0) {
+    await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'لم يُعتمد شيء: بنودُ هذا الفرز بلا نصٍّ أو تعثّر نشرُها. افتح اليومَ وراجعها.' })
+    return c.redirect(to, 303)
+  }
   if (stored.status === 'draft' && only === undefined) await approvePlan(c.env.DB, stored.id, org)
   const fresh = await planForId(c.env.DB, org, stored.id) ?? stored
   const settled = await schedulePlan(c.env.DB, org, fresh, now, blocked)
@@ -1076,7 +1081,13 @@ plan.get('/panel/plan/month', async (c) => {
     total = model.cards.length
   }
   const blocked = blockedKeys(findings)
-  const calItems = stored === null ? [] : await calendarItems(c.env.DB, org, stored.id)
+  // ‏الأسبوعُ العابرُ يقرأ خطّةَ الشهر المجاور لأيّامه (D-411)، عرضًا فقط: الاعتمادُ بالفرز يبقى لخطّة هذا الشهر
+  const own = stored === null ? [] : await calendarItems(c.env.DB, org, stored.id)
+  const others = await Promise.all(spanPeriods(calQ).filter((x) => x !== period).map(async (x) => {
+    const pl = await planForPeriod(c.env.DB, org, x)
+    return pl === null ? [] : (await calendarItems(c.env.DB, org, pl.id)).map((i) => ({ ...i, ready: false }))
+  }))
+  const calItems = [...own, ...others.flat()]
   const firstBlock = findings.find((f) => f.severity === 'block')
   const body = monthJourneyCard(facts.map((f) => monthJourney(f, today))) + '<div class="mt-3"></div>' + monthScreen({
     period, planId: stored?.id ?? null,

@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { bulkPick, calHref, calSpan, calStatus, matches, parseCalQuery, toggle, weekOf, type CalItem } from './calendar'
+import { bulkPick, calHref, calReady, calSpan, calStatus, spanPeriods, matches, parseCalQuery, toggle, weekOf, type CalItem } from './calendar'
 import { bulkForm, calFilters, unifiedCalendar } from '../../routes/ui/planMonthView'
 
 const KNOWN = ['linkedin', 'x', 'instagram']
 const q = (s: string) => parseCalQuery(new URLSearchParams(s), '2026-11-26', KNOWN)
 const items: CalItem[] = [
-  { id: 'a', platform: 'linkedin', due: '2026-11-02 09:00', title: 'أ', status: 'awaiting' },
-  { id: 'b', platform: 'x', due: '2026-11-02 12:00', title: 'ب', status: 'scheduled' },
-  { id: 'c', platform: 'x', due: '2026-11-20 10:00', title: 'ج', status: 'awaiting' },
-  { id: 'd', platform: 'instagram', due: '2026-11-03 10:00', title: 'د', status: 'published' },
+  { id: 'a', platform: 'linkedin', due: '2026-11-02 09:00', title: 'أ', status: 'awaiting', ready: true },
+  { id: 'b', platform: 'x', due: '2026-11-02 12:00', title: 'ب', status: 'scheduled', ready: false },
+  { id: 'c', platform: 'x', due: '2026-11-20 10:00', title: 'ج', status: 'awaiting', ready: true },
+  { id: 'd', platform: 'instagram', due: '2026-11-03 10:00', title: 'د', status: 'published', ready: false },
 ]
 
 describe('التقويم الموحّد (D-410)', () => {
@@ -68,5 +68,28 @@ describe('التقويم الموحّد (D-410)', () => {
     expect(f).toContain('data-confirm="اعتمد 1 بندًا')
     expect(f).toContain('name="scope" value="filter"')
     expect(bulkForm({ q: q('st=published'), items, platforms: KNOWN, dailyCap: 5 }, 'plan1')).not.toContain('<form')
+  })
+
+  it('D-411: العدُّ لا يَعِد بأكثر ممّا يُعتمد — الفاشلُ والمسوّدةُ الفارغة والبندُ بلا نصّ خارجه', () => {
+    expect(calReady(null, null, 'نصّ')).toBe(true)
+    expect(calReady(null, null, '  ')).toBe(false)
+    expect(calReady('draft', 'نصّ', null)).toBe(true)
+    expect(calReady('draft', ' ', 'نصّ')).toBe(false)
+    expect(calReady('failed', 'نصّ', 'نصّ')).toBe(false)
+    const dead: CalItem[] = ['f1', 'f2', 'f3'].map((id) => ({ id, platform: 'x', due: '2026-11-05 10:00', title: id, status: calStatus(id === 'f1' ? 'failed' : id === 'f2' ? 'draft' : null), ready: false }))
+    expect(dead.every((d) => d.status === 'awaiting')).toBe(true)
+    expect(bulkPick(dead, q('pf=x'))).toEqual([])
+    const f = bulkForm({ q: q('pf=x'), items: dead, platforms: KNOWN, dailyCap: 5 }, 'plan1')
+    expect(f).not.toContain('<form')
+    expect(bulkForm({ q: q('pf=x'), items: [...dead, ...items], platforms: KNOWN, dailyCap: 5 }, 'plan1')).toContain('(1)')
+  })
+
+  it('D-411: الأسبوعُ العابرُ يمسّ شهرين فتُقرأ خطّتاهما، والشهرُ واليومُ فترةٌ واحدة', () => {
+    expect(spanPeriods(q('v=week&d=2026-12-01'))).toEqual(['2026-11', '2026-12'])
+    expect(spanPeriods(q('v=week&d=2026-12-10'))).toEqual(['2026-12'])
+    expect(spanPeriods(q('p=2026-12'))).toEqual(['2026-12'])
+    const nov: CalItem = { id: 'n', platform: 'x', due: '2026-11-30 09:00', title: 'نوفمبر', status: 'scheduled', ready: false }
+    const w = unifiedCalendar({ q: q('v=week&d=2026-12-01'), items: [nov], platforms: KNOWN, dailyCap: 5 })
+    expect(w).toContain('نوفمبر')
   })
 })
