@@ -668,6 +668,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
   document.querySelectorAll('form[data-match-confirm]').forEach(function(f){
     var sel=f.querySelector('select'), t=f.querySelector('input[name="confirm"]'), b=f.querySelector('button[type="submit"]'), nm=f.querySelector('[data-match-name]');
     if(!sel||!t||!b)return;
+    // ‏وسببُ التعطيل نصٌّ يُرى: تلميحُ الحقل يقول ما يُكتب (D-418)
+    if(t.id&&document.getElementById(t.id+'-hint'))b.setAttribute('aria-describedby',t.id+'-hint');
     function want(){var o=sel.options[sel.selectedIndex]; return o?(o.getAttribute('data-name')||''):'';}
     function check(){
       var w=want(), ok=w!==''&&t.value.trim()===w;
