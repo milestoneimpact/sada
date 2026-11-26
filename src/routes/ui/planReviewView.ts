@@ -215,7 +215,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
     if (n === 0) {
       // ‏وفي اللوحة: اليومُ الفارغُ هدفُ إفلاتٍ أيضًا (D-330)، فيحمل تاريخَه
       cells.push(board === undefined
-        ? html`<span class="rv-cd" aria-hidden="true"${raw(cur(day))}><b>${dayLabel(day, 'short')}</b></span>`
+        ? html`<span class="rv-cd"${raw(cur(day) === '' ? ' aria-hidden="true"' : cur(day))}><b>${dayLabel(day, 'short')}</b></span>`
         : html`<div class="rv-cd is-day" data-day="${day}"${raw(cur(day))}><b aria-hidden="true">${dayLabel(day, 'short')}</b></div>`)
       continue
     }
