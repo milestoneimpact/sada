@@ -109,6 +109,18 @@ describe('السلسلةُ والتغريدةُ من مصدرٍ واحد (مرا
     ])
   })
 
+  it('«اعتمد ما في الفرز» يجدول بنودَ الفرز وحدَها، لا كلَّ معتمَدٍ في الخطّة (مراجعة D-425)', async () => {
+    const { db, plan } = seedTwin()
+    db.raw.exec(`INSERT INTO plan_items (id, org_id, plan_id, item_key, platform, due_local, source_kind) VALUES
+      ('i1', 'org_owner', 'pl', 'k1', 'x', '2026-10-27 09:00', 'text'), ('i2', 'org_owner', 'pl', 'k2', 'x', '2026-10-29 09:00', 'text')`)
+    db.raw.exec("UPDATE posts SET plan_item_id = CASE id WHEN 'p-text' THEN 'i1' ELSE 'i2' END")
+    expect((await schedulePlan(db, 'org_owner', plan, NOW, new Set(), new Set(['i2']))).scheduled).toBe(1)
+    expect(db.raw.prepare('SELECT id, status FROM posts ORDER BY id').all()).toEqual([
+      { id: 'p-text', status: 'approved' },
+      { id: 'p-thread', status: 'queued' },
+    ])
+  })
+
   it('والمراجعةُ تُري كلَّ بندٍ مسوّدتَه، و«احذف» على السلسلة يرفض مسوّدتَها هي', async () => {
     const { db, plan, items } = seedTwin()
     const model = await reviewModel(db, 'org_owner', { ...plan, choices: { autoImage: false } } as unknown as StoredPlan)

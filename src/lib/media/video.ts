@@ -340,8 +340,9 @@ export async function animateForPost(
     // ‏‏ولّد المزوّدُ المقطع: يُوسَم أثرًا — والمالُ محسوبٌ وُسم أم لم يُوسَم (D-415)
     await markVideoGenerated(deps.db, org, spend.ledgerId)
   } catch (error) {
-    // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — ومالُ نداءٍ ردّه المزوّدُ يعود إلى الميزانيّة (D-414)
-    await releaseVideoSpend(deps.db, org, spend.ledgerId)
+    // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — ومالُ نداءٍ **ردّه المزوّدُ صراحةً** يعود إلى الميزانيّة (D-414).
+    // ‏ومهلةٌ أو عطلٌ مجهول قد يقع بعد أن وُلّد المقطعُ وحُوسب: المالُ يبقى محسوبًا (مراجعة D-425 · D-415)
+    if (error instanceof AiError && error.rejected) await releaseVideoSpend(deps.db, org, spend.ledgerId)
     await releaseClaim(deps.db, org, key)
     return {
       kind: 'failed',

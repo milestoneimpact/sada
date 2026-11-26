@@ -121,7 +121,7 @@ export function restBinding(
         // الرمزُ يقرّر الإعادة. و 429 و 5xx تُعاد، وما عداهما لا
         const retryable = response.status === 429 || response.status >= 500
         // ولا يُقرأ الجسدُ كاملا: أوّلُ خطأٍ وحده، مقصوصًا وبلا روابط
-        throw new AiError(await refusal(response), retryable)
+        throw new AiError(await refusal(response), retryable, response.status >= 400 && response.status < 500)
       }
 
       const contentType = response.headers.get('Content-Type') ?? ''
@@ -132,7 +132,7 @@ export function restBinding(
       // غلافُ Cloudflare: { success, result, errors }. ويُفَضّ إلى `result`
       // ليتّحد شكلُ الجوابين — فالمنادي لا يعرف بأيّ وجهٍ نُودي
       if (payload['success'] === false) {
-        throw new AiError('رفضت Cloudflare الطلب (success:false)', false)
+        throw new AiError('رفضت Cloudflare الطلب (success:false)', false, true)
       }
       // ‏وجوابُ النهاية الجامعة شكلُ النموذج نفسُه ({ state, result: { video } }) بلا غلاف `success`:
       // فلا يُفَضّ، وإلّا ضاعت `state` وبقي `{ video }` بلا رأسه (D-188)
@@ -148,6 +148,11 @@ export class AiError extends Error {
   constructor(
     message: string,
     readonly retryable: boolean,
+    /**
+     * ‏**ردَّه المزوّدُ صراحةً قبل أيّ عمل** (مراجعة D-425): جوابٌ ‎4xx أو رفضٌ معلن. وحده يُعيد مالَ الفيديو إلى الميزانيّة؛
+     * ‏ومهلةٌ أو عطلٌ مجهول لا يُعرَف أوُلِّد المقطعُ أم لا، فالمالُ يبقى محسوبًا (D-415).
+     */
+    readonly rejected: boolean = false,
   ) {
     super(message)
   }
@@ -291,7 +296,7 @@ export async function generateVideo(
     // ‏خطأُ وجه REST يحمل حكمَه وسببَه بكلام المالك (D-188) — يمرّ كما هو ولا يُغلَّف ثانيةً
     if (error instanceof AiError) throw error
     const detail = error instanceof Error ? error.message : 'عطل'
-    if (/Insufficient balance|\b402\b/i.test(detail)) throw new AiError(`${NO_CREDIT} (${detail.slice(0, 160)})`, false)
+    if (/Insufficient balance|\b402\b/i.test(detail)) throw new AiError(`${NO_CREDIT} (${detail.slice(0, 160)})`, false, true)
     const retryable = /capacity|429|3040|timeout|rate/i.test(detail)
     throw new AiError(`Workers AI: ${detail}`, retryable)
   }

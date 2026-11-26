@@ -200,7 +200,7 @@ client.get('/panel/client/report', async (c) => {
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
   ])
-  const report = await monthlyReport(c.env.DB, org, monthOf(c.req.query('month'), new Date()), zone)
+  const report = await monthlyReport(c.env.DB, org, monthOf(c.req.query('month'), new Date(), zone), zone)
   const flash = await takeFlash(c.env, c.req.raw)
   return page((nonce) =>
     soloPage(`صدى — تقرير ${report.month}`, { href: '/panel/client', label: 'رحلة العميل' },
@@ -217,11 +217,11 @@ client.post('/panel/client/report/send', async (c) => {
   const gate = await guardPost(c)
   if ('denied' in gate) return gate.denied
   const org = activeOrg(gate.session.record)
-  const month = monthOf(String(gate.form.get('month') ?? ''), new Date())
   const [orgRow, zone] = await Promise.all([
     c.env.DB.prepare('SELECT name FROM orgs WHERE id = ?').bind(org).first<{ name: string }>().catch(() => null),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
   ])
+  const month = monthOf(String(gate.form.get('month') ?? ''), new Date(), zone)
   const name = orgRow?.name ?? 'منظّمتي'
   const report = await monthlyReport(c.env.DB, org, month, zone)
   const sent = await sendText(c.env.EMAIL, OWNER_EMAIL, `صدى — تقرير ${month} · ${name}`,

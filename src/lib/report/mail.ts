@@ -13,7 +13,7 @@ import { OWNER_EMAIL } from '../ownerEmail'
 import { platformLabel } from '../oauth/providers'
 import { money } from '../format'
 import { record } from '../audit'
-import { monthlyReport, reportText, shiftMonth } from './monthly'
+import { monthlyReport, monthOf, reportText, shiftMonth } from './monthly'
 
 export interface MailedReport {
   readonly org: string
@@ -23,7 +23,8 @@ export interface MailedReport {
 }
 
 export async function mailMonthlyReports(db: Db, mail: MailBinding | undefined, now: Date, zone: string | null): Promise<MailedReport[]> {
-  const month = shiftMonth(now.toISOString().slice(0, 7), -1)
+  // ‏الشهرُ الذي انقضى **بمنطقة المالك** (مراجعة D-425): فجرُ الأوّل بـ UTC قد يكون آخرَ يومٍ في الشهر محلّيًّا
+  const month = shiftMonth(monthOf(undefined, now, zone), -1)
   const { results } = await db.prepare(`SELECT c.org_id, c.report_mailed_month, o.name FROM client_options c JOIN orgs o ON o.id = c.org_id
       WHERE c.report_mail = 1 AND (c.report_mailed_month IS NULL OR c.report_mailed_month < ?) ORDER BY c.org_id`)
     .bind(month).all<{ org_id: string; report_mailed_month: string | null; name: string }>()

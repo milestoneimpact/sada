@@ -205,7 +205,7 @@ export async function delayItem(db: Db, org: string, planId: string, index: numb
   if (queued !== null && queued.scheduled_at !== null) {
     const moved = new Date(queued.scheduled_at.replace(' ', 'T') + 'Z')
     moved.setUTCDate(moved.getUTCDate() + days)
-    const r = await reschedulePost(db, queued.id, moved.toISOString().slice(0, 16), now, org)
+    const r = await reschedulePost(db, queued.id, moved.toISOString().slice(0, 16), now, org, true)
     if (!r.ok) return { ok: true, note: `أُخّر البند، ولم يتحرّك موعدُ منشوره: ${r.reason}` }
   }
   return { ok: true }
@@ -231,7 +231,7 @@ export async function moveItem(db: Db, org: string, planId: string, index: numbe
     const [h, mi] = to.time.split(':').map(Number) as [number, number]
     const utc = localToUtc(y, mo, d, h, mi, await storedZone(db))
     if (utc === null) return { ok: false, reason: 'هذه الساعةُ لا وجودَ لها بتوقيتك' }
-    const r = await reschedulePost(db, post.id, utc.toISOString().slice(0, 16), now, org)
+    const r = await reschedulePost(db, post.id, utc.toISOString().slice(0, 16), now, org, true)
     if (!r.ok) return { ok: false, reason: `لم يُنقل: ${r.reason}` }
   }
   at.plan.items[index] = { ...item, day: to.day, time: to.time }

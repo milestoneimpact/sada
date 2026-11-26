@@ -65,6 +65,15 @@ export function destinationLabel(a: DestinationLike, platformName: string): stri
   return `${a.displayName} · ${platformName}`
 }
 
+/**
+ * ‏**بصمةُ الموافقة** (مراجعة D-425): ‏SHA-256 لرمز التجديد (أو الوصول إن غاب) ساعةَ اختيار الصفحات — تُحفظ في
+ * ‏`accounts.grant_id` (‏0072) فتعرف الصفحاتُ أنّها من موافقةٍ واحدة **بعد** أن يجدّد التجديدُ رموزَها كلًّا وحدها. لا تُفكّ إلى رمز.
+ */
+export async function grantIdOf(tokens: { readonly accessToken: string; readonly refreshToken: string | null }): Promise<string> {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('sada:grant:' + (tokens.refreshToken ?? tokens.accessToken)))
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, '0')).join('')
+}
+
 /** مفتاحُ نسخة الوجهة الثانية — **مفتاحٌ لكلّ منشور** (D-004)، ومشتقٌّ فلا تُنشأ النسخةُ مرّتين. */
 export function destinationKeyOf(baseKey: string, accountId: string): string {
   return `${baseKey}:dest:${accountId}`

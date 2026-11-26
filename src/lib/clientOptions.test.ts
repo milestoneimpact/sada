@@ -7,7 +7,8 @@ import { fakeDb, type FakeDb } from '../test/fakes'
 import { fakeMailer } from '../test/emailLogin'
 import { createLink, findLink, recordVerdict } from './clientReview'
 import { readClientOptions, writeClientOptions } from './clientOptions'
-import { schedulePost } from './schedule/job'
+import { dispatchDue, reschedulePost, restoreSchedule, schedulePost, unschedule } from './schedule/job'
+import { scheduleDestinations } from './schedule/destinations'
 import { mailMonthlyReports } from './report/mail'
 
 const NOW = new Date('2098-12-20T10:00:00Z')
@@ -62,6 +63,57 @@ describe('موافقةُ العميل قبل النشر (D-412)', () => {
   })
 })
 
+describe('حارسُ الموافقة في كلّ أبواب الطابور (مراجعة D-425)', () => {
+  const status = (id: string) => (db.raw.prepare('SELECT status, scheduled_at FROM posts WHERE id = ?').get(id) as { status: string; scheduled_at: string | null })
+
+  beforeEach(async () => {
+    await writeClientOptions(db, 'org_owner', { approvalRequired: true, reportMail: false })
+    await say('approve')
+    expect((await schedule('p1')).ok).toBe(true)
+  })
+
+  it('«غيّر الموعد» لمنشورٍ وافق العميلُ على موعده يُردّ بسببٍ مقروء، وبعد «أطلب تعديلًا» يُردّ بسببه', async () => {
+    const moved = await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner')
+    expect(!moved.ok && moved.reason).toContain('انقل البندَ في الخطّة')
+    await say('changes')
+    const held = await reschedulePost(db, 'p1', '2099-01-05T04:00', NOW, 'org_owner', true)
+    expect(!held.ok && held.reason).toContain('طلب العميلُ تعديل')
+    expect(status('p1').scheduled_at).toBe('2099-01-04 04:00:00')
+  })
+
+  it('التراجعُ عن السحب لا يعيد إلى الطابور ما طلب العميلُ تعديلَه بعد السحب', async () => {
+    const pulled = await unschedule(db, 'p1', 'org_owner')
+    expect(pulled.ok).toBe(true)
+    await say('changes')
+    const back = await restoreSchedule(db, 'p1', pulled.ok ? pulled.at : '', 'a1', 'org_owner')
+    expect(!back.ok && back.reason).toContain('طلب العميلُ تعديل')
+    expect(status('p1').status).toBe('approved')
+  })
+
+  it('رأيٌ تبدّل بعد الجدولة يُمسك المنشورَ عند الإرسال: يعود معتمَدًا بلا موعدٍ ويُكتب سببُه، ولا يُرسَل', async () => {
+    await say('changes')
+    const sent: unknown[] = []
+    const out = await dispatchDue({ db, queue: { async sendBatch(m) { sent.push(...m) } }, now: () => new Date('2099-01-04T04:05:00Z') })
+    expect(out.kind).toBe('none')
+    expect(sent).toHaveLength(0)
+    expect(status('p1')).toEqual({ status: 'approved', scheduled_at: null })
+    const why = db.raw.prepare("SELECT detail FROM audit_log WHERE action = 'post.client_hold' AND target = 'p1'").all() as { detail: string }[]
+    expect(why.map((w) => w.detail)).toEqual([expect.stringContaining('طلب العميلُ تعديل')])
+  })
+
+  it('ونسخةُ الوجهة الثانية يُحكم عليها برأي أصلها، فتُجدوَل ولا تُحذف', async () => {
+    db.raw.exec(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a2', 'linkedin', 'org', '111', 'صفحة', 'active')`)
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, plan_id, source_id, approved_by, approved_at) VALUES
+      ('p3', 'linkedin', 'text', 'نصّ', 'approved', 'k3', 'pl1', 's1', 'owner', '2098-12-01')`)
+    db.raw.exec(`DELETE FROM posts WHERE id = 'p1'`)
+    const out = await scheduleDestinations(db, 'p3', ['a1', 'a2'], '2099-01-04T04:00', NOW, 'org_owner')
+    expect(out.map((o) => o.result.ok)).toEqual([true, true])
+    // ‏والنسخةُ لا تحمل الخطّة: «جدوِل الخطّة» لا يراها فلا يجدولها على حسابٍ آخر
+    const copy = db.raw.prepare("SELECT plan_id FROM posts WHERE idempotency_key = 'k3:dest:a2'").get() as { plan_id: string | null }
+    expect(copy.plan_id).toBeNull()
+  })
+})
+
 describe('تقريرُ الشهر إلى البريد آليًّا (D-412)', () => {
   const NOV = new Date('2099-12-02T03:03:00Z')
 
@@ -81,6 +133,13 @@ describe('تقريرُ الشهر إلى البريد آليًّا (D-412)', () 
     expect(mail.sent[0]!.raw).not.toContain('SECRET')
     expect(await mailMonthlyReports(db, mail, new Date('2099-12-03T03:03:00Z'), null)).toEqual([])
     expect(mail.sent).toHaveLength(1)
+  })
+
+  it('والشهرُ الذي انقضى بمنطقة المالك: فجرُ الأوّل بـ UTC آخرُ يومٍ في لوس أنجلوس، فلا يُرسَل شهرٌ لم ينقضِ (مراجعة D-425)', async () => {
+    await writeClientOptions(db, 'org_owner', { approvalRequired: false, reportMail: true })
+    const mail = fakeMailer()
+    expect(await mailMonthlyReports(db, mail, NOV, 'America/Los_Angeles')).toEqual([{ org: 'org_owner', month: '2099-11', sent: true }])
+    expect(await mailMonthlyReports(db, mail, new Date('2100-01-01T03:03:00Z'), 'America/Los_Angeles')).toEqual([])
   })
 
   it('بريدٌ لم يُرسَل يُعيد الحجز فيُعاد في الغد', async () => {
