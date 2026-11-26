@@ -21,7 +21,6 @@ import { GLYPH_ICON, ICON } from './icons'
 import { LOGOS } from './logos'
 import { loginPage, worthCell } from '../panelView'
 import { secondFactorPage } from '../authView'
-import { landingPage } from '../landing'
 import { runInNewContext } from 'node:vm'
 import { THEME_SCRIPT } from './scripts'
 import { serverErrorPage } from './errorView'
@@ -1971,7 +1970,6 @@ describe('الهويّة من لوحتها (D-196)', () => {
 
 /** صفحاتُ لحظة العلامة بوجوهها كلِّها — القالب T6. */
 const T6_PAGES: ReadonlyArray<readonly [string, string]> = [
-  ['صفحة الهبوط (D-193)', landingPage('n')],
   ['الدخول بمفتاح', loginPage({ passkeys: true }, 'n')],
   ['الدخول بكلمة الإدارة', loginPage({}, 'n')],
   ['الدخول موقوفًا', loginPage({ blocked: true, error: 'موقوف' }, 'n')],

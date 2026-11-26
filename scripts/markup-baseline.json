@@ -4,11 +4,6 @@
     "cards": 5,
     "inputs": 7
   },
-  "routes/landing.ts": {
-    "buttons": 1,
-    "cards": 0,
-    "inputs": 0
-  },
   "routes/panelView.ts": {
     "buttons": 11,
     "cards": 30,

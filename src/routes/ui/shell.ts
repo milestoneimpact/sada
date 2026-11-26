@@ -400,6 +400,8 @@ export function shell(
     panelScript?: boolean
     /** صفحتا لحظة العلامة (القالب T6): شريطُ المتصفّح بأرض اللحظة دون «md» (`MOMENT_COLOR`) */
     moment?: boolean
+    /** الموقعُ العامّ: بطاقةُ Open Graph بعنوان الصفحة ووصفها ورابطها المطلق */
+    og?: { readonly url: string }
   } = {},
 ): string {
   // ‏الجسدُ ولوحةُ الأوامر وسكربتُ الثيم مرسومةٌ خارج القالب: تُوثَق عند الحدّ، و`nonce` يُهرَّب كأيّ قيمة (D-281)
@@ -410,7 +412,11 @@ export function shell(
       ? ''
       : html`\n<meta name="description" content="${options.description}">`
   }
-<title>${title}</title>${options.moment === true ? html`\n${MOMENT_COLOR}` : ''}
+<title>${title}</title>${
+    options.og === undefined
+      ? ''
+      : html`\n<meta property="og:type" content="website"><meta property="og:site_name" content="SADA · صدى"><meta property="og:title" content="${title}"><meta property="og:description" content="${options.description ?? ''}"><meta property="og:url" content="${options.og.url}"><link rel="canonical" href="${options.og.url}">`
+  }${options.moment === true ? html`\n${MOMENT_COLOR}` : ''}
 ${FAVICON}
 ${PWA_HEAD}
 <script nonce="${nonce}">${raw(THEME_BOOT)}</script>

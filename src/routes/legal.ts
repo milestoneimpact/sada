@@ -46,7 +46,7 @@ const UPDATED = '2026-11-12'
  * **وما لم يُضبَط لا يُخترَع.** بريدٌ لا وجود له في سياسةِ خصوصيّة أسوأ
  * من غيابه: المراجعُ يجرّبه فيرتدّ، فيسقط الطلب على كذبةٍ صغيرة.
  */
-function operator(env: Env): { entity: string; contact: string | null } {
+export function operator(env: Env): { entity: string; contact: string | null } {
   const entity = (env.LEGAL_ENTITY ?? '').trim()
   const contact = (env.LEGAL_CONTACT ?? '').trim()
   return {

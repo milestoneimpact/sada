@@ -625,7 +625,7 @@ writeAudited(
 // ‏صفحتا الخطأ (خطّة التصميم 7.11 · D-189): من دالّتيهما اللتين يخدمهما Worker، لا نسخةٌ هنا —
 // ‏رابطٌ قديمٌ إلى منصّةٍ لا وجودَ لها، واستثناءٌ في قراءةٍ برقم طلبٍ من Cloudflare
 // ‏صفحةُ الهبوط على الجذر (D-193)
-writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody(), 'n', '', { indexable: true }))
+writeAudited('/tmp/screen-landing.html', shell('صدى', landingBody().value, 'n', '', { indexable: true }))
 writeAudited('/tmp/screen-404.html', notFoundPage('n', '/panel/channels/myspace', 'لا منصّة بهذا الاسم'))
 writeAudited('/tmp/screen-500.html', serverErrorPage('n', '8f1e2d3c4b5a6978-FRA', '/panel/report'))
 

@@ -97,6 +97,8 @@ function sliceCard(s: PlatformSlice): string {
  */
 export interface MonthSpend {
   readonly total: number
+  /** تقديرُ المقاطع خارجَ المجموع الحقيقيّ (D-415). */
+  readonly estimated?: number
   /** حُسب الشهرُ بتوقيت الرياض لأنّ منطقةَ المالك لم تصل، فيُقال (D-201). */
   readonly utc: boolean
 }
@@ -104,7 +106,8 @@ export interface MonthSpend {
 function monthLine(m: MonthSpend | undefined): string {
   if (m === undefined) return ''
   return `<div class="sub">هذا الشهر حتّى اليوم:
-    <a class="tap" href="/panel/settings#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت الرياض' : ''}</div>`
+    <a class="tap" href="/panel/settings#c2">${escapeHtml(money(m.total))}</a>${m.utc ? ' بتوقيت الرياض' : ''}${
+      (m.estimated ?? 0) > 0 ? ' · ومقاطع بالتقدير: ' + escapeHtml(money(m.estimated ?? 0)) + ' (تقدير)' : ''}</div>`
 }
 
 /** جسدُ تقريرٍ واحد. */

@@ -51,28 +51,29 @@ export const PAGES = `/* ══ شاشةُ المنصّة ═══════�
 .auth h1{text-align:center; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-1)}
 .auth .lede{text-align:center; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); margin:0 0 var(--s-5)}
 .auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
-/* ── صفحةُ الهبوط (D-193): شاشةٌ واحدةٌ على الهاتف، وزرٌّ أوّليٌّ واحد ─────────────── */
-.land{max-width:32rem; margin:8vh auto 0; text-align:center}
-.land .glyph{margin:0 auto var(--s-4); width:var(--s-16); height:var(--s-16); border-radius:var(--r-card)}
-.land h1{font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-2)}
-.land-lede{margin:0 auto var(--s-5); color:var(--ink-2); font-size:var(--t-body); line-height:var(--lh-body); max-width:var(--measure)}
-.land-cta{width:100%; justify-content:center}
-.land-steps{list-style:none; margin:var(--s-6) 0 0; padding:0; display:grid; gap:var(--s-3); text-align:start}
-.land-steps li{display:flex; gap:var(--s-3); align-items:flex-start}
-.land-steps li > span:last-child{display:flex; flex-direction:column; gap:var(--s-0)}
-.land-steps b{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600}
-.land-steps li > span:last-child > span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.land-n{flex:none; display:grid; place-items:center; width:var(--s-8); height:var(--s-8); border-radius:50%;
-  background:var(--surface-2); font-weight:600; font-size:var(--t-small)}
-.land-pfs{list-style:none; margin:var(--s-6) 0 0; padding:0; display:flex; justify-content:center; gap:var(--s-4); color:var(--ink-2)}
-.land-pf svg{width:var(--icon-lg); height:var(--icon-lg)}
-.land-foot{margin-top:var(--s-6); display:flex; flex-wrap:wrap; justify-content:center; gap:var(--s-4); font-size:var(--t-small)}
-.land-en{margin-top:var(--s-8); padding-top:var(--s-6); border-top:1px solid var(--line); text-align:start;
-  font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.land-en h2{font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:600; color:var(--ink); margin:0 0 var(--s-2)}
-.land-en h3{font-size:var(--t-small); font-weight:600; color:var(--ink); margin:var(--s-4) 0 var(--s-1)}
-.land-en ol, .land-en ul{margin:var(--s-2) 0; padding-inline-start:var(--s-5); display:grid; gap:var(--s-1)}
-.land-en p{margin:0 0 var(--s-2)}
+/* ── الموقعُ العامّ (D-416): رأسٌ يتنقّل، وبطاقاتُ مزايا، وأسئلة، وتذييلٌ بالوثيقتين ── */
+.site-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s-3);
+  padding-bottom:var(--s-4); margin-bottom:var(--s-6); border-bottom:var(--bd)}
+.site-brand{display:flex; align-items:center; gap:var(--s-2); color:var(--ink); text-decoration:none; font-size:var(--t-h3); line-height:var(--lh-h3); min-block-size:var(--tap)}
+.site-mark svg{display:block; width:var(--icon-lg); height:var(--icon-lg); border-radius:var(--r-control)}
+.site-nav{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-4); font-size:var(--t-small); line-height:var(--lh-small)}
+.site-enter{padding:var(--s-1) var(--s-3); border:var(--bd); border-radius:var(--r-pill)}
+.site-hero{padding:var(--s-4) 0 var(--s-2)}
+.site-grid{list-style:none; display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:var(--s-3)}
+.doc .site-grid{padding:0}
+.site-grid li{display:flex; flex-direction:column; gap:var(--s-1); margin:0; padding:var(--s-4)}
+.site-grid span{font-size:var(--t-small); line-height:var(--lh-small)}
+.site-pfs{list-style:none; display:flex; flex-wrap:wrap; gap:var(--s-4)}
+.doc .site-pfs{padding:0}
+.site-pfs li{display:flex; align-items:center; gap:var(--s-2); margin:0}
+.site-pfs svg{width:var(--icon-lg); height:var(--icon-lg)}
+.site-steps{padding-inline-start:var(--s-5)}
+.site-steps li{font-size:var(--t-body); line-height:var(--lh-body); color:var(--ink-2); margin-bottom:var(--s-2)}
+.site-faq{border-bottom:var(--bd-soft); padding:var(--s-3) 0}
+.site-faq summary{cursor:pointer; font-weight:600; color:var(--ink)}
+.site-faq p{margin:var(--s-2) 0 0}
+.site-foot nav{display:flex; flex-wrap:wrap; gap:var(--s-4)}
+.site-foot p{font-size:var(--t-small); line-height:var(--lh-small); margin:var(--s-3) 0 0}
 .auth input{width:100%; direction:ltr; text-align:start; margin-bottom:var(--s-3)}
 .auth button{width:100%; justify-content:center; padding:var(--s-3)}
 .auth .card form + form{margin-top:var(--s-3)}

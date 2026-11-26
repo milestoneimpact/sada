@@ -25,8 +25,8 @@
  */
 import { routeFor } from '../ai/routes'
 import { CLAIM_UNAVAILABLE, claimGeneration, releaseClaim } from './claim'
-import { blockerReason, checkAllowance, videoCapFor } from '../limits'
-import { claimVideoSpend, releaseVideoSpend, videoBudgetReason } from './videoBudget'
+import { blockerReason, checkAllowance, videoCapFor, videoMonthCapOf } from '../limits'
+import { claimVideoSpend, markVideoGenerated, releaseVideoSpend, videoBudgetReason } from './videoBudget'
 import { signMediaToken, mediaUrl } from './link'
 import {
   AiError, MAX_SECONDS, VIDEO_MODELS, fetchVideoBytes, generateVideo, restBinding,
@@ -312,11 +312,11 @@ export async function animateForPost(
    * متزامنان لا يمرّان معًا على آخر ما بقي. والسعرُ **تقديرُ المالك** (`video_clip_usd`) لا سعرٌ مقروء،
    * فيبقى الوسمُ `price_unverified`. **والدفترُ يسجّل ما نُودي به فعلا**: النموذجُ في اسم العمليّة.
    */
-  const mine = allowance.org?.settings ?? allowance.settings
-  const scope = mine.monthlyVideoCapUsd === allowance.settings.monthlyVideoCapUsd ? 'global' : 'org'
+  // ‏‏«سقفُ العميل» حين كتبه لنفسه لا حين تساوت القيمتان (D-415): عميلٌ كتب ما يساوي العامَّ سقفُه سقفُه
+  const { cap, scope } = videoMonthCapOf(allowance)
   const spend = await claimVideoSpend(deps.db, {
     org,
-    cap: mine.monthlyVideoCapUsd,
+    cap,
     clip: allowance.settings.videoClipUsd,
     operation: `video:${model}:price_unverified`,
     refId: postId,
@@ -337,6 +337,8 @@ export async function animateForPost(
       model,
     )
     url = out.url
+    // ‏‏ولّد المزوّدُ المقطع: يُوسَم أثرًا — والمالُ محسوبٌ وُسم أم لم يُوسَم (D-415)
+    await markVideoGenerated(deps.db, org, spend.ledgerId)
   } catch (error) {
     // **وفشلٌ يترك حجزَه يمنع إعادةَ المحاولة ثلاثين دقيقة** — ومالُ نداءٍ ردّه المزوّدُ يعود إلى الميزانيّة (D-414)
     await releaseVideoSpend(deps.db, org, spend.ledgerId)

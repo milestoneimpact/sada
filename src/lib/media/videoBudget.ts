@@ -81,16 +81,37 @@ export async function claimVideoSpend(
   return { kind: 'cap', budget: videoBudget(c.cap, await videoSpendThisMonth(db, c.org), c.clip) }
 }
 
-/** نداءٌ لم يبلغ المزوّدَ يعيد مالَه — ويبقى صفُّه موسومًا أثرًا. */
+/** وسمُ صفٍّ ولّد مزوّدُه المقطع (D-415): أثرٌ يُقرأ، ولا يتوقّف عليه احتسابُ المال — الصفُّ بلا نتيجةٍ يبقى محسوبًا. */
+export const GENERATED_TAG = ':generated'
+/** وسمُ صفٍّ أُعيد مالُه — ردّه المزوّدُ صراحةً، ولا غير. */
+export const RELEASED_TAG = ':released'
+
+/** نداءٌ لم يبلغ المزوّدَ يعيد مالَه — ويبقى صفُّه موسومًا أثرًا. **وفشلُ الإعادة يُسجَّل لا يُبلَع** (D-415). */
 export async function releaseVideoSpend(db: Db, org: string, ledgerId: string): Promise<void> {
   await db
     .prepare(
-      `UPDATE cost_ledger SET unit_cost = 0, total = 0, operation = operation || ':released'
-        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%:released'`,
+      `UPDATE cost_ledger SET unit_cost = 0, total = 0, operation = operation || '${RELEASED_TAG}'
+        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%${RELEASED_TAG}' AND operation NOT LIKE '%${GENERATED_TAG}'`,
     )
     .bind(ledgerId, org)
     .run()
-    .catch(() => undefined)
+    // ‏‏المعرّفُ وحده في السجلّ — لا رمزَ ولا سرّ؛ والصفُّ يبقى محسوبًا: الخطأُ يميل إلى المنع (D-415)
+    .catch((error: unknown) => { console.error({ job: 'video_release', ledger: ledgerId, failed: String(error) }) })
+}
+
+/**
+ * ولّد المزوّدُ المقطع: يُوسَم صفُّه أثرًا، فلا تعيده إعادةٌ متأخّرة (D-415).
+ * والفشلُ هنا يُسجَّل ولا يُسقط المقطع — ما أُنفق أُنفق، والصفُّ يبقى بكلفته على كلّ حال.
+ */
+export async function markVideoGenerated(db: Db, org: string, ledgerId: string): Promise<void> {
+  await db
+    .prepare(
+      `UPDATE cost_ledger SET operation = operation || '${GENERATED_TAG}'
+        WHERE id = ? AND org_id = ? AND operation NOT LIKE '%${RELEASED_TAG}' AND operation NOT LIKE '%${GENERATED_TAG}'`,
+    )
+    .bind(ledgerId, org)
+    .run()
+    .catch((error: unknown) => { console.error({ job: 'video_mark', ledger: ledgerId, failed: String(error) }) })
 }
 
 /** رسالةُ البلوغ — عربيّةٌ بأرقامها، وتقول أين يُرفع. */
