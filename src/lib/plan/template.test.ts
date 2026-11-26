@@ -155,6 +155,7 @@ describe('قالبا الأسبوع واليوم (D-408)', () => {
   })
   it('README يذكر دليلَ الوكيل وفحصَ الملفّ', () => {
     expect(templateReadme()).toMatch(/PLAN-AGENT-GUIDE\.md/)
+    expect(templateReadme()).toMatch(/يعبر حدَّ شهرين يُقسَم على ملفّين/)
     expect(templateReadme()).toMatch(/npm run plan:check/)
   })
 })

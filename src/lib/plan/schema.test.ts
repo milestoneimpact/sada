@@ -43,6 +43,14 @@ describe('checkPlanFile', () => {
     ])
   })
 
+  it('نسبةٌ مئويّة ليست سعرًا، والمبلغُ بعملته يبقى سعرًا', () => {
+    const ok = checkPlanFile('plan.json', JSON.stringify([{ day: '2026-12-06', time: '09:00', platform: 'x', text: 'نمونا 30% هذا العام' }]))
+    expect(ok.lines).toEqual([])
+    expect(ok.ok).toBe(true)
+    const bad = checkPlanFile('plan.json', JSON.stringify([{ day: '2026-12-06', time: '09:00', platform: 'x', text: 'بـ $49 فقط' }]))
+    expect(bad.lines).toEqual(['الصفّ 1، العمود «النص»: فيه سعرٌ أو مبلغ — الأسعارُ لا تُكتب في الخطّة'])
+  })
+
   it('‏JSON معطوبٌ أو حقلٌ غريب أو ملفٌّ بلا نصّ: سطرٌ عربيّ واحد', () => {
     expect(checkPlanFile('a.json', '{').lines[0]).toMatch(/^ليس JSON صالحًا/)
     expect(checkPlanFile('a.json', '[{"day":"2026-12-06","price":"1"}]').lines).toEqual(['الصفّ 1: حقولٌ لا يعرفها القالب: price'])

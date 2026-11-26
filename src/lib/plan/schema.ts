@@ -36,7 +36,7 @@ export const PLAN_SCHEMA = {
 export interface PlanCheck { readonly ok: boolean; readonly rows: number; readonly lines: readonly string[] }
 
 const HASHTAG = /(^|\s)#[\p{L}\p{N}_]+/gu
-const PRICE = /(\d[\d.,]*\s*(ريال|ر\.س|درهم|دينار|جنيه|دولار|SAR|USD|\$|%))|((ريال|SAR|USD|\$)\s*\d)/iu
+const PRICE = /(\d[\d.,]*\s*(ريال|ر\.س|درهم|دينار|جنيه|دولار|SAR|USD|\$))|((ريال|SAR|USD|\$)\s*\d)/iu
 export const MAX_HASHTAGS = 3
 
 function fromJson(text: string): { csv: string } | { error: string } {
