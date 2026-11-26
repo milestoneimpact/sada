@@ -94,7 +94,7 @@ export interface Section {
   readonly label: string
   readonly note: string
   readonly icon: string
-  readonly group: 'العمل' | 'الموارد' | 'الضبط'
+  readonly group: 'العمل' | 'الموارد' | 'الإعدادات'
   /** في ذيل الرافدة لا في مجموعاتها (D-381): الإعداداتُ وحدَها، بجوار حال النظام. */
   readonly foot?: boolean
   readonly alias: string
@@ -150,9 +150,9 @@ export const SECTIONS: readonly Section[] = [
   { id: 'feed', label: 'التيّار', note: 'ما سيُنشر وما نُشر في تيّارٍ واحد — وهنا يقع الاعتماد', icon: ICON.feed, group: 'العمل', alias: 'feed stream timeline تيار سيل', page: '/panel/feed', bar: true },
   { id: 'results', label: 'النتائج', note: 'هذا الأسبوع، وما أُنفق هذا الشهر، وتحليل مفصّل', icon: ICON.report, group: 'العمل', alias: 'spend cost month انفاق انفقت كلفه تكلفه مصروف results report weekly pivot analysis تقرير اسبوعي جدول محوري تحليل', bar: true, page: '/panel/report' },
   // ‏والمنشوراتُ مطويّة (D-388): لوحُها باقٍ بمسوّداته ومحرّره، يُبلَغ من «المزيد» ومن بطاقات التيّار، لا من الرافدة
-  { id: 'posts', label: 'المنشورات', note: 'المسوّدات والكتابة والفيديو', icon: ICON.posts, group: 'العمل', alias: 'posts drafts video مسودات فيديو', tight: 'منشورات', tucked: 'more' },
+  { id: 'posts', label: 'المسوّدات والفيديو', note: 'المسوّدات والكتابة والفيديو', icon: ICON.posts, group: 'العمل', alias: 'posts drafts video منشورات مسودات فيديو', tight: 'مسوّدات', tucked: 'more' },
   // ‏والخطّةُ ورشةٌ لا وجهة (D-388، بعد D-289): `/panel/plan` يفتح المراجعةَ، و«ورشة الخطّة» رابطُها في رأس التيّار
-  { id: 'plan', label: 'الخطّة', note: 'ورشةُ الخطّة: راجعها واعتمدها وعدّلها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع ورشه', page: '/panel/plan', tucked: 'palette' },
+  { id: 'plan', label: 'الخطّة', note: 'ورشةُ الخطّة: راجعها واعتمدها وعدّلها', icon: ICON.plan, group: 'العمل', alias: 'plan calendar month خطه تقويم شهر اسبوع ورشه', page: '/panel/plan', tucked: 'more' },
   // ‏والثانيةُ ما يُعدّ له: المكتبةُ ثمّ الحساباتُ ثمّ ما عليك
   { id: 'library', label: 'المكتبة', note: 'ملفّات Drive — ومسحُها وتحليلُها', icon: ICON.sources, group: 'الموارد', alias: 'library sources drive scan مصادر درايف ملفات', page: '/panel/library' },
   // ‏وحزمةُ المحتوى من الإعدادات («المصادر والقواعد») ومن بطاقة «من GitHub» (D-388)، ولوحةُ الأوامر تفهرسها دائمًا
@@ -160,7 +160,7 @@ export const SECTIONS: readonly Section[] = [
   { id: 'accounts', label: 'الحسابات', note: 'ربط المنصّات وحال كلّ منها', icon: ICON.channels, group: 'الموارد', alias: 'accounts channels link قنوات حسابات لينكدإن تويتر يوتيوب تيكتوك', page: '/panel/accounts' },
   { id: 'tasks', label: 'ما عليك', note: 'المهامّ اليدويّة التي لا يقدر عليها صدى', icon: ICON.tasks, group: 'الموارد', alias: 'tasks todo مهام', page: '/panel/tasks' },
   // ‏والإعداداتُ في ذيل الرافدة مع حال النظام (`foot`)، وفي «المزيد» على الهاتف
-  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان — والمصادر والقواعد', icon: ICON.settings, group: 'الضبط', alias: 'settings limits budget providers keys security sessions rules imports ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات قواعد استيرادات', page: '/panel/settings', foot: true },
+  { id: 'settings', label: 'الإعدادات', note: 'الإنفاق والحدود، وخدمات الكتابة والصور، والأمان — والمصادر والقواعد', icon: ICON.settings, group: 'الإعدادات', alias: 'settings limits budget providers keys security sessions rules imports ميزانيه اعدادات سقف مزودون مفاتيح امان جلسات قواعد استيرادات', page: '/panel/settings', foot: true },
 ]
 
 /**
@@ -240,8 +240,8 @@ export function buildCommands(
     { label: 'اكتب منشورًا من مصدر', note: 'من خلاصة مصدر محلَّل — نداء مدفوع', id: 'posts', anchor: 'write', alias: 'write new post draft جديد كتابه مسوده' },
     { label: 'ارفع فيديو', note: 'مقطعُك إلى YouTube وTikTok وInstagram', id: 'posts', anchor: 'videos', alias: 'upload video clip reel short مقطع رفع' },
     { label: 'امسح Drive', note: 'يقرأ الملفّات الجديدة — والزرّ في المكتبة', id: 'library', anchor: 'sources', alias: 'scan drive درايف مسح' },
-    { label: 'اعتمد مسوّدة', note: 'القرار لك وحدَك — في المنشورات', id: 'posts', alias: 'approve draft' },
-    { label: 'اربط قناةً جديدة', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
+    { label: 'اعتمد مسوّدة', note: 'القرار لك وحدَك — في التيّار', id: 'feed', alias: 'approve draft' },
+    { label: 'اربط حسابًا جديدًا', note: 'LinkedIn · X · YouTube · TikTok', id: 'accounts', anchor: 'channels', alias: 'connect account oauth ربط حساب' },
     { label: 'بدّل سقف الإنفاق', note: 'الحدّ اليوميّ وعدد التحليلات', id: 'settings', anchor: 'limits', alias: 'budget cap spend ميزانيه انفاق سقف' },
     { label: 'راجع الجلسات', note: 'ما هو مفتوح الآن، وإنهاؤه', id: 'settings', anchor: 'security', alias: 'sessions revoke' },
   ]) {

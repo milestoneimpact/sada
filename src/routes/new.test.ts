@@ -59,7 +59,8 @@ describe('«منشورات جديدة» (D-387)', () => {
     expect(html).toContain('href="/panel/plan/import"')
     expect(html).toContain('href="/panel/package"')
     expect(html.match(/class="nw-cost m-0"/g)).toHaveLength(3)
-    expect(html.match(/btn btn-primary/g)).toHaveLength(3)
+    // ‏وزرٌّ أوّليٌّ رابعٌ هو «منشور جديد» في رأس الصفحة (D-419)، والبطاقاتُ ثلاثٌ في المحتوى
+    expect(html.slice(html.indexOf('</header>')).match(/btn btn-primary/g)).toHaveLength(3)
     expect((await app.request('/panel/new', {}, env)).status).toBe(401)
   })
 

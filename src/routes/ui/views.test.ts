@@ -1126,7 +1126,7 @@ describe('الرأس الموحَّد (D-381)', () => {
   it('ترتيبُه: العلامةُ ثمّ البحثُ ثمّ الجرسُ ثمّ الحساب، ولا رابطَ رجوع', () => {
     const html = pageTop()
     expect(html.startsWith('<header class="topbar page-top">')).toBe(true)
-    const at = ['class="home glyph tb"', 'class="cmdk-open"', 'class="bell"', 'class="menu-'].map((k) => html.indexOf(k))
+    const at = ['class="home glyph tb"', 'منشور جديد', 'class="cmdk-open"', 'class="bell"'].map((k) => html.indexOf(k)).concat(html.lastIndexOf('class="menu-'))
     for (const i of at) expect(i).toBeGreaterThan(0)
     expect([...at].sort((x, y) => x - y)).toEqual(at)
     expect(html).not.toContain('nav class="back"')
@@ -1135,6 +1135,13 @@ describe('الرأس الموحَّد (D-381)', () => {
     expect(css.rule('.topbar .glyph.tb').display).toBe('none')
     expect(css.rule('.topbar .glyph.tb', `@media${below('md')}`).display).toBe('grid')
     expect(css.rule('.glyph svg')).toMatchObject({ width: '56%', height: '56%' })
+  })
+
+  it('و«منشور جديد» في رأس كلّ صفحةٍ مفردة، وأبوابُه الأربعة إلى اللوحة (D-419)', () => {
+    const html = pageTop()
+    expect(html.match(/منشور جديد/g)?.length).toBe(1)
+    expect(html).toContain('href="/panel#idea"')
+    expect(soloPage('صدى — تجربة', { href: '/panel/feed', label: 'التيّار' }, '<p>x</p>', 'n')).toContain('منشور جديد')
   })
 
   it('وعلى الهاتف رأسٌ مختصر: لا بحثَ ولا حالَ فيه — هما في «المزيد» وبطاقة الآلة (§4.3)', () => {

@@ -108,7 +108,7 @@ export function planDocScreen(d: PlanDocData): string {
   </section>`
 
   const bar = html`<nav class="row gap-2 pd-tools" aria-label="أدوات العرض">
-    <a class="btn btn-secondary btn-sm" href="/panel/plan/review">راجع وعدّل</a><span class="grow"></span>
+    <a class="btn btn-secondary btn-sm" href="/panel/plan">راجع وعدّل</a><span class="grow"></span>
     <button class="btn btn-secondary btn-sm" type="button" id="pd-print">اطبع أو احفظ PDF</button></nav>`
 
   return html`<div class="pd">${bar}${hero}${mix}${cal}${content}${tail}</div>`.value

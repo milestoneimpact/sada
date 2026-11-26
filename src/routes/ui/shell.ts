@@ -18,6 +18,7 @@ import { panelScript, STYLE_PATH, stripJs, uiScript } from '../../lib/ui/asset'
 import { FACES } from '../../lib/ui/fonts'
 import { MARK, MOMENT, THEME, below } from './tokens'
 import { ownerViewing } from '../../lib/access'
+import { newPostMenu } from './newMenu'
 
 /**
  * الخطّ — **زوجُ Plex من أصلنا** (D-099 · D-185).
@@ -327,14 +328,14 @@ export function bell(unread: number | null): string {
  * كان للصفحة المستقلّة شريطُ عودةٍ («‹ المنشورات»، D-140 وD-167) وللّوحة رأسٌ ثانٍ، فكانت الصفحةُ تُقرأ
  * بنمطين. والرافدةُ (D-178) صارت في كلّ صفحةٍ بقسمها معلَّمًا، فالرجوعُ بابُها لا سهمٌ. فالرأسُ هنا ما في
  * رأس اللوحة نفسِه: العلامةُ بابًا إلى الرئيسيّة (على الهاتف وحدَه، حيث لا رافدة)، ثمّ «بحث وأوامر» بشكل
- * حقلٍ ومعه `Ctrl K`، ثمّ الإشعاراتُ والحساب. **والعنوانُ `h1` أوّلُ ما في المحتوى تحته**: رأسُ الصفحة
+ * حقلٍ ومعه `Ctrl K`، ثمّ الإشعاراتُ والحساب. و«منشور جديد ▾» قبلها (D-419): بابُ الكتابة من كلّ صفحةٍ مفردة. **والعنوانُ `h1` أوّلُ ما في المحتوى تحته**: رأسُ الصفحة
  * (`.page-head`) يحمل معه وصفَه وفعلَه، فنقلُه إلى الشريط يفصل العنوانَ عن فعله.
  */
 export function pageTop(): string {
   // ‏العلامةُ والرمزُ ثابتان في الشيفرة، وزرُّ الأوامر والقائمةُ من العُدّة: تُوثَق عند الحدّ (D-281)
   return html`<header class="topbar page-top">
     <a class="home glyph tb" href="/panel" aria-label="صدى — الرئيسيّة">${raw(GLYPH_SVG)}</a>
-    <span class="grow"></span>${raw(commandTrigger())}${raw(bell(null))}${raw(accountMenu())}
+    <span class="grow"></span>${raw(newPostMenu('', 'primary'))}${raw(commandTrigger())}${raw(bell(null))}${raw(accountMenu())}
   </header>`.value
 }
 
