@@ -23,6 +23,17 @@ async function session(): Promise<{ cookie: string; csrf: string }> {
   return { cookie, csrf: /name="_csrf" value="([^"]+)"/.exec(html)?.[1] ?? '' }
 }
 
+describe('مساراتُ النماذج بـ GET (D-438)', () => {
+  it.each([
+    ['/panel/client/brief', '/panel/client#brief'], ['/panel/client/limits', '/panel/client#limits'],
+    ['/panel/client/options', '/panel/client#options'], ['/panel/orgs', '/panel/settings#orgs'], ['/panel/security', '/panel/settings#security'],
+  ])('%s يُحوَّل إلى قسمه', async (from, to) => {
+    const res = await app.request(from, {}, env)
+    expect(res.status).toBe(303)
+    expect(res.headers.get('Location')).toBe(to)
+  })
+})
+
 describe('رحلةُ العميل', () => {
   it('لا تُفتح بلا جلسة', async () => {
     expect((await app.request('/panel/client', { headers: { Cookie: `${COOKIE}=gone` } }, env)).status).toBe(401)
@@ -34,7 +45,12 @@ describe('رحلةُ العميل', () => {
     for (const s of ['العميل', 'الموجز', 'القنوات', 'الخطّة', 'المحتوى', 'الكلفة', 'التحليل']) expect(html).toContain(` · ${s}</div>`)
     expect(html).toContain('لم يُكتب بعد')
     // ‏والتقدّمُ والتالي في سطرٍ واحد فوق البلاطات
-    expect(html).toContain('<b>اكتمل 1 من 7</b> — التالي: <b>الموجز</b>.')
+    // ‏والتالي من الجاهزيّة (D-438): الحساباتُ قبل الموجز
+    expect(html).toContain('<b>اكتمل 1 من 7</b> — التالي: <b>ربطُ قناة</b>.')
+    // ‏وعناوينُ الجاهزيّة قصيرة، والجملةُ تحتها، ولا نقطتان في النصّ المخفيّ
+    for (const t of ['قناة', 'موجز', 'حدود']) expect(html).toContain('</span>' + t + '<span class="vh"> ')
+    expect(html).not.toContain('<span class="vh">: ')
+    expect(html).toContain('<span class="flow-say">لا حسابَ متّصلًا بعد')
     expect(html).toContain('action="/panel/client/brief"')
   })
 

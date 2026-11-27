@@ -13,7 +13,7 @@ import { button } from './components/button'
 import { notice, toastRegion } from './components/toast'
 import { money } from '../../lib/format'
 import { platformLabel } from '../../lib/oauth/providers'
-import { BRIEF_CHANNELS, BRIEF_MAX, isEmptyBrief, type Brief } from '../../lib/brief'
+import { BRIEF_CHANNELS, BRIEF_MAX, isEmptyBrief, briefGap, type Brief } from '../../lib/brief'
 import { estimateLine, estimatePlan, type Estimate } from '../../lib/estimate'
 import { approveAllForm } from './sections/plan'
 import { SPAN_LABEL } from '../../lib/plan/prompt'
@@ -155,37 +155,54 @@ function connectedOf(d: ClientData): number {
   return d.connected ?? Object.values(d.linked).reduce((n, v) => n + v, 0)
 }
 
+interface Step { readonly done: boolean; readonly title: string; readonly say: string; readonly link: string }
+
 /**
- * **جاهزيّةُ العميل** (D-418) — ثلاثةُ بنودٍ قبل أيّ خطّة: قناةٌ مربوطة، وموجزٌ مكتمل، وحدودٌ موروثةٌ أو مكتوبة.
- * بمكوّن `ol.flow` نفسِه، وكلُّ بندٍ `done` أو `now`؛ والأوّلُ الناقصُ هو الخطوةُ الحاليّة. وإليه يُحوَّل من «أنشئ المنظّمة».
+ * **بنودُ الجاهزيّة والخطوةُ التالية** (D-418 · D-438) — تُحسب مرّةً هنا بالترتيب: الحساباتُ ثمّ الموجزُ ثمّ الحدود،
+ * ويقرؤها سطرُ التقدّم وبطاقةُ الجاهزيّة معًا. `next` أوّلُ بندٍ لم يتمّ، أو ‎-1 إن تمّت كلُّها.
  */
-function setup(d: ClientData): string {
+export function setupSteps(d: ClientData): { readonly items: readonly Step[]; readonly next: number } {
   const n = connectedOf(d)
   const written = d.limits !== undefined && Object.keys(d.limits.mine).length > 0
   // ‏وقناةٌ واحدةٌ ناقصةٌ من الموجز تُربط من صفحتها مباشرةً لا من قائمة الحسابات (D-435)
   const gap = d.brief.channels.filter((p) => (d.linked[p] ?? 0) === 0)
   const linkTo = gap.length === 1 ? '/panel/channels/' + encodeURIComponent(gap[0]!) : '/panel/accounts'
-  const items: readonly { readonly done: boolean; readonly title: string; readonly say: string }[] = [
-    { done: n > 0, title: 'قناةٌ مربوطة',
-      say: n > 0 ? String(n) + ' ' + (n === 1 ? 'حسابٌ متّصل' : 'حساباتٍ متّصلة') + '.' : 'لا حسابَ متّصلًا بعد — والخطّةُ بلا قناةٍ لا تُنشر. <a href="' + linkTo + '">' + (gap.length === 1 ? 'اربط ' + escapeHtml(platformLabel(gap[0] as never)) : 'اربط حسابًا') + '</a>' },
-    { done: !isEmptyBrief(d.brief) && d.brief.channels.length > 0,
-      title: 'موجزٌ مكتمل',
-      say: isEmptyBrief(d.brief) ? 'اكتب ما يريده العميل ولمن وبأيّ نبرة. <a href="#brief">اكتب الموجز</a>'
-        : d.brief.channels.length === 0 ? 'بقي أن تختار قنواته في الموجز. <a href="#brief">اختر القنوات</a>' : 'الموجزُ مكتوبٌ وقنواتُه مختارة.' },
-    { done: true, title: 'حدودٌ موروثةٌ أو مكتوبة',
-      say: written ? 'لهذا العميل سقوفُه المكتوبة. <a href="#limits">راجعها</a>' : 'يرث الحدودَ العامّة، ولك أن تكتب له سقفًا دونها. <a href="#limits">الحدود</a>' },
+  const g = briefGap(d.brief)
+  const a = (href: string, label: string): string => '<a href="' + escapeHtml(href) + '">' + escapeHtml(label) + '</a>'
+  const items: readonly Step[] = [
+    { done: n > 0, title: 'قناة',
+      say: n > 0 ? String(n) + ' ' + (n === 1 ? 'حسابٌ متّصل' : 'حساباتٍ متّصلة') + '.' : 'لا حسابَ متّصلًا بعد — والخطّةُ بلا قناةٍ لا تُنشر.',
+      link: a(linkTo, gap.length === 1 ? 'اربط ' + platformLabel(gap[0] as never) : 'اربط حسابًا') },
+    { done: g.complete, title: 'موجز',
+      say: g.complete ? 'الموجزُ مكتوبٌ وقنواتُه وإيقاعُه مختارة.'
+        : g.missing.includes('الوصف') ? 'اكتب ما يريده العميل ولمن وبأيّ نبرة.'
+          : 'بقي في الموجز: ' + g.missing.join(' و') + '.',
+      link: a('#brief', g.missing.includes('الوصف') ? 'اكتب الموجز' : 'أكمل الموجز') },
+    { done: true, title: 'حدود',
+      say: written ? 'لهذا العميل سقوفُه المكتوبة.' : 'يرث الحدودَ العامّة، ولك أن تكتب له سقفًا دونها.',
+      link: a('#limits', written ? 'راجعها' : 'الحدود') },
   ]
-  const now = items.findIndex((i) => !i.done)
-  const steps = items.map((it, i) => '<li data-state="' + (it.done ? 'done' : 'now') + '"' + (i === now ? ' aria-current="step"' : '') + '>'
+  return { items, next: items.findIndex((i) => !i.done) }
+}
+
+/**
+ * **جاهزيّةُ العميل** (D-418) — ثلاثةُ بنودٍ قبل أيّ خطّة، بعناوين قصيرة (قناة · موجز · حدود) وتحت كلٍّ جملتُه كاملة.
+ * بمكوّن `ol.flow` نفسِه؛ والأوّلُ الناقصُ هو الخطوةُ الحاليّة وفيه رابطُها. وإليه يُحوَّل من «أنشئ المنظّمة».
+ */
+function setup(d: ClientData): string {
+  const { items, next } = setupSteps(d)
+  const steps = items.map((it, i) => '<li data-state="' + (it.done ? 'done' : 'now') + '"' + (i === next ? ' aria-current="step"' : '') + '>'
       + '<span class="flow-n" aria-hidden="true">' + (it.done ? '✓' : String(i + 1)) + '</span>' + escapeHtml(it.title)
-      + '<span class="vh">: ' + (it.done ? 'تمّ' : 'لم يتمّ') + '</span></li>').join('')
-  const line = now === -1 ? 'العميلُ جاهز — خطّط له الآن. <a href="/panel/plan">خطّط</a>' : (items[now]?.say ?? '')
+      + '<span class="vh"> ' + (it.done ? 'تمّ' : 'لم يتمّ') + '</span>'
+      + '<span class="flow-say">' + escapeHtml(it.say) + (i === next ? ' ' + it.link : '') + '</span></li>').join('')
+  const line = next === -1 ? '<p class="hint m-0 mt-3">العميلُ جاهز — خطّط له الآن. <a href="/panel/plan">خطّط</a></p>' : ''
   return '<div class="mb-4">' + card({ id: 'setup', title: 'جاهزيّة العميل', titleId: 'setup-t', attrs: 'tabindex="-1"',
-    body: '<ol class="flow">' + steps + '</ol><p class="hint m-0 mt-3">' + line + '</p>' }) + '</div>'
+    body: '<ol class="flow">' + steps + '</ol>' + line }) + '</div>'
 }
 
 export function clientScreen(d: ClientData): string {
   const b = d.brief
+  const gap = briefGap(b)
   const chosen = b.channels
   const missing = chosen.filter((p) => (d.linked[p] ?? 0) === 0)
   const e = d.estimate
@@ -199,8 +216,10 @@ export function clientScreen(d: ClientData): string {
   const at = (state: State): State => { states.push(state); return state }
   const stations = [
     station(1, 'العميل', at('done'), `<bdi>${escapeHtml(d.orgName)}</bdi>`, link('/panel/settings#orgs', 'بدّل العميل')),
-    station(2, 'الموجز', at(isEmptyBrief(b) ? 'todo' : 'done'),
-      isEmptyBrief(b) ? 'لم يُكتب بعد — والكتابةُ بلا موجزٍ بصوتٍ عامّ.' : escapeHtml(b.goal || b.tone || b.audience), link('#brief', isEmptyBrief(b) ? 'اكتبه' : 'عدّله', isEmptyBrief(b))),
+    station(2, 'الموجز', at(gap.complete ? 'done' : 'todo'),
+      isEmptyBrief(b) ? 'لم يُكتب بعد — والكتابةُ بلا موجزٍ بصوتٍ عامّ.'
+        : escapeHtml(b.goal || b.tone || b.audience || b.avoid) + (gap.complete ? '' : ' — بقي: ' + gap.missing.join(' و') + '.'),
+      link('#brief', isEmptyBrief(b) ? 'اكتبه' : gap.complete ? 'عدّله' : 'أكمله', !gap.complete)),
     station(3, 'القنوات', at(chosen.length === 0 ? 'idle' : missing.length === 0 ? 'done' : 'todo'),
       chosen.length === 0 ? 'لم تُختر في الموجز.'
         : missing.length === 0 ? `${chosen.map((p) => escapeHtml(platformLabel(p as never))).join(' · ')} — كلُّها مربوطة.`
@@ -217,11 +236,13 @@ export function clientScreen(d: ClientData): string {
       `${link('/panel/assets', 'الأصول')}${link('/panel/settings#auto-image', 'الصورة الآليّة')}`),
     station(6, 'الكلفة', at(e.posts === 0 ? 'idle' : 'done'), cost, link('/panel/settings#limits', 'السقوف')),
     station(7, 'التحليل', at(d.measured >= 8 ? 'done' : 'idle'),
-      d.measured >= 8 ? `${d.measured} منشورًا قِيست: أرجحُ الأوقات وأفضلُ الأشكال جاهزة.` : `${d.measured} من 8 منشورات قِيست — ثمّ يُقال ما ينجح.`,
+      d.measured >= 8 ? `${d.measured} منشورًا قِيست: أرجحُ الأوقات وأفضلُ الأشكال جاهزة.` : 'يُقال ما ينجح بعد 8 منشورات مقيسة — قِيس ' + String(d.measured) + '.',
       `${link('/panel/insights', 'ما ينجح')}${link('/panel/client/report', 'تقرير الشهر')}`),
   ]
   const ready = states.filter((x) => x === 'done').length
-  const next = TITLES[states.indexOf('todo')]
+  // ‏التالي من بنود الجاهزيّة أوّلًا (D-438) — الحساباتُ ثمّ الموجز — ثمّ من المحطّات
+  const prep = setupSteps(d)
+  const next = prep.next === -1 ? TITLES[states.indexOf('todo')] : ['ربطُ قناة', 'إكمالُ الموجز', 'الحدود'][prep.next]
 
   return `${pageHead('العميل', 'رحلةُ العميل', 'من «ماذا تريد؟» إلى «ما الذي نجح؟» — <b>كلُّ محطّةٍ تقول حالَها وزرَّها</b>، ولا يُنشر شيءٌ قبل اعتمادك.')}
   ${d.flash === undefined || d.flash === null ? '' : toastRegion(notice({ tone: d.flash.kind, html: escapeHtml(d.flash.text), alert: d.flash.kind === 'bad' }))}

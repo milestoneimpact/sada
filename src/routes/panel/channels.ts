@@ -420,7 +420,7 @@ channels.get('/panel/channels/:platform', async (c) => {
     ...(clipReach === undefined ? {} : { reachPublic: clipReach }),
     ...(platform === 'tiktok' && reach !== null ? { reachNoScope: tiktokNeedsScope(reach) } : {}),
     // ‏نبضُ القناة لهذا العميل (D-263) — في «المنشورات» وحدها، من الحقائق نفسِها التي يقرؤها «ما ينجح»
-    ...(tab === 'posts' && needs?.measured === true
+    ...(tab === 'posts' && needs?.measured === true && view.accounts.length > 0
       ? { pulse: channelPulse(await readFacts(c.env.DB, activeOrg(session.record), platform), now, await ownerZone(c.env.DB, c.req.header('Cookie') ?? null)) }
       : {}),
   })

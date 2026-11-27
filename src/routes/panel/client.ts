@@ -191,6 +191,14 @@ client.post('/panel/client/brief', async (c) => {
   return c.redirect('/panel/client?saved=1#setup', 303)
 })
 
+/**
+ * ‏عنوانُ نموذجٍ يُفتح بـ GET (D-438) — من سجلّ المتصفّح أو رابطٍ منسوخ — **يصل قسمَه لا 404**: هذه مساراتُ POST،
+ * وقراءتُها تحويلٌ إلى البطاقة التي ترسمها.
+ */
+for (const [part, hash] of [['brief', 'brief'], ['limits', 'limits'], ['options', 'options']] as const) {
+  client.get('/panel/client/' + part, (c) => c.redirect('/panel/client#' + hash, 303))
+}
+
 /** تقريرُ الشهر لكلّ عميل (D-262 · AGENCY-PLAN و-٦) — يُطبع PDF من المتصفّح. */
 client.get('/panel/client/report', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)

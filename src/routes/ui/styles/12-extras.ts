@@ -384,6 +384,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .flow li[data-state="done"]{border-block-start-color:var(--ink-2)}
 .flow li[data-state="now"]{color:var(--ink); font-weight:600; border-block-start-color:var(--focus)}
 .flow-n{display:inline-grid; place-items:center; width:var(--icon-md); height:var(--icon-md); border-radius:var(--r-pill); background:var(--surface-2); flex:none}
+.flow li:has(.flow-say){flex-wrap:wrap}
+.flow-say{flex-basis:100%; font-weight:400; color:var(--ink-2)}
 .flow li[data-state="now"] .flow-n{background:var(--focus); color:var(--surface)}
 @media${below('md')}{.flow{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* ── شريطُ الفلتر الواحد والرقمُ باتّجاهه (UX-AUDIT-4 · أ) ─────────────

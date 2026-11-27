@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { fakeDb } from '../test/fakes'
-import { BRIEF_MAX, EMPTY_BRIEF, readBrief, voiceSection, writeBrief } from './brief'
+import { BRIEF_MAX, EMPTY_BRIEF, briefGap, readBrief, voiceSection, writeBrief } from './brief'
 import { estimateMonth } from './estimate'
 
 describe('موجزُ العميل (D-257)', () => {
@@ -35,5 +35,14 @@ describe('تقديرُ الشهر قبل البدء (D-257)', () => {
   it('ولا رقمَ بلا سابقة في الدفتر', () => {
     expect(estimateMonth({ perWeek: 3, channels: 1, autoImage: false, perDraft: null, perImage: null }).usd).toBeNull()
     expect(estimateMonth({ perWeek: 3, channels: 1, autoImage: true, perDraft: 0.01, perImage: null }).usd).toBeNull()
+  })
+})
+
+describe('briefGap — تعريفٌ واحدٌ لـ«الموجز مكتمل» (D-438)', () => {
+  it('يسمّي الناقص: الوصف ثمّ القنوات ثمّ الإيقاع', () => {
+    expect(briefGap(EMPTY_BRIEF).missing).toEqual(['الوصف', 'القنوات'])
+    expect(briefGap({ ...EMPTY_BRIEF, goal: 'أن يُعرف', perWeek: 0 }).missing).toEqual(['القنوات', 'الإيقاع'])
+    const full = briefGap({ ...EMPTY_BRIEF, goal: 'أن يُعرف', channels: ['x'], perWeek: 3 })
+    expect(full).toEqual({ complete: true, missing: [] })
   })
 })

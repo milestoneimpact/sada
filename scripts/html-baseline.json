@@ -20,7 +20,7 @@
   "routes/panelView.ts": 83,
   "routes/ui/channels.ts": 29,
   "routes/ui/chart.ts": 21,
-  "routes/ui/clientView.ts": 30,
+  "routes/ui/clientView.ts": 29,
   "routes/ui/command.ts": 18,
   "routes/ui/components/badge.ts": 7,
   "routes/ui/components/button.ts": 13,
