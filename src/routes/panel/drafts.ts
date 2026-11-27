@@ -963,7 +963,8 @@ drafts.post('/panel/drafts/reschedule', async (c) => {
   await setFlash(c.env, c.req.raw, result.ok
     ? { kind: 'ok', text: `تغيّر الموعد: ${platformLabel(result.platform)}${result.account === '' ? '' : ` (${result.account})`} ${ownerWhen(result.at, zone, now)}.` }
     : { kind: 'bad', text: `لم يتغيّر الموعد: ${result.reason}` })
-  return result.ok ? toCard('d', id) : toEditor(id, 'ed-when')
+  // ‏ومن التيّار (D-433) يعود إلى بطاقته فيه
+  return result.ok ? (form.get('back') === 'feed' ? toFeed(id) : toCard('d', id)) : toEditor(id, 'ed-when')
 })
 
 /**

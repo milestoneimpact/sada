@@ -2890,6 +2890,23 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
   })
 
+  it('«انقلها إلى» على بطاقة المجدولة في التيّار تغيّر الموعد وتعود إلى البطاقة فيه (D-433)', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    await seedAccount('linkedin', 'عمر')
+    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
+    await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account: (await db.prepare('SELECT id FROM accounts LIMIT 1').first<{ id: string }>())!.id, preset: 'custom', local: '2031-01-05T21:30', text: 'ن'.repeat(300) })
+    const html = await (await app.request('/panel/feed', withSession(cookie), env)).text()
+    const card = html.slice(html.indexOf(`id="f-${id}"`)).slice(0, 4000)
+    expect(card).toContain('action="/panel/drafts/reschedule"')
+    expect(card).toContain('name="back" value="feed"')
+    expect(card).toContain('الأحد 9:00 ص')
+    const r = await post(cookie, '/panel/drafts/reschedule', { id, preset: 'tomorrow', back: 'feed' })
+    expect(where(r)).toBe(`/panel/feed#f-${id}`)
+    const row = await db.prepare('SELECT status, scheduled_at FROM posts WHERE id = ?').bind(id).first<Record<string, string>>()
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
+  })
+
   it('وبلا كعكة تُقرأ المنطقة المحفوظة، وأوّل زيارة حقًّا بتوقيت الرياض لا غرينتش (D-200 · D-201)', async () => {
     const id = await seedPost('linkedin', 'draft')
     await seedAccount('linkedin', 'عمر')

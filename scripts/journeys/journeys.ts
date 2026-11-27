@@ -658,13 +658,10 @@ const R9: Journey = {
     const { page, m, stack } = j
     const id = stack.seeded.posts.queued
     const was = status(stack, id)?.scheduled_at
-    // ‏من التيّار (D-388): المجدولُ بطاقةٌ فيه و«افتح» عليها يفتح بطاقتَه في لوح المنشورات — لا «المنشورات» ثمّ تبويب «مجدولة»
+    // ‏من التيّار (D-433): «انقلها إلى» على بطاقة المجدولة نفسِها — «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح اللوح
     await goSection(page, m, 'التيّار')
     await page.waitForURL(/\/panel\/feed/)
-    await m.tap(link(page.locator(`#f-${id}`), 'افتح'), '«افتح» على بطاقة المجدولة في التيّار')
-    await page.waitForURL(/\/panel#d-/)
-    // ‏«انقلها إلى» على بطاقتها نفسِها (D-200): «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح المحرّر
-    await m.tap(button(page.locator(`#d-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة', { key: true })
+    await m.tap(button(page.locator(`#f-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة في التيّار', { key: true })
     m.mark('rescheduled')
     const row = status(stack, id)
     return {
