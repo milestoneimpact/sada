@@ -621,6 +621,8 @@ describe('أفعال البطاقة بلا تحميل (D-207)', () => {
   it('**ولا إرسال ثانيًا**: التحويل يُقرأ يدويًّا، والسقوط يعيد تحميل اللوحة بـGET', () => {
     expect(block).toContain("redirect:'manual'")
     expect(block).toContain("fetch('/panel?swap=posts',{credentials:'same-origin'})")
+    // ‏‏وصفُّ الرئيسيّة لا يُطوى على 3xx وحده: البطاقةُ الجديدة تقول إن بقي في الطابور (D-432)
+    expect(block).toContain("if(kr&&theirs&&theirs.hasAttribute('data-desk'))kr=null;")
     expect(block).not.toMatch(/\.submit\(|submit\.call/)
     expect(block).toContain('location.reload()')
   })

@@ -178,6 +178,12 @@ describe('بابُ الكتابة في سطر التحيّة (D-326 · «أنش�
     expect(html).toContain('<summary><span>و2 غيرُها</span></summary>')
     expect(html.indexOf('<li>ج</li>')).toBeGreaterThan(html.indexOf('<details class="fold">'))
   })
+  it('ومعتمَدةٌ بلا موعدٍ ولا مسوّدة: الطابورُ أوّلًا وسطرُ الحال يعدّها ويربطها (D-432)', () => {
+    const none = facts({ counts: { perPlatform: { x: { draft: 0, approved: 2, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } })
+    const html = homeTop(none, NOW, '<div class="card desk" id="desk"><span class="count" data-desk-n>2</span></div>', '', '', { rows: '<li>أ</li>', tools: '' })
+    expect(html.indexOf('id="desk"')).toBeLessThan(html.indexOf('id="hw-t"'))
+    expect(html).toContain('<a href="#desk"><b class="num">2</b> بانتظار قرارك</a>')
+  })
   it('ولا شيء ينتظر: حالٌ فارغةٌ إيجابيّة لا قائمةٌ خالية', () => {
     const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',
       createdAt: '2026-09-01 00:00:00', expiresAt: '2026-12-01 00:00:00' }], () => true)

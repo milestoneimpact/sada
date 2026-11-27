@@ -657,6 +657,11 @@ const INFO_CAPTION = '<b>إنفوجرافيك من نصّ المنشور</b>: ع
  * **و`failed` لا تُخلَط بـ `published`** (رحلة R-8، الخطّة 5.6 و8.2): كانتا معًا تحت
  * «غادرت»، فالمنشورُ الفاشلُ — وفيه فعلٌ باقٍ — بين منشوراتٍ نُشرت ولا فعلَ فيها.
  */
+/** ‏‏أما زال لها صفٌّ في «ينتظر قرارك»؟ مسوّدةٌ أو معتمَدةٌ بلا موعد — فالسكربتُ لا يطوي الصفَّ إلّا إن خرجت (D-432). */
+function deskOpen(d: DraftRow): boolean {
+  return d.status === 'draft' || ((d.status === 'approved' || d.status === 'edited') && d.scheduledAt === null)
+}
+
 function bucketOf(d: DraftRow): string {
   if (d.status === 'draft') return 'waiting'
   if (d.status === 'approved' || d.status === 'edited') return 'approved'
@@ -986,7 +991,7 @@ function card(
     d.approvedBy === null ? '' : `<span class="chip">${d.status === 'rejected' ? 'رفضها' : 'اعتمدها'} ${escapeHtml(deciderText(d.approvedBy))}</span>`,
   ].filter((x) => x !== '').join('')
 
-  return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}
+  return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}${deskOpen(d) ? ' data-desk' : ''}
     data-status="${escapeHtml(bucketOf(d))}" data-rank="${URGENCY[bucketOf(d)] ?? 9}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     <div class="draft-top">

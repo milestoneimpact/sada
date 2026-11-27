@@ -270,7 +270,9 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '
   const repeated = next.tone === 'bad' && next.href.startsWith('/oauth/')
   // ‏و«لا شيء ينتظرك» من `nextAction` ليست بندًا: هي الحالُ الفارغةُ نفسُها، فتُقال فيها لا صفًّا
   const idle = next.tone === 'ok' && next.text.startsWith('لا شيء ينتظرك')
-  const waitingN = total(f.counts, 'draft')
+  // ‏‏والعددُ عددُ ما في طابور القرار لا المسوّدات وحدها (مراجعة D-432): المعتمَدةُ بلا موعدٍ قرارٌ ينتظرك أيضًا
+  const deskN = Number(/data-desk-n>(\d+)</.exec(kpis)?.[1] ?? 0)
+  const waitingN = Math.max(total(f.counts, 'draft'), deskN)
   const status = html`<p class="hello-status m-0">${waitingN > 0 ? html`<a href="#desk"><b class="num">${String(waitingN)}</b> بانتظار قرارك</a>` : html`<b class="num">${String(waitingN)}</b> بانتظار قرارك`} · <b class="num">${String(weekCount(f.scheduled ?? [], now))}</b> مجدولة هذا الأسبوع</p>`
   const head = html`<div class="home-head"><div class="hello-t"><p class="hello m-0">${greeting(now, f.zone)}</p>${bare ? html`` : status}</div><span class="grow"></span>${raw(entry)}</div>`
   const nextRow = repeated || idle ? '' : html`<li class="todo-next" data-tone="${next.tone}"><span class="dot ${next.tone}"></span>
@@ -287,7 +289,7 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '
     ${waiting.tools === '' ? html`` : html`<div class="row gap-2 mt-3">${raw(waiting.tools)}</div>`}
   </div>`
   // ‏‏**القرارُ قبل الصيانة** (D-431): ما ينتظر قرارك أوّلًا حين يكون، فـ«اعتمد · غدًا» في الشاشة الأولى على الهاتف
-  const deskFirst = waitingN > 0 && kpis !== ''
+  const deskFirst = kpis !== ''
   return `${head.value}
   ${deskFirst ? kpis : ''}
   ${box.value}

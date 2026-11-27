@@ -603,6 +603,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
       }
       // ‏وصفُّ «ينتظر قرارك» في الرئيسيّة يُطوى بعد القرار (D-431): عددُه ينقص، والبطاقةُ تذهب حين تفرغ
       var kr=document.getElementById('k-'+id);
+      // ‏‏ولا يُطوى إلّا إن خرج المنشورُ من الطابور فعلًا (D-432): رفضٌ أو جدولةٌ تعذّرت يردّان 3xx أيضًا، فالبطاقةُ الجديدة هي الحكم
+      if(kr&&theirs&&theirs.hasAttribute('data-desk'))kr=null;
       if(kr){var dk=document.getElementById('desk'); kr.remove();
         if(dk){var left=dk.querySelectorAll('li.desk-row').length, kn=dk.querySelector('[data-desk-n]');
           if(left===0&&!dk.querySelector('a.tap'))dk.remove(); else if(kn)kn.textContent=String(Math.max(0,(+kn.textContent||1)-1));}}
