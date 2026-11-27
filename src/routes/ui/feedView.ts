@@ -142,9 +142,9 @@ function action(c: FeedCard, v: FeedView): Html {
  * ‏و`back=feed` يعيد إلى البطاقة `#f-{id}` في التيّار لا إلى اللوح. وإرسالٌ عاديّ بلا `data-swap`: التيّارُ صفحةٌ بلا سكربت اللوح، وتبديلُه يجلب `/panel` لا التيّار.
  */
 function quickMove(id: string): Html {
-  return html`<form class="inline" method="POST" action="/panel/drafts/reschedule" data-busy="جار…" aria-label="انقل الموعد إلى">
+  return html`<form class="inline" method="POST" action="/panel/drafts/reschedule" data-busy="جار…">
     <input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="feed">
-    ${raw(PRESETS.map((p) => button({ label: p.label, variant: 'secondary', size: 'sm', type: 'submit', name: 'preset', value: p.kind })).join(''))}</form>`
+    <span role="group" aria-label="انقل الموعد إلى">${raw(PRESETS.map((p) => button({ label: p.label, variant: 'secondary', size: 'sm', type: 'submit', name: 'preset', value: p.kind })).join(''))}</span></form>`
 }
 
 /**

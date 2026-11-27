@@ -94,6 +94,8 @@ table,.chip,.count,.ago,.money,.num,.note,.step-n{font-variant-numeric:tabular-n
 .hello-t{display:flex; flex-direction:column; gap:var(--s-1); min-width:0}
 .hello-status{font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink-2)}
 .hello-status b{color:var(--ink); font-weight:600}
+/* ‏و«بانتظار قرارك» رابطٌ إلى «ينتظر قرارك» (D-431): هدفُ لمسٍ ‏44px لا سطرُ نصّ */
+.hello-status a{display:inline-flex; align-items:center; min-block-size:var(--tap)}
 .home-waiting{margin-bottom:var(--gap-card)}
 .home-waiting .card-head{margin-bottom:var(--s-2)}
 /* ‏وأفعالُ البطاقة العامّة في طرفها الآخر (D-381): الصفوفُ بقياسها المقروء في البدء، والمسحُ والمراجعةُ ختامٌ في النهاية لا ذيلٌ تحت الصفوف */
