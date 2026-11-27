@@ -131,6 +131,8 @@ const RULES: readonly (readonly [RegExp, Role])[] = [
   [/^\/panel\/(settings|orgs|orgs\/delete)$/, 'owner'],
   // ‏المدير: ربطُ القنوات وفصلُها، والمسحُ والتحليل، والترويج، واستيرادُ الخطط
   [/^\/panel\/(channels\/disconnect|scan|analyze|sources|images\/quota|report\/promote|plan-import|plan\/import|plan-rules|client\/limits|client\/options)(\/|$)/, 'admin'],
+  // ‏والمديرُ يُكمل ربطَ صفحة LinkedIn الذي بدأه في `/oauth/linkedin-page/start` (D-430): كان يقع على المالك فينقطع في منتصفه
+  [/^\/panel\/linkedin-pages\/pick$/, 'admin'],
   // ‏الناشر: كلُّ ما يعتمد أو يجدول أو يُنشر
   [/^\/panel\/drafts\/(approve-many|schedule|reschedule|unschedule|requeue|thread-check|spread\/apply|undo-approve|undo-reject|undo-unschedule)$/, 'publisher'],
   [/^\/panel\/plan\/(approve|approve-all|start|schedule|pin|review\/approve|review\/bulk|review\/redraft|cancel|share|share\/revoke|check\/fix|post\/hold|month\/(?:approve|unschedule|reopen))$/, 'publisher'],

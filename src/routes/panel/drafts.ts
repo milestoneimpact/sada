@@ -25,7 +25,7 @@ import { getProvider } from '../../lib/providers'
 import { activeOrg } from '../../lib/tenancy'
 import { loadSession } from '../../lib/session'
 import { isLinkedInPage, linkStates, listAccounts } from '../../lib/channels'
-import { scheduleDestinations, withdrawCopies, type DestinationResult } from '../../lib/schedule/destinations'
+import { readDestinationTexts, scheduleDestinations, withdrawCopies, type DestinationResult } from '../../lib/schedule/destinations'
 import { destinationLabel } from '../../lib/linkedinPage'
 import { clock, dayLabel, localParts, validZone, zoneNote } from '../../lib/time/zone'
 import { ownerZone } from '../../lib/time/ownerZone'
@@ -437,7 +437,7 @@ drafts.post('/panel/drafts/decide', async (c) => {
   if (result.ok && result.status !== 'rejected' && wants === 'approve-schedule') {
     // ‏والإمساكُ بنافذة «تراجَع» (D-324): موعدٌ أقربُ منها يُردّ، فلا يُنشَر شيءٌ والزرُّ قائم
     // ‏‏وجهتان أو أكثر (D-423): منشورٌ لكلّ وجهةٍ بمفتاحه، والأولى على المنشور نفسِه
-    const all = await scheduleDestinations(c.env.DB, id, form.getAll('account').map(String), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS)
+    const all = await scheduleDestinations(c.env.DB, id, form.getAll('account').map(String), readWhen(form, zone, now), now, activeOrg(gate.session.record), UNDO_WINDOW_SECONDS, readDestinationTexts(form))
     scheduled = all[0]!.result
     extraNote = await destinationsNote(c.env.DB, activeOrg(gate.session.record), all.slice(1))
     await record(c.env.DB, {
@@ -658,6 +658,8 @@ drafts.post('/panel/drafts/schedule', async (c) => {
     now,
     activeOrg(gate.session.record),
     UNDO_WINDOW_SECONDS,
+    // ‏ونصٌّ لكلّ وجهةٍ زائدة (D-426)، والفارغُ نصُّ الأصل
+    readDestinationTexts(form),
   )
   const result = all[0]!.result
   const extraNote = await destinationsNote(c.env.DB, activeOrg(gate.session.record), all.slice(1))

@@ -846,6 +846,10 @@ details.card .nt-list{margin-top:var(--s-4)}
 .cr-note{display:grid; gap:var(--s-1); font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .cr-note textarea{width:100%; font:inherit; font-size:var(--t-ui); line-height:var(--lh-ui); color:var(--ink); padding:var(--s-2) var(--s-3); border:var(--bd); border-radius:var(--r-control); background:var(--surface)}
 .cr-acts{display:flex; flex-wrap:wrap; gap:var(--s-2)}
+.cr-hero{gap:var(--s-3)}
+.cr-brand{display:flex; align-items:center; gap:var(--s-3); font-size:var(--t-ui); line-height:var(--lh-ui)}
+.cr-mark{display:inline-grid; place-items:center; inline-size:var(--s-10); block-size:var(--s-10); flex:none; border-radius:var(--r-control); background:var(--ink); color:var(--surface); font-weight:600; font-size:var(--t-ui); line-height:1}
+.cr-powered{margin:var(--s-2) 0 0; text-align:center; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
 .cr-saved{margin:0 0 var(--s-4); padding:var(--s-3) var(--s-4); border-radius:var(--r-control); background:var(--ok-wash); color:var(--ink); font-weight:600}
 .rv-client{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .rv-client q{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}

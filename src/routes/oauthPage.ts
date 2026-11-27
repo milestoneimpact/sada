@@ -25,6 +25,7 @@ import { LEGACY_RAW, openScoped, sealScoped } from '../lib/crypto'
 import { loadSession, readCookie } from '../lib/session'
 import { record } from '../lib/audit'
 import { activeOrg } from '../lib/tenancy'
+import { normalizeEmail, OWNER_EMAIL } from '../lib/ownerEmail'
 import { grantIdOf, listAdminOrgs, PAGE_CALLBACK_PATH, PAGE_SAY, PAGE_SCOPES, pageApp, pageCanPublish, type AdminOrg } from '../lib/linkedinPage'
 import { pagesFoundBody, pagesPickBody, pagesRefusedBody, unreachedBody } from './ui/oauthResult'
 import { devDetail, resultPage } from './oauth'
@@ -43,21 +44,26 @@ const SETUP = '/panel/channels/linkedin?tab=setup'
 interface PickBlob { readonly tokens: TokenResponse; readonly orgs: readonly AdminOrg[] }
 
 /** ‏يختم الدورةَ في KV برمز المالك — **مشفّرةً بنطاق منظّمته** (D-005)، ولا شيءَ منها نصًّا. */
-export async function stashPick(env: Pick<Env, 'KV' | 'TOKEN_ENC_KEY'>, org: string, blob: PickBlob): Promise<string> {
+/** ‏بريدُ صاحب الجلسة — والجلسةُ القديمةُ بلا بريدٍ للمالك. */
+const emailOf = (record: { readonly email?: string | null }): string => normalizeEmail(record.email ?? OWNER_EMAIL)
+
+/** ‏ويُختم لمن بدأ (D-430): المنظّمةُ والبريدُ معًا، فلا يفتحه مديرٌ آخر ولا منظّمةٌ أخرى. */
+export async function stashPick(env: Pick<Env, 'KV' | 'TOKEN_ENC_KEY'>, org: string, blob: PickBlob, by: string = OWNER_EMAIL): Promise<string> {
   const id = randomToken()
   const sealed = await sealScoped(env.TOKEN_ENC_KEY, tokenScope(org), JSON.stringify(blob), PICK_PREFIX + id)
-  await env.KV.put(PICK_PREFIX + id, JSON.stringify({ org, sealed }), { expirationTtl: PICK_TTL })
+  await env.KV.put(PICK_PREFIX + id, JSON.stringify({ org, by: normalizeEmail(by), sealed }), { expirationTtl: PICK_TTL })
   return id
 }
 
 /** ‏يفتح ما خُتم — لمنظّمة الجلسة وحدها، وإلّا `null`. */
-export async function readPick(env: Pick<Env, 'KV' | 'TOKEN_ENC_KEY'>, id: string, org: string): Promise<PickBlob | null> {
+export async function readPick(env: Pick<Env, 'KV' | 'TOKEN_ENC_KEY'>, id: string, org: string, by: string = OWNER_EMAIL): Promise<PickBlob | null> {
   if (!/^[A-Za-z0-9_-]{8,128}$/.test(id)) return null
   const raw = await env.KV.get(PICK_PREFIX + id)
   if (raw === null) return null
   try {
-    const row = JSON.parse(raw) as { org: string; sealed: { ciphertext: string; iv: string } }
+    const row = JSON.parse(raw) as { org: string; by?: string; sealed: { ciphertext: string; iv: string } }
     if (row.org !== org) return null
+    if (normalizeEmail(row.by ?? OWNER_EMAIL) !== normalizeEmail(by)) return null
     return JSON.parse(await openScoped(env.TOKEN_ENC_KEY, tokenScope(org), row.sealed, PICK_PREFIX + id, LEGACY_RAW)) as PickBlob
   } catch {
     return null
@@ -83,6 +89,7 @@ oauthPage.get('/oauth/linkedin-page/start', async (c) => {
     createdAt: new Date().toISOString(),
     scopes: PAGE_SCOPES.join(' '),
     org: activeOrg(session.record),
+    by: emailOf(session.record),
     binding: await bindingHash(nonce),
   })
   const url = new URL(LINKEDIN.authorizeUrl)
@@ -117,7 +124,7 @@ oauthPage.get('/oauth/linkedin-page/callback', async (c) => {
     }
     const orgs = await listAdminOrgs(tokens.accessToken)
     if (orgs.length === 0) return done(resultPage('صدى — لم تُربَط صفحة', pagesRefusedBody(PAGE_SAY.none), 400))
-    const pick = await stashPick(c.env, saved.org ?? 'org_owner', { tokens, orgs })
+    const pick = await stashPick(c.env, saved.org ?? 'org_owner', { tokens, orgs }, saved.by ?? OWNER_EMAIL)
     return done(resultPage('صدى — اختر صفحاتك', pagesFoundBody(orgs.map((o) => o.name), '/panel/linkedin-pages?pick=' + (pick)), 200))
   } catch (error) {
     if (error instanceof StateError) return c.json({ error: 'invalid_state' }, 400)
@@ -133,7 +140,7 @@ oauthPage.get('/panel/linkedin-pages', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const pick = c.req.query('pick') ?? ''
-  const blob = await readPick(c.env, pick, activeOrg(session.record))
+  const blob = await readPick(c.env, pick, activeOrg(session.record), emailOf(session.record))
   if (blob === null) {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت مهلة اختيار الصفحات — «اربط صفحة LinkedIn» من جديد.' })
     return new Response(null, { status: 303, headers: { Location: SETUP } })
@@ -150,7 +157,7 @@ oauthPage.post('/panel/linkedin-pages/pick', async (c) => {
   if ('denied' in gate) return gate.denied
   const org = activeOrg(gate.session.record)
   const pick = String(gate.form.get('pick') ?? '')
-  const blob = await readPick(c.env, pick, org)
+  const blob = await readPick(c.env, pick, org, emailOf(gate.session.record))
   if (blob === null) {
     await setFlash(c.env, c.req.raw, { kind: 'warn', text: 'انتهت مهلة اختيار الصفحات — «اربط صفحة LinkedIn» من جديد.' })
     return new Response(null, { status: 303, headers: { Location: SETUP } })

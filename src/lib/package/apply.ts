@@ -83,15 +83,23 @@ export function packageKey(org: string, period: string, item: string, platform: 
   return `plan:${org}:${period}:${item}:${platform}`
 }
 
+/**
+ * ‏**بندُ الصفحة** (D-429): `linkedin-page` في الخطّة، و`posts.platform` يبقى `linkedin` (الفرقُ في الحساب، D-423) —
+ * ‏فالعلامةُ مفتاحُه: `plan:…:linkedin-page`، غيرُ مفتاح البند الشخصيّ في يومه. فلا ترحيل.
+ */
+export const PAGE_ITEM = 'linkedin-page'
+export const storedPlatform = (platform: string): string => (platform === PAGE_ITEM ? 'linkedin' : platform)
+export const isPageKey = (key: string | null): boolean => /^plan:.*:linkedin-page(:after:.*)?$/.test(key ?? '')
+
 /** منشوراتُ الحزمة الحيّة — أحدثُها لكلّ (شهر، مادّة، منصّة). */
 export async function packagePosts(db: Db, org: string): Promise<PackagePost[]> {
   const { results } = await db.prepare(
-    `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin, edited_in_sada FROM posts
+    `SELECT id, coalesce(package_period, substr(package_due, 1, 7), '') AS period, package_item_no, platform, status, text, copy_origin, edited_in_sada, idempotency_key FROM posts
       WHERE org_id = ? AND package_item_no IS NOT NULL ORDER BY created_at ASC, rowid ASC LIMIT 800`,
-  ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null; edited_in_sada: number }>()
+  ).bind(org).all<{ id: string; period: string; package_item_no: string; platform: string; status: string; text: string; copy_origin: string | null; edited_in_sada: number; idempotency_key: string | null }>()
   const latest = new Map<string, PackagePost>()
   for (const r of results) {
-    const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin, editedInSada: r.edited_in_sada === 1 }
+    const p = { id: r.id, period: r.period, item: r.package_item_no, platform: r.platform === 'linkedin' && isPageKey(r.idempotency_key) ? PAGE_ITEM : r.platform, status: r.status, text: r.text, copyOrigin: r.copy_origin, editedInSada: r.edited_in_sada === 1 }
     const k = p.period + '|' + p.item + '|' + p.platform
     // ‏المؤرشفُ لا يغلب حيًّا قبله، لكنّ الأحدثَ من مؤرشفَين يغلب: منه يُبنى مفتاحُ العائد ثالثةً، فلا يصطدم بمفتاح الثاني
     const had = latest.get(k)
@@ -124,7 +132,7 @@ export function changeStatements(ctx: ApplyContext, change: Change, post: Packag
       `INSERT OR IGNORE INTO posts (id, platform, type, text, status, idempotency_key, model, rationale, org_id,
           package_item_no, source_revision_id, copy_origin, copy_blob_sha, package_due, package_period)
         VALUES (?, ?, ?, ?, 'draft', ?, 'owner', 'من حزمة المحتوى', ?, ?, ?, 'package', ?, ?, ?)`,
-    ).bind(id, a.platform, isThread(a.platform, a.text) ? 'thread' : 'text', a.text, key, org,
+    ).bind(id, storedPlatform(a.platform), isThread(storedPlatform(a.platform), a.text) ? 'thread' : 'text', a.text, key, org,
       a.item, ctx.revisionId, ctx.copySha, a.date + ' ' + a.time, period === '' ? null : period))
     if (a.media !== null) { const m = attachStatement(db, org, id, a.media); if (m !== null) s.push(m) }
     return { statements: s, postId: id }
@@ -136,7 +144,7 @@ export function changeStatements(ctx: ApplyContext, change: Change, post: Packag
       WHERE id = ? AND org_id = ? AND ${guard}`).bind(ctx.revisionId, post.id, org))
   } else if (change.kind === 'text' && a !== null && a.text !== null) {
     s.push(db.prepare(`UPDATE posts SET text = ?, type = ?, copy_origin = 'package', copy_blob_sha = ?, source_revision_id = ?
-      WHERE id = ? AND org_id = ? AND ${guard}`).bind(a.text, isThread(a.platform, a.text) ? 'thread' : 'text', ctx.copySha, ctx.revisionId, post.id, org))
+      WHERE id = ? AND org_id = ? AND ${guard}`).bind(a.text, isThread(storedPlatform(a.platform), a.text) ? 'thread' : 'text', ctx.copySha, ctx.revisionId, post.id, org))
   } else if (change.kind === 'time' && a !== null) {
     s.push(db.prepare(`UPDATE posts SET package_due = ?, package_period = coalesce(?, package_period), source_revision_id = ? WHERE id = ? AND org_id = ? AND ${guard}`)
       .bind(a.date + ' ' + a.time, entryPeriod(a) || null, ctx.revisionId, post.id, org))
