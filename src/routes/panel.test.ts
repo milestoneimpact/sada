@@ -4675,11 +4675,38 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     expect((await app.request(to, withSession(cookie), env)).status).toBe(404)
   })
 
+  it('ملفّ plans/YYYY-MM.md من الباب نفسِه، والصفّ بلا نصّ يُترك، والاعتماد بلا تأكيد ومعه «تراجَع» (D-434)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+    const cookie = await login()
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+    const md = `# خطّة\n\n| اليوم | الساعة | المنصة | النص | الملف | ملاحظة |\n|---|---|---|---|---|---|\n| ${future} | 09:30 | linkedin | المعلم نقطة قرار | | |\n| ${future} | 20:00 | x | | | |\n`
+    const body = new FormData()
+    body.set('file', new Blob([md], { type: 'text/markdown' }), `${future.slice(0, 7)}.md`)
+    const read = await app.request('/panel/plan-import', withSession(cookie, { method: 'POST', body }), env)
+    const to = read.headers.get('Location')!
+    expect(to).toMatch(/^\/panel\/plan-import\/[0-9a-f-]{36}$/)
+    const preview = await (await app.request(to, withSession(cookie), env)).text()
+    expect(preview).toContain('اعتمد وجدوِل منشورًا واحدًا')
+    expect(preview).toContain('<input type="hidden" name="lines" value="5">')
+    expect(preview).not.toContain('data-confirm')
+    const approve = new FormData()
+    approve.set('lines', '5')
+    await app.request(`${to}/approve`, withSession(cookie, { method: 'POST', body: approve }), env)
+    const board = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(board).toContain('action="/panel/plan-import/undo"')
+    const post = db.raw.prepare(`SELECT id, status FROM posts`).get() as { id: string; status: string }
+    expect(post.status).toBe('queued')
+    const undo = new FormData()
+    undo.set('id', post.id)
+    expect((await app.request('/panel/plan-import/undo', withSession(cookie, { method: 'POST', body: undo }), env)).status).toBe(303)
+    expect((db.raw.prepare(`SELECT status FROM posts WHERE id = ?`).get(post.id) as { status: string }).status).not.toBe('queued')
+  })
+
   it('حقل الملفّ موصول بسكربت القراءة الفوريّة، وزرّ «اقرأ الخطّة» باق لمن لا سكربت عنده (ر-5)', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     const card = html.slice(html.indexOf('action="/panel/plan-import"'), html.indexOf('</form>', html.indexOf('action="/panel/plan-import"')))
-    expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV)</span>')
+    expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV أو MD)</span>')
     expect(card).toMatch(/<input type="file" name="file"[^>]*data-plan-file>/)
     // ‏الاختيارُ هو الفعل؛ والزرُّ لمن لا سكربتَ عنده وحده، فلا يُضغط زرٌّ داكنٌ قبل اختيار الملفّ
     expect(card).toContain('<noscript><button class="btn btn-secondary" type="submit">اقرأ الخطّة</button></noscript>')

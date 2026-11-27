@@ -546,7 +546,7 @@ const R4: Journey = {
 const R5: Journey = {
   id: 'R-5',
   title: 'استيراد خطّة من ملفّ CSV',
-  plan: { target: '4 (§6: «عندي خطّة» في «خطّةُ الشهر» ← الملفّ ← «اعتمد وجدوِل» ← التأكيد)' },
+  plan: { target: '3 (§6: «عندي خطّة» في «خطّةُ الشهر» ← الملفّ ← «اعتمد وجدوِل»؛ بلا تأكيدٍ مزدوج و«تراجَع» بعدها · D-434)' },
   async run({ page, m, stack, assets }) {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     // ‏**بطريق §6 من الرئيسيّة** (D-326): «منشور جديد ▾» ← «خطّة من ملفّ» — كانت الرحلةُ تفتح «المنشورات» أوّلًا فتعدّ لمسةً
@@ -555,7 +555,7 @@ const R5: Journey = {
     await m.tap(link(page.locator('.home-plan'), /عندي خطّة/), '«عندي خطّة» في بطاقة «خطّةُ الشهر»')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
-    await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
+    await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV أو MD)» ← الملفّ', { key: true })
     // ‏الملفُّ يُقرأ حين يُختار؛ و«اقرأ الخطّة» تُضغط إن بقيت ظاهرةً بعده لا قبله
     const read = button(form, 'اقرأ الخطّة')
     if ((await read.count()) > 0) await m.tap(read, '«اقرأ الخطّة»')
@@ -566,6 +566,42 @@ const R5: Journey = {
     await m.tap(approve, `«${label || 'اعتمد وجدوِل'}»`)
     const after = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     return { success: after - before === 3, verified: `منشورات مجدولة جديدة: ${after - before} من 3 أسطر` }
+  },
+}
+
+/** ‏ملفُّ الوكيل `plans/YYYY-MM.md` كما يكتبه (D-434): جدولُ القالب، وصفٌّ بلا نصٍّ يُترك. */
+function planMd(): { name: string; mimeType: string; buffer: Buffer } {
+  const day = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+  const md = [
+    `# خطّة ${day.slice(0, 7)}`, '',
+    '| اليوم | الساعة | المنصة | النص | الملف | ملاحظة |', '|---|---|---|---|---|---|',
+    `| ${day} | 09:30 | linkedin | المعلَم اتّفاقٌ مكتوب على معنى «تمّ» قبل أن يبدأ العمل. | | |`,
+    `| ${day} | 12:00 | x | ثلاثة أسئلة قبل كلّ معلَم توفّر ساعةً كلّ أسبوع. | | |`,
+    `| ${day} | 18:00 | linkedin | من الاجتماع الطويل إلى المراجعة القصيرة. | | |`,
+    `| ${day} | 20:00 | x |  | | |`, '',
+  ].join('\n')
+  return { name: `${day.slice(0, 7)}.md`, mimeType: 'text/markdown', buffer: Buffer.from(md, 'utf8') }
+}
+
+const R5md: Journey = {
+  id: 'R-5·md',
+  title: 'استيراد ملفّ الخطّة plans/YYYY-MM.md من الباب نفسِه',
+  plan: { target: '3 (D-434: «عندي خطّة» ← ملفّ md ← «اعتمد وجدوِل»)' },
+  async run({ page, m, stack }) {
+    const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
+    await m.tap(link(page.locator('.home-plan'), /عندي خطّة/), '«عندي خطّة» في بطاقة «خطّةُ الشهر»')
+    const form = page.locator('form[action="/panel/plan-import"]')
+    const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
+    await m.file(pick, form.locator('input[name="file"]'), planMd(), '«اختر ملفّ الخطّة (CSV أو MD)» ← YYYY-MM.md', { key: true })
+    const read = button(form, 'اقرأ الخطّة')
+    if ((await read.count()) > 0) await m.tap(read, '«اقرأ الخطّة»')
+    else m.note('قُرئ الملفّ حين اختير — بلا «اقرأ الخطّة»')
+    m.mark('previewed')
+    const approve = visible(page.locator('form[action$="/approve"] button[type="submit"]')).first()
+    const label = ((await approve.textContent().catch(() => '')) ?? '').trim()
+    await m.tap(approve, `«${label || 'اعتمد وجدوِل'}»`)
+    const after = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
+    return { success: after - before === 3, verified: `منشورات مجدولة جديدة من md: ${after - before} من 3 صفوف بنصّ` }
   },
 }
 
@@ -1096,6 +1132,6 @@ const R18: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R5md, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
 
 export { Blocked }
