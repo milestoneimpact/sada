@@ -990,8 +990,8 @@ export function pageConnectCard(ready: boolean, base: string, accounts: readonly
  */
 function unlinkedSection(d: PlatformScreenData): string {
   const label = d.view.spec.label
+  // ‏بلا نقش: الصفحةُ على الهاتف تبدأ به تحت شريط البحث مباشرةً، والنقشُ يُبعَد ‏24px عن النصّ (D-196)
   return emptyState({
-    echo: true,
     title: 'اربط ' + label + ' أوّلًا',
     html: html`زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة. ثمّ يُنشر هنا، ويُقال ما ينجح بعد ${String(MIN_POSTS)} منشورات مقيسة.`.value,
     action: html`<div class="row mt-3">${raw(button({ label: 'ما يحتاجه الربط', href: href(d.view.spec.id, { tab: 'setup' }) }))}</div>`.value,
