@@ -393,4 +393,15 @@ describe('قناةٌ بلا حسابٍ مربوط (D-438)', () => {
     expect(html).not.toContain('خرج في 30 يومًا')
     expect(html).not.toContain('id="history"')
   })
+
+  it('حسابٌ فُصل ومنشوراتُه باقية: الدعوةُ فوقها، والقادمُ وما نُشر لا يختفيان (D-439)', () => {
+    const html = screen({ view: bare,
+      upcoming: [row({ id: 'u9', status: 'queued', scheduledAt: '2026-09-07 06:00:00', sortAt: '2026-09-07 06:00:00' })],
+      pulse: { last30: 0, median30: null, trend: null, slot: null, format: null, why: null } })
+    expect(html).toContain('اربط X أوّلًا')
+    expect(html).toContain('id="upcoming"')
+    expect(html).toContain('id="history"')
+    expect(html.indexOf('اربط X أوّلًا')).toBeLessThan(html.indexOf('id="upcoming"'))
+    expect(html).not.toContain('خرج في 30 يومًا')
+  })
 })

@@ -1039,9 +1039,12 @@ export function platformScreen(d: PlatformScreenData): string {
       ? waitingSection(d)
       : d.tab === 'media'
         ? mediaSection(d)
-        : d.view.accounts.length === 0
-          ? unlinkedSection(d)
-          : `${pulseStrip(d)}${upcomingSection(d)}${historySection(d)}`
+        : d.view.accounts.length > 0
+          ? `${pulseStrip(d)}${upcomingSection(d)}${historySection(d)}`
+          // ‏وحسابٌ فُصل ومنشوراتُه باقيةٌ في D1: الدعوةُ إلى الربط فوقها، ولا تُخفى (D-439)
+          : d.upcoming.length === 0 && d.history.rows.length === 0
+            ? unlinkedSection(d)
+            : unlinkedSection(d) + upcomingSection(d) + historySection(d)
   // ‏الإشعارُ مكوّنُه (D-189)، والخطأُ يُعلَن تنبيهًا ويبقى حتّى يُغلَق (7.8)
   const flash = toastRegion(d.flash === null
     ? ''
