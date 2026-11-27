@@ -162,9 +162,12 @@ function connectedOf(d: ClientData): number {
 function setup(d: ClientData): string {
   const n = connectedOf(d)
   const written = d.limits !== undefined && Object.keys(d.limits.mine).length > 0
+  // ‏وقناةٌ واحدةٌ ناقصةٌ من الموجز تُربط من صفحتها مباشرةً لا من قائمة الحسابات (D-435)
+  const gap = d.brief.channels.filter((p) => (d.linked[p] ?? 0) === 0)
+  const linkTo = gap.length === 1 ? '/panel/channels/' + encodeURIComponent(gap[0]!) : '/panel/accounts'
   const items: readonly { readonly done: boolean; readonly title: string; readonly say: string }[] = [
     { done: n > 0, title: 'قناةٌ مربوطة',
-      say: n > 0 ? String(n) + ' ' + (n === 1 ? 'حسابٌ متّصل' : 'حساباتٍ متّصلة') + '.' : 'لا حسابَ متّصلًا بعد — والخطّةُ بلا قناةٍ لا تُنشر. <a href="/panel/accounts">اربط حسابًا</a>' },
+      say: n > 0 ? String(n) + ' ' + (n === 1 ? 'حسابٌ متّصل' : 'حساباتٍ متّصلة') + '.' : 'لا حسابَ متّصلًا بعد — والخطّةُ بلا قناةٍ لا تُنشر. <a href="' + linkTo + '">' + (gap.length === 1 ? 'اربط ' + escapeHtml(platformLabel(gap[0] as never)) : 'اربط حسابًا') + '</a>' },
     { done: !isEmptyBrief(d.brief) && d.brief.channels.length > 0,
       title: 'موجزٌ مكتمل',
       say: isEmptyBrief(d.brief) ? 'اكتب ما يريده العميل ولمن وبأيّ نبرة. <a href="#brief">اكتب الموجز</a>'
@@ -202,7 +205,7 @@ export function clientScreen(d: ClientData): string {
       chosen.length === 0 ? 'لم تُختر في الموجز.'
         : missing.length === 0 ? `${chosen.map((p) => escapeHtml(platformLabel(p as never))).join(' · ')} — كلُّها مربوطة.`
           : `بقي ربطُ ${missing.map((p) => escapeHtml(platformLabel(p as never))).join(' و')}.`,
-      link('/panel/accounts', missing.length === 0 ? 'الحسابات' : 'اربط', missing.length > 0)),
+      link(missing.length === 1 ? '/panel/channels/' + encodeURIComponent(missing[0]!) : '/panel/accounts', missing.length === 0 ? 'الحسابات' : 'اربط', missing.length > 0)),
     station(4, 'الخطّة', at(d.plan === null ? 'todo' : 'done'),
       d.plan === null ? 'لا خطّة بعد — من أسبوعٍ إلى شهرين.'
         : `${SPAN_LABEL[d.plan.span ?? 'week']} يبدأ ${escapeHtml(d.plan.week)}: ${d.plan.plan.items.length} بندًا، ${d.plan.status === 'approved' ? 'معتمَدة' : 'تنتظر اعتمادك'}.`,

@@ -18,7 +18,7 @@ import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
-import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet, weekOfDay } from '../ui/planReviewView'
 import { postEditScreen } from '../ui/postEditView'
 import { COUNT_SCRIPT } from '../ui/scripts'
 import { vtName } from '../ui/parts'
@@ -742,6 +742,14 @@ plan.get('/panel/plan/review', async (c) => {
   const asked = c.req.query('id')
   const current = asked !== undefined && asked !== '' ? await planForId(c.env.DB, org, asked) ?? await latestPlan(c.env.DB, org) : await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
+  // ‏‏`?item=` بصمةُ بندٍ من إشعار حكم العميل (D-435): تُحلّ هنا إلى أسبوعها ومرسات بطاقتها — ضغطةٌ واحدة إلى الإصلاح.
+  // ‏وبصمةٌ لم تعد في الخطّة (تغيّر موعدُها) تسقط إلى الخطّة نفسِها بلا خطأ
+  const wanted = c.req.query('item')
+  if (wanted !== undefined) {
+    const card = wanted === '' ? undefined : (await reviewModel(c.env.DB, org, current)).cards.find((x) => x.key === wanted)
+    return c.redirect(card === undefined ? '/panel/plan/review'
+      : '/panel/plan/review?w=' + String(weekOfDay(current.week, card.item.day)) + '#c-' + String(card.index), 303)
+  }
   const [model, zone, flash, orgRow, accounts, share, verdicts, waiting] = await Promise.all([
     reviewModel(c.env.DB, org, current),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),

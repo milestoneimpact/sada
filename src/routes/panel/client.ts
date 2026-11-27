@@ -188,7 +188,7 @@ client.post('/panel/client/brief', async (c) => {
     channels: f.getAll('channel'), perWeek: f.get('per_week'),
   })
   await record(c.env.DB, { actor: 'panel', action: 'brief.write' }, c.req.raw)
-  return c.redirect('/panel/client?saved=1#brief', 303)
+  return c.redirect('/panel/client?saved=1#setup', 303)
 })
 
 /** تقريرُ الشهر لكلّ عميل (D-262 · AGENCY-PLAN و-٦) — يُطبع PDF من المتصفّح. */

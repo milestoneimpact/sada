@@ -276,7 +276,10 @@ describe('GET /oauth/:platform/callback', () => {
     expect(first.status).toBe(200)
     const second = await app.request(`/oauth/x/callback?code=c&state=${state}`, withBinding(), env)
     expect(second.status).toBe(400)
-    expect((await second.json()) as unknown).toEqual({ error: 'invalid_state' })
+    // ‏صفحةٌ لإنسانٍ لا JSON (D-435): «انتهت مهلة الربط» وزرُّها بدءٌ جديد
+    const html = await second.text()
+    expect(html).toContain('انتهت مهلة الربط')
+    expect(html).toMatch(/href="\/oauth\/x\/start"[^>]*>(?:<[^>]*>)*\s*اربط من جديد/)
   })
 
   it('يرفض state لم يصدر منا', async () => {

@@ -89,6 +89,8 @@ export interface ConnectedData {
   readonly hasRefresh: boolean
   readonly expiresAt: string
   readonly zone?: string | null
+  /** ‏رُبط لعميلٍ لا للمالك (D-435): الزرُّ الأوّليّ إلى «جاهزيّة العميل»، لا إلى شاشة المنصّة. */
+  readonly forClient?: boolean
 }
 
 /** رُبط الحساب — وما يستطيعه يُقال هنا لا يُترك ليُكتشَف عند أوّل نشر. */
@@ -142,8 +144,10 @@ export function connectedBody(d: ConnectedData): string {
   </div>
 
   <div class="row mt-4">
-    ${button({ label: 'شاشة ' + LABEL[d.platform], variant: 'primary', href: '/panel/channels/' + d.platform })}
-    ${ACCOUNTS}
+    ${d.forClient === true
+      ? button({ label: 'التالي: جاهزيّة العميل', variant: 'primary', href: '/panel/client#setup' })
+        + button({ label: 'شاشة ' + LABEL[d.platform], href: '/panel/channels/' + d.platform })
+      : button({ label: 'شاشة ' + LABEL[d.platform], variant: 'primary', href: '/panel/channels/' + d.platform }) + ACCOUNTS}
   </div>`
 }
 
@@ -501,6 +505,19 @@ export function otherBrowserBody(platform: Platform): string {
       ` + button({ label: 'الحسابات', variant: 'primary', href: panelHref('channels') }) + `
     </div>
   </div>`
+}
+
+/**
+ * ‏**انتهت مهلةُ الربط** (D-435): حالةٌ منتهيةٌ أو مستهلَكة — تحديثُ صفحة العودة، أو رجوعٌ إليها، أو دورةٌ تُركت طويلًا.
+ * ‏كانت سطرَ JSON (`invalid_state`) يراه إنسانٌ في متصفّحه؛ والإصلاحُ الوحيد بدءٌ جديد، فهو الزرُّ الأوّليّ.
+ */
+export function expiredBody(platform: Platform): string {
+  const label = LABEL[platform]
+  return head(platform, 'لم يكتمل', 'انتهت مهلة الربط',
+    'هذه العودةُ من ' + escapeHtml(label) + ' لم تعد صالحة — انتهت مهلتُها أو استُعملت من قبل. <b>ولم يُربَط بها شيءٌ جديد.</b>') + card({ title: 'ما يُفعَل',
+    body: '<p class="hint">ابدأ الربطَ من جديد وأكمله دون توقّفٍ طويل عند شاشة الموافقة.</p><div class="row mt-3">'
+      + button({ label: 'اربط من جديد', variant: 'primary', href: '/oauth/' + platform + '/start' })
+      + button({ label: 'صفحة ' + label, href: '/panel/channels/' + platform }) + '</div>' })
 }
 
 export interface UnreachedData {

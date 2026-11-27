@@ -116,6 +116,25 @@ describe('مركز الإشعارات (D-294)', () => {
     expect(pageHtml).toContain('صورة تنتظر حصّةَ الغد')
   })
 
+  // ‏D-435: كلُّ إشعارٍ يقود بضغطةٍ إلى إصلاحه، لا إلى صفحةٍ يُبحث فيها
+  it('إذنٌ انتهى يقود إلى «أعد الربط» نفسِه، والمقترِبُ إلى الحسابات', async () => {
+    db.raw.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('a-li', 'linkedin', 'member', 'abc', 'عمر', 'active')`).run()
+    db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, org_id) VALUES ('a-li', 'refresh', 0, '2026-11-01', 'org_owner')`).run()
+    const html = await (await get('/panel/notices')).text()
+    expect(html).toMatch(/href="\/oauth\/linkedin\/start"[^>]*>(?:<[^>]*>)*\s*أعد الربط/)
+    db.raw.prepare('DELETE FROM token_alerts').run()
+    db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, org_id) VALUES ('a-li', 'refresh', 7, '2026-12-01', 'org_owner')`).run()
+    expect(await (await get('/panel/notices')).text()).toContain('href="/panel/accounts"')
+  })
+
+  it('حكمُ العميل يقود إلى بطاقة البند في الخطّة ببصمته', async () => {
+    db.raw.exec('PRAGMA foreign_keys = OFF')
+    db.raw.prepare(`INSERT INTO review_links (id, org_id, plan_id, token_hash, created_by, expires_at) VALUES ('l-1', 'org_owner', 'pl-1', 'h', 'panel', '2099-01-01')`).run()
+    db.raw.prepare(`INSERT INTO review_verdicts (link_id, org_id, plan_id, item_key, verdict, note) VALUES ('l-1', 'org_owner', 'pl-1', 's1|x|2026-11-03|09:00', 'changes', 'أقصر')`).run()
+    const html = await (await get('/panel/notices')).text()
+    expect(html).toContain('href="/panel/plan/review?item=s1%7Cx%7C2026-11-03%7C09%3A00"')
+  })
+
   it('علّةٌ في منظّمةٍ أخرى لا تُعدّ لهذه', async () => {
     db.raw.prepare(`INSERT INTO orgs (id, name) VALUES ('org_other', 'غيرها')`).run()
     db.raw.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status, org_id) VALUES ('a-o', 'x', 'member', 'o', 'غيرُه', 'active', 'org_other')`).run()
@@ -159,6 +178,8 @@ describe('إشعاراتُ الذاكرة: النبضُ والسقف', () => {
     const notes = memoryNotices(late, null, now)
     expect(notes.map((n) => n.kind)).toEqual(['pulse'])
     expect(notes[0]!.text).toContain('لم تدُر')
+    // ‏وبطاقةُ «هل الآلة تعمل؟» في الإعدادات لا في الرئيسيّة (D-435)
+    expect(notes[0]!.href).toBe('/panel/settings#machine')
     const fresh = pulses([{ job: 'renew', at: '2026-11-04 11:55:00', outcome: 'ok', detail: '' }], now)
     expect(memoryNotices(fresh, null, now)).toEqual([])
   })

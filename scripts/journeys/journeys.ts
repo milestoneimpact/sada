@@ -1132,6 +1132,51 @@ const R18: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R5md, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
+/**
+ * ‏**ر-20 · إشعار ← الإصلاح** (D-435): ثلاثةُ إشعاراتٍ تُفتح من «الإشعارات»، وكلٌّ بضغطةٍ واحدة إلى موضع إصلاحه — الآلةُ إلى
+ * ‏«هل الآلة تعمل؟» في الإعدادات (كانت `/panel#machine` فتسقط على رأس الرئيسيّة)، وإذنٌ انتهى إلى بدء إعادة الربط (كان الحسابات)،
+ * ‏وطلبُ تعديلٍ من العميل إلى بطاقة البند في أسبوعه (كان رأسَ الخطّة). وفتحُ الصفحة تمهيدٌ لا يُعدّ: الجرسُ بابُها في كلّ شاشة.
+ */
+let r20Key = ''
+const R20: Journey = {
+  id: 'R-20',
+  title: 'إشعار ← الإصلاح: الآلة وانتهاء الإذن وطلب التعديل، كلٌّ بضغطة',
+  plan: { target: '3 = ضغطةٌ لكلّ إشعارٍ من الثلاثة (≤1 لكلٍّ · D-435)' },
+  async prepare(stack) {
+    await R13.prepare!(stack)
+    const it = (JSON.parse(q<{ plan_json: string }>(stack, 'SELECT plan_json FROM plans WHERE id = ?', r13Plan)?.plan_json ?? '{}') as { items: { sourceId: string; platform: string; day: string; time: string }[] }).items[1]!
+    r20Key = `${it.sourceId}|${it.platform}|${it.day}|${it.time}`
+    stack.db.raw.prepare(`INSERT INTO review_links (id, org_id, plan_id, token_hash, created_by, expires_at) VALUES ('rl-r20', 'org_owner', ?, 'r20', 'panel', datetime('now', '+7 days'))`).run(r13Plan)
+    stack.db.raw.prepare(`INSERT INTO review_verdicts (link_id, org_id, plan_id, item_key, verdict, note) VALUES ('rl-r20', 'org_owner', ?, ?, 'changes', 'أقصر من هذا')`).run(r13Plan, r20Key)
+    stack.db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, org_id) VALUES (?, 'refresh', 0, datetime('now'), 'org_owner')`).run(stack.seeded.accounts.linkedin)
+    stack.db.raw.prepare(`INSERT INTO heartbeats (job, at, outcome, detail) VALUES ('renew', datetime('now', '-3 hours'), 'ok', '')
+      ON CONFLICT (job) DO UPDATE SET at = excluded.at, outcome = 'ok'`).run()
+    return 'خطّةُ R-13، وطلبُ تعديلٍ من العميل على بندها الثاني، وإذنُ تجديد LinkedIn منتهٍ، ودورةُ التجديد متأخّرةٌ ثلاث ساعات'
+  },
+  async run({ page, m, stack }) {
+    const open = async (): Promise<void> => { await page.goto(`${stack.url}/panel/notices`); await page.waitForLoadState('networkidle') }
+    const act = (text: RegExp) => visible(page.locator('li', { hasText: text }).locator('.nt-act a')).first()
+    await open()
+    await m.tap(act(/لم تدُر منذ/), '«افتح «هل الآلة تعمل؟»» على إشعار دورة التجديد')
+    const machine = new URL(page.url())
+    const machineOk = machine.pathname === '/panel/settings' && machine.hash === '#machine' && (await page.locator('#machine').count()) > 0
+    await open()
+    const reauth = act(/إذن التجديد لـ LinkedIn .* انتهى/)
+    const reauthHref = (await reauth.getAttribute('href')) ?? ''
+    await m.tap(reauth, '«أعد الربط» على إشعار انتهاء الإذن')
+    const reauthOk = reauthHref === '/oauth/linkedin/start'
+    await open()
+    await m.tap(act(/يطلب العميل تعديل/), '«افتح المنشور وعدّله» على طلب العميل')
+    await page.waitForURL(/\/panel\/plan\/review\?w=\d+#c-\d+/)
+    const card = new URL(page.url()).hash
+    const reviewOk = (await page.locator(card).count()) > 0
+    return {
+      success: machineOk && reauthOk && reviewOk,
+      verified: `الآلة: ${machine.pathname}${machine.hash} (${machineOk ? 'نعم' : 'لا'}) · الإذن: ${reauthHref || '—'} · التعديل: ${new URL(page.url()).search}${card} (${reviewOk ? 'البطاقة ظاهرة' : 'لا بطاقة'})`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R5md, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18, R20]
 
 export { Blocked }

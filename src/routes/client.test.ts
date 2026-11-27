@@ -54,6 +54,17 @@ describe('رحلةُ العميل', () => {
     expect(html).toContain('24 منشورًا')
     expect(html).toContain('ولا تقدير قبل أوّل مسوّدة')
     expect(html).toContain('بقي ربطُ LinkedIn وX')
+    // ‏حفظُ الموجز إلى «جاهزيّة العميل» (D-435)، وقناتان ناقصتان تُربطان من قائمة الحسابات
+    expect(res.headers.get('Location')).toBe('/panel/client?saved=1#setup')
+    expect(html).toContain('href="/panel/accounts"')
+    // ‏وقناةٌ واحدةٌ ناقصةٌ تُربط من صفحتها مباشرة
+    const one = new FormData()
+    one.set('_csrf', csrf); one.set('goal', 'هدف'); one.append('channel', 'linkedin'); one.set('per_week', '2')
+    await app.request('/panel/client/brief', { method: 'POST', body: one, headers: { Cookie: cookie } }, env)
+    const single = await (await app.request('/panel/client', { headers: { Cookie: cookie } }, env)).text()
+    expect(single).toContain('بقي ربطُ LinkedIn')
+    expect(single).toContain('href="/panel/channels/linkedin"')
+    expect(single).toMatch(/<a href="\/panel\/channels\/linkedin">اربط LinkedIn<\/a>/)
 
     // ‏وبلا رمز النموذج لا يُحفظ شيء
     const bad = new FormData()

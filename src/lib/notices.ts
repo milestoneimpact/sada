@@ -104,7 +104,7 @@ export function memoryNotices(pulses: readonly Pulse[], allowance: Pick<Allowanc
         text: p.state === 'failed'
           ? `دورة «${p.label}» سقطت في آخر مرّة${p.beat?.detail ? `: ${p.beat.detail}` : ''}`
           : `دورة «${p.label}» لم تدُر منذ ${minutes > 0 ? `${minutes} دقيقة فوق موعدها` : 'موعدها'} — هل العدّاء يعمل؟`,
-        href: '/panel#machine',
+        href: '/panel/settings#machine',
         action: 'افتح «هل الآلة تعمل؟»',
         at: p.beat?.at ?? now.toISOString(),
       })
@@ -226,7 +226,8 @@ export async function collectNotices(
       text: v.verdict === 'approve'
         ? `وافق العميل على منشور ${label} (${v.item_key.split('|')[2] ?? ''})`
         : `يطلب العميل تعديل منشور ${label} (${v.item_key.split('|')[2] ?? ''})${v.note === '' ? '' : ': «' + v.note + '»'}`,
-      href: '/panel/plan/review', action: 'افتح الخطّة', at: v.at,
+      // ‏إلى البطاقة نفسِها لا إلى رأس الخطّة (D-435): `?item=` يُحلّ في الخادم إلى أسبوعها ومرساتها
+      href: '/panel/plan/review?item=' + encodeURIComponent(v.item_key), action: v.verdict === 'approve' ? 'افتح المنشور' : 'افتح المنشور وعدّله', at: v.at,
     })
   }
   for (const f of failed) {
@@ -257,7 +258,11 @@ export async function collectNotices(
       ref: `token:${t.account_id}:${t.kind}:${t.threshold}`, kind: 'token', tone: t.threshold === 0 ? 'bad' : 'warn',
       text: `${t.kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'} لـ ${platformLabel(t.platform as Platform)} (${t.display_name}) ${
         t.threshold === 0 ? 'انتهى' : `يقترب — بقي ${t.threshold} ${t.threshold === 1 ? 'يوم' : 'أيّام'}`}`,
-      href: '/panel/accounts', action: 'الحسابات', at: t.at,
+      // ‏وإذنٌ انتهى يُصلَح بإعادة الربط نفسِها لا بصفحة الحسابات (D-435)
+      ...(t.threshold === 0
+        ? { href: `/oauth/${encodeURIComponent(t.platform)}/start`, action: 'أعد الربط' }
+        : { href: '/panel/accounts', action: 'الحسابات' }),
+      at: t.at,
     })
   }
   for (const e of security) {
