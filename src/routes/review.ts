@@ -25,10 +25,11 @@ export const review = new Hono<{ Bindings: Env }>()
 const TITLE = 'صدى — راجع منشوراتك'
 
 /** منطقةُ متصفّح العميل من كعكته القصيرة على `/r` (D-428) — ليست سرًّا ولا تدخل قرارًا. */
-function clientZoneOf(cookie: string | null): string | null {
+export function clientZoneOf(cookie: string | null): string | null {
   const m = new RegExp('(?:^|;\\s*)' + CLIENT_TZ_COOKIE + '=([^;]+)').exec(cookie ?? '')
   if (m === null) return null
-  try { return validZone(decodeURIComponent(m[1]!)) } catch { return null }
+  // ‏و«UTC» ليست منطقةَ إنسان (D-436): متصفّحٌ بلا ضبطٍ أو آليٌّ يقولها، فيُعاد الرسمُ بعد «موافق» بغرينتش — فتسقط إلى منطقة المالك
+  try { const z = validZone(decodeURIComponent(m[1]!)); return z === null || /^(Etc\/)?(UTC|GMT|Universal|Zulu)$/i.test(z) ? null : z } catch { return null }
 }
 
 function gone(): Response {

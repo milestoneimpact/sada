@@ -12,6 +12,9 @@ import { loginResponse, page } from './shared'
 
 export const help = new Hono<{ Bindings: Env }>()
 
+// ‏«/help» عنوانٌ يُكتَب باليد (D-442): يُحوَّل إلى الدليل لا إلى 404
+help.get('/help', (c) => c.redirect('/panel/help', 301))
+
 help.get('/panel/help', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)

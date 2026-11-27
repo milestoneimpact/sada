@@ -111,7 +111,7 @@ describe('مركز الإشعارات (D-294)', () => {
     db.raw.prepare(`INSERT INTO audit_log (actor, action, target, detail, org_id, at) VALUES ('system', 'image.quota_wait', 'p-9', '3 صور', 'org_owner', datetime('now'))`).run()
     expect(bellCount(await (await get('/panel')).text())).toBe(2)
     const pageHtml = await (await get('/panel/notices')).text()
-    expect(pageHtml).toContain('انقطع إذن LinkedIn (عمر)')
+    expect(pageHtml).toContain('انتهى إذن LinkedIn (عمر) — والنشر عليه متوقّف.')
     expect(pageHtml).toContain('href="/oauth/linkedin/start"')
     expect(pageHtml).toContain('صورة تنتظر حصّةَ الغد')
   })

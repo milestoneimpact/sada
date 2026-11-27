@@ -167,6 +167,18 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(db.raw.prepare("SELECT status FROM posts WHERE id = 'p1'").get()).toEqual({ status: 'rejected' })
   })
 
+  it('الفعلُ الجماعيّ يُبقي التصفيةَ واليومَ في العنوان، وما خالف النمطَ يسقط (D-437)', async () => {
+    const { cookie, csrf } = await session()
+    const page = await (await app.request('/panel/plan/review?w=1&only=wait', { headers: { Cookie: cookie } }, env)).text()
+    expect(page).toContain('<input type="hidden" name="only" value="wait">')
+    const f = form({ _csrf: csrf, id: 'pl1', do: 'delay', w: '1', only: 'wait', d: '2099-01-06', back: 'review' })
+    const res = await app.request('/panel/plan/review/bulk', { method: 'POST', body: f, headers: { Cookie: cookie } }, env)
+    expect(res.headers.get('Location')).toBe('/panel/plan/review?w=1&only=wait&d=2099-01-06')
+    const bad = form({ _csrf: csrf, id: 'pl1', do: 'delay', w: '1', only: 'x"><', d: 'nope', back: 'review' })
+    const r2 = await app.request('/panel/plan/review/bulk', { method: 'POST', body: bad, headers: { Cookie: cookie } }, env)
+    expect(r2.headers.get('Location')).toBe('/panel/plan/review?w=1')
+  })
+
   it('بلا خطّةٍ يُرسَل إلى «خطّة جديدة»، والمعالجُ يطلب المراجعةَ بعد البناء', async () => {
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     const { cookie } = await session()
@@ -522,7 +534,7 @@ describe('«عندي خطّة» (D-287)', () => {
     expect(db.raw.prepare("SELECT count(*) AS n FROM plans WHERE status <> 'superseded'").get()).toEqual({ n: 0 })
     const preview = await (await app.request(to, { headers: { Cookie: cookie } }, env)).text()
     expect(preview).toContain('هذا ما فهمته')
-    expect(preview).toContain('2099-02-01 إلى 2099-02-03')
+    expect(preview).toContain('<bdi>الأحد، 1 فبراير</bdi> إلى <bdi>الثلاثاء، 3 فبراير</bdi>')
     expect(preview).toContain('الساعةُ أرجحُ ساعات المنصّة')
     expect(preview).toContain('ابنِ كما هي')
     const k = new URL(to, 'http://x').searchParams.get('k') ?? ''

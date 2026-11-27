@@ -27,8 +27,11 @@ import { platformLabel } from '../../lib/oauth/providers'
 import { postStatus } from '../../lib/status'
 import { stamp, todayKey } from '../../lib/time/zone'
 import { field } from './components/field'
-import { segmented, tabs as tabBar } from './components/tabs'
-import { AR_LATN, num } from '../../lib/format'
+import { escapeHtml } from './escape'
+import { card as cardBox } from './components/card'
+import { segmented } from './components/tabs'
+import { AR_LATN, counted, NOUNS, num } from '../../lib/format'
+import { textProblem } from '../../lib/draft/store'
 import { SPAN_LABEL, imageFor, spanDays } from '../../lib/plan/prompt'
 import { GAP_LABEL, type Gap, type ReviewCard, type ReviewModel } from '../../lib/plan/review'
 
@@ -63,7 +66,11 @@ export interface ReviewView {
   readonly seatedIdeas?: number
   /** رأيُ العميل في كلّ بندٍ ببصمته (D-353). */
   readonly verdicts?: ReadonlyMap<string, { readonly verdict: 'approve' | 'changes'; readonly note: string }>
+  /** شريطُ التصفية (D-436): «تنتظر» أو «العميلُ موافق» أو منصّةٌ، ويومٌ واحد (`?d=`) — من العنوان، فيعمل بلا سكربت. */
+  readonly filter?: { readonly only?: string | null; readonly day?: string | null }
 }
+
+const WEEKDAYS: readonly string[] = ['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت']
 
 /** أيُّ أسبوعٍ من الخطّة يقع فيه اليوم — من 1. */
 export function weekOfDay(start: string, day: string): number {
@@ -139,10 +146,12 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
   const approve = c.post === null || (status !== 'draft' && status !== 'approved' && status !== 'edited')
     ? html``
     : html`<form class="inline" method="POST" action="/panel/plan/review/approve" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}"><input type="hidden" name="back" value="feed">${raw(button({ label: status === 'draft' ? 'اعتمد' : 'جدوِل', variant: 'primary', size: 'sm', type: 'submit', icon: ICON.check }))}</form>`
+  // ‏**الفحصُ نفسُه الذي يردّ الاعتماد** (D-436): مسوّدةٌ نصُّها أقصرُ من منشورٍ تُبرَز قبل «اعتمد المحدّد» لا بعده
+  const short = c.post !== null && waits(c) ? textProblem(c.item.platform, c.post.text) : null
   const undo = c.post === null || status !== 'queued'
     ? html``
     : html`<form class="inline" method="POST" action="/panel/plan/review/undo" data-busy="جار…">${hidden}<input type="hidden" name="post" value="${c.post.id}">${raw(button({ label: 'تراجَع', size: 'sm', type: 'submit' }))}</form>`
-  return html`<article class="card rv" id="c-${String(c.index)}" data-gaps="${c.gaps.join(' ')}">
+  return html`<article class="card rv${short === null ? '' : ' is-bad'}" id="c-${String(c.index)}" data-gaps="${c.gaps.join(' ')}">
     <header class="rv-h">
       <label class="rv-sel"><input type="checkbox" name="sel" form="rv-bulk" value="${String(c.index)}|${c.key}|${c.post?.id ?? ''}" aria-label="حدّد بند ${label} ${local}"></label>
       <span class="pf-logo rv-pf" data-pf="${c.post?.page !== undefined ? 'linkedin-page' : c.item.platform}" aria-hidden="true">${raw(LOGOS[c.item.platform] ?? '')}</span>
@@ -153,7 +162,7 @@ function card(c: ReviewCard, m: ReviewModel, zone: string | null, view: ReviewVi
     <div class="rv-pv">${preview}</div>
     ${c.post === null || c.item.why === 'من خطّتك المرفوعة' ? html`` : html`<p class="hint m-0">${c.item.angle}</p>`}
     ${c.item.note === undefined ? html`` : html`<p class="hint m-0">ملاحظة: ${c.item.note}</p>`}
-    ${c.gaps.includes('clash') ? html`<div class="row gap-2"><span class="chip">${GAP_LABEL.clash}</span></div>` : html``}
+    ${c.gaps.includes('clash') ? html`<div class="row gap-2"><span class="chip">${GAP_LABEL.clash}</span></div>` : html``}${short === null ? html`` : html`<p class="rv-short m-0" role="note"><b>قصير</b> — ${short}. افتح البطاقة وأكمل نصَّها، ثمّ اعتمد.</p>`}
     ${clientSaid(view.verdicts?.get(c.key))}
     ${imageActs(c, m, w)}
     <div class="row gap-2 rv-acts">
@@ -182,13 +191,30 @@ function clientSaid(v: { readonly verdict: 'approve' | 'changes'; readonly note:
 
 /** «شارك مع العميل» (D-353): رابطٌ يُنشأ ويُعرض مرّةً، أو حالُ الرابط النافذ وإلغاؤه. */
 const shareBtn = btnClass('secondary', 'sm')
+/**
+ * **رابطُ العميل الذي يُعرض مرّةً** (D-436): حقلٌ للقراءة وحدها يُحدَّد كلُّه بلمسة، و«انسخ الرابط» (الحافظة) و«شارك»
+ * (`navigator.share`) زرّان يظهران حين يقدر المتصفّح. وبلا سكربتٍ الحقلُ نفسُه يُنسخ باليد. ولا يُطفأ وحدَه: لا يُستعاد.
+ */
+export function shareLinkBox(text: string, url: string): string {
+  return cardBox({ title: text, titleId: 'rv-link-t', attrs: 'aria-labelledby="rv-link-t"', body: html`<div class="row gap-2 rv-link">
+    ${raw(field({ id: 'rv-link-u', label: 'رابطُ العميل', hint: 'يرى به العميلُ منشوراتِ هذه الخطّة ويقول رأيه، ولا ينشر ولا يعتمد.',
+      control: '<input type="url" id="rv-link-u" class="mono" dir="ltr" readonly value="' + escapeHtml(url) + '">' }))}
+    ${raw(button({ label: 'انسخ الرابط', variant: 'primary', size: 'sm', attrs: 'data-copy="rv-link-u"' }))}
+    ${raw(button({ label: 'شارك', size: 'sm', attrs: 'data-share="rv-link-u" hidden' }))}</div>`.value })
+}
+
+/** سكربتُ «شارك» — و«انسخ الرابط» بـ`COPY_SCRIPT` العامّ (الحافظةُ ثمّ التحديد). يُرسَل مع الصفحة التي فيها الرابطُ وحدَها، لا مع كلّ مراجعة. */
+export const SHARE_LINK_SCRIPT = `(function(){var u=document.getElementById('rv-link-u'), sh=document.querySelector('[data-share]'); if(!u)return;
+  u.onfocus=function(){u.select();};
+  if(navigator.share){sh.hidden=false; sh.onclick=function(){navigator.share({url:u.value}).catch(function(){});};}})();`
+
 function shareBox(m: ReviewModel, view: ReviewView): Html {
   const s = view.share ?? { count: 0, until: null }
   const said = view.verdicts === undefined ? 0 : [...view.verdicts.values()].length
   const changes = view.verdicts === undefined ? 0 : [...view.verdicts.values()].filter((v) => v.verdict === 'changes').length
   // ‏فعلٌ ثانويٌّ بأيقونة المشاركة (§6.2) لا طيّةٌ بعرض الصفحة: الطيُّ نفسُه «details» فيعمل بلا سكربت
   return html`<details class="rv-share"><summary class="${shareBtn}">${raw(ICON.share)}<span>شارك مع العميل${s.count > 0 ? ' · رابطٌ نافذ' : ''}${said > 0 ? ' · قال رأيه في ' + AR(said) + (changes > 0 ? '، ويطلب تعديلَ ' + AR(changes) : '') : ''}</span></summary>
-    <p class="hint">رابطٌ يرى به العميلُ منشورات هذه الخطّة بشكل كلّ منصّة، ويقول في كلٍّ منها «موافق» أو «أطلب تعديلًا» بملحوظة. لا ينشر ولا يعتمد، ولا يرى شيئًا سواها. وينتهي بعد أربعة عشر يومًا، أو حين تُبنى خطّةٌ أحدث.</p>
+    <p class="hint">يرى به العميلُ منشوراتِ الخطّة ويقول في كلٍّ «موافق» أو «أطلب تعديلًا». لا ينشر ولا يعتمد، وينتهي بعد 14 يومًا أو بخطّةٍ أحدث.</p>
     <div class="row gap-2">
       <form class="inline" method="POST" action="/panel/plan/share" data-busy="جار…"><input type="hidden" name="id" value="${m.plan.id}">
         ${raw(button({ label: s.count > 0 ? 'أنشئ رابطًا آخر' : 'أنشئ رابطَ العميل', variant: s.count > 0 ? 'secondary' : 'primary', type: 'submit', size: 'sm' }))}</form>
@@ -211,9 +237,8 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
   const byDay = new Map<string, ReviewCard[]>()
   for (const c of m.cards) byDay.set(c.item.day, [...(byDay.get(c.item.day) ?? []), c])
   const cells: Html[] = []
-  // ‏الأسبوعُ يبدأ الأحد في الرأس، فيومُ بدايةٍ غيرُه يُزاح بخاناتٍ فارغة
+  // ‏**الأسبوعُ يبدأ من أوّل أيّام الخطّة** (D-436): رأسُ الأيّام يدور إليه، فلا خاناتٍ فارغةً قبل البداية
   const lead = new Date(start + 'T12:00:00Z').getUTCDay()
-  for (let i = 0; i < lead; i += 1) cells.push(html`<span class="rv-cd" aria-hidden="true"></span>`)
   for (let i = 0; i < days; i += 1) {
     const day = shift(start, i)
     const cards = (byDay.get(day) ?? []).sort((a, b) => a.item.time.localeCompare(b.item.time))
@@ -251,7 +276,7 @@ export function calendar(m: ReviewModel, hrefOf: (day: string) => string = (day)
       })}
     </div>`)
   }
-  return html`<nav class="rv-cal${board === undefined ? '' : ' is-board'}" aria-label="أيّام الخطّة">${['أحد', 'اثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'].map((d) => html`<span class="rv-wd" aria-hidden="true">${d}</span>`)}${cells}</nav>`
+  return html`<nav class="rv-cal${board === undefined ? '' : ' is-board'}" aria-label="أيّام الخطّة">${WEEKDAYS.slice(lead).concat(WEEKDAYS.slice(0, lead)).map((d) => html`<span class="rv-wd" aria-hidden="true">${d}</span>`)}${cells}</nav>`
 }
 
 function gapsBar(m: ReviewModel): Html {
@@ -279,8 +304,22 @@ function weekTabs(m: ReviewModel, shown: number): Html {
     tabs.push(html`<a class="rv-wk${w === shown ? ' is-on' : ''}" href="?w=${String(w)}"${w === shown ? raw(' aria-current="page"') : ''}><b>الأسبوع ${AR(w)}</b>
       <span class="ago">${dayLabel(from, 'short')}–${dayLabel(shift(from, 6), 'short')} · ${AR(inWeek.length)} ${open > 0 ? html`· <em>${AR(open)} تنتظر</em>` : ''}</span></a>`)
   }
-  tabs.push(html`<a class="rv-wk${shown === 0 ? ' is-on' : ''}" href="?w=all"${shown === 0 ? raw(' aria-current="page"') : ''}><b>الكلّ</b><span class="ago">${AR(m.cards.length)} منشورًا</span></a>`)
+  tabs.push(html`<a class="rv-wk${shown === 0 ? ' is-on' : ''}" href="?w=all"${shown === 0 ? raw(' aria-current="page"') : ''}><b>الكلّ</b><span class="ago">${counted(m.cards.length, NOUNS.post)}</span></a>`)
   return html`<nav class="rv-weeks" aria-label="أسابيع الخطّة">${tabs}</nav>`
+}
+
+const firstDayOf = (m: ReviewModel, shown: number): string => shown === 0 ? m.plan.week : shift(m.plan.week, (shown - 1) * 7)
+
+/**
+ * **شريطُ التصفية** (D-436): نموذجُ GET بـ«تنتظر» أو «العميلُ موافق» أو منصّة — يعمل بلا سكربت. والمنظارُ روابطُ تعمل فعلًا:
+ * الشهرُ «الكلّ» (`?w=all`)، والأسبوعُ شريطُ الأسابيع (`?w=N`)، واليومُ خانتُه في التقويم (`?d=`) ومعه رابطُ العودة إلى أسبوعه. و«حدّد كلّ الظاهر» في شريط الجملة يحدّد ما بقي بعد التصفية.
+ */
+function filterBar(m: ReviewModel, w: string, day: string | null, fl: NonNullable<ReviewView['filter']>): Html {
+  const opts: [string, string][] = [['', 'الكلّ'], ['wait', 'تنتظر'], ['client', 'العميلُ موافق'],
+    ...[...new Set(m.cards.map((c) => c.item.platform))].map((p): [string, string] => [p, platformLabel(p as never)])]
+  return html`<form method="GET" class="rv-filter"><input type="hidden" name="w" value="${w}">${day === null ? html`` : html`<input type="hidden" name="d" value="${day}"><a href="?w=${String(weekOfDay(m.plan.week, day))}${fl.only === null || fl.only === undefined || fl.only === '' ? '' : '&only=' + encodeURIComponent(fl.only)}">${dayLabel(day, 'short')} وحدَه · اعرض أسبوعه</a>`}
+    <select name="only" aria-label="صفِّ">${opts.map(([v, l]) => html`<option value="${v}"${(fl.only ?? '') === v ? raw(' selected') : ''}>${l}</option>`)}</select>
+    ${raw(button({ label: 'صفِّ', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>`
 }
 
 /**
@@ -291,7 +330,7 @@ function weekTabs(m: ReviewModel, shown: number): Html {
 function planActions(m: ReviewModel): Html {
   const scheduled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
   const drafts = m.cards.filter((c) => c.post !== null && (c.post.status === 'draft' || c.post.status === 'approved')).length
-  const keep = scheduled === 0 ? '' : ' ويبقى ما جُدول (' + AR(scheduled) + ') في موعده؛ تسحبه من «المنشورات» إن شئت.'
+  const keep = scheduled === 0 ? '' : '، ويبقى المجدولُ (' + AR(scheduled) + ') في موعده.'
   // ‏«⋯» (§6.2): أفعالُ الخطّة كلِّها نادرةٌ ولا تنافس «اعتمد» — زرُّ أيقونةٍ اسمُه «أفعال الخطّة»
   return html`${raw(menu({ label: 'أفعال الخطّة', variant: 'icon', size: 'sm', icon: ICON.more, items: [
     // ‏وما جُدول ونُشر في التيّار (D-388) لا في «متابعة» رابعة
@@ -299,14 +338,17 @@ function planActions(m: ReviewModel): Html {
     menuItem({ label: 'اعرض واطبع', href: '/panel/plan/view' }),
     menuItem({ label: 'أعد بناء الخطّة', href: '/panel/plan/new' }),
     menuAction({ label: 'ألغِ الخطّة', action: '/panel/plan/cancel', fields: { id: m.plan.id }, danger: true,
-      confirm: 'ألغِ هذه الخطّة؟ تُرفض مسوّداتُها التي لم تُجدوَل (' + AR(drafts) + ')' + keep }),
+      confirm: 'ألغِ الخطّة؟ تُرفض مسوّداتُها (' + AR(drafts) + ')' + keep }),
   ] }))}`
 }
 
 export function planReviewScreen(m: ReviewModel, zone: string | null, view: ReviewView = {}): string {
   const span = SPAN_LABEL[m.plan.span ?? 'week']
   const end = shift(m.plan.week, spanDays(m.plan.span ?? 'week') - 1)
-  const shown = shownWeek(m, view.week, view.now, zone)
+  const fl = view.filter ?? {}
+  const oneDay = fl.day !== null && fl.day !== undefined && /^\d{4}-\d{2}-\d{2}$/.test(fl.day) ? fl.day : null
+  // ‏ويومٌ وحدَه (`?d=`) يقع في أسبوعه: شريطُ الأسابيع يعلّمه
+  const shown = shownWeek(m, view.week ?? (oneDay === null ? null : String(weekOfDay(m.plan.week, oneDay))), view.now, zone)
   const w = shown === 0 ? 'all' : String(shown)
   const state = m.lockedAt !== null
     ? html`<span class="st ok">مثبَّتة · الإصدار ${AR(m.version)}</span>`
@@ -332,7 +374,9 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       ${(view.seatedIdeas ?? 0) > 0 && maySpend() ? html`<form class="inline" method="POST" action="/panel/plan/review/write-seated" data-busy="تُكتب…"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'اكتبها من أفكارها بقواعد الإرشادات (' + AR(view.seatedIdeas ?? 0) + ' نداءً مدفوعًا)', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}
       ${inFlight === 0 && failed.length > 0 ? html`<form class="inline" method="POST" action="/panel/plan/review/redraft"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'أعد كتابة ما تعذّر (' + AR(failed.length) + ')', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}</div>`
   const visible = [...m.cards]
-    .filter((c) => shown === 0 || weekOfDay(m.plan.week, c.item.day) === shown)
+    .filter((c) => oneDay !== null ? c.item.day === oneDay : shown === 0 || weekOfDay(m.plan.week, c.item.day) === shown)
+    .filter((c) => fl.only === 'wait' ? c.post === null || waits(c) : fl.only === 'client' ? view.verdicts?.get(c.key)?.verdict === 'approve'
+      : fl.only === null || fl.only === undefined || fl.only === '' || c.item.platform === fl.only)
     .sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))
   const byDay = new Map<string, ReviewCard[]>()
   for (const c of visible) byDay.set(c.item.day, [...(byDay.get(c.item.day) ?? []), c])
@@ -354,14 +398,10 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       <thead><tr><th scope="col">الموعد</th><th scope="col">المنصّة</th><th scope="col">الحال</th><th scope="col">المنشور</th></tr></thead><tbody>${rows}</tbody></table></div>`
   // ‏مقطعٌ (segmented · §6.2) لا زرّان متساويان: اختيارٌ واحدٌ من اثنين، بلغة «الاختيار» في D-189
   const toggle = html`<span class="rv-vw" hidden>${raw(segmented('طريقة العرض', 'view', [{ value: 'cards', label: 'بطاقات', pressed: true }, { value: 'list', label: 'قائمة' }]))}</span>`
-  // ‏تبويباتُ الخطّة تحت العنوان (§6.2): ثلاثُ صفحاتٍ لشيءٍ واحد، فالتنقّلُ بينها بلغة التنقّل
-  const sub = tabBar('صفحات الخطّة', [
-    { label: 'الخطّة', href: '/panel/plan', current: true },
-    { label: 'عرض للطباعة', href: '/panel/plan/view' },
-    { label: 'خطّة جديدة', href: '/panel/plan/new' },
-  ])
+  // ‏**شريطُ الأقسام مرّةً واحدة** (D-436): كانت «صفحاتُ الخطّة» (الخطّة · عرض للطباعة · خطّة جديدة) شريطًا ثانيًا يكرّر الرافدةَ
+  // ‏وقائمةَ «أفعال الخطّة» التي فيها الرابطان نفسُهما — فبقيت القائمةُ وحدَها
   const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
-      <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${AR(v.items)} بندًا، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
+      <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${counted(v.items, NOUNS.item)}، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
   // ‏«اعتمد الأسبوع»: مسوّداتُ المعروض كلُّها بنموذج الجملة نفسِه — لا طريقَ ثانيًا حول فحص الاعتماد
   const weekDrafts = visible.filter((c) => c.post !== null && c.post.status === 'draft')
   const allDrafts = m.gaps.pending
@@ -369,14 +409,14 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   // ‏زرٌّ واحدٌ في الذيل (D-387): «اعتمد الأسبوع» يعتمد ويجدول في المواعيد، ويعود إلى التيّار (`back=feed`). وكان بجواره
   // ‏«اعتمد الخطّة كاملة» ثانيًا؛ فصار في رأس التيّار «اعتمد كلّ ما ينتظر» وحدَه
   const approveWeek = weekDrafts.length === 0 ? html`` : html`<form class="inline" method="POST" action="/panel/plan/review/bulk" data-busy="جار الاعتماد…" data-away
-      data-confirm="${'اعتمد ' + AR(weekDrafts.length) + (weekDrafts.length === 1 ? ' منشورًا' : ' منشورات') + ' كما كُتبت وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
+      data-confirm="${'اعتمد ' + counted(weekDrafts.length, NOUNS.post, 'acc') + ' وجدوِلها في مواعيدها؟ تُنشر بعدها وحدَها.'}">
       <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="feed">
       ${weekDrafts.map((c) => html`<input type="hidden" name="sel" value="${String(c.index)}|${c.key}|${c.post?.id ?? ''}">`)}
       ${raw(button({ label: 'اعتمد ' + scope + ' (' + AR(weekDrafts.length) + ')', variant: 'primary', type: 'submit', name: 'do', value: 'approve', icon: ICON.check }))}</form>`
   const rest = allDrafts <= weekDrafts.length ? html`` : html`<span class="hint">و${AR(allDrafts - weekDrafts.length)} في أسابيعَ أخرى — من رأس التيّار كلُّها</span>`
   // ‏«أضف منشورًا» (D-336): يومٌ من المعروض، ومنصّةٌ من قنوات الخطّة، وساعةٌ بتوقيت المالك، وجملةٌ تقول ما يقوله — نموذجٌ إلى مساره
   const channels = [...new Set([...m.plan.choices.channels, ...m.cards.map((c) => c.item.platform)])]
-  const firstDay = shown === 0 ? m.plan.week : shift(m.plan.week, (shown - 1) * 7)
+  const firstDay = firstDayOf(m, shown)
   const lastDay = shown === 0 ? end : [shift(firstDay, 6), end].sort()[0]!
   const today = todayKey(view.now ?? new Date(), zone)
   const addDay = today >= firstDay && today <= lastDay ? today : firstDay
@@ -398,19 +438,22 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const due = [...m.cards].filter((c) => (c.post === null && c.failed === undefined) || waits(c))
     .sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))[0]
   const next = due === undefined ? html`` : raw(button({ label: 'تابع الكتابة', variant: 'primary', size: 'sm', href: '?w=' + String(weekOfDay(m.plan.week, due.item.day)) + '#c-' + String(due.index) }))
-  const weekHref = (day: string): string => '?w=' + String(weekOfDay(m.plan.week, day)) + '#d-' + day
+  // ‏**اليومُ في التقويم يفتح يومَه وحدَه** (D-436 · منظارُ اليوم): الأسبوعُ من شريط الأسابيع، والشهرُ «الكلّ»
+  const keep = fl.only === null || fl.only === undefined || fl.only === '' ? '' : '&only=' + encodeURIComponent(fl.only)
+  const weekHref = (day: string): string => '?d=' + day + keep + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
-    ${raw(sub)}
     <div class="row gap-2 mb-3 rv-status">${state}<span class="hint">كُتب ${AR(written)} من ${AR(m.cards.length)}</span>${next}<span class="grow"></span>${toggle}${shareBox(m, view)}${planActions(m)}</div>
     ${progress}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) }, view.now)}
     ${weekTabs(m, shown)}
+    ${filterBar(m, w, oneDay, fl)}
     ${gapsBar(m)}
     <form method="POST" action="/panel/plan/review/bulk" id="rv-bulk" class="rv-bulk card card-inset">
-      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="feed">
-      <span id="rv-n">حدّد بنودًا لفعلٍ واحدٍ عليها</span><span class="grow"></span>
-      <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve" data-away>اعتمد المحدّد</button>
+      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="review">${fl.only === null || fl.only === undefined || fl.only === '' ? html`` : html`<input type="hidden" name="only" value="${fl.only}">`}${oneDay === null ? html`` : html`<input type="hidden" name="d" value="${oneDay}">`}
+      <span id="rv-n">حدّد بنودًا</span><span class="grow"></span>
+      ${raw(button({ label: 'حدّد كلّ الظاهر', size: 'sm', attrs: 'data-all hidden' }))}
+      <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد المحدّد</button>
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="delay">أخّرها يومًا</button>
       <button class="btn btn-danger btn-sm" type="submit" name="do" value="drop" data-confirm="أزِل البنودَ المحدَّدة من الخطّة؟">أزِلها</button>
     </form>
@@ -534,7 +577,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
   var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function vt(fn){ if(document.startViewTransition&&!calm){document.startViewTransition(fn);} else fn(); }
   function upd(){var bar=document.getElementById('rv-bulk'), n=document.getElementById('rv-n'); if(!bar||!n)return;
-    var k=root.querySelectorAll('input[name="sel"]:checked').length; bar.hidden=k===0; n.textContent=k.toLocaleString('ar-u-nu-latn')+' محدَّدًا';}
+    var k=root.querySelectorAll('input[name="sel"]:checked').length; n.textContent=k<1?'حدّد بنودًا':k<2?'واحدٌ محدَّد':k<3?'اثنان محدَّدان':k+(k<11?' محدَّدة':' محدَّدًا'); bar.querySelector('[data-all]').hidden=false;}
   document.addEventListener('change',function(e){if(e.target&&e.target.name==='sel')upd();});
   upd(); view(); setTimeout(function(){root.setAttribute('data-seen','1');},700);
   // ‏منظارُ العرض (D-337): بطاقاتٌ أو قائمة — يُحفظ في المتصفّح وحدَه (تفضيلُ عرضٍ لا بيان)، ويُعاد بعد كلّ تحديثٍ حيّ
@@ -546,7 +589,8 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
     var g=root.querySelector('.rv-vw'); if(!g)return; g.hidden=false;
     g.querySelectorAll('[data-view]').forEach(function(b){b.setAttribute('aria-pressed',String(b.getAttribute('data-view')===v));});
   }
-  document.addEventListener('click',function(e){var b=e.target&&e.target.closest?e.target.closest('.rv-vw [data-view]'):null; if(b)view(b.getAttribute('data-view'));});
+  document.addEventListener('click',function(e){var t=e.target, b=t&&t.closest?t.closest('.rv-vw [data-view]'):null; if(b)view(b.getAttribute('data-view'));
+    if(t.closest&&t.closest('[data-all]')){root.querySelectorAll('.rv-days [name=sel]').forEach(function(x){x.checked=true;}); upd();}});
   function here(){return '/panel/plan/review'+location.search;}
   // ‏الإشعارُ من ردّ الخادم كما رسمه؛ ويذهب وحدَه بعد ستّ ثوانٍ إلّا الخطأ
   var flashT=null;

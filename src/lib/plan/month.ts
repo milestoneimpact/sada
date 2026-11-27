@@ -100,6 +100,13 @@ export interface MonthJourney {
   readonly alerts: readonly string[]
 }
 
+/** ‏العددُ والمعدود معًا (D-440): «يوم» و«يومين» و«4 أيّام» و«11 يومًا» — كان «4 يومًا». */
+export function daysAr(n: number): string {
+  if (n === 1) return 'يوم واحد'
+  if (n === 2) return 'يومين'
+  return n >= 3 && n <= 10 ? `${String(n)} أيّام` : `${String(n)} يومًا`
+}
+
 /** الرحلةُ لشهر، وتنبيهاتُها: نشرٌ فشل، أو شهرٌ يقترب بلا خطّة. `today` يومُ المالك المحلّيّ. */
 export function monthJourney(f: MonthFacts, today: string): MonthJourney {
   const counts: Record<StationId, number> = {
@@ -117,7 +124,7 @@ export function monthJourney(f: MonthFacts, today: string): MonthJourney {
     const start = `${f.period}-01`
     const left = Math.round((Date.parse(`${start}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000)
     if (left <= 0) alerts.push(`شهر ${f.period} بدأ بلا خطّة.`)
-    else if (left <= 10) alerts.push(`شهر ${f.period} يبدأ بعد ${String(left)} يومًا بلا خطّة، فادفع ملفّه إلى 01-plan.`)
+    else if (left <= 10) alerts.push(`شهر ${f.period} يبدأ بعد ${daysAr(left)} بلا خطّة، فضع ملفّه في «مجلّد الخطّة في Drive».`)
   }
   return { period: f.period, reached, counts, alerts }
 }

@@ -56,6 +56,7 @@ import { readiness, type Readiness } from '../../lib/platform/readiness'
 import { nativePost, npDay, npRow, npTile, type NpMedia, type NpPlatform } from './nativePost'
 import { returnTo } from '../../lib/nav/back'
 import { emptyState } from './components/empty'
+import { MIN_POSTS } from '../../lib/insights/whatWorks'
 import { threadCheckForm } from './sections/drafts'
 import { button } from './components/button'
 import { card } from './components/card'
@@ -983,6 +984,20 @@ export function pageConnectCard(ready: boolean, base: string, accounts: readonly
   })
 }
 
+/**
+ * ‏**قناةٌ بلا حسابٍ مربوط** (D-438): لا تحليلاتٍ فارغةً ولا «ما نُشر» لم يُنشر — الربطُ وحدَه وما يحتاجه.
+ * ‏وزرُّ «اربط» في الرأس، فهنا الطريقُ إلى متطلّباته في «الضبط» والعتبةُ التي يُقال بعدها ما ينجح.
+ */
+function unlinkedSection(d: PlatformScreenData): string {
+  const label = d.view.spec.label
+  // ‏بلا نقش: الصفحةُ على الهاتف تبدأ به تحت شريط البحث مباشرةً، والنقشُ يُبعَد ‏24px عن النصّ (D-196)
+  return emptyState({
+    title: 'اربط ' + label + ' أوّلًا',
+    html: html`زرُّ الربط في رأس الصفحة يفتح شاشةَ الإذن عند المنصّة. ثمّ يُنشر هنا، ويُقال ما ينجح بعد ${String(MIN_POSTS)} منشورات مقيسة.`.value,
+    action: html`<div class="row mt-3">${raw(button({ label: 'ما يحتاجه الربط', href: href(d.view.spec.id, { tab: 'setup' }) }))}</div>`.value,
+  })
+}
+
 // ── الصفحة ────────────────────────────────────────────────────────────
 
 export function platformScreen(d: PlatformScreenData): string {
@@ -1024,7 +1039,12 @@ export function platformScreen(d: PlatformScreenData): string {
       ? waitingSection(d)
       : d.tab === 'media'
         ? mediaSection(d)
-        : `${pulseStrip(d)}${upcomingSection(d)}${historySection(d)}`
+        : d.view.accounts.length > 0
+          ? `${pulseStrip(d)}${upcomingSection(d)}${historySection(d)}`
+          // ‏وحسابٌ فُصل ومنشوراتُه باقيةٌ في D1: الدعوةُ إلى الربط فوقها، ولا تُخفى (D-439)
+          : d.upcoming.length === 0 && d.history.rows.length === 0
+            ? unlinkedSection(d)
+            : unlinkedSection(d) + upcomingSection(d) + historySection(d)
   // ‏الإشعارُ مكوّنُه (D-189)، والخطأُ يُعلَن تنبيهًا ويبقى حتّى يُغلَق (7.8)
   const flash = toastRegion(d.flash === null
     ? ''

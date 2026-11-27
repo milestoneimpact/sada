@@ -47,7 +47,7 @@ describe('«ما ينجح»', () => {
     seed(3)
     const html = await (await get('/panel/insights')).text()
     expect(html).toContain('لا حكمَ بعد')
-    expect(html).toContain('3 من 8 منشورات نُشرت وقِيست')
+    expect(html).toContain('يُقال بعد 8 منشورات مقيسة — قِيس 3')
     expect(html).toContain('aria-current="page"><span>ما ينجح</span>')
   })
 

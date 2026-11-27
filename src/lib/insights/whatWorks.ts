@@ -122,7 +122,7 @@ function ratio(a: number, b: number): string | null {
 export function whatWorks(facts: readonly PostFact[], zone: string | null): WhatWorks {
   const samples = facts.length
   if (samples < MIN_POSTS) {
-    return { samples, overall: 0, dims: null, slot: null, advice: [], why: `لم يُقَس بعد — ${samples} من ${MIN_POSTS} منشورات نُشرت وقِيست` }
+    return { samples, overall: 0, dims: null, slot: null, advice: [], why: `يُقال بعد ${MIN_POSTS} منشورات مقيسة — قِيس ${samples}` }
   }
   const overall = median(facts.map((f) => f.engagement))
   const parts = new Map(facts.map((f) => [f.id, localParts(parseSqliteUtc(f.publishedAt) ?? new Date(0), zone)]))

@@ -20,7 +20,7 @@ import { escapeHtml } from './shell'
 import { platformLabel } from '../../lib/oauth/providers'
 import { historyBars } from './chart'
 import { toHijri } from '../../lib/analyze/hijri'
-import { counted, money, NOUNS, relativeTime } from '../../lib/format'
+import { counted, money, num as fmtNum, NOUNS, relativeTime } from '../../lib/format'
 import type { PlatformSlice, ReportPost, StoredReport, WeeklyReport } from '../../lib/report/weekly'
 import type { OpenSuggestion } from '../../lib/report/promote'
 import { LOGOS } from './logos'
@@ -82,7 +82,7 @@ function sliceCard(s: PlatformSlice): string {
   return `<div class="slice">
     <div class="plat-logo">${logo}</div>
     <div class="slice-id"><h3>${escapeHtml(platformLabel(s.platform))}</h3>
-      <span class="chip">${escapeHtml(counted(s.published, NOUNS.post))} · قِيس ${s.measured}</span>
+      <span class="chip">${escapeHtml(counted(s.published, NOUNS.post))} · قِيس ${fmtNum(s.measured)}</span>
       <a class="tap" href="/panel/channels/${escapeHtml(s.platform)}">اعرض منشوراتها</a></div>
     <div class="stats">
       ${sum('ظهور', s.impressions, s.impressionsFrom, s.published)}
@@ -190,7 +190,7 @@ export function reportBody(r: WeeklyReport, now: Date, month?: MonthSpend, kpis 
           : r.published === 1
             ? `خرج منشور واحد، ${r.measured === 1 ? 'وقِيس' : 'ولم يُقَس بعد'}.`
             : `خرج ${escapeHtml(counted(r.published, NOUNS.post))}، قِيس ${
-              r.published === 2 ? 'منهما' : 'منها'} <b>${r.measured}</b>.`
+              r.published === 2 ? 'منهما' : 'منها'} <b>${fmtNum(r.measured)}</b>.`
       }</p>
       ${monthLine(month)}
     </div>
@@ -355,7 +355,7 @@ export function weekKpis(cur: WeeklyReport, prev: WeeklyReport | null): string {
   const tile = (k: string, v: string, note: string): string =>
     `<div class="card tile"><div class="kv-k">${k}</div><div class="kv-v">${v}</div><div class="note">${escapeHtml(note)}</div></div>`
   // ‏وما لم يُقَس لا يُرسَم بذهب العرض: سطرٌ هادئ بحبر ثالث (SPEC-v1 §6.4)
-  const num = (n: number | null): string => (n === null ? '<span class="kv-none">—</span><span class="kv-un">لم يُقَس بعد</span>' : n.toLocaleString('en-US'))
+  const num = (n: number | null): string => (n === null ? '<span class="kv-none">—</span><span class="kv-un">لم يُقَس بعد</span>' : fmtNum(n))
   const imp = total(cur, 'impressions'), act = total(cur, 'interactions')
   return `<div class="card grid tiles c3 mb-4">
     ${tile('الظهور', num(imp), delta(imp, prev === null ? null : total(prev, 'impressions'), prev !== null))}
@@ -427,7 +427,7 @@ export function reportScreen(d: ReportScreenData): string {
                     r.id,
                   )}">${escapeHtml(weekOf(r.body.from, r.body.to, d.now))}</a></td>
                   <td data-label="خرج">${r.body.published}</td>
-                  <td data-label="قِيس">${r.body.measured}</td>
+                  <td data-label="قِيس">${fmtNum(r.body.measured)}</td>
                   <td data-label="أُنفق">${escapeHtml(money(r.body.spendUsd))}</td>
                 </tr>`,
               )

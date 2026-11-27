@@ -81,7 +81,9 @@ describe('«منشورات جديدة» (D-387)', () => {
     const review = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     // ‏نماذجُ المراجعة تحمل back=feed سلفًا، وزرُّ الذيل واحد «اعتمد الأسبوع»
     expect(review).toContain('action="/panel/plan/review/approve"')
-    expect(review.match(/name="back" value="feed"/g)!.length).toBeGreaterThanOrEqual(3)
+    expect(review.match(/name="back" value="feed"/g)!.length).toBeGreaterThanOrEqual(2)
+    // ‏و«اعتمد المحدّد» يبقى في المراجعة (D-436): ما ردّه الفحصُ يُرى في بطاقته، لا في التيّار
+    expect(review).toMatch(/id="rv-bulk"[\s\S]*?name="back" value="review"/)
     expect(review).toContain('اعتمد الأسبوع (1)')
     expect(review).toContain('>اعتمد المحدّد</button>')
     expect(review).not.toContain('اعتمد الخطّة كاملة')

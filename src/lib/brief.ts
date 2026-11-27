@@ -87,3 +87,18 @@ export function voiceSection(b: Brief): string {
     b.avoid === '' ? '' : `- ما لا يُقال: ${b.avoid}`,
   ].filter((l) => l !== '').join('\n')
 }
+
+/** ‏ما ينقص الموجزَ ليكتمل — بأسمائه كما تُقال. */
+export type BriefPart = 'الوصف' | 'القنوات' | 'الإيقاع'
+
+/**
+ * **تعريفٌ واحدٌ لـ«الموجز مكتمل»** (D-438): وصفٌ مكتوب (هدفٌ أو جمهورٌ أو نبرةٌ أو محظور)، وقناةٌ مختارة على الأقلّ،
+ * وإيقاعٌ فوق الصفر. تقرؤه محطّةُ الموجز وبطاقةُ الجاهزيّة معًا، فلا تقول إحداهما «جاهز» والأخرى «ناقص».
+ */
+export function briefGap(b: Brief): { readonly complete: boolean; readonly missing: readonly BriefPart[] } {
+  const missing: BriefPart[] = []
+  if (isEmptyBrief(b)) missing.push('الوصف')
+  if (b.channels.length === 0) missing.push('القنوات')
+  if (b.perWeek <= 0) missing.push('الإيقاع')
+  return { complete: missing.length === 0, missing }
+}

@@ -339,6 +339,10 @@ session.post('/panel/sessions/revoke', async (c) => {
   return back('security')
 })
 
+/** ‏GET على مسارَي النموذجين (D-438) يصل قسمَهما في الإعدادات بدل 404. */
+session.get('/panel/orgs', (c) => c.redirect('/panel/settings#orgs', 303))
+session.get('/panel/security', (c) => c.redirect('/panel/settings#security', 303))
+
 /**
  * منظّمةٌ جديدة (D-225) — **من حساب الدخول الحاليّ، وهو حسابُ المشغّل**.
  * تُنشأ ومعها علامتُها الأولى. ومع «switch=1» (D-418) تصير النشطةَ ويُحوَّل إلى جاهزيّتها، وبدونه تبقى في القائمة.

@@ -13,6 +13,16 @@ import { escapeHtml } from '../escape'
 import { byUrgency, decideForm, editorHref, platformMark, quickScheduleForm, type MediaView, type Target } from './drafts'
 import { platformLabel } from '../../../lib/oauth/providers'
 
+/**
+ * ‏‏**سطران لا المنشورُ كلُّه** (D-440): الصفُّ يقصّه CSS في سطرين، وكان يحمل النصَّ كاملًا (‏٤٤٤ محرفًا) مرّةً ثانيةً بعد بطاقته
+ * ‏في «المنشورات». فيُقطع عند ‏180 محرفًا بـ«…» — أكثرُ من سطرين على ‏‎--measure‏ — والنصُّ كاملًا في «عدّل».
+ */
+export const DESK_CHARS = 180
+export function deskText(text: string): string {
+  const flat = text.replace(/\s*\n\s*/g, ' ')
+  return flat.length <= DESK_CHARS ? flat : flat.slice(0, DESK_CHARS).trimEnd() + '…'
+}
+
 /** ‏كم بطاقةً تُرسَم — والباقي رابطٌ إلى اللوح بعدده. */
 export const DESK_MAX = 3
 
@@ -35,7 +45,7 @@ export function deskQueue(drafts: readonly DraftRow[], now: Date, targets: reado
     return `<li class="desk-row" id="k-${escapeHtml(d.id)}">
       <div class="desk-head">${platformMark(d.platform)}<b><bdi>${escapeHtml(who)}</bdi></b>
         <span class="ago">${failed ? 'فشل نشرُها · ' : d.status === 'draft' ? '' : 'معتمَدةٌ بلا موعد · '}${escapeHtml(relativeTime(d.createdAt, now))}</span></div>
-      <p class="desk-text" dir="auto">${escapeHtml(d.text.replace(/\s*\n\s*/g, ' '))}</p>
+      <p class="desk-text" dir="auto">${escapeHtml(deskText(d.text))}</p>
       <div class="desk-acts">${act}</div>
     </li>`
   }).join('')

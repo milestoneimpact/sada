@@ -35,7 +35,7 @@ const STATUS_SAY: Readonly<Record<string, string>> = {
 export function importsScreen(rows: readonly ImportRow[], canRecheck: boolean): string {
   const head = pageHead('الخطّة', 'الاستيرادات', 'كلّ ملفّ دخل صدى، بحاله وبصمته وشهره وما غيّر.')
   if (rows.length === 0) {
-    return head + card({ title: 'لا استيراد بعد', body: html`<p class="hint">ادفع ملفّ الشهر إلى 01-plan أو ألصق جدولًا في «خطّة جديدة».</p>`.value })
+    return head + card({ title: 'لا استيراد بعد', body: html`<p class="hint">ضع ملفّ الشهر في «مجلّد الخطّة في Drive» أو ألصق جدولًا في «خطّة جديدة».</p>`.value })
   }
   const body = html`<div class="scroll"><table>
     <thead><tr><th>المصدر</th><th>الشهر</th><th>الحال</th><th>البصمة</th><th>ما تغيّر</th><th>الإجراء</th></tr></thead>
@@ -209,7 +209,7 @@ export function monthScreen(d: MonthScreenData): string {
     ${raw(button({ label: d.next + ' ›', href: go(d.next), size: 'sm', variant: 'quiet' }))}
     ${raw(button({ label: 'الاستيرادات', href: '/panel/plan/imports', size: 'sm', variant: 'secondary' }))}</div>`.value
   if (d.planId === null) {
-    return head + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ادفع ملفّ ${d.period} إلى 01-plan، أو ابدأ خطّة جديدة.</p>
+    return head + nav + card({ title: 'لا خطّة لهذا الشهر', body: html`<p class="hint">ضع ملفّ ${d.period} في «مجلّد الخطّة في Drive»، أو ابدأ خطّة جديدة.</p>
       <div class="row">${raw(button({ label: 'خطّة جديدة', href: '/panel/plan/new' }))}</div>`.value })
   }
   const ids = html`<input type="hidden" name="id" value="${d.planId}"><input type="hidden" name="p" value="${d.period}">`

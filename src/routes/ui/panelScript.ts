@@ -76,6 +76,8 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
     // ‏وترتدّ إلى الرئيسيّة — فالمعرّفُ يُطلَب أيًّا كان، ولوحُه من موضعه
     var isPane=Array.prototype.some.call(panes,function(p){return p.dataset.pane===id;});
     var card=isPane?null:target(id);
+    // ‏‏و«أصلحه» إلى «#d-…» تفتح طيّةَ البطاقة (D-440): الموعدُ والتفاصيلُ أمامه لا خلف ضغطةٍ ثانية
+    if(card&&/^d-/.test(card.id)){var dm=card.querySelector('details.draft-more'); if(dm)dm.open=true;}
     // ‏وبابُ المُنشئ من مرساته (D-308): «#write» تختار «من مصدر» و«#idea» تختار «من فكرة»
     if(card){var cm=card.closest('.composer'); if(cm){var rd=cm.querySelector('[name=cmp][value="'+card.id+'"]'); if(rd)rd.checked=true;}}
     // ‏ومرساةٌ لوحُها في صفحةٍ أخرى (D-211): «/panel#settings» المحفوظةُ تذهب إلى «/panel/settings#settings»، والخريطةُ

@@ -333,7 +333,7 @@ const data: PanelData = {
   ],
   targets: [
     { id: 'a1', platform: 'linkedin', label: 'عمر عبدالحميد · LinkedIn' },
-    { id: 'a2', platform: 'linkedin', label: 'بصائر للاستشارات · LinkedIn' },
+    { id: 'a2', platform: 'linkedin', label: 'بصائر للاستشارات · LinkedIn', page: true },
   ],
   writableSources: [
     { id: 's1', name: 'تقرير الأثر السنويّ 2026.docx' },
@@ -547,10 +547,12 @@ writeAudited('/tmp/panel-zero-accounts.html', panelPage({ only: 'accounts', data
  * ‏بصورتها (الاعتمادُ والحفظُ والموعدُ بتوقيت المالك)، ومجدولةٌ («غيّر الموعد»).
  */
 const pick = (id: string): (typeof data.drafts)[number] => data.drafts.find((d) => d.id === id)!
-writeAudited('/tmp/panel-editor.html', panelPage({ only: null, data: { ...data, zone: 'Asia/Riyadh', editing: pick('d1') } }), {
+// ‏‏والمحرّرُ بحسابين بديلين كما قِيس (D-440): الصفحةُ وجهةٌ تُدقَّق في الرئيسيّة واللوح، وسقفُ المحرّر لما يُرسَم فيه
+const peers = data.targets.map(({ id, platform, label }) => ({ id, platform, label }))
+writeAudited('/tmp/panel-editor.html', panelPage({ only: null, data: { ...data, targets: peers, zone: 'Asia/Riyadh', editing: pick('d1') } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
-writeAudited('/tmp/panel-editor-queued.html', panelPage({ only: null, data: { ...data, zone: 'Asia/Riyadh', editing: pick('d5') } }), {
+writeAudited('/tmp/panel-editor-queued.html', panelPage({ only: null, data: { ...data, targets: peers, zone: 'Asia/Riyadh', editing: pick('d5') } }), {
   m1: fixtureImage(1024, 1024, 25), m3: fixtureImage(1080, 1350, 215),
 })
 /*

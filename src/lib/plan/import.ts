@@ -58,6 +58,12 @@ const PLATFORM_NAMES: Readonly<Record<string, PlanPlatform>> = {
  */
 export const PAGE_NAMES: ReadonlySet<string> = new Set(['linkedin-page', 'linkedin:page', 'linkedin page', 'صفحة لينكدإن', 'صفحة linkedin'])
 
+/** منصّةُ خانةٍ كما كتبها المالك (D-436 · المعاينة): `linkedin-page` لصفحة، والمعرّفُ لما يُعرف، و`null` لما لا يُعرف. */
+export function platformOfCell(cell: string): PlanPlatform | 'linkedin-page' | null {
+  const k = norm(cell)
+  return PAGE_NAMES.has(k) ? 'linkedin-page' : PLATFORM_NAMES[k] ?? null
+}
+
 /** أعمدةُ الملفّ — والعنوانُ بالعربيّة أو بالإنجليزيّة. */
 type Column = 'date' | 'time' | 'platform' | 'text' | 'video' | 'zone' | 'item' | 'media' | 'format'
 const COLUMNS: Readonly<Record<string, Column>> = {

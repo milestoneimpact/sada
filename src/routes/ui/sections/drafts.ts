@@ -196,7 +196,7 @@ function scheduler(
       ${why.action === 'relink'
         ? `<a class="btn btn-primary btn-sm" href="/oauth/${escapeHtml(d.platform)}/start">أعد الربط</a>`
         : ''}
-      ${why.action === 'confirm' ? threadCheckForm(d.id) : why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink')}
+      ${why.action === 'confirm' ? threadCheckForm(d.id) : why.action === 'none' ? '' : requeueForm(d.id, why.action !== 'relink', 'أعد المحاولة')}
     </div>`
   }
 
@@ -291,16 +291,34 @@ function scheduler(
  * ‏**الاعتمادُ يعرض الموعد** (D-218): مسوّدةٌ لها حسابٌ واحدٌ يناسبها ولا ينقصها وسيطٌ تُعتمَد وتُجدوَل
  * ‏بضغطةٍ واحدة — «اعتمد · غدًا 9:00 ص» — بالمسار نفسِه الذي يسلكه المحرّر (`approve-schedule`، D-198)،
  * ‏و«اعتمد» وحدَه ثانويٌّ بجوارها. والموعدُ مكتوبٌ على الزرّ نفسِه فلا يُجدوَل شيءٌ لم يُقرأ، والسحبُ
- * ‏في شريط المجدولة الذي تنزل إليه. وحيث تعدّد الحسابُ أو نقص الوسيطُ يبقى «اعتمد» وحده كما كان.
+ * ‏في شريط المجدولة الذي تنزل إليه. وحيث نقص الوسيطُ يبقى «اعتمد» وحده؛ وحيث تعدّد الحسابُ فوجهتُه `defaultTarget` (D-440).
  *
  * ‏**و«ارفض» ظاهرٌ بجانبه** (D-267 · EASE ب): كان في «أفعال أخرى» خلف قائمة، والقرارُ اثنان لا واحد. والتراجعُ في الإشعار
  * ‏بعده (D-100) هو الأمانُ لا سؤالٌ قبله، واختصارُ R يجد زرَّه الآن.
  */
 export const APPROVE_AT = PRESETS.find((p) => p.kind === 'tomorrow')!
 
+/**
+ * ‏‏**الوجهةُ الافتراضيّة حين تتعدّد** (D-440): كان حسابان على LinkedIn (شخصٌ وصفحة) يُسقطان «اعتمد · غدًا» إلى «اعتمد»
+ * ‏وحدَه في الرئيسيّة، فيُعتمَد المنشورُ ولا يُجدوَل. فالحسابُ الذي سُمّي للمسوّدة إن طابق، وإلّا الشخصيُّ الواحدُ بجوار
+ * ‏صفحاته — كما يختاره `destinationsField` ابتداءً — واسمُه ظاهرٌ بجوار الزرّ. وحسابان شخصيّان بديلان: لا افتراض.
+ * ‏والمطابقةُ ببداية الاسم للصفحة وحدها (D-441): «عمر» لا يختار بين «عمر الخالد» و«عمر سالم».
+ */
+export function defaultTarget(d: DraftRow, targets: readonly Target[]): Target | null {
+  const fit = targets.filter((t) => t.platform === d.platform)
+  if (fit.length <= 1) return fit[0] ?? null
+  const named = d.accountName === null ? undefined : fit.find((t) => t.label === d.accountName || (t.page === true && t.label.startsWith(d.accountName + ' ')))
+  if (named !== undefined) return named
+  // ‏‏وحسابان شخصيّان بديلان لا يُختار بينهما عن المالك (D-218): الافتراضُ للشخصيّ الواحد بجوار صفحاته وحدَه
+  const people = fit.filter((t) => t.page !== true)
+  return people.length === 1 ? people[0]! : null
+}
+
 export function decideForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string {
   const id = escapeHtml(d.id)
-  const fit = targets.filter((t) => t.platform === d.platform)
+  const to = defaultTarget(d, targets)
+  const fit = to === null ? [] : [to]
+  const several = targets.filter((t) => t.platform === d.platform).length > 1
   const oneStep = fit.length === 1 && missingMedia(d.platform, readyMimes(d, media)) === null
   // ‏و«اعتمد فقط» زال من هنا (D-387): الاعتمادُ بلا موعدٍ في شاشة التعديل وحدَها. وبلا سكربتٍ يعود الفعلُ إلى بطاقته في التيّار
   return `<form class="inline" method="POST" action="/panel/drafts/decide" data-busy="جار…" data-swap>
@@ -308,7 +326,7 @@ export function decideForm(d: DraftRow, targets: readonly Target[], media: reado
     ? `<input type="hidden" name="account" value="${escapeHtml(fit[0]!.id)}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
              <button class="btn btn-primary btn-sm" type="submit" name="do" value="approve-schedule" data-optimistic="اعتُمدت وجُدولت"
-               data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>`
+               data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>${several ? `<span class="ago">على <bdi>${escapeHtml(fit[0]!.label)}</bdi></span>` : ''}`
     : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}
              <button class="btn btn-danger btn-sm" type="submit" name="do" value="reject" data-optimistic="رُفضت">ارفض</button></form>`
 }
@@ -318,19 +336,21 @@ export function decideForm(d: DraftRow, targets: readonly Target[], media: reado
  * ‏يضعه «اعتمد · غدًا». وإلّا فلا شيء، ويبقى «عدّل» طريقَها إلى شريط الجدولة.
  */
 export function quickScheduleForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string | null {
-  const fit = targets.filter((t) => t.platform === d.platform)
+  const to = defaultTarget(d, targets)
+  const fit = to === null ? [] : [to]
   if (fit.length !== 1 || missingMedia(d.platform, readyMimes(d, media)) !== null) return null
   return html`<form class="inline" method="POST" action="/panel/drafts/schedule" data-busy="جار…" data-swap>
              <input type="hidden" name="id" value="${d.id}"><input type="hidden" name="account" value="${fit[0]!.id}">
              <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
-             ${raw(button({ label: 'جدوِل · ' + APPROVE_AT.label, variant: 'primary', size: 'sm', type: 'submit', attrs: html`data-optimistic="جُدولت" data-tip="على ${fit[0]!.label}"`.value }))}</form>`.value
+             ${raw(button({ label: 'جدوِل · ' + APPROVE_AT.label, variant: 'primary', size: 'sm', type: 'submit', attrs: html`data-optimistic="جُدولت" data-tip="على ${fit[0]!.label}"`.value }))}${
+               targets.filter((t) => t.platform === d.platform).length > 1 ? html`<span class="ago">على <bdi>${fit[0]!.label}</bdi></span>` : html``}</form>`.value
 }
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
-export function requeueForm(id: string, primary: boolean): string {
+export function requeueForm(id: string, primary: boolean, label = 'أعده إلى المعتمَد'): string {
   return `<form class="inline" method="POST" action="/panel/drafts/requeue" data-busy="جار…">
     <input type="hidden" name="id" value="${escapeHtml(id)}">
-    <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">أعده إلى المعتمَد</button></form>`
+    <button class="btn ${primary ? 'btn-primary' : 'btn-secondary'} btn-sm" type="submit">${escapeHtml(label)}</button></form>`
 }
 
 /**
@@ -940,8 +960,10 @@ function card(
    * ‏ما تحت النصّ سطرٌ واحد: المجدولةُ والفاشلةُ شريطُهما المختصرُ ظاهرًا (موعدُها و«اسحب الموعد»، أو سببُها
    * ‏و«أعده»)، كما أبقاهما D-195، والمعتمَدةُ نموذجُ جدولتها في الطيّة، والمسوّدةُ سطرُ مصدرها إن تغيّر.
    */
+  // ‏‏**والفاشلةُ سببُها وإعادتُها على البطاقة نفسِها** (D-440): كان السطرُ «سببُه وزرّ إعادته في «الموعد والتفاصيل»» يُرسل
+  // ‏المالكَ من «أصلحه» إلى طيّةٍ مغلقة. فشريطُها (`scheduler`) ظاهرٌ تحت النصّ، ولا يُعاد في الطيّة
   const line = d.status === 'failed'
-    ? `<p class="pc-line" data-tone="bad">${statusBadge('bad', '▲', 'لم يُنشر')}<span>سببُه وزرّ إعادته في «الموعد والتفاصيل».</span></p>`
+    ? scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone)
     : ''
   // ‏وموعدُ المجدولة في سطر الحساب قصيرًا بـ UTC، وبتوقيتك في شريطها تحت الطيّة
   const when = d.status === 'queued' && d.scheduledAt !== null
@@ -1033,7 +1055,7 @@ function card(
       ${open ? preview(d, spec.label) : ''}
       ${editDiff(d)}
       ${imagePane(d, media, lines)}
-      ${ready ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone)}
+      ${ready || d.status === 'failed' ? '' : scheduler(d, targets, earliest, now, pageOnly, peaks[d.platform], media, zone)}
       <div class="draft-meta">${meta}</div>
     </details>`}
   </div>`

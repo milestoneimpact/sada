@@ -183,8 +183,8 @@ export const THEME_SCRIPT = `
     all().forEach(function(b){
       b.setAttribute('aria-pressed',String(b.dataset.theme===v));});
   };
-  var saved='light';
-  try{saved=localStorage.getItem('sada-theme')||'light';}catch(e){}
+  var saved='system';
+  try{saved=localStorage.getItem('sada-theme')||'system';}catch(e){}
   apply(saved);
   all().forEach(function(b){
     b.addEventListener('click',function(){apply(b.dataset.theme);});});

@@ -54,6 +54,25 @@ const SECURITY_REFS = `SELECT 'security:' || id AS ref FROM audit_log
     AND at >= datetime('now', '-7 days') AND COALESCE(target, '') != ?4
     AND ('security:' || id) NOT IN (SELECT ref FROM notice_reads WHERE org_id = 'org_owner' AND by_email = ?3)`
 
+/**
+ * ‏**إذنٌ انتهى: جملةٌ واحدة وفعلٌ واحد** (D-440) — في الشريط أعلى اللوحة، وفي «ما ينتظرك»، وفي الإشعار. كانت ثلاثَ صيغٍ
+ * ‏(«انتهى الإذن» و«انقطع إذن…» و«إذن الوصول… انتهى») وثلاثةَ أفعال («جدّد» و«جدّد إذن…» و«أعد الربط») لحالٍ واحدة.
+ */
+export function expiredText(label: string, account?: string): string {
+  return `انتهى إذن ${label}${account === undefined || account === '' ? '' : ` (${account})`} — والنشر عليه متوقّف.`
+}
+export const RELINK = 'أعد الربط'
+export function relinkHref(platform: string): string {
+  return `/oauth/${encodeURIComponent(platform)}/start`
+}
+
+/** ‏‏فعلٌ ثانٍ على الإشعار نفسِه (D-440): «أعد النشر» يعيد الفاشلَ إلى المعتمَد بنموذجٍ لا برابط. */
+export interface NoticeForm {
+  readonly action: string
+  readonly id: string
+  readonly label: string
+}
+
 export interface Notice {
   /** ثابتٌ لحدثه: المنشورُ الفاشل نفسُه مرجعٌ واحد مهما أُعيدت قراءتُه. */
   readonly ref: string
@@ -64,6 +83,7 @@ export interface Notice {
   readonly href: string
   readonly action: string
   readonly at: string
+  readonly form?: NoticeForm
 }
 
 export interface NoticeRead {
@@ -237,13 +257,15 @@ export async function collectNotices(
       ref: `publish:${f.id}`, kind: 'publish', tone: 'bad',
       text: `فشل نشر «${snippet}${f.text.length > 48 ? '…' : ''}» على ${label}: ${whyFailed(briefError(f.why), f.platform).text}`,
       href: `/panel/journey/${f.id}`, action: 'افتح المنشور', at: f.failed_at ?? f.created_at,
+      // ‏‏و«أعد النشر» على الإشعار نفسِه (D-440): يعيده إلى المعتمَد فيُجدوَل من شريط بطاقته — لا نشرَ بلا موعدٍ يُقرأ
+      form: { action: '/panel/drafts/requeue', id: f.id, label: 'أعد النشر' },
     })
   }
   for (const a of reauth) {
     out.push({
       ref: `reauth:${a.id}:${a.needs_reauth_at ?? ''}`, kind: 'reauth', tone: 'bad',
-      text: `انقطع إذن ${platformLabel(a.platform as Platform)} (${a.display_name}) — والنشر عليه متوقّف حتّى يُعاد الربط`,
-      href: `/oauth/${encodeURIComponent(a.platform)}/start`, action: 'أعد الربط', at: a.needs_reauth_at ?? now.toISOString(),
+      text: expiredText(platformLabel(a.platform as Platform), a.display_name),
+      href: relinkHref(a.platform), action: RELINK, at: a.needs_reauth_at ?? now.toISOString(),
     })
   }
   for (const q of quota) {
@@ -256,11 +278,12 @@ export async function collectNotices(
   for (const t of tokens) {
     out.push({
       ref: `token:${t.account_id}:${t.kind}:${t.threshold}`, kind: 'token', tone: t.threshold === 0 ? 'bad' : 'warn',
-      text: `${t.kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'} لـ ${platformLabel(t.platform as Platform)} (${t.display_name}) ${
-        t.threshold === 0 ? 'انتهى' : `يقترب — بقي ${t.threshold} ${t.threshold === 1 ? 'يوم' : 'أيّام'}`}`,
+      text: t.threshold === 0
+        ? expiredText(platformLabel(t.platform as Platform), t.display_name)
+        : `${t.kind === 'refresh' ? 'إذن التجديد' : 'إذن الوصول'} لـ ${platformLabel(t.platform as Platform)} (${t.display_name}) يقترب — بقي ${t.threshold} ${t.threshold === 1 ? 'يوم' : 'أيّام'}`,
       // ‏وإذنٌ انتهى يُصلَح بإعادة الربط نفسِها لا بصفحة الحسابات (D-435)
       ...(t.threshold === 0
-        ? { href: `/oauth/${encodeURIComponent(t.platform)}/start`, action: 'أعد الربط' }
+        ? { href: relinkHref(t.platform), action: RELINK }
         : { href: '/panel/accounts', action: 'الحسابات' }),
       at: t.at,
     })

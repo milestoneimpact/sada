@@ -202,7 +202,7 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
   const text: Readonly<Record<FirstRun['steps'][number]['key'], { what: string; why: string; act: Html }>> = {
     link: {
       what: 'اربط أوّل حساب',
-      why: 'صدى يكتب ولا ينشر حتّى تربط منصّة. لكلّ منصّةٍ تطبيقٌ يُضبط مرّةً واحدة بمساعدٍ مرقّم، ثمّ «اربط».',
+      why: 'صدى يكتب ولا ينشر حتّى تربط منصّة. اختر واحدة: يُضبط تطبيقُها مرّةً واحدة بخطواتٍ مرقّمة، ثمّ يُربط حسابك.',
       act: doors.length === 0 ? html`` : html`<span class="why">اختر منصّة: ${doors}</span>`,
     },
     material: {
@@ -325,8 +325,8 @@ export function planCard(
     return html`<div class="card home-plan" role="region" aria-labelledby="hp-t">
       <div class="card-head"><h2 id="hp-t">خطّةُ الشهر</h2></div>
       ${/* ‏و«عندي خطّة» رابطٌ ثانويٌّ إلى بطاقة الاستيراد في اللوح نفسِه (D-422): خرج من «منشور جديد ▾» (D-417) فبقي بلا بابٍ في الرئيسيّة */''}
-      ${/* ‏بابٌ واحد (D-387): يكتبها المساعد، أو من ملفّ، أو من GitHub — والاختيارُ في صفحته لا هنا */''}
-      <p class="m-0">لا خطّة بعد. يكتبها المساعد في أربع خطوات، أو ترفع خطّتك من ملفّ، أو تُزامن حزمتك من GitHub.</p>
+      ${/* ‏بابٌ واحد (D-387): يكتبها المساعد أو تُرفع من ملفّ — والاختيارُ في صفحته؛ وذكرُ GitHub زال (D-440): بابُ المطوّر لا المالك */''}
+      <p class="m-0">لا خطّة بعد. يكتبها المساعد في أربع خطوات، أو ترفع خطّتك من ملفّ.</p>
       <div class="row gap-2 mt-3"><a class="btn btn-primary" href="/panel/new">منشورات جديدة</a><a class="tap" href="/panel#plan-import">عندي خطّة (CSV)</a></div>
     </div>`.value
   }

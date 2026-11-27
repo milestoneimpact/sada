@@ -227,6 +227,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
    والمحلّيّ أخفت وأصغر: **هو الأليف الذي يُقرأ بلمحة**، والأوّل هو
    الذي يُنسَخ ويُقارَن. */
 .when-t{display:inline-flex; flex-direction:column; gap:1px; vertical-align:middle}
+/* ‏‏والموعدُ سطرٌ لا يُقطع بين «9:00» و«ص» (D-440) */
+.when-t b,.pc-when bdi{white-space:nowrap}
 .when-t .tz{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-weight:600}
 
 /* سطرُ الذروة — خبرٌ لا أمر، فبلا زرٍّ ولا لونِ حالة (D-043) */
@@ -384,6 +386,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .flow li[data-state="done"]{border-block-start-color:var(--ink-2)}
 .flow li[data-state="now"]{color:var(--ink); font-weight:600; border-block-start-color:var(--focus)}
 .flow-n{display:inline-grid; place-items:center; width:var(--icon-md); height:var(--icon-md); border-radius:var(--r-pill); background:var(--surface-2); flex:none}
+.flow li:has(.flow-say){flex-wrap:wrap}
+.flow-say{flex-basis:100%; font-weight:400; color:var(--ink-2)}
 .flow li[data-state="now"] .flow-n{background:var(--focus); color:var(--surface)}
 @media${below('md')}{.flow{grid-template-columns:repeat(3,minmax(0,1fr))}}
 /* ── شريطُ الفلتر الواحد والرقمُ باتّجاهه (UX-AUDIT-4 · أ) ─────────────
@@ -574,7 +578,20 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-day + .rv-day{margin-top:var(--s-6)}
 /* ‏**الأيّامُ شبكةٌ تملأ العرض** (D-355): كان كلُّ يومٍ سطرًا ببطاقةٍ في ثلث الشاشة والباقي فارغ. واليومُ الواحد يأخذ عمودًا،
    والمزدحمُ يتمدّد في عموده نزولًا */
-.rv-days{display:grid; gap:var(--s-6) var(--s-5); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
+/* ‏وعمودان أو ثلاثةٌ لا أكثر على العريض (D-436): أربعةُ أعمدةٍ بعرض 22rem تشتّت يومَ الخطّة */
+.rv-days{display:grid; gap:var(--s-6) var(--s-5); grid-template-columns:repeat(auto-fill,minmax(max(min(100%,22rem),calc((100% - 2 * var(--s-5)) / 3)),1fr)); align-items:start}
+.rv.is-bad{box-shadow:inset 0 0 0 var(--ring-w) var(--bad)}
+.rv-short{color:var(--bad)}
+.pv-table tr.is-bad > *{background:var(--bad-wash)}
+.rv-filter{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; margin-bottom:var(--s-4)}
+.rv-link{margin-bottom:var(--s-4)}
+.rv-link input{width:100%; min-height:var(--tap)}
+/* ‏**شريطُ الجملة فوق شريط التبويب السفليّ على الهاتف** (D-436): كان يغطّي مربّعاتِ الاختيار. والأيّامُ تحشو أسفلَها بقدره */
+@media${below('md')}{
+  .rv-bulk{top:auto; bottom:calc(var(--s-16) + var(--safe-b))}
+  .rv-days{padding-bottom:var(--s-16)}
+  .rv-sel input{scroll-margin-block-end:var(--s-16)}
+}
 .rv-days > .rv-day + .rv-day{margin-top:0}
 .rv-days > .rv-day .rv-cards{grid-template-columns:minmax(0,1fr)}
 .rv-days > p{grid-column:1 / -1}
@@ -823,7 +840,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .nt-meta{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .nt-kind{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 .nt-text{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui)}
-.nt-act{flex:none}
+.nt-act{flex:none; display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .nt-calm{display:flex; align-items:center; gap:var(--s-4)}
 details.card .nt-list{margin-top:var(--s-4)}
 @media${below('sm')}{
