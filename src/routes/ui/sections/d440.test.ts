@@ -29,6 +29,13 @@ describe('D-440 · الرئيسيّة والمسوّدات والتنبيهات'
     expect(defaultTarget(row('w', 'draft'), [{ ...PERSON, platform: 'x' as const }])).toBeNull()
   })
 
+  it('D-441 · بدايةُ الاسم لا تختار بين حسابين شخصيّين، وتكفي للصفحة', () => {
+    const twins = [{ id: 'b1', platform: 'linkedin' as const, label: 'عمر الخالد' }, { id: 'b2', platform: 'linkedin' as const, label: 'عمر سالم' }]
+    expect(defaultTarget(row('w', 'draft', 'عمر'), twins)).toBeNull()
+    expect(defaultTarget(row('w', 'draft', 'عمر الخالد'), twins)?.id).toBe('b1')
+    expect(defaultTarget(row('w', 'draft', 'بصائر'), [...twins, PAGE])?.id).toBe('a2')
+  })
+
   it('البطاقة الفاشلة تقول سببها و«أعد المحاولة» ظاهرين، لا في الطيّة', () => {
     const d = { ...row('f', 'failed'), failure: 'http_500: Internal', model: null, cost: 0, rationale: null, sourceId: null, sourceName: null,
       stale: false, approvedBy: null, approvedAt: null, dispatchedAt: null, publishCost: 0, originalText: null } as unknown as DraftRow

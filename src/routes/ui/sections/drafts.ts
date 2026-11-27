@@ -302,11 +302,12 @@ export const APPROVE_AT = PRESETS.find((p) => p.kind === 'tomorrow')!
  * ‏‏**الوجهةُ الافتراضيّة حين تتعدّد** (D-440): كان حسابان على LinkedIn (شخصٌ وصفحة) يُسقطان «اعتمد · غدًا» إلى «اعتمد»
  * ‏وحدَه في الرئيسيّة، فيُعتمَد المنشورُ ولا يُجدوَل. فالحسابُ الذي سُمّي للمسوّدة إن طابق، وإلّا الشخصيُّ الواحدُ بجوار
  * ‏صفحاته — كما يختاره `destinationsField` ابتداءً — واسمُه ظاهرٌ بجوار الزرّ. وحسابان شخصيّان بديلان: لا افتراض.
+ * ‏والمطابقةُ ببداية الاسم للصفحة وحدها (D-441): «عمر» لا يختار بين «عمر الخالد» و«عمر سالم».
  */
 export function defaultTarget(d: DraftRow, targets: readonly Target[]): Target | null {
   const fit = targets.filter((t) => t.platform === d.platform)
   if (fit.length <= 1) return fit[0] ?? null
-  const named = d.accountName === null ? undefined : fit.find((t) => t.label === d.accountName || t.label.startsWith(d.accountName + ' '))
+  const named = d.accountName === null ? undefined : fit.find((t) => t.label === d.accountName || (t.page === true && t.label.startsWith(d.accountName + ' ')))
   if (named !== undefined) return named
   // ‏‏وحسابان شخصيّان بديلان لا يُختار بينهما عن المالك (D-218): الافتراضُ للشخصيّ الواحد بجوار صفحاته وحدَه
   const people = fit.filter((t) => t.page !== true)
