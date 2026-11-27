@@ -17,6 +17,7 @@ import { PERIODS, portfolio, previousWindow, type Period } from '../../lib/portf
 import { clientsCalendar, portfolioScreen } from '../ui/portfolioView'
 import { portfolioCalendar } from '../../lib/portfolioCalendar'
 import { sendText } from '../../lib/mail/send'
+import { inviteMail } from '../../lib/mail/invite'
 import { clearSetting, isOrgKey, ORG_KEYS, readSettings, readSettingsBoth, writeSetting } from '../../lib/settings'
 import { pivot, readCols, readDimension, readMeasure, toCsv } from '../../lib/pivot'
 import { loadFacts } from '../../lib/pivotStore'
@@ -297,10 +298,13 @@ client.post('/panel/team/invite', async (c) => {
     await setFlash(c.env, c.req.raw, { kind: 'bad', text: result.reason })
     return c.redirect('/panel/team#invite', 303)
   }
-  const sent = await sendText(c.env.EMAIL, result.email, 'دعوة إلى صدى',
-    `دُعيت إلى صدى بدور «${ROLE_LABEL[String(f.get('role')) as MemberRole].name}».\n\n` +
-    `ادخل من ${c.env.PUBLIC_BASE_URL}/panel واكتب بريدك هذا، فيصلك رمزٌ من ستّة أرقام.\n` +
-    'لا كلمةَ مرورٍ تُحفظ، ولا يدخل أحدٌ بلا الرمز.')
+  const names = new Map((await listOrgs(c.env.DB)).map((o) => [o.id, o.name]))
+  const mail = inviteMail({
+    by: gate.session.record.email ?? OWNER_EMAIL, role: String(f.get('role')) as MemberRole,
+    spaces: f.get('all') === '1' ? '*' : [...new Set(f.getAll('org').map(String))].map((id) => names.get(id) ?? id),
+    base: c.env.PUBLIC_BASE_URL,
+  })
+  const sent = await sendText(c.env.EMAIL, result.email, mail.subject, mail.text)
   await record(c.env.DB, { actor: 'panel', action: 'team.invite', target: result.email, detail: `${String(f.get('role'))}${sent.sent ? '' : ` · لم تُرسَل: ${sent.reason}`}` }, c.req.raw)
   await setFlash(c.env, c.req.raw, sent.sent
     ? { kind: 'ok', text: `دُعي ${result.email} ووصلته رسالةُ الدعوة.` }
