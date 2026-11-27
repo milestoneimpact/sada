@@ -36,7 +36,7 @@ describe('شاشة الشهر (D-383 المرحلة ٨)', () => {
     expect(j.alerts[0]).toContain('فشل')
     const n = monthJourney({ period: '2026-12', hasPlan: false, reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0 }, '2026-11-25')
     expect(n.reached).toBeNull()
-    expect(n.alerts[0]).toContain('بعد 6 يومًا')
+    expect(n.alerts[0]).toContain('بعد 6 أيّام')
     const far = monthJourney({ period: '2026-12', hasPlan: false, reviewed: false, items: 0, approved: 0, queued: 0, published: 0, failed: 0 }, '2026-11-01')
     expect(far.alerts).toHaveLength(0)
   })

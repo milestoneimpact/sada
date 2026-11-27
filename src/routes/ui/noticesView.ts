@@ -42,7 +42,7 @@ function row(n: Notice, read: NoticeRead | undefined, now: Date): Html {
       <span class="nt-text">${n.text}</span>
       ${read === undefined ? html`` : html`<span class="ago">قرأها ${read.byEmail ?? 'أحدٌ'} ${relativeTime(read.readAt, now)}</span>`}
     </span>
-    <span class="nt-act">${raw(button({ label: n.action, href: n.href, variant: read === undefined && n.tone === 'bad' ? 'primary' : 'secondary', size: 'sm' }))}</span>
+    <span class="nt-act">${n.form === undefined ? html`` : html`<form class="inline" method="POST" action="${n.form.action}" data-busy="جار…"><input type="hidden" name="id" value="${n.form.id}">${raw(button({ label: n.form.label, type: 'submit', variant: read === undefined && n.tone === 'bad' ? 'primary' : 'secondary', size: 'sm' }))}</form>`}${raw(button({ label: n.action, href: n.href, variant: read === undefined && n.tone === 'bad' && n.form === undefined ? 'primary' : 'secondary', size: 'sm' }))}</span>
   </li>`
 }
 

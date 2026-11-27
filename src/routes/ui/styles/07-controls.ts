@@ -100,7 +100,9 @@ form.inline{display:inline; margin:0}
 .err-sum-l{margin:0; padding-inline-start:var(--s-5); font-size:var(--t-ui); line-height:var(--lh-ui); font-weight:400}
 .err-sum-l a{color:var(--link)}
 /* ‏والحقلُ حين يكون مجموعةً: بلا إطارِ المتصفّح ولا حشوِه، وعنوانُها بوزن العنوان (D-297) */
-fieldset.field{margin-inline:0; padding:0; border:0; min-inline-size:0}
+fieldset.field,fieldset.stack{margin-inline:0; padding:0; border:0; min-inline-size:0}
+/* ‏‏ومربّعُ الوجهة بلا هامش المتصفّح (D-440): ‏3px خارج السلّم، وهدفُه ‏44px */
+fieldset.stack input[type=checkbox]{margin:0; inline-size:var(--tap); block-size:var(--tap)}
 fieldset.field > legend{padding:0; margin-bottom:var(--s-2); font-weight:600}
 /* اللصيقةُ نمطُ «ui» بحبر المتن (D-185 · خطّة التصميم 7.6): كانت ‏١٢٫٥ خافتةً فوق
    حقل ‏١٥٫٥ — تُقرأ هامشًا، وهي سؤال الحقل */

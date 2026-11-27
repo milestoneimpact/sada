@@ -39,6 +39,7 @@ import { providersSection } from './ui/sections/providers'
 import { securitySection } from './ui/sections/security'
 import { shortcutsSwitch } from './ui/components/tabs'
 import { accountMenu, densitySwitch, escapeHtml, GLYPH_SVG, injectCsrf, motionSwitch, shell, themeSwitch, bell } from './ui/shell'
+import { expiredText, RELINK, relinkHref } from '../lib/notices'
 import { brandMoment, firstBand } from './ui/moment'
 import { B64URL_SCRIPT, PASSKEY_TEXT_SCRIPT, RC_RENEW, recoveryStaleNote } from './ui/scripts'
 import { alertChannel, bar, fileName, glyph, healthCard, machineCard, pageHead, pathArrows, pct, type HealthView, type OutboxRow } from './ui/parts'
@@ -1129,9 +1130,9 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   for (const c of stale) {
     items.push({
       kind: 'bad',
-      text: `${c.spec.label}: انتهى الإذن — والنشر متوقّف عليها.`,
-      go: '#channels',
-      label: 'جدّد',
+      text: expiredText(c.spec.label),
+      go: relinkHref(c.spec.id),
+      label: RELINK,
     })
   }
   // ‏والمحفوظُ بلا إذنٍ بعد المنتهي (D-166): يسقط أوّلُ منشورٍ مجدولٍ عليه
@@ -1144,7 +1145,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     })
   }
   // ‏ورحلةُ الشهرين (D-383 · المرحلة ٨): كلُّ تنبيهٍ يذهب إلى شاشة الشهر
-  for (const a of d.monthAlerts ?? []) items.push({ kind: 'warn', text: a, go: '/panel/plan/month', label: 'افتح الشهر' })
+  // ‏‏ومنظّمةٌ بلا قناةٍ لا تُسأل عن خطّة الشهر ولا عن Drive ولا عن المصادر (D-440): الربطُ أوّلًا، وما بعده يُقال بعده
+  for (const a of linkedChannels === 0 ? [] : d.monthAlerts ?? []) items.push({ kind: 'warn', text: a, go: '/panel/plan/month', label: 'افتح الشهر' })
   if (d.paused) {
     items.push({ kind: 'warn', text: 'النظام موقوف مؤقّتا — لا مسح ولا تحليل ولا نشر.', go: '#limits', label: 'استأنف' })
   }
@@ -1173,6 +1175,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     items.push({ kind: 'warn', text: 'لا رموز استرداد — فقد الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
 
+  const wideSpend = (d.orgs ?? []).length > 1
   const todoRows = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
       ${i.go === undefined ? '' : `<span class="todo-go">${button({ label: i.label ?? 'اذهب', size: 'sm', variant: 'secondary', href: i.go })}</span>`}</li>`)
@@ -1203,7 +1206,7 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     // ‏صفّان ثمّ «و N غيرُها» (D-431)، و«افتح التيّار» زال من هنا: الشريطُ السفليُّ يحمله
     rows: todoRows.slice(0, 2).join(''),
     rest: todoRows.slice(2),
-    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
+    tools: linkedChannels === 0 ? '' : SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
   })}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،
@@ -1230,7 +1233,8 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
    * ‏يُقرآن بلا فتح، وما عداهما خلف «التفاصيل» — طيٌّ أصيلٌ يعمل بلا سكربت. والرقمان من السلسلة نفسِها التي يرسمها الرسمُ تحته.
    */''}
   <div class="card home-cost mt-3" role="region" aria-labelledby="hc-t">
-    <div class="card-head"><h2 id="hc-t">الكلفة وما وقع</h2></div>
+    <div class="card-head"><h2 id="hc-t">الكلفة وما وقع${/* ‏‏والدفترُ عامٌّ لا لمنظّمة (D-440): سقفُ الإنفاق واحدٌ للنشر كلِّه، فالرقمُ يُوسَم بمداه حيث تعدّدت المنظّمات */''}${
+      wideSpend ? ' · كلّ المنظّمات' : ''}</h2></div>
     <dl class="hc-nums">
       <div><dt>إنفاق اليوم</dt><dd class="num">${escapeHtml(money(d.series[d.series.length - 1]?.total ?? 0))}</dd></div>
       <div><dt>إنفاق 14 يومًا</dt><dd class="num">${escapeHtml(money(d.series.reduce((n, x) => n + x.total, 0)))}</dd></div>
@@ -1789,13 +1793,15 @@ export function panelPage(view: PaneView): string {
     // ‏**والشريطُ يحيل ولا يعيد الحال** (D-235): «منقطعة» تقولها البلاطةُ والبطاقةُ مرّةً، والشريطُ يسمّي ويدلّ
     // ‏ومنصّةٌ واحدةٌ انتهى إذنُها يُقال سببُها هنا: «ما ينتظرك» لم يعد يقوله (D-381)
     html: one !== undefined && one.v.state === 'needs_reauth'
-      ? html`<b><bdi>${one.v.spec.label}</bdi></b>: انتهى الإذن — والنشر متوقّف عليها.`.value
+      ? escapeHtml(expiredText(one.v.spec.label))
       : `${needy.slice(0, 3)
       .map(({ v }) => `<b><bdi>${escapeHtml(v.spec.label)}</bdi></b>`)
       .join(' و')}${needy.length > 3 ? ` <b>و${needy.length - 3} غيرُها</b>` : ''} ${needy.length === 1 ? 'تحتاج' : 'تحتاج كلّ منها'} يدَك.`,
     action: one === undefined
       ? { label: 'افتح الحسابات', href: '#channels' }
-      : { label: 'جدّد إذن ' + one.v.spec.label, href: '/panel/channels/' + one.v.spec.id },
+      : one.v.state === 'needs_reauth'
+        ? { label: RELINK, href: relinkHref(one.v.spec.id) }
+        : { label: 'جدّد إذن ' + one.v.spec.label, href: '/panel/channels/' + one.v.spec.id },
   })
 
   // ‏الإشعارُ مكوّنُه (D-189): «تراجَع» فعلُه في طرفه، والسكربتُ يُطفيه ويقرّر أيذهب وحدَه

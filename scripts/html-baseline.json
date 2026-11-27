@@ -17,7 +17,7 @@
   "routes/panel/reports.ts": 3,
   "routes/panel/session.ts": 7,
   "routes/panel/shared.ts": 4,
-  "routes/panelView.ts": 83,
+  "routes/panelView.ts": 82,
   "routes/ui/channels.ts": 29,
   "routes/ui/chart.ts": 21,
   "routes/ui/clientView.ts": 29,

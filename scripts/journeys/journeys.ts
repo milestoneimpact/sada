@@ -1161,7 +1161,7 @@ const R20: Journey = {
     const machine = new URL(page.url())
     const machineOk = machine.pathname === '/panel/settings' && machine.hash === '#machine' && (await page.locator('#machine').count()) > 0
     await open()
-    const reauth = act(/إذن التجديد لـ LinkedIn .* انتهى/)
+    const reauth = act(/انتهى إذن LinkedIn .* والنشر عليه متوقّف/)
     const reauthHref = (await reauth.getAttribute('href')) ?? ''
     await m.tap(reauth, '«أعد الربط» على إشعار انتهاء الإذن')
     const reauthOk = reauthHref === '/oauth/linkedin/start'

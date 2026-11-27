@@ -227,6 +227,8 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
    والمحلّيّ أخفت وأصغر: **هو الأليف الذي يُقرأ بلمحة**، والأوّل هو
    الذي يُنسَخ ويُقارَن. */
 .when-t{display:inline-flex; flex-direction:column; gap:1px; vertical-align:middle}
+/* ‏‏والموعدُ سطرٌ لا يُقطع بين «9:00» و«ص» (D-440) */
+.when-t b,.pc-when bdi{white-space:nowrap}
 .when-t .tz{font-size:var(--t-caption); line-height:var(--lh-caption); color:var(--ink-2); font-weight:600}
 
 /* سطرُ الذروة — خبرٌ لا أمر، فبلا زرٍّ ولا لونِ حالة (D-043) */
@@ -838,7 +840,7 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .nt-meta{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2)}
 .nt-kind{font-size:var(--t-small); line-height:var(--lh-small); font-weight:600; color:var(--ink-2)}
 .nt-text{max-width:var(--measure); font-size:var(--t-ui); line-height:var(--lh-ui)}
-.nt-act{flex:none}
+.nt-act{flex:none; display:flex; flex-wrap:wrap; gap:var(--s-2)}
 .nt-calm{display:flex; align-items:center; gap:var(--s-4)}
 details.card .nt-list{margin-top:var(--s-4)}
 @media${below('sm')}{
