@@ -2108,6 +2108,19 @@ describe('مراجعة الهويّة (D-196)', () => {
     runInNewContext(THEME_SCRIPT, { document: doc2, localStorage: { getItem: () => 'light', setItem() {}, removeItem() {} } })
     expect(metas.map((m) => m.content)).toEqual([MOMENT.ground, THEME.light['--bg'], THEME.light['--bg']])
   })
+
+  it('بلا اختيارٍ محفوظ يترك سكربتُ الإقلاع «data-theme» للنظام، كمبدّل الثيم (D-443)', () => {
+    const html = loginPage({}, 'n')
+    const boot = /<script nonce="n">([\s\S]*?)<\/script>/.exec(html)?.[1] ?? ''
+    const ds = {} as Record<string, string>
+    runInNewContext(boot, { document: { documentElement: { dataset: ds }, querySelectorAll: () => [] }, localStorage: { getItem: () => null } })
+    expect(ds.theme).toBeUndefined()
+    // ‏والافتراضيُّ واحدٌ في السكربتين
+    expect(boot).toContain("||'system'")
+    expect(THEME_SCRIPT).toContain("||'system'")
+    expect(boot).not.toContain("||'light'")
+    expect(THEME_SCRIPT).not.toContain("||'light'")
+  })
 })
 
 describe('اللوح بالأهمّ أوّلًا و«الأرشيف» (D-215)', () => {
