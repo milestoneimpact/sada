@@ -57,3 +57,15 @@ describe('checkPlanFile', () => {
     expect(checkPlanFile('w.md', renderTemplate('2026-12-06', 'md', weekRows('2026-12-06'))).lines).toEqual(['لا صفَّ بنصّ — الملفّ لا يحمل منشورًا'])
   })
 })
+
+describe('planUploadCsv (D-434)', () => {
+  it('md يُكتب CSV بأرقام سطوره، والصفّ بلا نصّ يُترك، وCSV يمرّ كما هو', async () => {
+    const { planUploadCsv } = await import('./schema')
+    const md = '# خطّة\n\n| اليوم | الساعة | المنصة | النص |\n|---|---|---|---|\n| 2026-12-01 | 09:00 | x | أهلًا, يا |\n| 2026-12-02 | 09:00 | x | |\n'
+    const csv = planUploadCsv('plans/2026-12.md', md)
+    const { parseCsvRecords } = await import('./import')
+    expect(parseCsvRecords(csv).map((r) => r.line)).toEqual([3, 5])
+    expect(csv).toContain('"أهلًا, يا"')
+    expect(planUploadCsv('a.csv', 'date,time\n')).toBe('date,time\n')
+  })
+})

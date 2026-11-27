@@ -1171,10 +1171,9 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
     items.push({ kind: 'warn', text: 'لا رموز استرداد — فقد الجهاز يصير قفلا نهائيّا.', go: '#security', label: 'ولّدها' })
   }
 
-  const todo = items
+  const todoRows = items
     .map((i) => `<li><span class="dot ${i.kind}"></span><span>${escapeHtml(i.text)}</span>
       ${i.go === undefined ? '' : `<span class="todo-go">${button({ label: i.label ?? 'اذهب', size: 'sm', variant: 'secondary', href: i.go })}</span>`}</li>`)
-    .join('')
 
   return `<section data-pane="overview" hidden>
   <h1 class="vh">${escapeHtml(sectionLabel('overview'))}</h1>
@@ -1198,10 +1197,11 @@ function overviewPane(d: ShellData & OverviewData & Partial<Pick<PostsData, 'pla
   ${d.sources.some((x) => x.analyzed) ? '' : firstBand()}
   ${/* ‏**الخطّةُ أوّلًا** (D-289): محورُ المنصّة أوّلُ ما يُرى — وتُحمَّل مع «المنشورات» على `/panel`، فلا جملةَ جديدة */''}
   ${/* ‏**«ما ينتظرك» بعد التحيّة بعرض اللوح** (SPEC-v1 §6.1 · D-381): يرسمها `homeTop`، وصفوفُها من هنا وأدواتُها ثانويّة */''}
-  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
-    rows: todo,
-    // ‏و«افتح التيّار» ثانويٌّ بجوارها (D-386): الصفحةُ الواحدةُ لما سيُنشر وما نُشر
-    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }) + button({ label: 'افتح التيّار', size: 'sm', variant: 'secondary', href: '/panel/feed' }),
+  ${homeTop(facts, d.now, deskQueue(d.drafts, d.now, d.targets, d.media), d.plan === undefined ? '' : planCard(d.plan, d.planCounts, d.now, d.zone ?? null), homeNew(), {
+    // ‏صفّان ثمّ «و N غيرُها» (D-431)، و«افتح التيّار» زال من هنا: الشريطُ السفليُّ يحمله
+    rows: todoRows.slice(0, 2).join(''),
+    rest: todoRows.slice(2),
+    tools: SCAN_BTN + button({ label: 'مراجعة المصادر', size: 'sm', variant: 'secondary', href: '#sources' }),
   })}
   ${/*
    * **عمودان يُملآن لا يُمدّان** (D-136): ما عليك وما وقع في العمود الأوّل،

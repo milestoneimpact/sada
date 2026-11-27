@@ -181,6 +181,20 @@ describe('مراجعةُ الخطّة (D-286)', () => {
  * **منشوران في اليوم على المنصّة نفسِها من المصدر نفسِه** (D-329): البندُ يطابق مسوّدتَه بمعرّفه لا بمصدره ومنصّته، ولكلّ
  * منصّةٍ صورتُها — و«ابدأ» يرسل لكلّ بندٍ معرّفَه وزاويتَه ونوعَ صورة منصّته.
  */
+describe('إشعارُ حكم العميل إلى بطاقته (D-435)', () => {
+  it('`?item=` يُحلّ إلى أسبوع البند ومرساته، وبصمةٌ غائبةٌ إلى الخطّة', async () => {
+    const { cookie } = await session()
+    const go = await app.request('/panel/plan/review?item=' + encodeURIComponent('s2|x|2099-01-06|09:00'), { headers: { Cookie: cookie } }, env)
+    expect(go.status).toBe(303)
+    const at = go.headers.get('Location') ?? ''
+    expect(at).toMatch(/^\/panel\/plan\/review\?w=1#c-\d+$/)
+    const html = await (await app.request('/panel/plan/review?w=1', { headers: { Cookie: cookie } }, env)).text()
+    expect(html).toContain('id="' + at.split('#')[1]! + '"')
+    const gone = await app.request('/panel/plan/review?item=nope', { headers: { Cookie: cookie } }, env)
+    expect(gone.headers.get('Location')).toBe('/panel/plan/review')
+  })
+})
+
 describe('بندٌ بمعرّفه، ولكلّ منصّةٍ صورتُها (D-329)', () => {
   beforeEach(() => {
     db.raw.exec("UPDATE plans SET status = 'superseded'; DELETE FROM posts")

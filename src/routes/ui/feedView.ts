@@ -10,6 +10,7 @@ import type { FeedCard, FeedModel } from '../../lib/feed'
 import { postStatus } from '../../lib/status'
 import { clock, dayKey, dayKeyLabel, dayLabel } from '../../lib/time/zone'
 import { parseSqliteUtc, num } from '../../lib/format'
+import { PRESETS } from '../../lib/time/local'
 import { platformLabel } from '../../lib/oauth/providers'
 import { mayDo } from '../../lib/plan/rights'
 import { allows } from '../../lib/access'
@@ -131,7 +132,19 @@ function action(c: FeedCard, v: FeedView): Html {
   }
   // ‏مجدولٌ أو معتمَدٌ بلا موعد: منشورُ الخطّة إلى شاشة التعديل والسجلّ (D-383 المرحلة ٧)، وما سواه إلى بطاقته في لوح
   // ‏المنشورات (D-388): فيها «انقلها إلى» بضغطةٍ (D-200) والمحرّرُ — واللوحُ خرج من الرافدة، وهذا بابُه
-  return raw(button({ label: 'افتح', variant: 'primary', size: 'sm', href: c.planId !== null ? '/panel/plan/post/' + encodeURIComponent(c.id) : '/panel#d-' + encodeURIComponent(c.id) }))
+  const open = raw(button({ label: 'افتح', variant: c.status === 'queued' ? 'secondary' : 'primary', size: 'sm', href: c.planId !== null ? '/panel/plan/post/' + encodeURIComponent(c.id) : '/panel#d-' + encodeURIComponent(c.id) }))
+  return c.status === 'queued' && mayDo(role, 'approve', 'draft').ok ? html`${quickMove(c.id)}${open}` : open
+}
+
+/**
+ * ‏**«انقلها إلى» على بطاقة المجدولة في التيّار** (D-433): أزرارُ `PRESETS` نفسُها التي على بطاقة اللوح (D-200)، ترسل
+ * ‏`preset` إلى `reschedule` فيحسبه الخادمُ بتوقيت المالك ويغيّر الموعدَ وحده (`reschedulePost`، والمُرسَلُ يُرفَض هناك).
+ * ‏و`back=feed` يعيد إلى البطاقة `#f-{id}` في التيّار لا إلى اللوح. وإرسالٌ عاديّ بلا `data-swap`: التيّارُ صفحةٌ بلا سكربت اللوح، وتبديلُه يجلب `/panel` لا التيّار.
+ */
+function quickMove(id: string): Html {
+  return html`<form class="inline" method="POST" action="/panel/drafts/reschedule" data-busy="جار…">
+    <input type="hidden" name="id" value="${id}"><input type="hidden" name="back" value="feed">
+    <span role="group" aria-label="انقل الموعد إلى">${raw(PRESETS.map((p) => button({ label: p.label, variant: 'secondary', size: 'sm', type: 'submit', name: 'preset', value: p.kind })).join(''))}</span></form>`
 }
 
 /**

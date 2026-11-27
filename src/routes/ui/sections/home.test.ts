@@ -164,12 +164,25 @@ describe('بابُ الكتابة في سطر التحيّة (D-326 · «أنش�
   it('سطرُ حالٍ واحد تحت التحيّة، ثمّ «ما ينتظرك» أوّلَ البطاقات، وخطوتُك التالية أوّلُ صفوفها بزرٍّ أوّليٍّ واحد (D-381)', () => {
     const html = homeTop(facts({ counts: { perPlatform: { x: { draft: 2, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } }), NOW,
       '', '', '', { rows: '<li>بند</li>', tools: '<a class="btn btn-secondary btn-sm" href="#sources">مراجعة المصادر</a>' })
-    expect(html).toMatch(/<p class="hello-status m-0"><b class="num">2<\/b> بانتظار قرارك · <b class="num">0<\/b> مجدولة هذا الأسبوع<\/p>/)
+    expect(html).toMatch(/<p class="hello-status m-0"><a href="#desk"><b class="num">2<\/b> بانتظار قرارك<\/a> · <b class="num">0<\/b> مجدولة هذا الأسبوع<\/p>/)
     const box = html.slice(html.indexOf('id="hw-t"'), html.indexOf('class="hstats"'))
     expect(box.indexOf('class="todo-next"')).toBeLessThan(box.indexOf('<li>بند</li>'))
     expect(box.match(/btn-primary/g)).toHaveLength(1)
     expect(box).toContain('مراجعة المصادر')
     expect(html.indexOf('id="hw-t"')).toBeLessThan(html.indexOf('class="hstats"'))
+  })
+  it('«ينتظر قرارك» قبل «ما ينتظرك» حين ينتظر شيء، والصيانةُ بعد صفّين تحت «و N غيرُها» (D-431)', () => {
+    const busy = facts({ counts: { perPlatform: { x: { draft: 2, approved: 0, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } })
+    const html = homeTop(busy, NOW, '<div class="card desk" id="desk"></div>', '', '', { rows: '<li>أ</li><li>ب</li>', tools: '', rest: ['<li>ج</li>', '<li>د</li>'] })
+    expect(html.indexOf('id="desk"')).toBeLessThan(html.indexOf('id="hw-t"'))
+    expect(html).toContain('<summary><span>و2 غيرُها</span></summary>')
+    expect(html.indexOf('<li>ج</li>')).toBeGreaterThan(html.indexOf('<details class="fold">'))
+  })
+  it('ومعتمَدةٌ بلا موعدٍ ولا مسوّدة: الطابورُ أوّلًا وسطرُ الحال يعدّها ويربطها (D-432)', () => {
+    const none = facts({ counts: { perPlatform: { x: { draft: 0, approved: 2, queued: 0, published: 1, failed: 0, nextAt: null } }, publishedWeek: 1 } })
+    const html = homeTop(none, NOW, '<div class="card desk" id="desk"><span class="count" data-desk-n>2</span></div>', '', '', { rows: '<li>أ</li>', tools: '' })
+    expect(html.indexOf('id="desk"')).toBeLessThan(html.indexOf('id="hw-t"'))
+    expect(html).toContain('<a href="#desk"><b class="num">2</b> بانتظار قرارك</a>')
   })
   it('ولا شيء ينتظر: حالٌ فارغةٌ إيجابيّة لا قائمةٌ خالية', () => {
     const linked = viewChannels([{ id: 'a1', platform: 'linkedin', kind: 'member', displayName: 'عمر', status: 'active',

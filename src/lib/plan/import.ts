@@ -459,6 +459,8 @@ export interface ApplyOutcome {
   readonly result: 'scheduled' | 'exists' | 'failed'
   /** سببُ الفشل، أو حالُ المنشور الموجود («مجدولٌ» أو «نُشر» أو «فشل»). */
   readonly reason?: string
+  /** معرّفُ المنشور المجدول — لـ«تراجَع» في الإشعار (D-434). */
+  readonly id?: string
 }
 
 /** حالُ منشورٍ موجودٍ بالمفتاح نفسِه — يقولها المنادي كما هي لا «كان مجدولًا» لكلّ حال. */
@@ -561,7 +563,7 @@ export async function applyPlan(
     }
     const scheduled = await schedulePost(db, slot.id, slot.account, slot.at, now)
     out[p.at] = scheduled.ok
-      ? { line: p.line, result: 'scheduled' }
+      ? { line: p.line, result: 'scheduled', id: slot.id }
       : { line: p.line, result: 'failed', reason: `اعتُمد ولم يُجدوَل: ${scheduled.reason}` }
   }
   return out

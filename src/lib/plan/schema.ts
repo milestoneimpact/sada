@@ -5,7 +5,8 @@
  * على `PLAN_SCHEMA`) يُكتب CSV بـ`renderTemplate` ثمّ يُقرأ بالقارئ ذاته. وفوق القارئ تنبيهاتُ الدليل التي لا يردّها
  * التطبيق: نصٌّ مكرَّر، ووسومٌ أكثرُ من ثلاثة، وأسعارٌ أو مبالغُ في النصّ.
  */
-import { issueText, looksMarkdown, readTemplate, renderTemplate, TEMPLATE_HEADER, TEXT_LIMIT, type TemplateRow } from './template'
+import { parseCsvRecords } from './import'
+import { issueText, looksMarkdown, markdownToCsv, readTemplate, renderTemplate, TEMPLATE_HEADER, TEXT_LIMIT, type TemplateRow } from './template'
 
 /** ‏JSON Schema لصفوف الخطّة — نسختُه في `docs/plan.schema.json` يحرسها اختبار. */
 export const PLAN_SCHEMA = {
@@ -86,4 +87,32 @@ export function checkPlanFile(name: string, text: string): PlanCheck {
   }
   if (lines.length === 0 && read.rows.length === 0) lines.push('لا صفَّ بنصّ — الملفّ لا يحمل منشورًا')
   return { ok: lines.length === 0, rows: read.rows.length, lines }
+}
+
+/** خليّةُ CSV بقاعدة RFC 4180 — تُقتبس إن حملت فاصلةً أو اقتباسًا أو سطرًا. */
+const quote = (c: string): string => (/[",\r\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)
+
+/** ملفٌّ مرفوعٌ في «من ملفّ» جدولُ markdown؟ — بامتداده، أو بشكله إن لم يكن `.csv`. */
+export function isMarkdownPlan(name: string, text: string): boolean {
+  return /\.md$/i.test(name) || (!/\.csv$/i.test(name) && looksMarkdown(text))
+}
+
+/**
+ * **بابٌ واحد للصيغتين** (D-434): ملفُّ الخطّة `plans/YYYY-MM.md` يُرفع في «من ملفّ» كما هو، فيُكتب CSV لـ`readPlan`.
+ * الجدولُ بـ`markdownToCsv` نفسِه الذي يقرأ به `readTemplate`، و**الصفُّ بلا نصٍّ يُترك** كما يتركه القالب (يأتي بكلّ الأيّام)
+ * — سطرًا فارغًا في مكانه، فيبقى رقمُ كلِّ صفٍّ رقمَ سطره في الملفّ. وCSV يمرّ كما هو.
+ */
+export function planUploadCsv(name: string, text: string): string {
+  if (!isMarkdownPlan(name, text)) return text
+  const recs = parseCsvRecords(markdownToCsv(text))
+  if (recs.length === 0) return ''
+  const head = recs[0]!.cells.map((h) => h.trim().toLowerCase())
+  const t = head.findIndex((h) => h === 'text' || h === 'النص' || h === 'النصّ')
+  const slots: string[] = []
+  for (const r of recs) {
+    if (r !== recs[0] && t >= 0 && (r.cells[t] ?? '').trim() === '') continue
+    while (slots.length < r.line - 1) slots.push('')
+    slots[r.line - 1] = r.cells.map(quote).join(',')
+  }
+  return slots.join('\r\n') + '\r\n'
 }

@@ -115,7 +115,7 @@
     "inputs": 0
   },
   "routes/ui/sections/desk.ts": {
-    "buttons": 3,
+    "buttons": 2,
     "cards": 1,
     "inputs": 0
   },

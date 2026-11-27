@@ -13,17 +13,22 @@ import { PRIVATE_ONLY, PRIVATE_REACH, TIKTOK_NO_SCOPE, tiktokNeedsScope, type Re
 import { momentLabel } from '../../lib/time/local'
 import { statusBadge } from './components/badge'
 
+/**
+ * **البابُ الواحد** (D-434): الرفعُ ومخارجُ المعاينة كلُّها («إلغاء»، والخطأ، والمهلة) تعود إلى هذه البطاقة نفسِها.
+ */
+export const IMPORT_DOOR = '/panel#plan-import'
+
 /** بطاقةُ الاستيراد في لوح المنشورات. */
 export function planImportCard(): string {
   return `<div class="card mt-3" id="plan-import">
     <div class="card-head"><h2>خطّتُك من ملفّ</h2><div class="grow"></div>
       <a class="tap" href="/panel/plan-import/template.csv" download>نزّل النموذج</a></div>
     <p class="hint">املأ جدولًا بأعمدة <b>التاريخ والوقت والمنصّة والنصّ</b> (والمقطع باسمه في «فيديوهاتك»)،
-      واحفظه CSV من Excel أو Google Sheets، ثمّ ارفعه هنا. <b>يُعرض عليك صفًّا صفًّا بمشكلاته، ولا يُجدوَل
+      واحفظه CSV من Excel أو Google Sheets ثمّ ارفعه هنا، أو ارفع ملفّ الخطّة <bdi dir="ltr">plans/YYYY-MM.md</bdi> كما كتبه الوكيل. <b>يُعرض عليك صفًّا صفًّا بمشكلاته، ولا يُجدوَل
       شيء قبل أن تعتمده</b> — وحتّى ${MAX_PLAN_ROWS} صفّ في الملفّ.</p>
     <form class="row" method="POST" action="/panel/plan-import" enctype="multipart/form-data" data-busy="جار القراءة…">
-      ${/* ‏ويُقرأ الملفّ فور اختياره (سكربت اللوحة، 7.6) واسمُه في اللصيقة؛ والزرّ لمن لا سكربت عنده */ ''}<label class="btn btn-primary vpick"><span data-plan-name>اختر ملفّ الخطّة (CSV)</span>
-        <input type="file" name="file" class="vfile" accept=".csv,text/csv" required data-plan-file></label>
+      ${/* ‏ويُقرأ الملفّ فور اختياره (سكربت اللوحة، 7.6) واسمُه في اللصيقة؛ والزرّ لمن لا سكربت عنده */ ''}<label class="btn btn-primary vpick"><span data-plan-name>اختر ملفّ الخطّة (CSV أو MD)</span>
+        <input type="file" name="file" class="vfile" accept=".csv,.md,text/csv,text/markdown" required data-plan-file></label>
       <noscript><button class="btn btn-secondary" type="submit">اقرأ الخطّة</button></noscript>
     </form>
   </div>`
@@ -102,7 +107,7 @@ export function planImportExpired(): string {
   return `<header class="page-head"><div class="eyebrow"><span class="ln"></span>خطّتُك من ملفّ</div>
       <h1>انتهت مهلة هذه المعاينة</h1>
       <p class="lede">تبقى المعاينة ساعتين، ثمّ تُمحى ولا يُجدوَل منها شيء. ارفع الملفّ من جديد لتراه بحاله الآن.</p></header>
-    <div class="card"><a class="btn btn-primary" href="/panel#plan-import">ارفع الملفّ من جديد</a></div>`
+    <div class="card"><a class="btn btn-primary" href="${IMPORT_DOOR}">ارفع الملفّ من جديد</a></div>`
 }
 
 /** صفحةُ المعاينة — والزرُّ يُرسم حين يكون في الملفّ صفٌّ واحدٌ سليمٌ على الأقلّ. */
@@ -121,7 +126,7 @@ export function planImportScreen(
           blocked === 0 ? '' : `، ويحتاج ${escapeHtml(counted(blocked, NOUNS.row))} إصلاحًا في الملفّ ثمّ يُرفع من جديد`}.`}</p></header>
     ${read.fileProblems.length > 0
       ? `<div class="card"><ul class="pi-why">${read.fileProblems.map((p) => `<li>${escapeHtml(p)}</li>`).join('')}</ul>
-          <a class="btn btn-secondary" href="/panel#plan-import">ارجع وارفع ملفًّا آخر</a></div>`
+          <a class="btn btn-secondary" href="${IMPORT_DOOR}">ارجع وارفع ملفًّا آخر</a></div>`
       : `<div class="card">
         <p class="hint">المواعيد ${fallback ? 'بتوقيت الرياض' : 'بتوقيتك'} كما فهمها صدى — راجعها قبل أن تعتمد.</p>
         <div class="scroll"><table class="pi">
@@ -132,12 +137,11 @@ export function planImportScreen(
           ${ready === 0
             ? '<span class="ago">لا صفّ جاهزًا — أصلح الملفّ وارفعه من جديد.</span>'
             : `<form class="inline" method="POST" action="/panel/plan-import/${escapeHtml(id)}/approve"
-                 data-busy="جار الجدولة…" data-confirm="${escapeHtml(ready === 1
-                   ? 'يُعتمَد منشور واحد ويُجدوَل في موعده. أتابع؟'
-                   : `يُعتمَد ${counted(ready, NOUNS.post)} ويُجدوَل كلّ في موعده. أتابع؟`)}">
+                 data-busy="جار الجدولة…">
+                 ${/* ‏بلا تأكيدٍ مزدوج (D-434): الزرُّ يذكر العدد، و«تراجَع» في الإشعار بعده يسحب ما جُدول (نمط D-327) */ ''}
                  <input type="hidden" name="lines" value="${escapeHtml(readyLines(read).join(','))}">
                  <button class="btn btn-primary" type="submit">اعتمد وجدوِل ${escapeHtml(counted(ready, NOUNS.post, 'acc'))}</button></form>`}
-          <a class="btn btn-secondary" href="/panel/plan">إلغاء</a>
+          <a class="btn btn-secondary" href="${IMPORT_DOOR}">إلغاء</a>
         </div>
       </div>`}`
 }

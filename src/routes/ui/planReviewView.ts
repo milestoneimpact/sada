@@ -66,7 +66,7 @@ export interface ReviewView {
 }
 
 /** أيُّ أسبوعٍ من الخطّة يقع فيه اليوم — من 1. */
-function weekOfDay(start: string, day: string): number {
+export function weekOfDay(start: string, day: string): number {
   const diff = Math.floor((Date.parse(day + 'T00:00:00Z') - Date.parse(start + 'T00:00:00Z')) / 86_400_000)
   return Math.floor(diff / 7) + 1
 }

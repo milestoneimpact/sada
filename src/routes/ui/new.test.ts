@@ -44,9 +44,10 @@ describe('التيّار: اعتمادٌ بلا ضياع', () => {
     expect(feedScreen({ model: model([]), zone: null, now: NOW, role: 'viewer' })).not.toContain('عندي خطّة')
   })
 
-  it('إلغاءُ الاستيراد إلى الخطّة، وإعادةُ المحاولة على مسار الاستيراد', () => {
+  it('«إلغاء» ومخارجُ الخطأ إلى باب الرفع نفسِه، وبلا تأكيدٍ مزدوج (D-434)', () => {
     const html = planImportScreen('p1', { rows: [], fileProblems: [] }, NOW)
-    expect(html).toContain('href="/panel/plan">إلغاء')
+    expect(html).toContain('href="/panel#plan-import">إلغاء')
+    expect(html).not.toContain('data-confirm')
     expect(planImportScreen('p1', { rows: [], fileProblems: ['تالف'] }, NOW)).toContain('href="/panel#plan-import"')
   })
 })

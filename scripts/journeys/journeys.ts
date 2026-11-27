@@ -235,7 +235,7 @@ const status = (stack: Stack, id: string) =>
 const R0: Journey = {
   id: 'R-0',
   title: 'مراجعة ما ينتظر قرارك: اعتماد مسوّدة',
-  plan: { target: '1 (§6: [اعتمد] في «تنتظر قرارك» على الرئيسيّة)' },
+  plan: { target: '1 (§6: [اعتمد · غدًا] في «ينتظر قرارك» على الرئيسيّة، بلا تحميل · D-431)' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
     // ‏**طريقُ §6** (D-326): «اعتمد» على صفّها في «ينتظر قرارك» على الرئيسيّة نفسِها (D-216) — كانت الرحلةُ تنزل من محطّة
@@ -244,7 +244,8 @@ const R0: Journey = {
     await m.tap(button(desk, /^اعتمد/), '«اعتمد» في «ينتظر قرارك» على الرئيسيّة', { key: true })
     const row = status(stack, id)
     crlf(m, stack, id)
-    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'}` }
+    // ‏‏والحلقةُ اليوميّة (D-431): «اعتمد · غدًا» يعتمد ويُجدوِل بلا تحميل، فالنجاحُ «queued» لا «approved»
+    return { success: row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? 'NULL'}` }
   },
 }
 
@@ -545,7 +546,7 @@ const R4: Journey = {
 const R5: Journey = {
   id: 'R-5',
   title: 'استيراد خطّة من ملفّ CSV',
-  plan: { target: '4 (§6: «عندي خطّة» في «خطّةُ الشهر» ← الملفّ ← «اعتمد وجدوِل» ← التأكيد)' },
+  plan: { target: '3 (§6: «عندي خطّة» في «خطّةُ الشهر» ← الملفّ ← «اعتمد وجدوِل»؛ بلا تأكيدٍ مزدوج و«تراجَع» بعدها · D-434)' },
   async run({ page, m, stack, assets }) {
     const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
     // ‏**بطريق §6 من الرئيسيّة** (D-326): «منشور جديد ▾» ← «خطّة من ملفّ» — كانت الرحلةُ تفتح «المنشورات» أوّلًا فتعدّ لمسةً
@@ -554,7 +555,7 @@ const R5: Journey = {
     await m.tap(link(page.locator('.home-plan'), /عندي خطّة/), '«عندي خطّة» في بطاقة «خطّةُ الشهر»')
     const form = page.locator('form[action="/panel/plan-import"]')
     const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
-    await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV)» ← الملفّ', { key: true })
+    await m.file(pick, form.locator('input[name="file"]'), assets.plan, '«اختر ملفّ الخطّة (CSV أو MD)» ← الملفّ', { key: true })
     // ‏الملفُّ يُقرأ حين يُختار؛ و«اقرأ الخطّة» تُضغط إن بقيت ظاهرةً بعده لا قبله
     const read = button(form, 'اقرأ الخطّة')
     if ((await read.count()) > 0) await m.tap(read, '«اقرأ الخطّة»')
@@ -568,6 +569,42 @@ const R5: Journey = {
   },
 }
 
+/** ‏ملفُّ الوكيل `plans/YYYY-MM.md` كما يكتبه (D-434): جدولُ القالب، وصفٌّ بلا نصٍّ يُترك. */
+function planMd(): { name: string; mimeType: string; buffer: Buffer } {
+  const day = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+  const md = [
+    `# خطّة ${day.slice(0, 7)}`, '',
+    '| اليوم | الساعة | المنصة | النص | الملف | ملاحظة |', '|---|---|---|---|---|---|',
+    `| ${day} | 09:30 | linkedin | المعلَم اتّفاقٌ مكتوب على معنى «تمّ» قبل أن يبدأ العمل. | | |`,
+    `| ${day} | 12:00 | x | ثلاثة أسئلة قبل كلّ معلَم توفّر ساعةً كلّ أسبوع. | | |`,
+    `| ${day} | 18:00 | linkedin | من الاجتماع الطويل إلى المراجعة القصيرة. | | |`,
+    `| ${day} | 20:00 | x |  | | |`, '',
+  ].join('\n')
+  return { name: `${day.slice(0, 7)}.md`, mimeType: 'text/markdown', buffer: Buffer.from(md, 'utf8') }
+}
+
+const R5md: Journey = {
+  id: 'R-5·md',
+  title: 'استيراد ملفّ الخطّة plans/YYYY-MM.md من الباب نفسِه',
+  plan: { target: '3 (D-434: «عندي خطّة» ← ملفّ md ← «اعتمد وجدوِل»)' },
+  async run({ page, m, stack }) {
+    const before = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
+    await m.tap(link(page.locator('.home-plan'), /عندي خطّة/), '«عندي خطّة» في بطاقة «خطّةُ الشهر»')
+    const form = page.locator('form[action="/panel/plan-import"]')
+    const pick = visible(form.locator('label').filter({ has: page.locator('input[name="file"]') })).first()
+    await m.file(pick, form.locator('input[name="file"]'), planMd(), '«اختر ملفّ الخطّة (CSV أو MD)» ← YYYY-MM.md', { key: true })
+    const read = button(form, 'اقرأ الخطّة')
+    if ((await read.count()) > 0) await m.tap(read, '«اقرأ الخطّة»')
+    else m.note('قُرئ الملفّ حين اختير — بلا «اقرأ الخطّة»')
+    m.mark('previewed')
+    const approve = visible(page.locator('form[action$="/approve"] button[type="submit"]')).first()
+    const label = ((await approve.textContent().catch(() => '')) ?? '').trim()
+    await m.tap(approve, `«${label || 'اعتمد وجدوِل'}»`)
+    const after = q<{ n: number }>(stack, "SELECT COUNT(*) AS n FROM posts WHERE status = 'queued'")?.n ?? 0
+    return { success: after - before === 3, verified: `منشورات مجدولة جديدة من md: ${after - before} من 3 صفوف بنصّ` }
+  },
+}
+
 const R6: Journey = {
   id: 'R-6',
   title: 'جدولة منشور معتمَد',
@@ -577,6 +614,23 @@ const R6: Journey = {
     const id = stack.seeded.posts.youtubeEdited
     await m.tap(station(page, 'الموعد'), 'محطّة «الموعد» في الرئيسيّة')
     await scheduleTomorrow(j, id, 'YouTube المعتمَد', true)
+    const row = status(stack, id)
+    return { success: row?.status === 'queued', verified: `status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? '—'} (UTC)` }
+  },
+}
+
+/**
+ * ‏**ر-6 من الرئيسيّة** (D-431): المعتمَدةُ بلا موعدٍ صفٌّ في «ينتظر قرارك» بـ«جدوِل · غدًا» — ضغطةٌ بلا تحميل، كانت
+ * ‏ثلاثًا (المحطّة، «غدًا 9:00 ص»، «جدوِل»).
+ */
+const R6home: Journey = {
+  id: 'R-6·الرئيسيّة',
+  title: 'جدولة منشور معتمَد من «ينتظر قرارك» على الرئيسيّة',
+  plan: { target: '1 (D-431)' },
+  async run({ page, m, stack }) {
+    const id = stack.seeded.posts.youtubeEdited
+    const desk = page.locator('#desk li.desk-row').filter({ has: page.locator(`input[name="id"][value="${id}"]`) })
+    await m.tap(button(desk, /^جدوِل/), '«جدوِل · غدًا» في «ينتظر قرارك» على الرئيسيّة', { key: true })
     const row = status(stack, id)
     return { success: row?.status === 'queued', verified: `status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? '—'} (UTC)` }
   },
@@ -640,13 +694,10 @@ const R9: Journey = {
     const { page, m, stack } = j
     const id = stack.seeded.posts.queued
     const was = status(stack, id)?.scheduled_at
-    // ‏من التيّار (D-388): المجدولُ بطاقةٌ فيه و«افتح» عليها يفتح بطاقتَه في لوح المنشورات — لا «المنشورات» ثمّ تبويب «مجدولة»
+    // ‏من التيّار (D-433): «انقلها إلى» على بطاقة المجدولة نفسِها — «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح اللوح
     await goSection(page, m, 'التيّار')
     await page.waitForURL(/\/panel\/feed/)
-    await m.tap(link(page.locator(`#f-${id}`), 'افتح'), '«افتح» على بطاقة المجدولة في التيّار')
-    await page.waitForURL(/\/panel#d-/)
-    // ‏«انقلها إلى» على بطاقتها نفسِها (D-200): «الأحد 9:00 ص» بتوقيت المالك ضغطةً واحدة، بلا فتح المحرّر
-    await m.tap(button(page.locator(`#d-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة', { key: true })
+    await m.tap(button(page.locator(`#f-${id}`), 'الأحد 9:00 ص'), '«الأحد 9:00 ص» على بطاقة المجدولة في التيّار', { key: true })
     m.mark('rescheduled')
     const row = status(stack, id)
     return {
@@ -1081,6 +1132,51 @@ const R18: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
+/**
+ * ‏**ر-20 · إشعار ← الإصلاح** (D-435): ثلاثةُ إشعاراتٍ تُفتح من «الإشعارات»، وكلٌّ بضغطةٍ واحدة إلى موضع إصلاحه — الآلةُ إلى
+ * ‏«هل الآلة تعمل؟» في الإعدادات (كانت `/panel#machine` فتسقط على رأس الرئيسيّة)، وإذنٌ انتهى إلى بدء إعادة الربط (كان الحسابات)،
+ * ‏وطلبُ تعديلٍ من العميل إلى بطاقة البند في أسبوعه (كان رأسَ الخطّة). وفتحُ الصفحة تمهيدٌ لا يُعدّ: الجرسُ بابُها في كلّ شاشة.
+ */
+let r20Key = ''
+const R20: Journey = {
+  id: 'R-20',
+  title: 'إشعار ← الإصلاح: الآلة وانتهاء الإذن وطلب التعديل، كلٌّ بضغطة',
+  plan: { target: '3 = ضغطةٌ لكلّ إشعارٍ من الثلاثة (≤1 لكلٍّ · D-435)' },
+  async prepare(stack) {
+    await R13.prepare!(stack)
+    const it = (JSON.parse(q<{ plan_json: string }>(stack, 'SELECT plan_json FROM plans WHERE id = ?', r13Plan)?.plan_json ?? '{}') as { items: { sourceId: string; platform: string; day: string; time: string }[] }).items[1]!
+    r20Key = `${it.sourceId}|${it.platform}|${it.day}|${it.time}`
+    stack.db.raw.prepare(`INSERT INTO review_links (id, org_id, plan_id, token_hash, created_by, expires_at) VALUES ('rl-r20', 'org_owner', ?, 'r20', 'panel', datetime('now', '+7 days'))`).run(r13Plan)
+    stack.db.raw.prepare(`INSERT INTO review_verdicts (link_id, org_id, plan_id, item_key, verdict, note) VALUES ('rl-r20', 'org_owner', ?, ?, 'changes', 'أقصر من هذا')`).run(r13Plan, r20Key)
+    stack.db.raw.prepare(`INSERT INTO token_alerts (account_id, kind, threshold, expires_at, org_id) VALUES (?, 'refresh', 0, datetime('now'), 'org_owner')`).run(stack.seeded.accounts.linkedin)
+    stack.db.raw.prepare(`INSERT INTO heartbeats (job, at, outcome, detail) VALUES ('renew', datetime('now', '-3 hours'), 'ok', '')
+      ON CONFLICT (job) DO UPDATE SET at = excluded.at, outcome = 'ok'`).run()
+    return 'خطّةُ R-13، وطلبُ تعديلٍ من العميل على بندها الثاني، وإذنُ تجديد LinkedIn منتهٍ، ودورةُ التجديد متأخّرةٌ ثلاث ساعات'
+  },
+  async run({ page, m, stack }) {
+    const open = async (): Promise<void> => { await page.goto(`${stack.url}/panel/notices`); await page.waitForLoadState('networkidle') }
+    const act = (text: RegExp) => visible(page.locator('li', { hasText: text }).locator('.nt-act a')).first()
+    await open()
+    await m.tap(act(/لم تدُر منذ/), '«افتح «هل الآلة تعمل؟»» على إشعار دورة التجديد')
+    const machine = new URL(page.url())
+    const machineOk = machine.pathname === '/panel/settings' && machine.hash === '#machine' && (await page.locator('#machine').count()) > 0
+    await open()
+    const reauth = act(/إذن التجديد لـ LinkedIn .* انتهى/)
+    const reauthHref = (await reauth.getAttribute('href')) ?? ''
+    await m.tap(reauth, '«أعد الربط» على إشعار انتهاء الإذن')
+    const reauthOk = reauthHref === '/oauth/linkedin/start'
+    await open()
+    await m.tap(act(/يطلب العميل تعديل/), '«افتح المنشور وعدّله» على طلب العميل')
+    await page.waitForURL(/\/panel\/plan\/review\?w=\d+#c-\d+/)
+    const card = new URL(page.url()).hash
+    const reviewOk = (await page.locator(card).count()) > 0
+    return {
+      success: machineOk && reauthOk && reviewOk,
+      verified: `الآلة: ${machine.pathname}${machine.hash} (${machineOk ? 'نعم' : 'لا'}) · الإذن: ${reauthHref || '—'} · التعديل: ${new URL(page.url()).search}${card} (${reviewOk ? 'البطاقة ظاهرة' : 'لا بطاقة'})`,
+    }
+  },
+}
+
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R5md, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18, R20]
 
 export { Blocked }

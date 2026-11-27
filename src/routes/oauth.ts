@@ -25,7 +25,7 @@ import { htmlHeaders, makeNonce } from '../lib/security/headers'
 import { soloPage } from './ui/shell'
 import { soloNav } from './ui/rail'
 import { buildCommands, sectionLabel } from './ui/command'
-import { connectedBody, elsewhereBody, otherBrowserBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
+import { connectedBody, elsewhereBody, expiredBody, otherBrowserBody, refusedBody, unconfiguredBody, unreachedBody } from './ui/oauthResult'
 import { setFlash } from './panel'
 import { ownerZone } from '../lib/time/ownerZone'
 
@@ -303,6 +303,8 @@ oauth.get('/oauth/:platform/callback', async (c) => {
         expiresAt: tokens.expiresAt,
         // ‏الكعكةُ على /panel وحدها، فالمحفوظةُ هنا (D-378)
         zone: await ownerZone(c.env.DB, c.req.header('Cookie') ?? null),
+        // ‏ربطٌ لعميل يقود إلى خطوته التالية في جاهزيّته (D-435)
+        forClient: (saved.org ?? OWNER_ORG) !== OWNER_ORG,
       }),
       200,
     ), platform)
@@ -355,8 +357,8 @@ oauth.get('/oauth/:platform/callback', async (c) => {
         502,
       )
     }
-    // ‏وحالةٌ منتهيةٌ أو مزوَّرة تبقى ردًّا لا صفحة: ليست عطلَ ضبطٍ يُشخَّص (D-046)
-    if (error instanceof StateError) return c.json({ error: 'invalid_state' }, 400)
+    // ‏وحالةٌ منتهيةٌ أو مزوَّرة صفحةٌ لا JSON (D-435): ليست عطلَ ضبطٍ يُشخَّص (D-046)، لكنّ من يراها إنسان — وإصلاحُها بدءٌ جديد
+    if (error instanceof StateError) return resultPage('صدى — انتهت مهلة الربط', expiredBody(platform), 400)
     /*
      * ‏**وما لم نعرفه صفحةٌ لا «Internal Server Error»** (ر-1).
      *

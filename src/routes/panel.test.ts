@@ -2890,6 +2890,23 @@ describe('الفعل يعود إلى بطاقته، والموعد بتوقيت 
     expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
   })
 
+  it('«انقلها إلى» على بطاقة المجدولة في التيّار تغيّر الموعد وتعود إلى البطاقة فيه (D-433)', async () => {
+    const id = await seedPost('linkedin', 'draft')
+    await seedAccount('linkedin', 'عمر')
+    const cookie = `${await login()}; sada_tz=Asia/Riyadh`
+    await post(cookie, '/panel/drafts/decide', { id, do: 'approve-schedule', from: 'editor', account: (await db.prepare('SELECT id FROM accounts LIMIT 1').first<{ id: string }>())!.id, preset: 'custom', local: '2031-01-05T21:30', text: 'ن'.repeat(300) })
+    const html = await (await app.request('/panel/feed', withSession(cookie), env)).text()
+    const card = html.slice(html.indexOf(`id="f-${id}"`)).slice(0, 4000)
+    expect(card).toContain('action="/panel/drafts/reschedule"')
+    expect(card).toContain('name="back" value="feed"')
+    expect(card).toContain('الأحد 9:00 ص')
+    const r = await post(cookie, '/panel/drafts/reschedule', { id, preset: 'tomorrow', back: 'feed' })
+    expect(where(r)).toBe(`/panel/feed#f-${id}`)
+    const row = await db.prepare('SELECT status, scheduled_at FROM posts WHERE id = ?').bind(id).first<Record<string, string>>()
+    expect(row?.['status']).toBe('queued')
+    expect(row?.['scheduled_at']).toMatch(/ 06:00:00$/)
+  })
+
   it('وبلا كعكة تُقرأ المنطقة المحفوظة، وأوّل زيارة حقًّا بتوقيت الرياض لا غرينتش (D-200 · D-201)', async () => {
     const id = await seedPost('linkedin', 'draft')
     await seedAccount('linkedin', 'عمر')
@@ -4658,11 +4675,38 @@ describe('خطّتُك من ملفّ: اقرأ، عاين، اعتمد وجدو�
     expect((await app.request(to, withSession(cookie), env)).status).toBe(404)
   })
 
+  it('ملفّ plans/YYYY-MM.md من الباب نفسِه، والصفّ بلا نصّ يُترك، والاعتماد بلا تأكيد ومعه «تراجَع» (D-434)', async () => {
+    await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-li', 'linkedin', 'member', 'sub', 'عمر', 'active')`).run()
+    const cookie = await login()
+    const future = new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10)
+    const md = `# خطّة\n\n| اليوم | الساعة | المنصة | النص | الملف | ملاحظة |\n|---|---|---|---|---|---|\n| ${future} | 09:30 | linkedin | المعلم نقطة قرار | | |\n| ${future} | 20:00 | x | | | |\n`
+    const body = new FormData()
+    body.set('file', new Blob([md], { type: 'text/markdown' }), `${future.slice(0, 7)}.md`)
+    const read = await app.request('/panel/plan-import', withSession(cookie, { method: 'POST', body }), env)
+    const to = read.headers.get('Location')!
+    expect(to).toMatch(/^\/panel\/plan-import\/[0-9a-f-]{36}$/)
+    const preview = await (await app.request(to, withSession(cookie), env)).text()
+    expect(preview).toContain('اعتمد وجدوِل منشورًا واحدًا')
+    expect(preview).toContain('<input type="hidden" name="lines" value="5">')
+    expect(preview).not.toContain('data-confirm')
+    const approve = new FormData()
+    approve.set('lines', '5')
+    await app.request(`${to}/approve`, withSession(cookie, { method: 'POST', body: approve }), env)
+    const board = await (await app.request('/panel', withSession(cookie), env)).text()
+    expect(board).toContain('action="/panel/plan-import/undo"')
+    const post = db.raw.prepare(`SELECT id, status FROM posts`).get() as { id: string; status: string }
+    expect(post.status).toBe('queued')
+    const undo = new FormData()
+    undo.set('id', post.id)
+    expect((await app.request('/panel/plan-import/undo', withSession(cookie, { method: 'POST', body: undo }), env)).status).toBe(303)
+    expect((db.raw.prepare(`SELECT status FROM posts WHERE id = ?`).get(post.id) as { status: string }).status).not.toBe('queued')
+  })
+
   it('حقل الملفّ موصول بسكربت القراءة الفوريّة، وزرّ «اقرأ الخطّة» باق لمن لا سكربت عنده (ر-5)', async () => {
     const cookie = await login()
     const html = await (await app.request('/panel', withSession(cookie), env)).text()
     const card = html.slice(html.indexOf('action="/panel/plan-import"'), html.indexOf('</form>', html.indexOf('action="/panel/plan-import"')))
-    expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV)</span>')
+    expect(card).toContain('<span data-plan-name>اختر ملفّ الخطّة (CSV أو MD)</span>')
     expect(card).toMatch(/<input type="file" name="file"[^>]*data-plan-file>/)
     // ‏الاختيارُ هو الفعل؛ والزرُّ لمن لا سكربتَ عنده وحده، فلا يُضغط زرٌّ داكنٌ قبل اختيار الملفّ
     expect(card).toContain('<noscript><button class="btn btn-secondary" type="submit">اقرأ الخطّة</button></noscript>')

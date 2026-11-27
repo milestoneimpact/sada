@@ -62,7 +62,7 @@ describe('الفريق (D-272)', () => {
 
     const csrf = await csrfOf(sara)
     // ‏يكتب الموجز (محرّر) — والنموذجُ يُقرأ مرّتين: في الحارس ثمّ في المسار
-    expect((await post('/panel/client/brief', sara, { _csrf: csrf, goal: 'هدفٌ من المحرّر', per_week: '2' })).headers.get('Location')).toBe('/panel/client?saved=1#brief')
+    expect((await post('/panel/client/brief', sara, { _csrf: csrf, goal: 'هدفٌ من المحرّر', per_week: '2' })).headers.get('Location')).toBe('/panel/client?saved=1#setup')
     expect(db.raw.prepare("SELECT goal FROM briefs WHERE org_id = 'org_a'").get()).toEqual({ goal: 'هدفٌ من المحرّر' })
     // ‏ويُكتب بريدُه في التدقيق
     expect(db.raw.prepare("SELECT by_email FROM audit_log WHERE action = 'brief.write'").get()).toEqual({ by_email: 'sara@example.com' })

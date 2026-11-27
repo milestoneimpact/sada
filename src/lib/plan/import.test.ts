@@ -148,7 +148,7 @@ describe('applyPlan', () => {
     const csv = 'date,time,platform,text\n2026-10-12,09:30,linkedin,أوّل\n2026-10-12,09:30,tiktok,بلا حساب\n'
     const read = readPlan(csv, facts())
     const first = await applyPlan(db, 'org_owner', read.rows, 'panel:passkey', NOW)
-    expect(first).toEqual([{ line: 2, result: 'scheduled' }])
+    expect(first).toEqual([{ line: 2, result: 'scheduled', id: expect.any(String) }])
     const row = db.raw.prepare(`SELECT status, approved_by, scheduled_at, account_id FROM posts`).get()
     expect(row).toEqual({ status: 'queued', approved_by: 'panel:passkey', scheduled_at: '2026-10-12 06:30:00', account_id: 'acc-li' })
 
@@ -227,13 +227,13 @@ describe('applyPlan بعد المراجعة (D-182)', () => {
     db.raw.exec(`UPDATE accounts SET status = 'needs_reauth'`)
     expect((await applyPlan(db, 'org_owner', rows, 'o', NOW))[0]).toMatchObject({ result: 'failed' })
     db.raw.exec(`UPDATE accounts SET status = 'active'`)
-    expect(await applyPlan(db, 'org_owner', rows, 'o', NOW)).toEqual([{ line: 2, result: 'scheduled' }, { line: 3, result: 'scheduled' }])
+    expect(await applyPlan(db, 'org_owner', rows, 'o', NOW)).toEqual([{ line: 2, result: 'scheduled', id: expect.any(String) }, { line: 3, result: 'scheduled', id: expect.any(String) }])
     expect((db.raw.prepare('SELECT COUNT(*) AS n FROM posts').get() as { n: number }).n).toBe(2)
 
     db.raw.exec(`UPDATE posts SET status = 'rejected' WHERE text = 'أوّل'`)
     db.raw.exec(`UPDATE posts SET status = 'published' WHERE text = 'ثان'`)
     expect(await applyPlan(db, 'org_owner', rows, 'o', NOW)).toEqual([
-      { line: 2, result: 'scheduled' },
+      { line: 2, result: 'scheduled', id: expect.any(String) },
       { line: 3, result: 'exists', reason: 'نُشر من قبل' },
     ])
     expect(db.raw.prepare(`SELECT status FROM posts WHERE text = 'أوّل' ORDER BY status`).all()).toEqual([{ status: 'queued' }, { status: 'rejected' }])
@@ -260,7 +260,7 @@ describe('سلسلة X من ملفّ (D-324)', () => {
     await db.prepare(`INSERT INTO accounts (id, platform, kind, external_id, display_name, status) VALUES ('acc-x', 'x', 'member', 'e', 'عمر', 'active')`).run()
     const thread = readPlan(csvOf('الأولى من السلسلة.\n---\nالثانية تردّ عليها.'), facts({ accounts: [x] }))
     expect(thread.rows[0]?.problems).toEqual([])
-    expect(await applyPlan(db, 'org_owner', thread.rows, 'panel:passkey', NOW)).toEqual([{ line: 2, result: 'scheduled' }])
+    expect(await applyPlan(db, 'org_owner', thread.rows, 'panel:passkey', NOW)).toEqual([{ line: 2, result: 'scheduled', id: expect.any(String) }])
     const single = readPlan('date,time,platform,text\n2026-10-13,09:30,x,تغريدة واحدة بلا فاصل\n', facts({ accounts: [x] }))
     await applyPlan(db, 'org_owner', single.rows, 'panel:passkey', NOW)
     expect(db.raw.prepare('SELECT type FROM posts ORDER BY scheduled_at').all()).toEqual([{ type: 'thread' }, { type: 'text' }])

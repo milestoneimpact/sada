@@ -298,7 +298,7 @@ function scheduler(
  */
 export const APPROVE_AT = PRESETS.find((p) => p.kind === 'tomorrow')!
 
-function decideForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string {
+export function decideForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string {
   const id = escapeHtml(d.id)
   const fit = targets.filter((t) => t.platform === d.platform)
   const oneStep = fit.length === 1 && missingMedia(d.platform, readyMimes(d, media)) === null
@@ -311,6 +311,19 @@ function decideForm(d: DraftRow, targets: readonly Target[], media: readonly Med
                data-tip="على ${escapeHtml(fit[0]!.label)}">اعتمد · ${escapeHtml(APPROVE_AT.label)}</button>`
     : '<button class="btn btn-primary btn-sm" type="submit" name="do" value="approve" data-optimistic="اعتُمدت">اعتمد</button>'}
              <button class="btn btn-danger btn-sm" type="submit" name="do" value="reject" data-optimistic="رُفضت">ارفض</button></form>`
+}
+
+/**
+ * ‏**«جدوِل · غدًا» بضغطةٍ للمعتمَدة بلا موعد** (D-431): وجهةٌ واحدةٌ ووسائطُها جاهزة، فالموعدُ الافتراضيُّ نفسُه الذي
+ * ‏يضعه «اعتمد · غدًا». وإلّا فلا شيء، ويبقى «عدّل» طريقَها إلى شريط الجدولة.
+ */
+export function quickScheduleForm(d: DraftRow, targets: readonly Target[], media: readonly MediaView[]): string | null {
+  const fit = targets.filter((t) => t.platform === d.platform)
+  if (fit.length !== 1 || missingMedia(d.platform, readyMimes(d, media)) !== null) return null
+  return html`<form class="inline" method="POST" action="/panel/drafts/schedule" data-busy="جار…" data-swap>
+             <input type="hidden" name="id" value="${d.id}"><input type="hidden" name="account" value="${fit[0]!.id}">
+             <input type="hidden" name="preset" value="${APPROVE_AT.kind}">
+             ${raw(button({ label: 'جدوِل · ' + APPROVE_AT.label, variant: 'primary', size: 'sm', type: 'submit', attrs: html`data-optimistic="جُدولت" data-tip="على ${fit[0]!.label}"`.value }))}</form>`.value
 }
 
 /** «أعده إلى المعتمَد» — بلا `return`: النجاحُ يعود إلى شريط جدولة البطاقة نفسِها. */
@@ -644,6 +657,11 @@ const INFO_CAPTION = '<b>إنفوجرافيك من نصّ المنشور</b>: ع
  * **و`failed` لا تُخلَط بـ `published`** (رحلة R-8، الخطّة 5.6 و8.2): كانتا معًا تحت
  * «غادرت»، فالمنشورُ الفاشلُ — وفيه فعلٌ باقٍ — بين منشوراتٍ نُشرت ولا فعلَ فيها.
  */
+/** ‏‏أما زال لها صفٌّ في «ينتظر قرارك»؟ مسوّدةٌ أو معتمَدةٌ بلا موعد — فالسكربتُ لا يطوي الصفَّ إلّا إن خرجت (D-432). */
+function deskOpen(d: DraftRow): boolean {
+  return d.status === 'draft' || ((d.status === 'approved' || d.status === 'edited') && d.scheduledAt === null)
+}
+
 function bucketOf(d: DraftRow): string {
   if (d.status === 'draft') return 'waiting'
   if (d.status === 'approved' || d.status === 'edited') return 'approved'
@@ -973,7 +991,7 @@ function card(
     d.approvedBy === null ? '' : `<span class="chip">${d.status === 'rejected' ? 'رفضها' : 'اعتمدها'} ${escapeHtml(deciderText(d.approvedBy))}</span>`,
   ].filter((x) => x !== '').join('')
 
-  return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}
+  return `<div class="card draft pc${live ? '' : ' done'}" id="d-${id}" data-draft="${id}"${here ? ' aria-current="true"' : ''}${deskOpen(d) ? ' data-desk' : ''}
     data-status="${escapeHtml(bucketOf(d))}" data-rank="${URGENCY[bucketOf(d)] ?? 9}" data-platform="${escapeHtml(d.platform)}"
     data-created="${Date.parse(d.createdAt.replace(' ', 'T') + 'Z') || 0}" data-cost="${d.publishCost}">
     <div class="draft-top">

@@ -18,7 +18,7 @@ import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
-import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet } from '../ui/planReviewView'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet, weekOfDay } from '../ui/planReviewView'
 import { postEditScreen } from '../ui/postEditView'
 import { COUNT_SCRIPT } from '../ui/scripts'
 import { vtName } from '../ui/parts'
@@ -40,8 +40,10 @@ import type { Env } from '../../env'
 import { readDriveMedia } from '../../lib/drive/media'
 import { currentPicks, readPackageMedia, readSource } from '../../lib/package/sync'
 import {
-  applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, PLAN_TEMPLATE, readPlan, type PlanFacts,
+  applyPlan, DEFAULT_ZONE, MAX_PLAN_BYTES, MAX_PLAN_ROWS, PLAN_TEMPLATE, readPlan, type PlanFacts,
 } from '../../lib/plan/import'
+import { planUploadCsv } from '../../lib/plan/schema'
+import { unschedule } from '../../lib/schedule/job'
 import { mediaLine, planImportExpired, planImportScreen } from '../ui/planImportView'
 import { PLAN_NEW_SCRIPT, planNewScreen } from '../ui/planNewView'
 import { taskReadyAlone } from './home'
@@ -595,7 +597,7 @@ plan.post('/panel/plan-import', async (c) => {
   if ('denied' in gate) return gate.denied
   const file = gate.form.get('file')
   if (!(file instanceof Blob) || file.size === 0) {
-    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يصل ملفّ — اختر ملفّ CSV ثمّ «اقرأ الخطّة».' })
+    await setFlash(c.env, c.req.raw, { kind: 'bad', text: 'لم يصل ملفّ — اختر ملفّ الخطّة (CSV أو MD) ثمّ «اقرأ الخطّة».' })
     return back('plan-import')
   }
   if (file.size > MAX_PLAN_BYTES) {
@@ -617,6 +619,8 @@ plan.post('/panel/plan-import', async (c) => {
     })
     return back('plan-import')
   }
+  // ‏وملفُّ الخطّة `plans/YYYY-MM.md` من الباب نفسِه (D-434): يُكتب CSV قبل أن يُحفظ، فالمعاينةُ والاعتمادُ بقارئٍ واحد
+  csv = planUploadCsv(file instanceof File ? file.name : '', csv)
   const id = crypto.randomUUID()
   await c.env.KV.put(`plan-import:${id}`, csv, { expirationTtl: PLAN_TTL })
   await record(c.env.DB, { actor: 'panel', action: 'plan.import.read', target: id, detail: `${file.size} bytes` }, c.req.raw)
@@ -682,10 +686,32 @@ plan.post('/panel/plan-import/:id/approve', async (c) => {
     exists > 0 ? `ولم يُكرَّر ما كان موجودًا: ${named(existing)}` : '',
     failed.length > 0 ? `وتعذّر ${counted(failed.length, NOUNS.row)}: ${named(failed)}` : '',
   ].filter((p) => p !== '')
+  // ‏والتراجعُ بدل التأكيد المزدوج (D-434، نمط D-327): ما جُدول الآن يُسحب بضغطةٍ من الإشعار
+  const ids = outcomes.flatMap((o) => (o.result === 'scheduled' && o.id !== undefined ? [o.id] : []))
   await setFlash(c.env, c.req.raw, {
     kind: scheduled > 0 && failed.length === 0 ? 'ok' : 'bad',
     text: parts.length === 0 ? 'لا صفّ جاهزًا في الملفّ — لم يُجدوَل شيء.' : `${parts.join('، ')}.`,
+    ...(ids.length === 0 ? {} : { undo: { action: '/panel/plan-import/undo', id: ids.join(','), label: 'تراجَع', swap: false } }),
   })
+  return back('posts')
+})
+
+/**
+ * **«تراجَع» بعد اعتماد الملفّ** (D-434): كلُّ ما جُدول من الضغطة يُسحب موعدُه بـ`unschedule` وحارسِها — ما أُرسل للنشر
+ * لا يُستردّ ويُقال عددُه. والمعرّفاتُ في منظّمة الجلسة وحدها.
+ */
+plan.post('/panel/plan-import/undo', async (c) => {
+  const gate = await guardPost(c)
+  if ('denied' in gate) return gate.denied
+  const org = activeOrg(gate.session.record)
+  const ids = [...new Set(String(gate.form.get('id') ?? '').split(',').map((s) => s.trim()).filter((s) => /^[0-9a-f-]{36}$/i.test(s)))].slice(0, MAX_PLAN_ROWS)
+  let pulled = 0
+  for (const id of ids) if ((await unschedule(c.env.DB, id, org)).ok) pulled += 1
+  const kept = ids.length - pulled
+  await record(c.env.DB, { actor: 'panel', action: 'plan.import.undo', target: ids[0] ?? '', detail: 'pulled:' + String(pulled) + ' kept:' + String(kept) }, c.req.raw)
+  await setFlash(c.env, c.req.raw, pulled === 0
+    ? { kind: 'bad', text: 'تعذّر التراجع — ما جُدول أُرسل للنشر أو تغيّر.' }
+    : { kind: 'ok', text: 'سُحبت مواعيد ' + counted(pulled, NOUNS.post) + ' وبقيت معتمَدة تنتظر موعدًا' + (kept > 0 ? '، وأُرسل ' + counted(kept, NOUNS.post) + ' فلم يُسحب' : '') + '.' })
   return back('posts')
 })
 
@@ -716,6 +742,14 @@ plan.get('/panel/plan/review', async (c) => {
   const asked = c.req.query('id')
   const current = asked !== undefined && asked !== '' ? await planForId(c.env.DB, org, asked) ?? await latestPlan(c.env.DB, org) : await latestPlan(c.env.DB, org)
   if (current === null) return c.redirect('/panel/plan/new', 303)
+  // ‏‏`?item=` بصمةُ بندٍ من إشعار حكم العميل (D-435): تُحلّ هنا إلى أسبوعها ومرسات بطاقتها — ضغطةٌ واحدة إلى الإصلاح.
+  // ‏وبصمةٌ لم تعد في الخطّة (تغيّر موعدُها) تسقط إلى الخطّة نفسِها بلا خطأ
+  const wanted = c.req.query('item')
+  if (wanted !== undefined) {
+    const card = wanted === '' ? undefined : (await reviewModel(c.env.DB, org, current)).cards.find((x) => x.key === wanted)
+    return c.redirect(card === undefined ? '/panel/plan/review'
+      : '/panel/plan/review?w=' + String(weekOfDay(current.week, card.item.day)) + '#c-' + String(card.index), 303)
+  }
   const [model, zone, flash, orgRow, accounts, share, verdicts, waiting] = await Promise.all([
     reviewModel(c.env.DB, org, current),
     ownerZone(c.env.DB, c.req.header('Cookie') ?? null),

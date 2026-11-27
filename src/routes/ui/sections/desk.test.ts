@@ -26,3 +26,24 @@ describe('«ينتظر قرارك» في الرئيسيّة (D-216)', () => {
     expect(html).toContain('و2 غيرُها في المنشورات')
   })
 })
+
+describe('الحلقةُ اليوميّة من الرئيسيّة (D-431)', () => {
+  const T = [{ id: 'acc1', platform: 'linkedin' as const, label: 'عمر' }]
+  it('«اعتمد · غدًا» نموذجُ البطاقة نفسُه بـ data-swap ووجهتِه', () => {
+    const html = deskQueue([row('w', 'draft', 9)], NOW, T, [])
+    expect(html).toContain('id="k-w"')
+    expect(html).toContain('data-swap')
+    expect(html).toContain('value="approve-schedule"')
+    expect(html).toContain('name="account" value="acc1"')
+  })
+  it('بلا وجهةٍ واحدة يبقى «اعتمد» وحدَه', () => {
+    expect(deskQueue([row('w', 'draft', 9)], NOW)).toContain('value="approve"')
+  })
+  it('المعتمَدةُ بلا موعدٍ صفٌّ بـ«جدوِل · غدًا»، والمجدولةُ لا', () => {
+    const free = { ...row('a', 'approved', 9), scheduledAt: null } as DraftRow
+    const html = deskQueue([free], NOW, T, [])
+    expect(html).toContain('action="/panel/drafts/schedule"')
+    expect(html).toContain('name="preset" value="tomorrow"')
+    expect(deskQueue([{ ...free, scheduledAt: '2026-10-16 06:00:00' } as DraftRow], NOW, T, [])).toBe('')
+  })
+})
