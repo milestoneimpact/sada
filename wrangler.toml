@@ -49,7 +49,7 @@ CF_AI_ACCOUNT_ID = "c6ea7ba30984d494a1a78efea6ddc9a0"
 # متغيّران لا سرّان: كلاهما يُنشر على الصفحة نفسها. وما لم يُضبَط لا
 # يُخترَع — بريدٌ لا وجود له في سياسةِ خصوصيّة يُسقط مراجعةَ المنصّة.
 LEGAL_ENTITY = ""
-LEGAL_CONTACT = ""
+LEGAL_CONTACT = "mi@sunkvalue.com"
 
 # Cron مجاني على الخطة المجانية (5 لكل حساب).
 # 03:00 UTC = 06:00 بتوقيت الرياض — قبل أن يبدأ اليوم
@@ -174,7 +174,7 @@ DRIVE_FOLDER_ID = "1U2UTordK05t6zJ7H_UU4LfcC7bAFFdi2"
 # متغيّران لا سرّان: كلاهما يُنشر على الصفحة نفسها. وما لم يُضبَط لا
 # يُخترَع — بريدٌ لا وجود له في سياسةِ خصوصيّة يُسقط مراجعةَ المنصّة.
 LEGAL_ENTITY = ""
-LEGAL_CONTACT = ""
+LEGAL_CONTACT = "mi@sunkvalue.com"
 
 [env.production.triggers]
 # دورتان لا واحدة (D-037):
