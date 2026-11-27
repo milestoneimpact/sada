@@ -783,7 +783,14 @@ plan.get('/panel/plan/review', async (c) => {
 /** الأسبوعُ المعروض كما أرسله النموذج — رقمٌ أو «all»، وما سواهما لا يُكتب في العنوان. */
 const weekOf = (form: FormData): string => {
   const w = String(form.get('w') ?? '')
-  return /^(?:\d{1,2}|all)$/.test(w) ? '?w=' + w : ''
+  const q: string[] = []
+  if (/^(?:\d{1,2}|all)$/.test(w)) q.push('w=' + w)
+  // ‏**والمنظارُ يبقى بعد الفعل** (D-437): التصفيةُ واليومُ يعودان كما أُرسلا، وما خالف نمطَهما لا يُكتب في العنوان
+  const only = String(form.get('only') ?? '')
+  if (/^[a-z_]{1,24}$/.test(only)) q.push('only=' + only)
+  const d = String(form.get('d') ?? '')
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) q.push('d=' + d)
+  return q.length === 0 ? '' : '?' + q.join('&')
 }
 
 /**

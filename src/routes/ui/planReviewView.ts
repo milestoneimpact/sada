@@ -317,7 +317,7 @@ const firstDayOf = (m: ReviewModel, shown: number): string => shown === 0 ? m.pl
 function filterBar(m: ReviewModel, w: string, day: string | null, fl: NonNullable<ReviewView['filter']>): Html {
   const opts: [string, string][] = [['', 'الكلّ'], ['wait', 'تنتظر'], ['client', 'العميلُ موافق'],
     ...[...new Set(m.cards.map((c) => c.item.platform))].map((p): [string, string] => [p, platformLabel(p as never)])]
-  return html`<form method="GET" class="rv-filter"><input type="hidden" name="w" value="${w}">${day === null ? html`` : html`<input type="hidden" name="d" value="${day}"><a href="?w=${String(weekOfDay(m.plan.week, day))}">${dayLabel(day, 'short')} وحدَه · اعرض أسبوعه</a>`}
+  return html`<form method="GET" class="rv-filter"><input type="hidden" name="w" value="${w}">${day === null ? html`` : html`<input type="hidden" name="d" value="${day}"><a href="?w=${String(weekOfDay(m.plan.week, day))}${fl.only === null || fl.only === undefined || fl.only === '' ? '' : '&only=' + encodeURIComponent(fl.only)}">${dayLabel(day, 'short')} وحدَه · اعرض أسبوعه</a>`}
     <select name="only" aria-label="صفِّ">${opts.map(([v, l]) => html`<option value="${v}"${(fl.only ?? '') === v ? raw(' selected') : ''}>${l}</option>`)}</select>
     ${raw(button({ label: 'صفِّ', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>`
 }
@@ -439,7 +439,8 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     .sort((a, b) => (a.item.day + a.item.time).localeCompare(b.item.day + b.item.time))[0]
   const next = due === undefined ? html`` : raw(button({ label: 'تابع الكتابة', variant: 'primary', size: 'sm', href: '?w=' + String(weekOfDay(m.plan.week, due.item.day)) + '#c-' + String(due.index) }))
   // ‏**اليومُ في التقويم يفتح يومَه وحدَه** (D-436 · منظارُ اليوم): الأسبوعُ من شريط الأسابيع، والشهرُ «الكلّ»
-  const weekHref = (day: string): string => '?d=' + day + '#d-' + day
+  const keep = fl.only === null || fl.only === undefined || fl.only === '' ? '' : '&only=' + encodeURIComponent(fl.only)
+  const weekHref = (day: string): string => '?d=' + day + keep + '#d-' + day
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
     <div class="row gap-2 mb-3 rv-status">${state}<span class="hint">كُتب ${AR(written)} من ${AR(m.cards.length)}</span>${next}<span class="grow"></span>${toggle}${shareBox(m, view)}${planActions(m)}</div>
@@ -449,7 +450,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
     ${filterBar(m, w, oneDay, fl)}
     ${gapsBar(m)}
     <form method="POST" action="/panel/plan/review/bulk" id="rv-bulk" class="rv-bulk card card-inset">
-      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="review">
+      <input type="hidden" name="id" value="${m.plan.id}"><input type="hidden" name="w" value="${w}"><input type="hidden" name="back" value="review">${fl.only === null || fl.only === undefined || fl.only === '' ? html`` : html`<input type="hidden" name="only" value="${fl.only}">`}${oneDay === null ? html`` : html`<input type="hidden" name="d" value="${oneDay}">`}
       <span id="rv-n">حدّد بنودًا</span><span class="grow"></span>
       ${raw(button({ label: 'حدّد كلّ الظاهر', size: 'sm', attrs: 'data-all hidden' }))}
       <button class="btn btn-secondary btn-sm" type="submit" name="do" value="approve">اعتمد المحدّد</button>
