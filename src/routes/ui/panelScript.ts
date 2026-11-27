@@ -601,6 +601,11 @@ export const SCRIPT = `${B64URL_SCRIPT}${PASSKEY_TEXT_SCRIPT}
         if(fresh){fresh.hidden=mine.hidden; mine.replaceWith(fresh); if(at>=0)cards[at]=fresh; wire(fresh);}
         else{mine.remove(); if(at>=0)cards.splice(at,1);}
       }
+      // ‏وصفُّ «ينتظر قرارك» في الرئيسيّة يُطوى بعد القرار (D-431): عددُه ينقص، والبطاقةُ تذهب حين تفرغ
+      var kr=document.getElementById('k-'+id);
+      if(kr){var dk=document.getElementById('desk'); kr.remove();
+        if(dk){var left=dk.querySelectorAll('li.desk-row').length, kn=dk.querySelector('[data-desk-n]');
+          if(left===0&&!dk.querySelector('a.tap'))dk.remove(); else if(kn)kn.textContent=String(Math.max(0,(+kn.textContent||1)-1));}}
       countsFrom(doc);
       var nf=doc.getElementById('flash');
       if(flashBox&&nf){

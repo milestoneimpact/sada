@@ -239,6 +239,8 @@ function firstRunCard(run: FirstRun, f: HomeFacts, now: Date): string {
 export interface Waiting {
   readonly rows: string
   readonly tools: string
+  /** ‏صفوفُ الصيانة بعد الصفّين الأوّلين (D-431): تُطوى تحت «و N غيرُها» فلا تدفع القرارَ تحت الطيّة */
+  readonly rest?: readonly string[]
 }
 
 /** عددُ ما يُنشر في الأيّام السبعة من الآن — العددُ نفسُه الذي يقوله «هذا الأسبوع». */
@@ -269,25 +271,30 @@ export function homeTop(f: HomeFacts, now: Date, kpis = '', lead = '', entry = '
   // ‏و«لا شيء ينتظرك» من `nextAction` ليست بندًا: هي الحالُ الفارغةُ نفسُها، فتُقال فيها لا صفًّا
   const idle = next.tone === 'ok' && next.text.startsWith('لا شيء ينتظرك')
   const waitingN = total(f.counts, 'draft')
-  const status = html`<p class="hello-status m-0"><b class="num">${String(waitingN)}</b> بانتظار قرارك · <b class="num">${String(weekCount(f.scheduled ?? [], now))}</b> مجدولة هذا الأسبوع</p>`
+  const status = html`<p class="hello-status m-0">${waitingN > 0 ? html`<a href="#desk"><b class="num">${String(waitingN)}</b> بانتظار قرارك</a>` : html`<b class="num">${String(waitingN)}</b> بانتظار قرارك`} · <b class="num">${String(weekCount(f.scheduled ?? [], now))}</b> مجدولة هذا الأسبوع</p>`
   const head = html`<div class="home-head"><div class="hello-t"><p class="hello m-0">${greeting(now, f.zone)}</p>${bare ? html`` : status}</div><span class="grow"></span>${raw(entry)}</div>`
   const nextRow = repeated || idle ? '' : html`<li class="todo-next" data-tone="${next.tone}"><span class="dot ${next.tone}"></span>
       <span><span class="next-k">خطوتُك التالية</span> ${next.text}</span>
       <span class="todo-go"><a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a></span></li>`.value
+  const rest = waiting.rest ?? []
   const rows = nextRow + waiting.rows
   const box = html`<div class="card home-waiting" role="region" aria-labelledby="hw-t">
     <div class="card-head"><h2 id="hw-t">ما ينتظرك</h2></div>
     ${rows === ''
       ? html`<div class="empty empty-ok"><p class="empty-t m-0"><span class="dot ok"></span> لا شيء ينتظرك الآن</p><p class="hint m-0">${idle ? next.text : 'كلّ ما بُني مضبوط.'}</p>${idle ? html`<p class="m-0 mt-2"><a class="btn btn-primary btn-sm" href="${next.href}">${next.label}</a></p>` : html``}</div>`
       : html`<ul class="todo todo-act">${raw(rows)}</ul>`}
+    ${rest.length === 0 ? html`` : html`<details class="fold"><summary><span>و${String(rest.length)} غيرُها</span></summary><ul class="todo todo-act">${raw(rest.join(''))}</ul></details>`}
     ${waiting.tools === '' ? html`` : html`<div class="row gap-2 mt-3">${raw(waiting.tools)}</div>`}
   </div>`
+  // ‏‏**القرارُ قبل الصيانة** (D-431): ما ينتظر قرارك أوّلًا حين يكون، فـ«اعتمد · غدًا» في الشاشة الأولى على الهاتف
+  const deskFirst = waitingN > 0 && kpis !== ''
   return `${head.value}
+  ${deskFirst ? kpis : ''}
   ${box.value}
   ${run === null ? '' : firstRunCard(run, f, now)}
   ${bare ? '' : stats(f)}
   ${/* ‏وطابورُ القرار بعد الأرقام (§6.1): بطاقةٌ بمنشورين كاملين كانت تدفع الأرقامَ تحت الطيّة، والخطوةُ الأولى في «ما ينتظرك» أصلًا */''}
-  ${kpis}
+  ${deskFirst ? '' : kpis}
   ${bare ? '' : html`<div class="home-grid">
     <div class="home-main">${raw(week(f.scheduled ?? [], now, f.zone))}</div>
     <aside class="home-aside" aria-label="رحلة المنشور">

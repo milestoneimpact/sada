@@ -235,7 +235,7 @@ const status = (stack: Stack, id: string) =>
 const R0: Journey = {
   id: 'R-0',
   title: 'مراجعة ما ينتظر قرارك: اعتماد مسوّدة',
-  plan: { target: '1 (§6: [اعتمد] في «تنتظر قرارك» على الرئيسيّة)' },
+  plan: { target: '1 (§6: [اعتمد · غدًا] في «ينتظر قرارك» على الرئيسيّة، بلا تحميل · D-431)' },
   async run({ page, m, stack }) {
     const id = stack.seeded.posts.draft
     // ‏**طريقُ §6** (D-326): «اعتمد» على صفّها في «ينتظر قرارك» على الرئيسيّة نفسِها (D-216) — كانت الرحلةُ تنزل من محطّة
@@ -244,7 +244,8 @@ const R0: Journey = {
     await m.tap(button(desk, /^اعتمد/), '«اعتمد» في «ينتظر قرارك» على الرئيسيّة', { key: true })
     const row = status(stack, id)
     crlf(m, stack, id)
-    return { success: row?.status === 'approved' || row?.status === 'edited' || row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'}` }
+    // ‏‏والحلقةُ اليوميّة (D-431): «اعتمد · غدًا» يعتمد ويُجدوِل بلا تحميل، فالنجاحُ «queued» لا «approved»
+    return { success: row?.status === 'queued', verified: `posts.status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? 'NULL'}` }
   },
 }
 
@@ -577,6 +578,23 @@ const R6: Journey = {
     const id = stack.seeded.posts.youtubeEdited
     await m.tap(station(page, 'الموعد'), 'محطّة «الموعد» في الرئيسيّة')
     await scheduleTomorrow(j, id, 'YouTube المعتمَد', true)
+    const row = status(stack, id)
+    return { success: row?.status === 'queued', verified: `status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? '—'} (UTC)` }
+  },
+}
+
+/**
+ * ‏**ر-6 من الرئيسيّة** (D-431): المعتمَدةُ بلا موعدٍ صفٌّ في «ينتظر قرارك» بـ«جدوِل · غدًا» — ضغطةٌ بلا تحميل، كانت
+ * ‏ثلاثًا (المحطّة، «غدًا 9:00 ص»، «جدوِل»).
+ */
+const R6home: Journey = {
+  id: 'R-6·الرئيسيّة',
+  title: 'جدولة منشور معتمَد من «ينتظر قرارك» على الرئيسيّة',
+  plan: { target: '1 (D-431)' },
+  async run({ page, m, stack }) {
+    const id = stack.seeded.posts.youtubeEdited
+    const desk = page.locator('#desk li.desk-row').filter({ has: page.locator(`input[name="id"][value="${id}"]`) })
+    await m.tap(button(desk, /^جدوِل/), '«جدوِل · غدًا» في «ينتظر قرارك» على الرئيسيّة', { key: true })
     const row = status(stack, id)
     return { success: row?.status === 'queued', verified: `status = ${row?.status ?? '—'} · scheduled_at = ${row?.scheduled_at ?? '—'} (UTC)` }
   },
@@ -1081,6 +1099,6 @@ const R18: Journey = {
   },
 }
 
-export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
+export const JOURNEYS: readonly Journey[] = [R0, R0undo, R1, R1setup, R1first, R2, R2stop, R3, R4, R5, R6, R6home, R7, R8, R9, R10, R11, R11code, R12, R13, R14, R15, R16, R17, R18]
 
 export { Blocked }
