@@ -18,7 +18,7 @@ import type { PlanImageStyle } from '../../lib/plan/prompt'
 import { generateForPost } from '../../lib/image/job'
 import { autoImageRoom } from '../../lib/image/auto'
 import { reviewModel, addItem, delayItem, dropItem, moveItem, pinPlan, settlePlan, undoItem } from '../../lib/plan/review'
-import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet, weekOfDay } from '../ui/planReviewView'
+import { PLAN_REVIEW_SCRIPT, planReviewScreen, planSheet, SHARE_LINK_SCRIPT, shareLinkBox, weekOfDay } from '../ui/planReviewView'
 import { postEditScreen } from '../ui/postEditView'
 import { COUNT_SCRIPT } from '../ui/scripts'
 import { vtName } from '../ui/parts'
@@ -312,7 +312,7 @@ plan.post('/panel/plan/share', async (c) => {
   const link = await createLink(c.env.DB, org, current.id, gate.session.record.email ?? 'owner')
   await record(c.env.DB, { actor: 'panel', action: 'review.share', target: current.id, detail: link.expiresAt.slice(0, 10) }, c.req.raw)
   const url = (c.env.PUBLIC_BASE_URL ?? new URL(c.req.url).origin) + '/r/' + link.token
-  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رابطُ العميل — انسخه الآن، فلا يُعرض مرّةً أخرى: ' + url })
+  await setFlash(c.env, c.req.raw, { kind: 'ok', text: 'رابطُ العميل جاهز — انسخه الآن، فلا يُعرض مرّةً أخرى.', link: url })
   return reviewBack()
 })
 
@@ -770,11 +770,13 @@ plan.get('/panel/plan/review', async (c) => {
   // ‏بوّابةُ الفحص (D-383 · المرحلة ٥): التعارضُ والازدحامُ قبل الاعتماد، والإصلاحُ بضغطة لمن يجدول
   const checked = planChecks(await reviewCheckInput(c.env.DB, org, model, await storedZone(c.env.DB), new Date()), await readRules(c.env.DB, org))
   const strip = checksStrip({ findings: checked, planId: current.id, w: c.req.query('w') ?? '', canFix: allows(session.record.role ?? 'owner', 'publisher') })
-  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts, seatedIdeas: (await seatedIdeaPosts(c.env.DB, org, current.id)).length }) +
-    (flash === null ? '' : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
+  const body = pkgBadge + strip + planReviewScreen(model, zone ?? null, { week: c.req.query('w') ?? null, now: new Date(), orgName: orgRow?.name ?? 'خطّتي', authors, share, verdicts,
+    filter: { only: c.req.query('only') ?? null, day: c.req.query('d') ?? null }, seatedIdeas: (await seatedIdeaPosts(c.env.DB, org, current.id)).length }) +
+    (flash === null ? '' : flash.link !== undefined ? shareLinkBox(flash.text, flash.link)
+      : toastRegion(notice({ tone: flash.kind, html: escapeHtml(flash.text), alert: flash.kind === 'bad' })))
   return page((nonce) =>
     soloPage('صدى — راجع الخطّة', { href: panelHref('posts'), label: 'المنشورات', at: '/panel/plan/review' }, injectCsrf(body, session.record.csrf), nonce,
-      PLAN_REVIEW_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),
+      PLAN_REVIEW_SCRIPT + (flash?.link === undefined ? '' : SHARE_LINK_SCRIPT), buildCommands({ onPanel: false }), soloNav('plan')),
   )
 })
 
@@ -1371,7 +1373,12 @@ plan.get('/panel/plan/import', async (c) => {
   const session = await loadSession(c.env.KV, c.req.raw, c.env.ADMIN_TOKEN)
   if (session === null) return loginResponse(c.env, c.req.raw)
   const hasPackage = (await readSource(c.env.DB, activeOrg(session.record)).catch(() => null)) !== null
-  const body = planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin'), hasPackage })
+  // ‏**ما تعذّر يُقال هنا مرّةً** (D-436): كان «bad()» يضع الإشعارَ ويعود إلى هذه الشاشة، وهي لا تقرؤه — فيفشل ملفُّ .md صامتًا،
+  // ‏ثمّ يظهر في أوّل شاشةٍ بعدها. والخطأُ يدلّ على قالب الشهر بالجدول: يُقرأ بلا نموذجٍ ولا كلفة
+  const flash = await takeFlash(c.env, c.req.raw)
+  const said = flash === null ? '' : toastRegion(notice({ tone: flash.kind, alert: flash.kind === 'bad',
+    html: escapeHtml(flash.text) + (flash.kind === 'bad' ? ' الأيسرُ قالبُ الشهر بالجدول: <a class="tap" href="/panel/plan/month-template?f=md" download>نزّل قالب الشهر</a>' : '') }))
+  const body = said + planSeatScreen({ canRead: allows(session.record.role ?? 'owner', 'admin'), hasPackage })
   return page((nonce) =>
     soloPage('صدى — عندي خطّة', { href: panelHref('posts'), label: 'المنشورات' }, injectCsrf(body, session.record.csrf), nonce,
       PLAN_SEAT_SCRIPT, buildCommands({ onPanel: false }), soloNav('plan')),

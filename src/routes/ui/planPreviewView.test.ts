@@ -9,7 +9,7 @@ describe('وسومُ المعاينة', () => {
   it('لكلّ صفٍّ شارتُه بلونٍ ورمزٍ وكلمة، والشريطُ يعدّها ويسكت عن الصفر', () => {
     const seat = { tags: { '2': 'new', '3': 'modified', '4': 'published' } as const, removed: [{ platform: 'x', due: '2099-01-08 13:00', angle: 'د', guarded: true }], importedAt: null }
     const out = planPreviewScreen({ ...base, seat })
-    expect(out).toContain('<th>عند البناء</th>')
+    expect(out).toContain('<th scope="col">عند البناء</th>')
     for (const w of ['جديد', 'معدَّل', 'منشور سابقًا', 'محذوف من الملفّ']) expect(out).toContain(w)
     expect(out).toContain('class="st-ic"')
     expect(tagBar(seat)).toContain('جديد 1')

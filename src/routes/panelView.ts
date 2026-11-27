@@ -355,6 +355,8 @@ export interface PanelFlash {
      */
     readonly swap?: false
   }
+  /** رابطٌ يُعرض مرّةً واحدة (D-436 · رابطُ العميل): في حقلٍ للقراءة وحدها بجانبه «انسخ الرابط» و«شارك»، لا ذيلًا في جملة. */
+  readonly link?: string
 }
 
 export interface PanelData {

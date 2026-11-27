@@ -522,7 +522,7 @@ describe('«عندي خطّة» (D-287)', () => {
     expect(db.raw.prepare("SELECT count(*) AS n FROM plans WHERE status <> 'superseded'").get()).toEqual({ n: 0 })
     const preview = await (await app.request(to, { headers: { Cookie: cookie } }, env)).text()
     expect(preview).toContain('هذا ما فهمته')
-    expect(preview).toContain('2099-02-01 إلى 2099-02-03')
+    expect(preview).toContain('<bdi>الأحد، 1 فبراير</bdi> إلى <bdi>الثلاثاء، 3 فبراير</bdi>')
     expect(preview).toContain('الساعةُ أرجحُ ساعات المنصّة')
     expect(preview).toContain('ابنِ كما هي')
     const k = new URL(to, 'http://x').searchParams.get('k') ?? ''

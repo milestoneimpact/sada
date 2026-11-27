@@ -574,7 +574,20 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-day + .rv-day{margin-top:var(--s-6)}
 /* ‏**الأيّامُ شبكةٌ تملأ العرض** (D-355): كان كلُّ يومٍ سطرًا ببطاقةٍ في ثلث الشاشة والباقي فارغ. واليومُ الواحد يأخذ عمودًا،
    والمزدحمُ يتمدّد في عموده نزولًا */
-.rv-days{display:grid; gap:var(--s-6) var(--s-5); grid-template-columns:repeat(auto-fill,minmax(min(100%,22rem),1fr)); align-items:start}
+/* ‏وعمودان أو ثلاثةٌ لا أكثر على العريض (D-436): أربعةُ أعمدةٍ بعرض 22rem تشتّت يومَ الخطّة */
+.rv-days{display:grid; gap:var(--s-6) var(--s-5); grid-template-columns:repeat(auto-fill,minmax(max(min(100%,22rem),calc((100% - 2 * var(--s-5)) / 3)),1fr)); align-items:start}
+.rv.is-bad{box-shadow:inset 0 0 0 var(--ring-w) var(--bad)}
+.rv-short{color:var(--bad)}
+.pv-table tr.is-bad > *{background:var(--bad-wash)}
+.rv-filter{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:center; margin-bottom:var(--s-4)}
+.rv-link{margin-bottom:var(--s-4)}
+.rv-link input{width:100%; min-height:var(--tap)}
+/* ‏**شريطُ الجملة فوق شريط التبويب السفليّ على الهاتف** (D-436): كان يغطّي مربّعاتِ الاختيار. والأيّامُ تحشو أسفلَها بقدره */
+@media${below('md')}{
+  .rv-bulk{top:auto; bottom:calc(var(--s-16) + var(--safe-b))}
+  .rv-days{padding-bottom:var(--s-16)}
+  .rv-sel input{scroll-margin-block-end:var(--s-16)}
+}
 .rv-days > .rv-day + .rv-day{margin-top:0}
 .rv-days > .rv-day .rv-cards{grid-template-columns:minmax(0,1fr)}
 .rv-days > p{grid-column:1 / -1}
