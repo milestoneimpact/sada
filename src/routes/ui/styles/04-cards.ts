@@ -200,7 +200,7 @@ footer.page-foot{display:block; font-size:var(--t-small); line-height:var(--lh-s
 .card{background:var(--surface); border:var(--bd); border-radius:var(--r-card);
   padding:var(--pad-card); box-shadow:var(--sh-1);
   transition:box-shadow var(--dur-2) var(--ease), border-color var(--dur-2) var(--ease), transform var(--dur-2) var(--ease);
-  animation:rise var(--dur-3) var(--ease-rise) both}
+  animation:rise var(--dur-3) var(--ease-rise) backwards}
 /* بطاقةُ القناة والمسوّدة تحملان فعلا، فترتفعان قليلا عند التحويم: الظلُّ الثاني
    والحدّ الوظيفيّ (خطّة التصميم 7.3). وبطاقات العرض لا ترتفع: حركة بلا فعل خلفها
    تَعِد بما لا يقع. **وكانت قاعدتين** (الثانية آخر الورقة بالظلّ الثالث تغلب
@@ -318,7 +318,7 @@ footer.page-foot{display:block; font-size:var(--t-small); line-height:var(--lh-s
 .hello{margin:0 0 var(--s-2); font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600}
 .hstats{list-style:none; margin:0 0 var(--gap-card); padding:0; display:grid; gap:0; overflow:hidden;
   grid-template-columns:repeat(4,minmax(0,1fr)); background:var(--surface); border:var(--bd); border-radius:var(--r-card);
-  box-shadow:var(--sh-1); animation:rise var(--dur-3) var(--ease-rise) both}
+  box-shadow:var(--sh-1); animation:rise var(--dur-3) var(--ease-rise) backwards}
 /* ‏**شريطٌ واحد لا أربعُ بطاقات** (D-355): الأرقامُ مقياسٌ واحد يُقرأ معًا، فتفصلها خيوطٌ لا حوافٌّ ملوّنة. والحالُ نقطةٌ قبل اسم الرقم */
 @media${below('md')}{.hstats{grid-template-columns:repeat(2,minmax(0,1fr))} .hstats li:nth-child(n+3){border-top:var(--bd)} .hstats li:nth-child(3){border-inline-start:0}}
 .hstats li + li{border-inline-start:var(--bd)}
@@ -344,7 +344,7 @@ footer.page-foot{display:block; font-size:var(--t-small); line-height:var(--lh-s
 .db-vals li{position:relative}
 .db-vals span{position:absolute; inset-inline:0; text-align:center; white-space:nowrap; font-size:var(--t-small);
   line-height:var(--lh-small); font-weight:600; color:var(--ink-2); font-variant-numeric:tabular-nums;
-  animation:rise var(--dur-3) var(--ease-rise) both}
+  animation:rise var(--dur-3) var(--ease-rise) backwards}
 .db-base{stroke:var(--line)}
 .db-bar rect{fill:var(--accent); transform-box:fill-box; transform-origin:50% 100%;
   animation:grow var(--dur-3) var(--ease-rise) both; animation-delay:calc(var(--i) * 25ms)}

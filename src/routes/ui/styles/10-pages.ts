@@ -46,18 +46,22 @@ export const PAGES = `/* ══ شاشةُ المنصّة ═══════�
    على شاشة ‏٣٢٠ — والصفحة كلُّها تُسحَب جانبًا */
 .wrap{width:100%; max-width:73.75rem; margin:0 auto; padding:var(--s-6) var(--s-5) var(--s-16)}
 .auth{max-width:25rem; margin:12vh auto}
+/* ‏وفي الشاشة القصيرة يتوسّط الدخولُ ما يُرى فعلا (D-445): «100svh» لا يحسب شريطَ المتصفّح المتحرّك */
+@supports(min-height:100svh){.auth{margin-block:max(var(--s-6),calc(50svh - 8 * var(--s-8)))}}
+/* ‏وتدخل عناصرُ الدخول متتابعةً: العلامةُ ثمّ العنوانُ ثمّ البطاقة، والإزاحةُ «rise» تبدأ مرئيّة */
+@media(prefers-reduced-motion:no-preference){.auth>.glyph,.auth>h1,.auth>.lede{animation:rise var(--dur-3) var(--ease-rise) backwards} .auth>h1{animation-delay:var(--stagger)} .auth>.lede{animation-delay:var(--stagger)} .auth>.card{animation-delay:calc(2 * var(--stagger))}}
 .auth .glyph{margin:0 auto var(--s-4); width:var(--s-16); height:var(--s-16); border-radius:var(--r-card);
   box-shadow:var(--sh-2), 0 0 0 1px var(--mark-ring)}
 .auth h1{text-align:center; font-size:var(--t-h1); line-height:var(--lh-h1); font-weight:600; margin:0 0 var(--s-1)}
 .auth .lede{text-align:center; color:var(--ink-2); font-size:var(--t-small); line-height:var(--lh-small); margin:0 0 var(--s-5)}
-.auth .card{padding:var(--s-5); box-shadow:var(--sh-2)}
+.auth .card{padding:var(--s-5); border:var(--bd); background:var(--surface); box-shadow:var(--sh-2)}
 /* ── الموقعُ العامّ (D-416): رأسٌ يتنقّل، وبطاقاتُ مزايا، وأسئلة، وتذييلٌ بالوثيقتين ── */
 .site-head{display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s-3);
   padding-bottom:var(--s-4); margin-bottom:var(--s-6); border-bottom:var(--bd)}
 .site-brand{display:flex; align-items:center; gap:var(--s-2); color:var(--ink); text-decoration:none; font-size:var(--t-h3); line-height:var(--lh-h3); min-block-size:var(--tap)}
 .site-mark svg{display:block; width:var(--icon-lg); height:var(--icon-lg); border-radius:var(--r-control)}
 .site-nav{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-4); font-size:var(--t-small); line-height:var(--lh-small)}
-.site-enter{padding:var(--s-1) var(--s-3); border:var(--bd); border-radius:var(--r-pill)}
+.site-enter{display:inline-flex; align-items:center; min-block-size:var(--tap); padding:var(--s-1) var(--s-3); border:var(--bd); border-radius:var(--r-pill)}
 .site-hero{padding:var(--s-4) 0 var(--s-2)}
 .site-grid{list-style:none; display:grid; grid-template-columns:repeat(auto-fill,minmax(15rem,1fr)); gap:var(--s-3)}
 .doc .site-grid{padding:0}

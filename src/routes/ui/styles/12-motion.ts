@@ -29,13 +29,13 @@ export const MOTION = `/* ═══ مفرداتُ الحركة (D-341) ══�
 @media${below('md')}{.rv-sheet[open]{animation-name:sheet-up}}
 dialog[open]::backdrop{animation:scrim-in var(--dur-2) var(--ease)}
 /* تدرّجُ الدخول: أوّلَ رسمٍ وحدَه — التحديثُ الحيّ يبدّل البطاقاتِ كلَّ ثوانٍ ولا تتراقص («data-seen» يكتبه السكربت بعد الرسم) */
-#rv-root:not([data-seen]) .rv-cards>*,.lib-grid>*{animation:rise var(--dur-3) var(--ease-out) both}
+#rv-root:not([data-seen]) .rv-cards>*,.lib-grid>*{animation:rise var(--dur-3) var(--ease-out) backwards}
 /* وبعد أوّل رسمٍ لا تصعد البطاقةُ من جديد: كانت كلُّ بطاقةٍ تعيد «rise» مع كلّ تحديثٍ حيّ (كلَّ ثماني ثوانٍ وصدى يكتب) */
 #rv-root[data-seen] .card{animation:none}
 #rv-root:not([data-seen]) .rv-cards>:nth-child(2),.lib-grid>:nth-child(2){animation-delay:var(--stagger)}
 #rv-root:not([data-seen]) .rv-cards>:nth-child(3),.lib-grid>:nth-child(3){animation-delay:calc(var(--stagger) * 2)}
-#rv-root:not([data-seen]) .rv-cards>:nth-child(4),.lib-grid>:nth-child(4){animation-delay:calc(var(--stagger) * 3)}
-#rv-root:not([data-seen]) .rv-cards>:nth-child(n+5),.lib-grid>:nth-child(n+5){animation-delay:calc(var(--stagger) * 4)}
+#rv-root:not([data-seen]) .rv-cards>:nth-child(n+4),.lib-grid>:nth-child(n+4){animation-delay:calc(var(--stagger) * 2)}
+/* ‏والتتابعُ على أوّل ثلاثٍ وحدها (D-444): ما بعدها يدخل مع الثالثة فلا تنتظر قائمةٌ طويلةٌ دورَها */
 /* lift: البطاقةُ ترتفع تحت المؤشّر، والمصغَّرةُ المحمولةُ ترتفع تحت الإصبع */
 @media(hover:hover){
   .lib-grid>*{transition:box-shadow var(--dur-2) var(--ease), transform var(--dur-2) var(--ease)}
@@ -59,6 +59,5 @@ dialog[open]:not(.rv-sheet){opacity:1; transform:none; transition:opacity var(--
 @starting-style{dialog[open]:not(.rv-sheet){opacity:0; transform:translateY(var(--s-2))}}
 details.more-sheet[open]>.more-panel{opacity:1; transform:none; transition:opacity var(--dur-2) var(--ease-out), transform var(--dur-2) var(--ease-out)}
 @starting-style{details.more-sheet[open]>.more-panel{opacity:0; transform:translateY(var(--s-2))}}
-details[open]:not(.more-sheet):not(.menu):not(.fab)>:not(summary){transition:transform var(--dur-2) var(--ease-out)}
-@starting-style{details[open]:not(.more-sheet):not(.menu):not(.fab)>:not(summary){transform:translateY(calc(-1 * var(--s-1)))}}
+/* ‏والطيُّ العامّ يملكه «::details-content» في 12-extras وحده (D-444): كانت هنا قاعدةُ «@starting-style» ثانيةٌ تُحرّك أبناءه فوق انزلاقه */
 `
