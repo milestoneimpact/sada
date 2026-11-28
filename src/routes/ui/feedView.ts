@@ -23,7 +23,7 @@ import { statusBadge } from './components/badge'
 import { button } from './components/button'
 import { cardClass } from './components/card'
 import { emptyState } from './components/empty'
-import { newPostMenu } from './newMenu'
+import { newFeedMenu } from './newMenu'
 import { menu, menuItem } from './components/menu'
 import { html, raw, type Html } from './html'
 
@@ -32,6 +32,31 @@ export interface FeedView {
   readonly zone: string | null
   readonly now: Date
   readonly role: Role
+  /** شريحةُ الحال المختارة من `?s=` (D-446)، أو `null` للكلّ. */
+  readonly filter?: FeedFilter | null
+}
+
+/** ‏**شرائحُ الحال** بترتيبها (D-446): ما يطلب يدَك أوّلًا، ثمّ ما يجري، ثمّ ما انتهى. */
+export const FEED_FILTERS = [
+  { key: 'awaiting', label: 'ينتظر اعتمادك' },
+  { key: 'writing', label: 'يُكتب' },
+  { key: 'queued', label: 'مجدول' },
+  { key: 'published', label: 'نُشر' },
+] as const
+export type FeedFilter = (typeof FEED_FILTERS)[number]['key']
+
+/** ‏`?s=` إلى شريحةٍ معروفة، وما سواها الكلّ. */
+export function parseFeedFilter(q: string | undefined): FeedFilter | null {
+  return FEED_FILTERS.find((f) => f.key === q)?.key ?? null
+}
+
+/** ‏**التصفيةُ في الخادم** (D-446): الصفحةُ تُرسَم بما في الشريحة وحدَه — بلا سكربت يخفي ما سواه. */
+function keep(c: FeedCard, f: FeedFilter): boolean {
+  if (f === 'writing') return c.kind === 'item'
+  if (c.kind === 'item') return false
+  if (f === 'awaiting') return c.status === 'draft'
+  if (f === 'queued') return c.status === 'queued'
+  return c.status === 'published'
 }
 
 const MONTHS = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'] as const
@@ -217,37 +242,45 @@ function approveAll(v: FeedView): Html {
 }
 
 /**
- * **رأسُ التيّار بابُ كلّ شيء** (D-387 · D-388): «منشورات جديدة» ثمّ «منشور جديد ▾» (أبوابُ المنشور الواحد، كانت في لوح
- * المنشورات وحدَه) ثمّ «اعتمد كلّ ما ينتظر». **وأوّليٌّ واحدٌ أبدًا** (`audit_primary`): الاعتمادُ حين ينتظر شيء، وإلّا
- * «منشورات جديدة»؛ و«منشور جديد ▾» ثانويٌّ دائمًا. وللمحرّر فأعلى (كلُّها كتابة). وحين تكون خطّةٌ قائمة رابطان صغيران:
- * «ورشة الخطّة» (المراجعة) و«تقويم الشهر» (شاراتُ الحمل و«اعتمد الشهر») — فالخطّةُ ورشةٌ تُبلَغ من هنا لا وجهةٌ في الرافدة.
+ * ‏**رأسُ التيّار: إجراءٌ رئيسيٌّ واحد** (D-446، كان D-387 · D-388 خمسةَ أبوابٍ متزاحمة): «اعتمد كلّ ما ينتظر» أوّليٌّ حين
+ * ‏ينتظر شيء، ثمّ «+ جديد» قائمةً واحدة (أوّليّةً حين لا ينتظر شيء — فالأوّليُّ واحدٌ أبدًا، `audit_primary`)، ثمّ «المزيد»
+ * ‏ثانويّةً فيها ورشةُ الخطّة وتقويمُ الشهر وبابا الخطّة. والكتابةُ للمحرّر فأعلى، والقراءةُ لكلّ دور.
  */
 function entry(v: FeedView, approve: string): Html {
   const parts: Html[] = []
-  if (v.model.plan !== null) {
-    parts.push(html`<a class="tap" href="/panel/plan/review">ورشة الخطّة</a>`)
-    parts.push(html`<a class="tap" href="/panel/plan/month">تقويم الشهر</a>`)
-  }
-  // ‏وأبوابُ الخطّة في قائمةٍ ثانويّةٍ واحدة (D-417) — خرج «خطّة من ملفّ» من «منشور جديد ▾»: الخطّةُ ليست منشورًا واحدًا
-  if (allows(v.role, 'editor')) {
-    parts.push(raw(menu({ label: 'الخطّة', variant: 'secondary', size: 'sm', attrs: 'data-feed-plan', items: [
-      menuItem({ label: 'خطّة جديدة', note: 'تُبنى من أهدافك', href: '/panel/plan/new' }),
-      menuItem({ label: 'عندي خطّة', note: 'CSV لأسابيع', href: '/panel#plan-import' }),
-    ] })))
-  }
-  if (allows(v.role, 'editor')) {
-    parts.push(raw(button({ label: 'منشورات جديدة', variant: approve === '' ? 'primary' : 'secondary', href: '/panel/new', icon: ICON.add })))
-    parts.push(raw(newPostMenu('data-feed-new', 'secondary')))
-  }
   if (approve !== '') parts.push(raw(approve))
+  const editor = allows(v.role, 'editor')
+  if (editor) parts.push(raw(newFeedMenu('data-feed-new', approve === '' ? 'primary' : 'secondary')))
+  const more: string[] = []
+  if (v.model.plan !== null) {
+    more.push(menuItem({ label: 'ورشة الخطّة', note: 'راجع ما كُتب', href: '/panel/plan/review' }))
+    more.push(menuItem({ label: 'تقويم الشهر', note: 'الحملُ يومًا يومًا', href: '/panel/plan/month' }))
+  }
+  if (editor) {
+    more.push(menuItem({ label: 'خطّة جديدة', note: 'تُبنى من أهدافك', href: '/panel/plan/new' }))
+    more.push(menuItem({ label: 'عندي خطّة', note: 'CSV لأسابيع', href: '/panel#plan-import' }))
+  }
+  if (more.length > 0) parts.push(raw(menu({ label: 'المزيد', variant: 'secondary', size: 'sm', attrs: 'data-feed-more', items: more })))
   return parts.length === 0 ? html`` : html`<div class="row gap-2 fd-entry">${parts}</div>`
 }
 
+/**
+ * ‏**شرائحُ الحال** (D-446): أربعةُ روابط `?s=` بأرقامٍ جدوليّة كبيرة وتسمياتٍ خافتة، والمختارةُ `aria-current`؛ و«الكلّ»
+ * ‏يظهر حين تُختار شريحة. والعددُ عددُ الشهر كما كان في السطر.
+ */
+function chips(v: FeedView): string {
+  const n = v.model.counts
+  const f = v.filter ?? null
+  const items = FEED_FILTERS.map((c) => html`<li><a class="fd-chip" href="/panel/feed?s=${c.key}"${f === c.key ? raw(' aria-current="page"') : ''}><b class="num">${String(n[c.key])}</b><span>${c.label}</span></a></li>`)
+  const all = f === null ? html`` : html`<li><a class="tap fd-all" href="/panel/feed">الكلّ</a></li>`
+  return html`<nav class="fd-chips" aria-label="حالات التيّار"><ul class="plain">${items}${all}</ul></nav>`.value
+}
+
 export function feedScreen(v: FeedView): string {
-  const m = v.model
+  const f = v.filter ?? null
+  const m = f === null ? v.model : { ...v.model, upcoming: v.model.upcoming.filter((c) => keep(c, f)), past: v.model.past.filter((c) => keep(c, f)) }
   const today = dayKey(v.now, v.zone)
-  const lede = html`<span class="fd-counts"><span><b class="num">${String(m.counts.published)}</b> نُشر</span><span><b class="num">${String(m.counts.queued)}</b> مجدول</span><span><b class="num">${String(m.counts.awaiting)}</b> ينتظر اعتمادك</span><span><b class="num">${String(m.counts.writing)}</b> يُكتب</span></span>`.value
-  const head = pageHead(monthName(today), 'التيّار', lede, entry(v, approveAll(v).value).value)
+  const head = pageHead(monthName(today), 'التيّار', '', entry(v, approveAll(v).value).value) + chips(v)
   const upcoming = m.upcoming.length === 0
     ? emptyState({ title: 'لا شيء ينتظر النشر', html: 'اعتمد مسوّدةً أو ابنِ خطّةً فيظهر هنا ما سيُنشر بموعده.', echo: true,
         action: button({ label: 'منشورات جديدة', size: 'sm', href: '/panel/new' }) })
@@ -255,11 +288,14 @@ export function feedScreen(v: FeedView): string {
   const past = m.past.length === 0
     ? emptyState({ title: 'لم يُنشر شيءٌ في هذه الأيّام', html: m.window.older === null ? 'ما يُنشر يظهر هنا بنتائجه.' : 'وما قبلها يُفتح من «أقدم».' })
     : html`<ol class="plain fd-list">${m.past.map((c) => card(c, v))}</ol>`.value
-  const older = m.window.older === null ? '' : html`<p class="fd-older"><a class="tap" href="/panel/feed?before=${m.window.older}">أقدم</a></p>`.value
+  const older = m.window.older === null ? '' : html`<p class="fd-older"><a class="tap" href="/panel/feed?before=${m.window.older}${f === null ? '' : '&s=' + f}">أقدم</a></p>`.value
+  // ‏وشريحةٌ مختارة ترسم قسمَها وحدَه: «نُشر» ما نُشر، وما سواها ما سيُنشر — فلا قسمَ فارغٌ بلا سبب
+  const showUp = f !== 'published'
+  const showPast = f === null || f === 'published'
   return head + html`
   <div class="fd">
-    <section class="fd-sec" aria-labelledby="fd-up"><h2 id="fd-up" class="fd-h">ما سيُنشر</h2>${raw(upcoming)}</section>
-    <div class="fd-now" role="separator" aria-label="الآن"><span>الآن</span></div>
-    <section class="fd-sec" aria-labelledby="fd-past"><h2 id="fd-past" class="fd-h">ما نُشر</h2>${raw(past)}${raw(older)}</section>
+    ${showUp ? html`<section class="fd-sec" aria-labelledby="fd-up"><h2 id="fd-up" class="fd-h">ما سيُنشر</h2>${raw(upcoming)}</section>` : ''}
+    ${showUp && showPast ? html`<div class="fd-now" role="separator" aria-label="الآن"><span>الآن</span></div>` : ''}
+    ${showPast ? html`<section class="fd-sec" aria-labelledby="fd-past"><h2 id="fd-past" class="fd-h">ما نُشر</h2>${raw(past)}${raw(older)}</section>` : ''}
   </div>`.value
 }
