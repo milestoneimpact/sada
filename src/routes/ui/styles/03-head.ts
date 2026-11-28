@@ -43,7 +43,7 @@ export const HEAD = `/* ══ رأسُ الصفحة ═════════
   color:var(--ink); text-decoration:none; transition:border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out)}
 .fd-chip b{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; font-variant-numeric:tabular-nums}
 .fd-chip span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.fd-chip:hover{background:var(--surface-2)}
+@media(hover:hover){.fd-chip:hover{background:var(--surface-2)}}
 .fd-chip[aria-current="page"]{border-color:var(--link); background:var(--surface-2)}
 .fd-all{align-self:center}
 
