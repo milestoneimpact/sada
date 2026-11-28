@@ -34,6 +34,19 @@ export const HEAD = `/* ══ رأسُ الصفحة ═════════
 .lede-lead{margin:0 0 var(--s-5); font-size:var(--t-body); line-height:var(--lh-body);
   color:var(--ink-2); max-width:var(--measure)}
 
+/* ‏**شرائحُ حال التيّار** (D-446): أربعةُ روابط تحت الرأس بترتيب ما يطلب يدَك — الرقمُ جدوليٌّ بحجم عنوانٍ ثالث،
+   والتسميةُ تحته بالحبر الخافت. والمختارةُ بحدّ الرابط، والهدفُ ‏٤٤ على الأقلّ */
+.fd-chips{margin:calc(-1 * var(--s-3)) 0 var(--s-5)}
+.fd-chips ul{display:flex; flex-wrap:wrap; gap:var(--s-2); align-items:stretch}
+.fd-chip{display:flex; flex-direction:column; justify-content:center; min-height:var(--tap); min-width:var(--tap);
+  padding:var(--s-2) var(--s-3); border:var(--bd); border-radius:var(--r-control); background:var(--surface);
+  color:var(--ink); text-decoration:none; transition:border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out)}
+.fd-chip b{font-size:var(--t-h3); line-height:var(--lh-h3); font-weight:600; font-variant-numeric:tabular-nums}
+.fd-chip span{font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
+@media(hover:hover){.fd-chip:hover{background:var(--surface-2)}}
+.fd-chip[aria-current="page"]{border-color:var(--link); background:var(--surface-2)}
+.fd-all{align-self:center}
+
 .pill{display:inline-flex; align-items:center; gap:var(--s-2); padding:var(--s-1) var(--s-3); border-radius:var(--r-pill);
   font-size:var(--t-caption); line-height:var(--lh-caption); font-weight:600; border:var(--bd); background:var(--surface-2)}
 .pill .led{width:var(--dot); height:var(--dot); border-radius:50%; background:var(--ink-3); flex:none}

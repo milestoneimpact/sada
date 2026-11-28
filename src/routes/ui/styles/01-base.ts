@@ -5,7 +5,7 @@ export const BASE = `
    «font-synthesis:none» على الجذر: طلب وزن لم يُحمَّل لا يُصطنَع بتغليظ الحروف
    رقميّا — والعربيّة المصطنَعة الثخانة تلتصق نقاطُها وتُقرأ ملطّخة. والسلّم لا
    يطلب إلّا ‏٤٠٠ و‏٦٠٠، و«audit_scale» يُسقط ما سواهما. */
-html{font-family:var(--font-ui); font-synthesis:none; scroll-behavior:smooth;
+html{font-family:var(--font-ui); scrollbar-gutter:stable; font-synthesis:none; scroll-behavior:smooth;
   /* ما يُركَّز أو يُقصَد بمرساةٍ لا يختفي خلف الشريط اللاصق ولا شريط الجوّال (D-149) */
   scroll-padding-top:calc(var(--topbar) + var(--s-3)); scroll-padding-bottom:calc(var(--tap) + var(--s-6))}
 body{
@@ -95,6 +95,7 @@ details[open]>summary .g-tog::after,details[open]>summary .ptog::after{transform
    والمتصفّح الذي لا يعرفها يلفّ كما يلفّ اليوم: **لا شيء ينكسر**.
    وحدُّها ستّة أسطر عند أكثر المحرّكات، وعناوينُنا دونها كلُّها. */
 h1,h2,h3{margin:0; text-wrap:balance}
+p,li{text-wrap:pretty}
 /* ‏أيقونةٌ تدلّ على جهةٍ تنعكس حين يُقرأ الوسمُ من اليسار (D-307): القسمُ الإنجليزيّ وأيُّ لغةٍ تُضاف */
 [dir="ltr"] svg[data-dir="mirrors"]{transform:scaleX(-1)}
 /* **والثخينُ ‏٦٠٠ لا «bold».** الافتراضيُّ يُحَلّ إلى ‏٧٠٠، وهو وزنٌ لا نحمّله

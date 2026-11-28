@@ -19,6 +19,17 @@ export function newItems(): string[] {
   ]
 }
 
+/**
+ * ‏**«+ جديد» في رأس التيّار** (D-446): كلُّ أبواب الكتابة في قائمة `details` واحدة — «منشورات جديدة» (المساعدُ يكتب
+ * ‏دفعةً) أوّلًا ثمّ أبوابُ المنشور الواحد. أوّليٌّ حين لا ينتظر شيء، وثانويٌّ بجوار «اعتمد كلّ ما ينتظر».
+ */
+export function newFeedMenu(attrs: string, variant: 'primary' | 'secondary'): string {
+  return menu({ label: 'جديد', variant, size: 'sm', icon: ICON.add, attrs, items: [
+    menuItem({ label: 'منشورات جديدة', note: 'يكتبها المساعد دفعةً', href: '/panel/new' }),
+    ...newItems(),
+  ] })
+}
+
 /** «منشور جديد ▾» بزيّه: أوّليٌّ في الترويسة وسطر التحيّة، وثانويٌّ في رأس التيّار حيث الأوّليُّ واحدٌ غيرُه (D-388). */
 export function newPostMenu(attrs: string, variant: 'primary' | 'secondary' = 'primary'): string {
   return menu({ label: 'منشور جديد', variant, size: 'sm', icon: ICON.add, attrs, items: newItems() })

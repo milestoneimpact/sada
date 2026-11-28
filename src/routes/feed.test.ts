@@ -87,7 +87,7 @@ describe('التيّار (D-386)', () => {
     expect(html).toContain('href="/panel/feed" data-bar aria-current="page"')
     // ‏وبابُ «منشورات جديدة» ثانويٌّ بجوار الاعتماد (D-387)، و«ورشة الخطّة» رابطٌ صغير
     expect(html).toContain('href="/panel/new"')
-    expect(html).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
+    expect(html).toContain('href="/panel/plan/review"')
     expect(html).not.toContain('اعتمد فقط')
   })
 
@@ -174,35 +174,60 @@ describe('التيّار (D-386)', () => {
 describe('رأس التيّار بحالاته (D-388)', () => {
   const head = (html: string): string => html.slice(html.indexOf('<div class="row gap-2 fd-entry">'), html.indexOf('<div class="fd">'))
 
-  it('ينتظر شيء: «اعتمد كلّ ما ينتظر» أوّليٌّ وحدَه، و«منشورات جديدة» ثمّ «منشور جديد ▾» ثانويّان، والرابطان الصغيران', async () => {
+  it('ينتظر شيء: «اعتمد كلّ ما ينتظر» أوّليٌّ وحدَه أوّلًا، ثمّ «+ جديد» و«المزيد» قائمتان ثانويّتان (D-446)', async () => {
     const { cookie } = await session()
     const html = await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text()
     const h = head(html)
-    expect(h).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
-    expect(h).toContain('href="/panel/plan/month">تقويم الشهر</a>')
-    expect(h.indexOf('منشورات جديدة')).toBeLessThan(h.indexOf('data-feed-new'))
-    expect(h.indexOf('data-feed-new')).toBeLessThan(h.indexOf('اعتمد كلّ ما ينتظر'))
-    expect(h).toMatch(/<a class="btn btn-secondary[^"]*" href="\/panel\/new"/)
+    expect(h.indexOf('اعتمد كلّ ما ينتظر')).toBeLessThan(h.indexOf('data-feed-new'))
+    expect(h.indexOf('data-feed-new')).toBeLessThan(h.indexOf('data-feed-more'))
     expect(h).toMatch(/<details[^>]*data-feed-new[^>]*>\s*<summary class="btn btn-secondary/)
+    expect(h).toMatch(/<details[^>]*data-feed-more[^>]*>\s*<summary class="btn btn-secondary/)
     expect((h.match(/btn-primary/g) ?? []).length).toBe(1)
-    expect(h).toContain('اعتمد كلّ ما ينتظر')
-    // ‏والأبوابُ الخمسة بمساراتها إلى اللوح
-    for (const href of ['/panel#idea', '/panel#write', '/panel#own', '/panel/library#videos', '/panel#plan-import']) expect(h).toContain(`href="${href}"`)
+    expect(h).toContain('href="/panel/plan/review"')
+    expect(h).toContain('href="/panel/plan/month"')
+    // ‏والأبوابُ كلُّها في القائمتين بمساراتها
+    for (const href of ['/panel/new', '/panel#idea', '/panel#write', '/panel#own', '/panel/library#videos', '/panel#plan-import']) expect(h).toContain(`href="${href}"`)
   })
 
-  it('لا شيءَ ينتظر: «منشورات جديدة» أوّليٌّ و«منشور جديد ▾» ثانويّ — أوّليٌّ واحدٌ أبدًا؛ وبلا خطّةٍ لا رابطَ ورشةٍ ولا تقويم', async () => {
+  it('لا شيءَ ينتظر: «+ جديد» أوّليٌّ — أوّليٌّ واحدٌ أبدًا؛ وبلا خطّةٍ لا ورشةَ ولا تقويم', async () => {
     db.raw.exec("UPDATE posts SET status = 'queued', scheduled_at = '2099-01-04 06:00:00', approved_by = 'owner', approved_at = datetime('now') WHERE status = 'draft'")
     const { cookie } = await session()
     let h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
     expect(h).not.toContain('اعتمد كلّ ما ينتظر')
-    expect(h).toMatch(/<a class="btn btn-primary[^"]*" href="\/panel\/new"/)
+    expect(h).toMatch(/<details[^>]*data-feed-new[^>]*>\s*<summary class="btn btn-primary/)
     expect((h.match(/btn-primary/g) ?? []).length).toBe(1)
-    expect(h).toContain('data-feed-new')
     db.raw.exec("UPDATE plans SET status = 'superseded'")
     h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
     expect(h).not.toContain('ورشة الخطّة')
     expect(h).not.toContain('تقويم الشهر')
     expect(h).toContain('data-feed-new')
+  })
+
+  it('شرائحُ الحال بترتيبها روابطَ ?s=، والتصفيةُ في الخادم (D-446)', async () => {
+    db.raw.exec(`INSERT INTO posts (id, platform, type, text, status, idempotency_key, account_id, scheduled_at, approved_by, approved_at, created_at) VALUES
+      ('q8', 'x', 'text', '${TEXT} مجدولٌ للشريحة', 'queued', 'k8', 'a1', '2099-02-01 06:00:00', 'owner', datetime('now'), '2026-01-01 14:00:00')`)
+    const { cookie } = await session()
+    const get = async (q: string): Promise<string> => (await app.request('/panel/feed' + q, { headers: { Cookie: cookie } }, env)).text()
+    const all = await get('')
+    const nav = all.slice(all.indexOf('<nav class="fd-chips"'), all.indexOf('</nav>', all.indexOf('<nav class="fd-chips"')))
+    const order = ['?s=awaiting', '?s=writing', '?s=queued', '?s=published'].map((k) => nav.indexOf(k))
+    expect(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1]!))).toBe(true)
+    expect(nav).toContain('<b class="num">')
+    expect(nav).not.toContain('aria-current')
+    expect(all).toContain('id="f-q8"')
+    const queued = await get('?s=queued')
+    expect(queued).toContain('id="f-q8"')
+    expect(queued).not.toContain('data-status="draft"')
+    expect(queued).toMatch(/href="\/panel\/feed\?s=queued" aria-current="page"/)
+    expect(queued).toContain('href="/panel/feed">الكلّ</a>')
+    const awaiting = await get('?s=awaiting')
+    expect(awaiting).toContain('data-status="draft"')
+    expect(awaiting).not.toContain('id="f-q8"')
+    const writing = await get('?s=writing')
+    expect(writing).toContain('id="f-item-')
+    expect(writing).not.toContain('class="card fd-card" id="f-p')
+    expect(await get('?s=published')).not.toContain('id="fd-up"')
+    expect(await get('?s=x')).toContain('id="f-q8"')
   })
 
   it('«افتح» على مجدولٍ ليس من خطّةٍ يفتح بطاقتَه في لوح المنشورات، ومنشورُ الخطّة شاشةَ التعديل', async () => {
@@ -221,8 +246,8 @@ describe('رأس التيّار بحالاته (D-388)', () => {
     const h = head(await (await app.request('/panel/feed', { headers: { Cookie: cookie } }, env)).text())
     expect(h).not.toContain('href="/panel/new"')
     expect(h).not.toContain('data-feed-new')
-    expect(h).toContain('href="/panel/plan/review">ورشة الخطّة</a>')
-    expect(h).toContain('href="/panel/plan/month">تقويم الشهر</a>')
+    expect(h).toContain('href="/panel/plan/review"')
+    expect(h).toContain('href="/panel/plan/month"')
   })
 
   it('الخطُّ الزمنيّ والمتابعةُ و«الخطّة» تحويلاتٌ لا صفحات', async () => {

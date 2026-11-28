@@ -37,17 +37,17 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 @media print{
   @page{margin:18mm}
   *{box-shadow:none!important; transition:none!important}
-  html,body{background:#fff!important; color:#000!important}
+  html,body{background:var(--print-bg)!important; color:var(--print-ink)!important}
   .rail,.topbar,.seg,.skip,footer,nav.tabs,button,.btn,form{display:none!important}
   .app{display:block}
   .app::before{display:none}
   /* والهوامشُ من @page لا من الحاوية: حاويةٌ بلا حدٍّ أقصى تمدّ السطرَ
      عبر الورقة كلّها، وقيد المقاس على الفقرات يبقى قائما */
   .content,.doc{padding:0; margin:0; max-width:100%}
-  .card,.ch,.draft{border:1px solid #ccc; break-inside:avoid; page-break-inside:avoid}
+  .card,.ch,.draft{border:1px solid var(--print-rule); break-inside:avoid; page-break-inside:avoid}
   section[data-pane][hidden]{display:none!important}
   h1,h2,h3{break-after:avoid; page-break-after:avoid}
-  a[href^="http"]::after{content:' (' attr(href) ')'; font-size:var(--t-caption); color:#555}
+  a[href^="http"]::after{content:' (' attr(href) ')'; font-size:var(--t-caption); color:var(--print-muted)}
   .doc a[href^="mailto"]::after{content:''}
 }
 
@@ -61,7 +61,8 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
    والتلميحُ يظهر بعد مهلة. وكلُّ خاصّيّةٍ تُحرَّك مسمّاةٌ (opacity وtransform وheight في الطيّ وحدَه)،
    ولا «transition:all». و«--dir» على الجذر وحدَه (D-124)، وصفحةٌ تُقرأ من اليسار تكتبه ‏-١ هناك. */
 @view-transition{navigation:auto}
-@keyframes rise{from{opacity:0; transform:translateY(var(--s-2))}to{opacity:1; transform:none}}
+/* ‏«rise» إزاحةٌ لا اختفاء (D-447): الشفافيةُ تبدأ من ‏0.92، فالبطاقةُ مرئيّةٌ من أوّل رسمٍ ولو تأخّرت الحركة أو لم تجرِ */
+@keyframes rise{from{opacity:.92; transform:translateY(var(--s-2))}to{opacity:1; transform:none}}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
 .skeleton{border-radius:var(--r-control); color:transparent;
   background:linear-gradient(90deg,var(--surface-2) 25%,var(--surface-3) 50%,var(--surface-2) 75%);
@@ -69,9 +70,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
 /* ‏البطاقاتُ تدخل متتابعةً لا دفعةً واحدة (D-312): ‏40ms بين البطاقة وأختها حتّى الخامسة، وما بعدها معها —
    فالمجموع تحت نصف ثانية (Material 3: التتابع ستّةٌ على الأكثر). والعدُّ بين الإخوة في الحاوية الواحدة */
 .card:nth-child(2){animation-delay:var(--stagger)}
-.card:nth-child(3){animation-delay:calc(2 * var(--stagger))}
-.card:nth-child(4){animation-delay:calc(3 * var(--stagger))}
-.card:nth-child(n+5){animation-delay:calc(4 * var(--stagger))}
+.card:nth-child(n+3){animation-delay:calc(2 * var(--stagger))}
 /* ‏الهيكلُ ثابتٌ والمحتوى يتبدّل (D-312): الرافدةُ والشريطُ باسمَيهما فلا يُعاد رسمُهما مع كلّ انتقال —
    صفحةٌ كلُّها تتلاشى تُقرأ «أُعيد تحميلُها»، ومحتوًى وحدَه يدخل يُقرأ «انتقلتُ». والحاليُّ في الرافدة
    باسمه فتنزلق علامتُه إلى القسم الجديد بدل أن تقفز (المجموعة تتحرّك من موضعها القديم إلى الجديد).
@@ -97,12 +96,12 @@ html[data-nav] section[data-pane] .card{animation-name:none}
 /* ── الطيُّ يُفتح بانزلاقٍ لا بقفزة (D-312) ──────────────────────────────
    «::details-content» صندوقُ ما تحت الرأس، وارتفاعُه من صفرٍ إلى «auto» يُحرَّك حيث تُعرَف
    «interpolate-size»، ويتلاشى معه. ومتصفّحٌ لا يعرفها يفتح كما يفتح اليوم — لا شيء ينكسر.
-   **وتُستثنى ورقةُ «المزيد» والقائمةُ**: ما فيهما موضوعٌ بإطلاقٍ خارج الصندوق، وصندوقٌ ارتفاعُه صفر
+   **وتُستثنى ورقةُ «المزيد» والقائمةُ وزرُّ «fab»**: ما فيهما موضوعٌ بإطلاقٍ خارج الصندوق، وصندوقٌ ارتفاعُه صفر
    يُحرَّك يحبسهما. والقصُّ بهامش ‏8px فلا يُقصّ ظلُّ بطاقةٍ ولا حلقةُ تركيز */
 details{interpolate-size:allow-keywords}
-details:not(.more-sheet):not(.menu)::details-content{height:0; overflow:clip; overflow-clip-margin:var(--s-2); opacity:0;
+details:not(.more-sheet):not(.menu):not(.fab)::details-content{height:0; overflow:clip; overflow-clip-margin:var(--s-2); opacity:0;
   transition:height var(--dur-2) var(--ease), opacity var(--dur-2) var(--ease), content-visibility var(--dur-2) allow-discrete}
-details[open]:not(.more-sheet):not(.menu)::details-content{height:auto; opacity:1}
+details[open]:not(.more-sheet):not(.menu):not(.fab)::details-content{height:auto; opacity:1}
 /* ‏والرأسُ يردّ على التمرير بلونٍ وأرض (انتقالُه في قاعدة «summary» في 08-sections)، ورأسُ المهمّة بأرض التمرير الخفيفة */
 @media(hover:hover){.setup>summary:hover{color:var(--ink)} .task>summary:hover{background:var(--hover)}}
 /* ‏والقائمةُ المنسدلة تدخل من زرّها: ‏96٪ إلى ‏100٪ مع تلاشٍ، والأصلُ عند الزرّ لا في الوسط */
@@ -660,6 +659,13 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-prog::-webkit-progress-bar{background:var(--surface-2); border-radius:var(--r-pill)}
 .rv-prog::-webkit-progress-value{background:var(--accent); border-radius:var(--r-pill)}
 .rv-prog::-moz-progress-bar{background:var(--accent); border-radius:var(--r-pill)}
+/* ‏رأسُ شريط التقدّم (D-447): تسميةٌ وعدد و«حدّث» هدفُها ‏44px */
+.rv-prog-h{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.rv-prog-h label{font-weight:600}
+.rv-prog-h span{color:var(--ink-2)}
+.rv-prog-h a{margin-inline-start:auto; display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); justify-content:center}
+.notice{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); margin:0 0 var(--s-3); padding:var(--s-2) var(--s-3); border:var(--bd-soft); border-color:color-mix(in srgb,var(--warn) 28%,transparent); border-radius:var(--r-inline); background:var(--warn-wash); color:var(--ink); font-size:var(--t-small); line-height:var(--lh-small)}
+.notice a{display:inline-flex; align-items:center; min-height:var(--tap)}
 .rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}
@@ -949,7 +955,6 @@ details.card .nt-list{margin-top:var(--s-4)}
 .fd-now::before,.fd-now::after{content:''; flex:1; border-block-start:var(--bd)}
 .fd-older{margin:0; text-align:center}
 .fd-fix{margin:0; font-size:var(--t-small); line-height:var(--lh-small); color:var(--ink-2)}
-.fd-counts{display:flex; gap:var(--s-3); flex-wrap:wrap}
 .fd-entry{align-items:center; flex-wrap:wrap; justify-content:flex-end}
 
 /* ── «منشورات جديدة» (D-387): ثلاثُ بطاقاتٍ كبيرة، بابٌ واحدٌ وزرٌّ واحدٌ في كلٍّ ────────── */

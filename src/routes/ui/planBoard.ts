@@ -11,6 +11,7 @@
  * **وكلُّها تسقط مع تقليل الحركة**.
  */
 import { escapeHtml } from './escape'
+import { dayHeading } from './when'
 import { LOGOS } from './logos'
 import { platformLabel } from '../../lib/oauth/providers'
 import { dayLabel } from '../../lib/time/zone'
@@ -92,19 +93,20 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
       ${opts.editable ? `${content(item, index)}${edit(item, index)}` : ''}
     </article>`
   }
-  const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }): string =>
-    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(title)}">
+  // ‏`name` نصٌّ خام (D-448): `title` قد يكون مهرَّبًا، فلا يُهرَّب مرّتين في `aria-label`
+  const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }, name?: string): string =>
+    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(name !== undefined ? dayHeading(name, list.length) : title)}">
       <h3 class="pb-head">${title}${sub === '' ? '' : ` <span class="ago">${escapeHtml(sub)}</span>`}<span class="count">${list.length}</span></h3>
       <div class="pb-drop">${list.map(({ item, index }) => card(item, index, opts)).join('')}</div>
     </section>`
 
   // ١ · أيّام: عمودٌ لكلّ يوم، أو لكلّ أسبوعٍ في الشهر (والبطاقةُ تحفظ يومَها من أسبوعه)
   const dayCols = (editable: boolean): string => (month
-    ? Array.from({ length: weeks }, (_, w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7 }))
-    : days.map((d, i) => ({ key: d, title: escapeHtml(label(d)), sub: '', from: i }))
+    ? Array.from({ length: weeks }, (_, w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7, name: undefined as string | undefined }))
+    : days.map((d, i) => ({ key: d, title: escapeHtml(label(d)), sub: '', from: i, name: label(d) as string | undefined }))
   ).map((col) => column(`data-drop data-day="${col.key}" data-width="${width}"`, col.title, col.sub,
     items.filter(({ item }) => { const i = days.indexOf(item.day); return i >= col.from && i < col.from + width }),
-    { showDay: month, editable })).join('')
+    { showDay: month, editable }, col.name)).join('')
 
   // ٢ · منصّات: عمودٌ لكلّ منصّة، والسحبُ إليه يبدّل المنصّة
   const platformCols = PLAN_PLATFORMS.map((p) => column(`data-drop data-set-platform="${p}"`, plat(p), '',
@@ -114,7 +116,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
   const weekdays = days.slice(0, 7).map((d) => `<div class="pb-wd">${escapeHtml(label(d).split(' ')[0] ?? '')}</div>`).join('')
   const cells = days.map((d) => {
     const list = items.filter(({ item }) => item.day === d)
-    return `<div class="pb-col pb-cell" data-drop data-day="${d}" data-width="1" aria-label="${escapeHtml(label(d))}">
+    return `<div class="pb-col pb-cell" data-drop data-day="${d}" data-width="1" aria-label="${escapeHtml(dayHeading(label(d), list.length))}">
       <span class="pb-dn">${escapeHtml(label(d, false))}</span><span class="pb-dl">${escapeHtml(label(d))}</span>
       ${list.map(({ item, index }) => `<div class="card card-inset pb-card pb-chip" data-drag data-index="${index}" data-offset="0" data-platform="${escapeHtml(item.platform)}" tabindex="0"
           data-tip="${escapeHtml(item.angle)}">${LOGOS[item.platform] ?? ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi><span class="pb-ct">${escapeHtml(item.angle)}</span></div>`).join('')}
