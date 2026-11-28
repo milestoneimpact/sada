@@ -93,19 +93,20 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
       ${opts.editable ? `${content(item, index)}${edit(item, index)}` : ''}
     </article>`
   }
-  const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }): string =>
-    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(sub === '' ? dayHeading(title.replace(/<[^>]*>/g, ''), list.length) : title)}">
+  // ‏`name` نصٌّ خام (D-448): `title` قد يكون مهرَّبًا، فلا يُهرَّب مرّتين في `aria-label`
+  const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }, name?: string): string =>
+    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(name !== undefined ? dayHeading(name, list.length) : title)}">
       <h3 class="pb-head">${title}${sub === '' ? '' : ` <span class="ago">${escapeHtml(sub)}</span>`}<span class="count">${list.length}</span></h3>
       <div class="pb-drop">${list.map(({ item, index }) => card(item, index, opts)).join('')}</div>
     </section>`
 
   // ١ · أيّام: عمودٌ لكلّ يوم، أو لكلّ أسبوعٍ في الشهر (والبطاقةُ تحفظ يومَها من أسبوعه)
   const dayCols = (editable: boolean): string => (month
-    ? Array.from({ length: weeks }, (_, w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7 }))
-    : days.map((d, i) => ({ key: d, title: escapeHtml(label(d)), sub: '', from: i }))
+    ? Array.from({ length: weeks }, (_, w) => ({ key: days[w * 7]!, title: `الأسبوع ${w + 1}`, sub: `من ${label(days[w * 7]!)}`, from: w * 7, name: undefined as string | undefined }))
+    : days.map((d, i) => ({ key: d, title: escapeHtml(label(d)), sub: '', from: i, name: label(d) as string | undefined }))
   ).map((col) => column(`data-drop data-day="${col.key}" data-width="${width}"`, col.title, col.sub,
     items.filter(({ item }) => { const i = days.indexOf(item.day); return i >= col.from && i < col.from + width }),
-    { showDay: month, editable })).join('')
+    { showDay: month, editable }, col.name)).join('')
 
   // ٢ · منصّات: عمودٌ لكلّ منصّة، والسحبُ إليه يبدّل المنصّة
   const platformCols = PLAN_PLATFORMS.map((p) => column(`data-drop data-set-platform="${p}"`, plat(p), '',

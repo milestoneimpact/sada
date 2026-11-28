@@ -357,9 +357,9 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
       ? html``
       : html`<span class="st idle">مسوّدة · الإصدار ${AR(m.version)}</span>`
   // ‏**«غير مثبَّت» شريطٌ يُفعل به** (D-447): الشارةُ كانت تقول الحالَ ولا تدلّ على ما بعده، فصارت سطرَ `.notice` فيه «قارن»
-  // ‏إلى الإصدارات المحفوظة. ولا زرَّ تثبيتٍ هنا: الاعتمادُ يجدول (D-327) و«ثبّت» خرج من هذه الشاشة عمدًا
+  // ‏إلى الإصدارات المحفوظة (D-448: الطيّةُ مفتوحةٌ ما دام غيرَ مثبَّت، فالرابطُ لا يقع على ملخّصٍ مغلق). ولا زرَّ تثبيتٍ هنا: الاعتمادُ يجدول (D-327) و«ثبّت» خرج من هذه الشاشة عمدًا
   const unpinned = m.lockedAt === null && m.versions.length > 0
-    ? html`<p class="notice">الإصدار ${AR(m.version)} عُدّل ولم يُثبَّت. <a href="#rv-versions">قارن</a></p>`
+    ? html`<p class="notice">الإصدار ${AR(m.version)} عُدّل ولم يُثبَّت. <a href="#rv-versions">الإصدارات</a></p>`
     : html``
   // ‏بلا لصيقةٍ فوق العنوان (§8 «رأسٌ واحد بلا روابط رجوع»): «المنشورات» فوق «خطّةُ النشر» كانت فتاتَ خبزٍ في ثوبٍ آخر، والموضعُ في الرافدة
   const head = pageHead('', 'خطّةُ النشر', span + ' · ' + dayLabel(m.plan.week) + ' – ' + dayLabel(end))
@@ -409,7 +409,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const toggle = html`<span class="rv-vw" hidden>${raw(segmented('طريقة العرض', 'view', [{ value: 'cards', label: 'بطاقات', pressed: true }, { value: 'list', label: 'قائمة' }]))}</span>`
   // ‏**شريطُ الأقسام مرّةً واحدة** (D-436): كانت «صفحاتُ الخطّة» (الخطّة · عرض للطباعة · خطّة جديدة) شريطًا ثانيًا يكرّر الرافدةَ
   // ‏وقائمةَ «أفعال الخطّة» التي فيها الرابطان نفسُهما — فبقيت القائمةُ وحدَها
-  const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4" id="rv-versions"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
+  const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4" id="rv-versions"${m.lockedAt === null ? ' open' : ''}><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
       <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${counted(v.items, NOUNS.item)}، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
   // ‏«اعتمد الأسبوع»: مسوّداتُ المعروض كلُّها بنموذج الجملة نفسِه — لا طريقَ ثانيًا حول فحص الاعتماد
   const weekDrafts = visible.filter((c) => c.post !== null && c.post.status === 'draft')

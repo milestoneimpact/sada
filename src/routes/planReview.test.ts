@@ -102,7 +102,12 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     expect(v1.items[1]!.day).toBe('2099-01-04')
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
     expect(after).toContain('الإصدار 2 عُدّل ولم يُثبَّت')
-    expect(after).toContain('href="#rv-versions">قارن')
+    expect(after).toContain('href="#rv-versions">الإصدارات</a>')
+    expect(after).toMatch(/<details class="fold mt-4" id="rv-versions" open>/)
+    expect(after).toContain('<label for="rv-prog">مجدولٌ أو منشور</label>')
+    expect(after).toMatch(/<span data-prog>[^<]+ من [^<]+<\/span><a href="">حدّث<\/a>/)
+    expect(after).toMatch(/<progress class="rv-prog" id="rv-prog" max="\d+" value="\d+">/)
+    expect(pinned).not.toContain('id="rv-versions" open')
     expect(after).toContain('الإصدار 1 — ثُبّت')
     // ‏و«أزِل» على مجدول (D-327): يُسحب موعدُه ويُرفض ويخرج بندُه — وما أُرسل للنشر لا يُزال
     db.raw.exec("UPDATE posts SET dispatched_at = datetime('now') WHERE id = 'p2'")
