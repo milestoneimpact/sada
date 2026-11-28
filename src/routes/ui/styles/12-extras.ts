@@ -61,7 +61,7 @@ export const EXTRAS = `/* ── الوثائق العامّة ─────�
    والتلميحُ يظهر بعد مهلة. وكلُّ خاصّيّةٍ تُحرَّك مسمّاةٌ (opacity وtransform وheight في الطيّ وحدَه)،
    ولا «transition:all». و«--dir» على الجذر وحدَه (D-124)، وصفحةٌ تُقرأ من اليسار تكتبه ‏-١ هناك. */
 @view-transition{navigation:auto}
-/* ‏«rise» إزاحةٌ لا اختفاء (D-444): الشفافيةُ تبدأ من ‏0.92، فالبطاقةُ مرئيّةٌ من أوّل رسمٍ ولو تأخّرت الحركة أو لم تجرِ */
+/* ‏«rise» إزاحةٌ لا اختفاء (D-447): الشفافيةُ تبدأ من ‏0.92، فالبطاقةُ مرئيّةٌ من أوّل رسمٍ ولو تأخّرت الحركة أو لم تجرِ */
 @keyframes rise{from{opacity:.92; transform:translateY(var(--s-2))}to{opacity:1; transform:none}}
 @keyframes shimmer{from{background-position:100% 0}to{background-position:-100% 0}}
 .skeleton{border-radius:var(--r-control); color:transparent;
@@ -659,6 +659,13 @@ a{transition:color var(--dur-1) var(--ease), text-decoration-color var(--dur-1) 
 .rv-prog::-webkit-progress-bar{background:var(--surface-2); border-radius:var(--r-pill)}
 .rv-prog::-webkit-progress-value{background:var(--accent); border-radius:var(--r-pill)}
 .rv-prog::-moz-progress-bar{background:var(--accent); border-radius:var(--r-pill)}
+/* ‏رأسُ شريط التقدّم (D-447): تسميةٌ وعدد و«حدّث» هدفُها ‏44px */
+.rv-prog-h{display:flex; align-items:center; gap:var(--s-2); font-size:var(--t-small); line-height:var(--lh-small)}
+.rv-prog-h label{font-weight:600}
+.rv-prog-h span{color:var(--ink-2)}
+.rv-prog-h a{margin-inline-start:auto; display:inline-flex; align-items:center; min-height:var(--tap); min-width:var(--tap); justify-content:center}
+.notice{display:flex; flex-wrap:wrap; align-items:center; gap:var(--s-2); margin:0 0 var(--s-3); padding:var(--s-2) var(--s-3); border:var(--bd-soft); border-color:color-mix(in srgb,var(--warn) 28%,transparent); border-radius:var(--r-inline); background:var(--warn-wash); color:var(--ink); font-size:var(--t-small); line-height:var(--lh-small)}
+.notice a{display:inline-flex; align-items:center; min-height:var(--tap)}
 .rv-progress{display:flex; flex-direction:column; gap:var(--s-1); margin-bottom:var(--s-3)}
 .rv-cal.is-board .rv-cd{align-items:stretch; justify-content:flex-start; padding:var(--s-1); min-height:var(--s-16); border:var(--bd-soft)}
 .rv-cal.is-board .rv-cd.is-wait{border:var(--bd-dash)}

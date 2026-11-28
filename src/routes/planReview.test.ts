@@ -101,7 +101,8 @@ describe('مراجعةُ الخطّة (D-286)', () => {
     const v1 = JSON.parse((db.raw.prepare('SELECT plan_json FROM plan_versions WHERE version = 1').get() as { plan_json: string }).plan_json) as { items: { day: string }[] }
     expect(v1.items[1]!.day).toBe('2099-01-04')
     const after = await (await app.request('/panel/plan/review', { headers: { Cookie: cookie } }, env)).text()
-    expect(after).toContain('عُدّلت بعد التثبيت · الإصدار 2 غير مثبَّت')
+    expect(after).toContain('الإصدار 2 عُدّل ولم يُثبَّت')
+    expect(after).toContain('href="#rv-versions">قارن')
     expect(after).toContain('الإصدار 1 — ثُبّت')
     // ‏و«أزِل» على مجدول (D-327): يُسحب موعدُه ويُرفض ويخرج بندُه — وما أُرسل للنشر لا يُزال
     db.raw.exec("UPDATE posts SET dispatched_at = datetime('now') WHERE id = 'p2'")

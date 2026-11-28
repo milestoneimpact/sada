@@ -8,6 +8,7 @@ import { clock, dayLabel, localParts, zoneNote } from '../../lib/time/zone'
 import { momentLabel, nextPeak, presetAt, PRESETS } from '../../lib/time/local'
 import { escapeHtml } from './escape'
 import { field } from './components/field'
+import { counted, NOUNS } from '../../lib/format'
 
 /** أوّلُ موعدٍ يقبله الحقلُ بتوقيت المالك: ربعُ ساعةٍ من الآن (دورةُ الإرسال تدور كلَّ ربع). */
 export function earliestLocal(now: Date, zone: string | null): string {
@@ -58,4 +59,13 @@ export function whenField(form: string, zone: string | null, now: Date, peaks: P
     })}</div>
     ${peakLine(peaks, zone, now)}
   </fieldset>`
+}
+
+/**
+ * ‏**رأسُ خانة اليوم** (D-447): «الأحد 8 نوفمبر · منشوران» — اليومُ بلا فاصلته وعددُ منشوراته بمثنّاه وجمعه (`counted`).
+ * ‏يأخذ وسمَ اليوم جاهزًا لأنّ لكلّ شاشةٍ صيغتَها (بتوقيتٍ أو بلا)، والعدُّ هنا وحدَه.
+ */
+export function dayHeading(label: string, n: number): string {
+  const day = label.replace(/،\s*/g, ' ').trim()
+  return n <= 0 ? day : day + ' · ' + counted(n, NOUNS.post)
 }

@@ -28,6 +28,7 @@ import { postStatus } from '../../lib/status'
 import { stamp, todayKey } from '../../lib/time/zone'
 import { field } from './components/field'
 import { escapeHtml } from './escape'
+import { dayHeading } from './when'
 import { card as cardBox } from './components/card'
 import { segmented } from './components/tabs'
 import { AR_LATN, counted, NOUNS, num } from '../../lib/format'
@@ -353,8 +354,13 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const state = m.lockedAt !== null
     ? html`<span class="st ok">مثبَّتة · الإصدار ${AR(m.version)}</span>`
     : m.versions.length > 0
-      ? html`<span class="st warn">عُدّلت بعد التثبيت · الإصدار ${AR(m.version)} غير مثبَّت</span>`
+      ? html``
       : html`<span class="st idle">مسوّدة · الإصدار ${AR(m.version)}</span>`
+  // ‏**«غير مثبَّت» شريطٌ يُفعل به** (D-447): الشارةُ كانت تقول الحالَ ولا تدلّ على ما بعده، فصارت سطرَ `.notice` فيه «قارن»
+  // ‏إلى الإصدارات المحفوظة. ولا زرَّ تثبيتٍ هنا: الاعتمادُ يجدول (D-327) و«ثبّت» خرج من هذه الشاشة عمدًا
+  const unpinned = m.lockedAt === null && m.versions.length > 0
+    ? html`<p class="notice">الإصدار ${AR(m.version)} عُدّل ولم يُثبَّت. <a href="#rv-versions">قارن</a></p>`
+    : html``
   // ‏بلا لصيقةٍ فوق العنوان (§8 «رأسٌ واحد بلا روابط رجوع»): «المنشورات» فوق «خطّةُ النشر» كانت فتاتَ خبزٍ في ثوبٍ آخر، والموضعُ في الرافدة
   const head = pageHead('', 'خطّةُ النشر', span + ' · ' + dayLabel(m.plan.week) + ' – ' + dayLabel(end))
   const written = m.cards.filter((c) => c.post !== null).length
@@ -364,13 +370,16 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const settled = m.cards.filter((c) => c.post !== null && (c.post.status === 'queued' || c.post.status === 'published')).length
   // ‏ما يُكتب أو يُرسم الآن: الصفحةُ تعيد تحميلَ نفسها ما دام شيءٌ في الطريق (السكربتُ يقرأ `data-live`)
   const live = inFlight > 0 ? 'write' : m.gaps.no_image > 0 ? 'image' : ''
+  // ‏**شريطُ تقدّمٍ أصليّ** (D-447): `<progress>` بتسميةٍ ظاهرة وعدد، و«حدّث» رابطٌ إلى الشاشة نفسِها يعمل بلا سكربت؛
+  // ‏والسكربتُ يُعلن تبدّلَ العدد في منطقةٍ مهذّبة (`aria-live`) لا تُنشأ إلّا به
   const progress = html`<div class="rv-progress">
-      <progress class="rv-prog" max="${String(Math.max(1, m.cards.length))}" value="${String(settled)}" aria-label="${'مجدولٌ أو منشور: ' + AR(settled) + ' من ' + AR(m.cards.length)}"></progress>
-      <span class="hint" role="status">${inFlight > 0
-        ? 'صدى يكتب الباقي الآن بصوره، والصفحةُ تتحدّث وحدَها.'
+      <div class="rv-prog-h"><label for="rv-prog">مجدولٌ أو منشور</label><span data-prog>${AR(settled)} من ${AR(m.cards.length)}</span><a href="">حدّث</a></div>
+      <progress class="rv-prog" id="rv-prog" max="${String(Math.max(1, m.cards.length))}" value="${String(settled)}"></progress>
+      <span class="hint">${inFlight > 0
+        ? 'صدى يكتب الباقي الآن.'
         : failed.length > 0
         ? 'تعذّرت كتابةُ ' + AR(failed.length) + ': ' + failed[0]!.failed!
-        : AR(settled) + ' من ' + AR(m.cards.length) + ' مجدولةٌ أو منشورة' + (m.gaps.pending > 0 ? ' · ' + AR(m.gaps.pending) + ' تنتظر اعتمادك' : '')}</span>
+        : m.gaps.pending > 0 ? AR(m.gaps.pending) + ' تنتظر اعتمادك' : ''}</span>
       ${(view.seatedIdeas ?? 0) > 0 && maySpend() ? html`<form class="inline" method="POST" action="/panel/plan/review/write-seated" data-busy="تُكتب…"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'اكتبها من أفكارها بقواعد الإرشادات (' + AR(view.seatedIdeas ?? 0) + ' نداءً مدفوعًا)', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}
       ${inFlight === 0 && failed.length > 0 ? html`<form class="inline" method="POST" action="/panel/plan/review/redraft"><input type="hidden" name="id" value="${m.plan.id}">${raw(button({ label: 'أعد كتابة ما تعذّر (' + AR(failed.length) + ')', variant: 'secondary', size: 'sm', type: 'submit' }))}</form>` : html``}</div>`
   const visible = [...m.cards]
@@ -383,7 +392,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const list = byDay.size === 0
     ? html`<p class="hint" role="status">لا منشورَ في هذا الأسبوع — اختر أسبوعًا آخر من الشريط.</p>`
     : [...byDay.entries()].map(([day, cards]) => html`<section class="rv-day" aria-labelledby="d-${day}">
-      <h2 class="rv-dh" id="d-${day}">${dayLabel(day)}</h2>
+      <h2 class="rv-dh" id="d-${day}">${dayHeading(dayLabel(day), cards.length)}</h2>
       <div class="rv-cards">${cards.map((c) => card(c, m, zone, view, w))}</div></section>`)
   // ‏عرضُ القائمة (D-337): المعروضُ نفسُه جدولًا مضغوطًا — يومٌ وساعةٌ ومنصّةٌ وحالٌ وأوّلُ النصّ، والصفُّ يفتح لوحَ بطاقته.
   // ‏تبديلُ المنظار بالسكربت وحدَه (D-328)، وبلا سكربتٍ البطاقاتُ كما هي والجدولُ مخفيّ
@@ -400,7 +409,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   const toggle = html`<span class="rv-vw" hidden>${raw(segmented('طريقة العرض', 'view', [{ value: 'cards', label: 'بطاقات', pressed: true }, { value: 'list', label: 'قائمة' }]))}</span>`
   // ‏**شريطُ الأقسام مرّةً واحدة** (D-436): كانت «صفحاتُ الخطّة» (الخطّة · عرض للطباعة · خطّة جديدة) شريطًا ثانيًا يكرّر الرافدةَ
   // ‏وقائمةَ «أفعال الخطّة» التي فيها الرابطان نفسُهما — فبقيت القائمةُ وحدَها
-  const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
+  const versions = m.versions.length === 0 ? html`` : html`<details class="fold mt-4" id="rv-versions"><summary><span>الإصدارات المحفوظة (${AR(m.versions.length)})</span></summary>
       <ul class="plain">${m.versions.map((v) => html`<li>الإصدار ${AR(v.version)} — ثُبّت ${stamp(v.lockedAt, zone)}، ${counted(v.items, NOUNS.item)}، جُدول منها ${AR(v.scheduled)}${v.lockedBy === null ? '' : ' · ' + v.lockedBy}</li>`)}</ul></details>`
   // ‏«اعتمد الأسبوع»: مسوّداتُ المعروض كلُّها بنموذج الجملة نفسِه — لا طريقَ ثانيًا حول فحص الاعتماد
   const weekDrafts = visible.filter((c) => c.post !== null && c.post.status === 'draft')
@@ -444,6 +453,7 @@ export function planReviewScreen(m: ReviewModel, zone: string | null, view: Revi
   return html`${raw(head)}
     <div id="rv-root" data-live="${live}" data-plan="${m.plan.id}" data-w="${w}">
     <div class="row gap-2 mb-3 rv-status">${state}<span class="hint">كُتب ${AR(written)} من ${AR(m.cards.length)}</span>${next}<span class="grow"></span>${toggle}${shareBox(m, view)}${planActions(m)}</div>
+    ${unpinned}
     ${progress}
     ${calendar(m, weekHref, { zone, cardHref: (c) => '?w=' + String(weekOfDay(m.plan.week, c.item.day)) + '#c-' + String(c.index) }, view.now)}
     ${weekTabs(m, shown)}
@@ -571,9 +581,19 @@ const weeksOf = (m: ReviewModel): number => Math.ceil(spanDays(m.plan.span ?? 'w
  *
  * وسؤالُ التأكيد من `CONFIRM_SCRIPT` (في طور الالتقاط على الوثيقة) يسبق هذا، فما يُبدَّل داخلٌ فيه بلا ربطٍ جديد.
  */
-export const PLAN_REVIEW_SCRIPT = `(function(){
+/**
+ * ‏**السكربتُ مطويًّا** (D-447): المسافاتُ في أوائل الأسطر تسقط، والسطرُ المنتهي بـ`;` أو `{` أو `,` يُلحق بما بعده —
+ * ‏فلا يتغيّر معنًى (لا إدراجَ فاصلةٍ آليٍّ بعد هذه الثلاث)، والتعليقُ يبقى سطرَه فلا يبتلع ما يليه. فتبقى الشاشةُ تحت سقفها.
+ */
+export function compact(js: string): string {
+  return js.split('\n').map((l) => l.trim()).filter((l) => l !== '')
+    .map((l) => l.replace(/([;,{]) (?=[a-z!(])/g, '$1'))
+    .reduce((out, l) => out === '' ? l : /[;{,]$/.test(out) && !out.slice(out.lastIndexOf('\n') + 1).includes('//') && !l.startsWith('//') ? out + l : out + '\n' + l, '')
+}
+export const PLAN_REVIEW_SCRIPT = compact(`(function(){
   var root=document.getElementById('rv-root'); if(!root)return;
   var sheet=document.getElementById('rv-sheet'), openI=null, flying=false;
+  var said=document.createElement('p'); said.className='vh'; said.setAttribute('aria-live','polite'); root.before(said);
   var calm=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
   function vt(fn){ if(document.startViewTransition&&!calm){document.startViewTransition(fn);} else fn(); }
   function upd(){var bar=document.getElementById('rv-bulk'), n=document.getElementById('rv-n'); if(!bar||!n)return;
@@ -607,6 +627,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
     if(!next)return false;
     var picked=[]; root.querySelectorAll('input[name="sel"]:checked').forEach(function(x){picked.push(x.value);});
     // ‏settle (D-341): ما تبدّلت حالُه بين الرسمين تنبض شارتُه مرّةً — الفعلُ يُرى أثرُه حيث وقع
+    var pw=(root.querySelector('[data-prog]')||{}).textContent;
     var was={}; root.querySelectorAll('.rv[id]').forEach(function(a){var s=a.querySelector('.st'); was[a.id]=s?s.textContent:'';});
     vt(function(){
       root.innerHTML=next.innerHTML;
@@ -614,6 +635,7 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
       root.querySelectorAll('input[name="sel"]').forEach(function(x){if(picked.indexOf(x.value)>=0)x.checked=true;});
       root.querySelectorAll('.rv[id]').forEach(function(a){var s=a.querySelector('.st'); if(s&&was[a.id]!==undefined&&was[a.id]!==s.textContent)s.classList.add('m-settle');});
       upd(); view();
+      var pq=root.querySelector('[data-prog]'); if(pq&&pq.textContent!==pw)said.textContent=pq.textContent;
     });
     if(!quiet)say(doc);
     return true;
@@ -746,4 +768,4 @@ export const PLAN_REVIEW_SCRIPT = `(function(){
     tries++;
     fetch(here(),{credentials:'same-origin'}).then(function(r){return r.ok?r.text():'';}).then(function(t){if(t&&!flying)adopt(t,true);}).catch(function(){});
   },8000);
-})();`
+})();`)

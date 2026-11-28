@@ -11,6 +11,7 @@
  * **وكلُّها تسقط مع تقليل الحركة**.
  */
 import { escapeHtml } from './escape'
+import { dayHeading } from './when'
 import { LOGOS } from './logos'
 import { platformLabel } from '../../lib/oauth/providers'
 import { dayLabel } from '../../lib/time/zone'
@@ -93,7 +94,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
     </article>`
   }
   const column = (attrs: string, title: string, sub: string, list: readonly { item: Item; index: number }[], opts: { showDay: boolean; editable: boolean }): string =>
-    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(title)}">
+    `<section class="pb-col" ${attrs} aria-label="${escapeHtml(sub === '' ? dayHeading(title.replace(/<[^>]*>/g, ''), list.length) : title)}">
       <h3 class="pb-head">${title}${sub === '' ? '' : ` <span class="ago">${escapeHtml(sub)}</span>`}<span class="count">${list.length}</span></h3>
       <div class="pb-drop">${list.map(({ item, index }) => card(item, index, opts)).join('')}</div>
     </section>`
@@ -114,7 +115,7 @@ export function planBoard(plan: StoredPlan, names: Readonly<Record<string, strin
   const weekdays = days.slice(0, 7).map((d) => `<div class="pb-wd">${escapeHtml(label(d).split(' ')[0] ?? '')}</div>`).join('')
   const cells = days.map((d) => {
     const list = items.filter(({ item }) => item.day === d)
-    return `<div class="pb-col pb-cell" data-drop data-day="${d}" data-width="1" aria-label="${escapeHtml(label(d))}">
+    return `<div class="pb-col pb-cell" data-drop data-day="${d}" data-width="1" aria-label="${escapeHtml(dayHeading(label(d), list.length))}">
       <span class="pb-dn">${escapeHtml(label(d, false))}</span><span class="pb-dl">${escapeHtml(label(d))}</span>
       ${list.map(({ item, index }) => `<div class="card card-inset pb-card pb-chip" data-drag data-index="${index}" data-offset="0" data-platform="${escapeHtml(item.platform)}" tabindex="0"
           data-tip="${escapeHtml(item.angle)}">${LOGOS[item.platform] ?? ''}<bdi dir="ltr">${escapeHtml(item.time)}</bdi><span class="pb-ct">${escapeHtml(item.angle)}</span></div>`).join('')}
